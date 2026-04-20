@@ -380,7 +380,7 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
 namespace mxo::liblttcp {
 
 /**
- * CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 - Challenge response packet builder (packet 0x03)
+ * Packet_CertChallenge_0x4b6538 - Challenge response packet builder (packet 0x03)
  * anchor: launcher.exe vtable `0x004b6538`
  *
  * Derived packet builder used by CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
@@ -393,7 +393,7 @@ namespace mxo::liblttcp {
  * - Slot 3 (+0x0c): 0x4419c0 - InitializePayloadSize (OVERRIDDEN - packet 0x11 setup, size 0x21)
  * - Slot 4 (+0x10): 0x441470 - EnsureStreamPacketEncryptionModule (OVERRIDDEN)
  */
-class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 : public ltlogin::Packet_0x4af2a4 {
+class Packet_CertChallenge_0x4b6538 : public ltlogin::Packet_0x4af2a4 {
 public:
     // Additional field for challenge response extraction (follows base class fields)
     // packetPayloadPtr points to payload for extracting SessionKey/Secret bytes
@@ -401,7 +401,7 @@ public:
     uint8_t* packetPayloadPtr = nullptr;  // +0x28 (after base's worldId24 at +0x24)
 
     // anchor: launcher.exe:0x443aa0 / vtable slot 0 (inherited destructor)
-    ~CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() override = default;
+    ~Packet_CertChallenge_0x4b6538() override = default;
 
     // anchor: launcher.exe:0x437b50 / vtable slot 1 (inherited, returns 0)
     // StubReturn0() inherited from base
@@ -450,7 +450,7 @@ public:
     }
 
     // Allow default construction for stack-local envelope instances
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538();
+    Packet_CertChallenge_0x4b6538();
 
     // anchor: launcher.exe:0x441920 -> CLTLoginMediatorPacketBuilderEnvelope_ctor_MessageRefAndFlag
     // Original signature: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
@@ -458,12 +458,12 @@ public:
     //   this->messageRef08 = messageRef;
     //   this->nopatchLauncherVersionValue04 = (flag == '\0') ? *(messageRef+0xc)+0xc : computed value
     //   this->mbr_0x10 = this->nopatchLauncherVersionValue04
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+    Packet_CertChallenge_0x4b6538(
         CMessageConnectionMessageRef_0x4ba23c* messageRef,
         uint8_t flag);
 
     // REMOVED: No matching original ctor - this overload is source-only convenience
-    explicit CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+    explicit Packet_CertChallenge_0x4b6538(
         const std::array<uint8_t, 16>& decryptedBytes);
 
     // anchor: launcher.exe:0x442ac6 -> envelope.mbr_0x10 +1/+5/+9/+0xd extracts to this+0x85/0x89/0x8d/0x91
@@ -474,20 +474,20 @@ public:
 };
 
 // Size: 0x18 (24 bytes) - vftptr(4) + nopatchLauncherVersionValue04(4) + messageRef08(4) + ownerReadyFlag0c(1) + padding(3) + packetPayloadPtr(4) = 20 bytes (actual may be padded to 24)
-static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x2c,
+static_assert(sizeof(Packet_CertChallenge_0x4b6538) == 0x2c,
               "CLTLoginMediatorPacketBuilderEnvelope size mismatch");
 
 // Default constructor is inherited from base Packet_0x4af2a4 (anchor: launcher.exe:0x439840)
 
 // anchor: launcher.exe:0x441920 -> CLTLoginMediatorPacketBuilderEnvelope_ctor_MessageRefAndFlag
-// CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 ctor with message ref and flag
+// Packet_CertChallenge_0x4b6538 ctor with message ref and flag
 // Original uses different offset calculation based on flag:
 //   flag == 0: packetPayloadPtr = payloadBase + 0xc
 //   flag != 0: packetPayloadPtr uses lookup table (see Ghidra decompile 0x441959-0x44197d)
 // The lookup table at 0x004cb4d4 is indexed by payload[13] nibbles
 // For now, use simplified payload base since both ExtractChallengeBytes (+1)
 // and ExtractForResponsePacket (+0x11) read relative offsets that work from base
-inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+inline Packet_CertChallenge_0x4b6538::Packet_CertChallenge_0x4b6538(
     CMessageConnectionMessageRef_0x4ba23c* messageRef,
     uint8_t flag) {
     (void)flag;  // Flag affects offset calculation in original
@@ -509,7 +509,7 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
 
 // anchor: launcher.exe:0x443aa0 -> PacketBuilder_CertChallengeResponse_Dtor (shared dtor)
 // UNUSED in main flow - array constructor would be at different address if it existed
-inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+inline Packet_CertChallenge_0x4b6538::Packet_CertChallenge_0x4b6538(
     const std::array<uint8_t, 16>& decryptedBytes) {
     // Not used in main flow - the messageRef constructor is used instead
     (void)decryptedBytes;

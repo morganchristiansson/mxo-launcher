@@ -3353,10 +3353,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         }
     }
 
-    // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
+    // anchor: launcher.exe:0x442a5e -> Packet_CertChallenge_0x4b6538::cls_0x4b6538
     // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
     // The message ref already has decrypted payload from above, now construct envelope with it
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
+    Packet_CertChallenge_0x4b6538 envelope(&localMessageRef, 0x01);
 
     spdlog::debug("HandleCode2ForBootstrap: localMessageRef={:08x}, storage={:08x}, payloadBase={:08x}",
             reinterpret_cast<uintptr_t>(&localMessageRef),
