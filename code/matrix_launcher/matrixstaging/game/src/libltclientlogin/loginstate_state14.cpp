@@ -11,11 +11,11 @@ const char* CLTLoginState_WorldListPending_0x4b4fec::DebugName() const {
 
 // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
 void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return;
     }
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
 
     // Current evidence-backed narrow scaffold for helper/state 14:
     // - verify auth-side connectivity first
@@ -68,12 +68,10 @@ void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginStat
 
 // anchor: launcher.exe:0x0043d4d0 (string/file anchors: loginstate.cpp, CLTLoginState_WorldListPending_0x4b4fec::AuthMessageDispatch())
 uint32_t CLTLoginState_WorldListPending_0x4b4fec::AuthMessageDispatch(void* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Current best contextual role from the vtable and string anchors:
     // - vtable 0x004b4fec / slot 5
     // - AS_GetWorldListReply / AS_PSGetWorldListReply
     (void)workItem;
-    (void)mediator;
     return 1;
 }
 

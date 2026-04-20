@@ -52,8 +52,7 @@ static uint32_t LoginStateWorkItemTypeScaffold(const void* workItem) {
 
 // anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
 uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (!workItem || !mediator) {
+    if (!workItem || !g_CurrentLoginMediator) {
         return 0u;
     }
 
@@ -62,31 +61,30 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
         return 0u;
     }
 
-    if (mediator->authConnectionFlag2c_ != 0u) {
-        mediator->PostEvent(1u);
+    if (g_CurrentLoginMediator->authConnectionFlag2c_ != 0u) {
+        g_CurrentLoginMediator->PostEvent(1u);
         spdlog::info(
             "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed armed owner+0x2c -> event=0x01 currentState={}",
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
-    if (mediator->GetLastLoginStatus() == 0u) {
-        mediator->worldListCountOrStatus80 = 1u;
+    if (g_CurrentLoginMediator->GetLastLoginStatus() == 0u) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 1u;
     }
-    const uint32_t switchDispatchResult = mediator->SetCurrentState(0u);
-    mediator->PostError(1u);
+    const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(0u);
+    g_CurrentLoginMediator->PostError(1u);
     spdlog::info(
         "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed unarmed owner+0x2c -> owner+0x80=0x{:08x} currentState={} switchDispatchResult=0x{:08x}",
-        static_cast<unsigned>(mediator->worldListCountOrStatus80),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80),
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
     return 1u;
 }
 
 // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
 uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (!workItem || !mediator) {
+    if (!workItem || !g_CurrentLoginMediator) {
         return 0u;
     }
 
@@ -95,23 +93,23 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
         return 0u;
     }
 
-    if (mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold()) {
-        mediator->PostEvent(0x0fu);
+    if (g_CurrentLoginMediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold()) {
+        g_CurrentLoginMediator->PostEvent(0x0fu);
         spdlog::info(
             "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed armed owner+0x2d -> event=0x0f currentState={}",
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
-    if (mediator->GetLastLoginStatus() == 0u) {
-        mediator->worldListCountOrStatus80 = 1u;
+    if (g_CurrentLoginMediator->GetLastLoginStatus() == 0u) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 1u;
     }
-    (void)mediator->SetCurrentState(3u);
-    mediator->PostError(7u);
+    (void)g_CurrentLoginMediator->SetCurrentState(3u);
+    g_CurrentLoginMediator->PostError(7u);
     spdlog::info(
         "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed unarmed owner+0x2d -> owner+0x80=0x{:08x} currentState={}",
-        static_cast<unsigned>(mediator->worldListCountOrStatus80),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+        static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80),
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     return 1u;
 }
 
@@ -136,9 +134,8 @@ uint32_t CLTLoginState::AuthMessageDispatch(void* workItem) {
     // - write owner `+0x80 = 0x12000004`
     // - return false-like
     // Uses g_CurrentLoginMediator (faithful to static-RE).
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (mediator != nullptr) {
-        mediator->worldListCountOrStatus80 = 0x12000004u;
+    if (g_CurrentLoginMediator != nullptr) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
     }
     return 0u;
 }
@@ -174,14 +171,13 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(mxo::
     // - if that helper returns `< 1`, return success-ish immediately
     // - otherwise write owner `+0x80 = 0x12000005` and fail
     // Uses g_CurrentLoginMediator (faithful to static-RE).
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Live-path caution tightened again from the latest breakpoint-only original run:
     // - after the proven state9 success tail (`0x41b450(0x0c) -> 0x41cfb0(0x18)`), the natural run
     //   later re-hit `0x41cfb0` with event `0x0f` and entered game
     // - it still did not hit `0x004397e0` or `0x41c5c0` on that continuation
     // - so keep this as a later probe path, not as the already-proven immediate post-state9 flow
-    if (slot6DispatchByte4_ == 1u && mediator != nullptr) {
-        const uint32_t dispatchResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
+    if (slot6DispatchByte4_ == 1u && g_CurrentLoginMediator != nullptr) {
+        const uint32_t dispatchResult = g_CurrentLoginMediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (dispatchResult < 1u) {
             spdlog::info(
                 "CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage byte4=1 delegated to owner callback84 workItem={} -> dispatchResult=0x{:08x}",
@@ -191,8 +187,8 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(mxo::
         }
     }
 
-    if (mediator != nullptr) {
-        mediator->worldListCountOrStatus80 = 0x12000005u;
+    if (g_CurrentLoginMediator != nullptr) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
     }
     spdlog::info(
         "CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage byte4=0x{:02x} set owner+0x80=0x12000005 workItem={}",

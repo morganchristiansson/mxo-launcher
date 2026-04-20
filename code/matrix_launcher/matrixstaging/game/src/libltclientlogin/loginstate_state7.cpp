@@ -49,9 +49,8 @@ const char* CLTLoginState_State7::DebugName() const {
 
 // anchor: launcher.exe:0x0043ba20 (vtable 0x004b50b4 slot 3)
 void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return;
     }
 
@@ -65,23 +64,23 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     // - copy current slot-record id pair from the record payload at `+0x10 + 0x03/+0x07`
     // - send through `0x41af70`
     // - post event `7`
-    if (!mediator->State10HasReadyConnectionState2()) {
-        const uint32_t fallbackResult = mediator->SetCurrentState(4u);
+    if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
+        const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return;
     }
-    if (mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0u) {
-        const uint32_t fallbackResult = mediator->SetCurrentState(6u);
+    if (g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0u) {
+        const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return;
     }
 
-    const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
-    const char* sourceBlock94String60Begin = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
+    const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
+    const char* sourceBlock94String60Begin = g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
 
     State7Packet0x0dBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
@@ -90,8 +89,8 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u);
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
-    mediator->PostEvent(0x07u);
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    g_CurrentLoginMediator->PostEvent(0x07u);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
@@ -107,16 +106,15 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 
 // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)
 uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return 0u;
     }
 
-    const std::vector<uint8_t>& stagedMarginBytes = mediator->StagedIncomingMarginPacketBytes();
+    const std::vector<uint8_t>& stagedMarginBytes = g_CurrentLoginMediator->StagedIncomingMarginPacketBytes();
     const ParsedState7Opcode0eReplyScaffold parsed = ParseState7Opcode0eReplyScaffold(stagedMarginBytes);
     if (!parsed.valid) {
-        mediator->worldListCountOrStatus80 = 0x12000005u;
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005",
             static_cast<unsigned>(stagedMarginBytes.size()),
@@ -124,8 +122,8 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         return 0u;
     }
 
-    mediator->worldListCountOrStatus80 = parsed.result09;
-    (void)mediator->SetCurrentState(3u);
+    g_CurrentLoginMediator->worldListCountOrStatus80 = parsed.result09;
+    (void)g_CurrentLoginMediator->SetCurrentState(3u);
 
     // Tightened event-8 meaning from the real state7 reply body:
     // - success/result `< 1` posts event `8`
@@ -134,17 +132,17 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     // - negative result: that makes the concrete `0x40ec70 -> +0xf0 -> state7 -> event 8`
     //   corridor removal-oriented, not the hidden success-side `+0xec / 0x41c1f0` producer
     if (parsed.result09 < 1u) {
-        mediator->PostEvent(0x08u);
+        g_CurrentLoginMediator->PostEvent(0x08u);
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e success result09=0x{:08x} -> switch helper state3 then PostEvent(0x08) currentState={}",
             static_cast<unsigned>(parsed.result09),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     } else {
-        mediator->PostError(0x09u);
+        g_CurrentLoginMediator->PostError(0x09u);
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e failure result09=0x{:08x} -> switch helper state3 then PostError(0x09) currentState={}",
             static_cast<unsigned>(parsed.result09),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     }
     return 1u;
 }

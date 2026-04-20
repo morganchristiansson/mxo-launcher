@@ -106,27 +106,25 @@ uint32_t CLTLoginState_State1_0x4b4fc4::Slot1_HandlePrimaryGate(void* workItem) 
 
 // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
 void CLTLoginState_State1_0x4b4fc4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     cachedUpstreamOrArg_0x4 = upstreamOrArg;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return;
     }
 
-    const uint32_t connectResult = mediator->BeginAuthConnection();
+    const uint32_t connectResult = g_CurrentLoginMediator->BeginAuthConnection();
     spdlog::info(
         "CLTLoginState_State1_0x4b4fc4::Slot3_BeginOrContinue cachedUpstream={} upstreamPhaseCode={} currentState={} -> BeginAuthConnection=0x{:08x}",
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4)),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(connectResult));
     return;
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
 uint32_t CLTLoginState_State1_0x4b4fc4::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (mediator != nullptr) {
-        mediator->worldListCountOrStatus80 = 0x12000005u;
+    if (g_CurrentLoginMediator != nullptr) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
     }
     spdlog::info(
         "CLTLoginState_State1_0x4b4fc4::Slot6_HandleSecondaryMessage workItem={} set owner+0x80=0x12000005",

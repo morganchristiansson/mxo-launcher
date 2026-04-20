@@ -26,8 +26,7 @@ const char* CLTLoginState_State4_0x4b503c::DebugName() const {
 
 // anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
 uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (!workItem || !mediator) {
+    if (!workItem || !g_CurrentLoginMediator) {
         return 0u;
     }
 
@@ -40,40 +39,40 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
     }
 
     // anchor: launcher.exe:0x439411-0x439420 - call GetStatusOrPayloadDword() twice (faithful to original)
-    // First call: store to mediator->worldListCountOrStatus80
+    // First call: store to g_CurrentLoginMediator->worldListCountOrStatus80
     const auto* workItemPayload = static_cast<const uint32_t*>(workItem);
     const uint32_t statusFirst = workItemPayload[2];  // offset 0x8
-    mediator->worldListCountOrStatus80 = statusFirst;
+    g_CurrentLoginMediator->worldListCountOrStatus80 = statusFirst;
     // Second call: test for zero (original calls the getter again, faithful to 0x439420)
     const uint32_t status = workItemPayload[2];  // offset 0x8, same as first call
 
     if (status != 0u) {
-        mediator->marginConnectionFlag2d_ = 1;
-        if (mediator->marginBeginCount24_ < static_cast<uint32_t>(mediator->marginAddressList3c_.Count())) {
+        g_CurrentLoginMediator->marginConnectionFlag2d_ = 1;
+        if (g_CurrentLoginMediator->marginBeginCount24_ < static_cast<uint32_t>(g_CurrentLoginMediator->marginAddressList3c_.Count())) {
             Slot3_BeginOrContinue(cachedUpstreamOrArg_0x4);
             spdlog::info(
                 "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate non-zero status=0x{:08x} ({}) cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3",
                 static_cast<unsigned>(status),
                 std::system_category().message(status),
                 fmt::ptr(cachedUpstreamOrArg_0x4),
-                static_cast<unsigned>(mediator->marginBeginCount24_),
-                static_cast<unsigned>(mediator->marginAddressList3c_.Count()));
+                static_cast<unsigned>(g_CurrentLoginMediator->marginBeginCount24_),
+                static_cast<unsigned>(g_CurrentLoginMediator->marginAddressList3c_.Count()));
             return 1u;
         }
 
         const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
-        mediator->ResetMarginConnectAttemptCountScaffold();
+        g_CurrentLoginMediator->ResetMarginConnectAttemptCountScaffold();
         if (nextHelperStateId != 13u) {
-            (void)mediator->SetCurrentState(3u);
+            (void)g_CurrentLoginMediator->SetCurrentState(3u);
         }
-        mediator->PostError(6u);
+        g_CurrentLoginMediator->PostError(6u);
         spdlog::info(
             "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate non-zero status=0x{:08x} ({}) retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
             static_cast<unsigned>(status),
             std::system_category().message(status),
             fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(nextHelperStateId),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -86,23 +85,22 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
     // - post event `0x0e`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     cachedUpstreamOrArg_0x4 = nullptr;
-    mediator->marginRouteState_.currentWorldId = -1;
-    const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
-    mediator->PostEvent(0x0eu);
+    g_CurrentLoginMediator->marginRouteState_.currentWorldId = -1;
+    const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
+    g_CurrentLoginMediator->PostEvent(0x0eu);
     spdlog::info(
         "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate status=0x{:08x} ({}) cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
         static_cast<unsigned>(status),
         std::system_category().message(status),
         static_cast<unsigned>(nextHelperStateId),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
     return 1u;
 }
 
 // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
 void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return;
     }
 
@@ -121,8 +119,8 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     switch (upstreamPhaseCode) {
         case 6: {
             BeginMarginConnectionForState4Case(
-                mediator,
-                mediator->ResolveMarginRouteDescriptor(),
+                g_CurrentLoginMediator,
+                g_CurrentLoginMediator->ResolveMarginRouteDescriptor(),
                 0u);
             return;
         }
@@ -136,19 +134,19 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
             // - so on the live state8/state13 continuation path the returned route-text pointer is
             //   forwarded even when current source still has no populated route-string table entry
             BeginMarginConnectionForState4Case(
-                mediator,
-                mediator->ResolveMarginRouteFromCurrentCharacterSlot(),
-                mediator->CurrentCharacterRouteIndexCc8Scaffold());
+                g_CurrentLoginMediator,
+                g_CurrentLoginMediator->ResolveMarginRouteFromCurrentCharacterSlot(),
+                g_CurrentLoginMediator->CurrentCharacterRouteIndexCc8Scaffold());
             return;
         }
 
         case 10: {
             BeginMarginConnectionForState4Case(
-                mediator,
-                mediator->ResolveMarginRouteFromDescriptorIndex(
-                    mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24),
+                g_CurrentLoginMediator,
+                g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
+                    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24),
                 static_cast<uint8_t>(
-                    mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 & 0xffu));
+                    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 & 0xffu));
             return;
         }
 
@@ -157,17 +155,17 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
             // `marginRouteState_.currentWorldId`; keep the field meaning provisional and
             // only preserve the original `!= -1 -> owner vtable +0xfc -> if non-null call 0x41e500`
             // structure here.
-            const int32_t field104Value = mediator->marginRouteState_.currentWorldId;
+            const int32_t field104Value = g_CurrentLoginMediator->marginRouteState_.currentWorldId;
             if (field104Value == -1) {
                 return;
             }
             const char* const routeHostText =
-                mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value));
+                g_CurrentLoginMediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value));
             if (routeHostText == nullptr) {
                 return;
             }
             BeginMarginConnectionForState4Case(
-                mediator,
+                g_CurrentLoginMediator,
                 routeHostText,
                 0u);
         }

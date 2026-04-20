@@ -10,7 +10,7 @@ const char* CLTLoginState_State18_0x4b0c00::DebugName() const {
 
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
 void CLTLoginState_State18_0x4b0c00::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
+    // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
     // Stronger current read from disassembly review:
     // - this is the later state18 session-helper path in the alternate
     //   `g_LaunchPadGateState16State18` family, not the active state2 -> owner+0x680
@@ -21,8 +21,8 @@ void CLTLoginState_State18_0x4b0c00::Slot3_BeginOrContinue(CLTLoginState* upstre
     // - it then reaches `0x420e70`, which copies helper `+0x18` into owner `+0x664`
     //   (`GameSessionID`) when helper flag `+0x2d` is clear
     (void)upstreamOrArg;
-    if (mediator) {
-        mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94();
+    if (g_CurrentLoginMediator) {
+        g_CurrentLoginMediator->RefreshSessionHelperGameSessionId664FromSourceBlock94();
     }
     return;
 }

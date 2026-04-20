@@ -57,11 +57,11 @@ static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& fla
 
 // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
 void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return;
     }
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
 
     // Faithfulness correction:
     // - `0x43c020` belongs to `CLTLoginState_State11_0x4b5154` slot 3, so the packet build/send shape
@@ -161,11 +161,11 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
 
 // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
 uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return 0u;
     }
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
 
     auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     // anchor: launcher.exe:0x43ae50

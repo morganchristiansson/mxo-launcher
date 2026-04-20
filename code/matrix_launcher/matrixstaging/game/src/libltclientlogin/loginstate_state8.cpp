@@ -158,9 +158,8 @@ const char* CLTLoginState_State8_0x4b5104::DebugName() const {
 
 // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
 void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return;
     }
 
@@ -211,32 +210,32 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // - newer `0x442d00/0x441bc0/0x441850` review now also rules out one tempting shortcut:
     //   the base type-4/MS wrapper path can synthesize a local type-`0x0b` completion object and
     //   fall into mediator fallback `0x41afc0`, which re-enters helper slot 2 instead of slot 6
-    if (!mediator->State10HasReadyConnectionState2()) {
-        const uint32_t fallbackResult = mediator->SetCurrentState(4u);
+    if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
+        const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
         return;
     }
-    if (mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
-        const uint32_t fallbackResult = mediator->SetCurrentState(6u);
+    if (g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
+        const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
             static_cast<unsigned>(fallbackResult),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
         return;
     }
 
     spdlog::info(
         "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
-        static_cast<unsigned>(mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14),
-        static_cast<unsigned>(mediator->state6UdpSessionSecretF18_),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+        static_cast<unsigned>(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14),
+        static_cast<unsigned>(g_CurrentLoginMediator->state6UdpSessionSecretF18_),
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
 
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
-    const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
     State8StructuredMarginPacketBuilder_0x4af2a4 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
@@ -254,50 +253,50 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // - `d50` = ai.cfg
     // - `d60` = shared cs/bl temporary slot on the proven client path
     // - `d70` = cui.cfg
-    packetBuilder.SetSelectionBlock(0x09, mediator->SelectionContextBlockCd0());
-    packetBuilder.SetSelectionBlock(0x19, mediator->SelectionContextBlockCe0());
-    packetBuilder.SetSelectionBlock(0x29, mediator->SelectionContextBlockCf0());
-    packetBuilder.SetSelectionBlock(0x79, mediator->SelectionContextBlockD40());
-    packetBuilder.SetSelectionBlock(0x89, mediator->SelectionContextBlockD50());
-    packetBuilder.SetSelectionBlock(0x99, mediator->SelectionContextBlockD60());
-    packetBuilder.SetSelectionBlock(0xa9, mediator->SelectionContextBlockD70());
-    packetBuilder.SetSelectionBlock(0x39, mediator->SelectionContextBlockD00());
-    packetBuilder.SetSelectionBlock(0x49, mediator->SelectionContextBlockD10());
-    packetBuilder.SetSelectionBlock(0x59, mediator->SelectionContextBlockD20());
-    packetBuilder.SetSelectionBlock(0x69, mediator->SelectionContextBlockD30());
+    packetBuilder.SetSelectionBlock(0x09, g_CurrentLoginMediator->SelectionContextBlockCd0());
+    packetBuilder.SetSelectionBlock(0x19, g_CurrentLoginMediator->SelectionContextBlockCe0());
+    packetBuilder.SetSelectionBlock(0x29, g_CurrentLoginMediator->SelectionContextBlockCf0());
+    packetBuilder.SetSelectionBlock(0x79, g_CurrentLoginMediator->SelectionContextBlockD40());
+    packetBuilder.SetSelectionBlock(0x89, g_CurrentLoginMediator->SelectionContextBlockD50());
+    packetBuilder.SetSelectionBlock(0x99, g_CurrentLoginMediator->SelectionContextBlockD60());
+    packetBuilder.SetSelectionBlock(0xa9, g_CurrentLoginMediator->SelectionContextBlockD70());
+    packetBuilder.SetSelectionBlock(0x39, g_CurrentLoginMediator->SelectionContextBlockD00());
+    packetBuilder.SetSelectionBlock(0x49, g_CurrentLoginMediator->SelectionContextBlockD10());
+    packetBuilder.SetSelectionBlock(0x59, g_CurrentLoginMediator->SelectionContextBlockD20());
+    packetBuilder.SetSelectionBlock(0x69, g_CurrentLoginMediator->SelectionContextBlockD30());
 
-    packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
+    packetBuilder.SetGameSessionId(g_CurrentLoginMediator->GetGameSessionId());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
-    mediator->PostEvent(0x09u);
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    g_CurrentLoginMediator->PostEvent(0x09u);
 
     spdlog::debug(
         "CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0(il.cfg)={} d00(hl.cfg)={} d10(an.cfg)={} d20(rl.cfg)={} d30(cl.cfg)={} d40(pi.cfg)={} d50(ai.cfg)={} d60(bl/cs.cfg)={} d70(cui.cfg)={}",
-        FormatU32x4Block(mediator->SelectionContextBlockCd0()),
-        FormatU32x4Block(mediator->SelectionContextBlockCe0()),
-        FormatU32x4Block(mediator->SelectionContextBlockCf0()),
-        FormatU32x4Block(mediator->SelectionContextBlockD00()),
-        FormatU32x4Block(mediator->SelectionContextBlockD10()),
-        FormatU32x4Block(mediator->SelectionContextBlockD20()),
-        FormatU32x4Block(mediator->SelectionContextBlockD30()),
-        FormatU32x4Block(mediator->SelectionContextBlockD40()),
-        FormatU32x4Block(mediator->SelectionContextBlockD50()),
-        FormatU32x4Block(mediator->SelectionContextBlockD60()),
-        FormatU32x4Block(mediator->SelectionContextBlockD70()));
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockCd0()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockCe0()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockCf0()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD00()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD10()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD20()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD30()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD40()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD50()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD60()),
+        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD70()));
 
     const unsigned nonZeroSnapshotBlockCount =
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockCd0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockCe0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockCf0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD00())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD10())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD20())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD30())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD40())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD50())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD60())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD70()));
-    const char* gameSessionId = mediator->GetGameSessionId();
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCd0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCe0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCf0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD00())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD10())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD20())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD30())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD40())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD50())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD60())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD70()));
+    const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
@@ -306,8 +305,8 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
         nonZeroSnapshotBlockCount,
-        mediator->SelectionContextBlockCd0()[0],
-        mediator->SelectionContextBlockD70()[3],
+        g_CurrentLoginMediator->SelectionContextBlockCd0()[0],
+        g_CurrentLoginMediator->SelectionContextBlockD70()[3],
         gameSessionId ? gameSessionId : "<empty>",
         sendResult);
     return;
@@ -315,9 +314,8 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
 uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
-    if (!mediator) {
+    if (!g_CurrentLoginMediator) {
         return 0u;
     }
 
@@ -336,16 +334,16 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         if (messageRef != nullptr) {
             spdlog::info(
                 "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage saw message ref but parse rejected currentState={} (expected MS_LoadCharacterReply layout)",
-                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+                g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         }
-        const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
+        const uint32_t fallbackResult = g_CurrentLoginMediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
             spdlog::info(
                 "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x{:08x}",
                 fallbackResult);
             return 1u;
         }
-        mediator->worldListCountOrStatus80 = 0x12000005u;
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
             fallbackResult);
@@ -362,17 +360,17 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionSelectorMinus2),
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionOffset0e),
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionByteCount),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
 
-    auto& ownerState = mediator->postAuthMarginLoadingState_0xf14;
-    mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
+    auto& ownerState = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14;
+    g_CurrentLoginMediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
-        (void)mediator->SetCurrentState(3u);
-        mediator->PostError(10u);
+        (void)g_CurrentLoginMediator->SetCurrentState(3u);
+        g_CurrentLoginMediator->PostError(10u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
             loadCharacterReplyEnvelope.status,
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
         return 1u;
     }
 
@@ -420,7 +418,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         ownerState.characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
         ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
 
-        const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
+        const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
         if (currentSlotRecord != nullptr) {
             if (currentSlotRecord->heapString14) {
                 const size_t copyCount = std::min(
@@ -826,10 +824,10 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         }
         LogState8PersistenceFamilySnapshot(ownerState, "completed", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, true);
 
-        if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(mediator->LoginHelperStateByIdScaffold(9u))) {
+        if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
             nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
         }
-        const uint32_t slot3Result = mediator->SetCurrentState(9u);
+        const uint32_t slot3Result = g_CurrentLoginMediator->SetCurrentState(9u);
         spdlog::info(
             "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x0b handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
             loadCharacterReplyEnvelope.handoffWord09,
@@ -837,12 +835,12 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         spdlog::info(
             "ROUTE CHECKPOINT: late-login state8 complete -> state9 handoffWord=0x{:04x} currentState={}",
             loadCharacterReplyEnvelope.handoffWord09,
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
         // Important recovered ordering detail from `0x41b450`:
         // - the helper9/state9 install itself immediately notifies the new helper through slot 3
         // - `0x439780` therefore runs before this later `PostEvent(0x0b)` tail
-        mediator->PostEvent(0x0bu);
+        g_CurrentLoginMediator->PostEvent(0x0bu);
 
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} usedCurrentSlotRecord={} -> currentState=helper9 event=0x0b",
