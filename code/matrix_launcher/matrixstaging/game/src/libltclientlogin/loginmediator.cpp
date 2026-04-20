@@ -355,7 +355,12 @@ uint32_t CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine
 
     // anchor: launcher.exe:0x41b1e8..0x41b1ef - direct CLTIPAddressList_Reinit call
     // Pass the raw pointer range for authAddressList4c_
+    // Ensure Winsock is initialized before DNS resolution (Initialize runs early before engine connect)
+    (void)mxo::libltnet::CLTSocketLayer::Init();
     authAddressList4c_.Reinit(g_qsAuthServerDNSName, authAddressListReinitFlags);
+
+    // Seed instance port field from global for BeginAuthConnection (uses g_AuthServerPort directly per static-RE)
+    authServerPortHostOrder_ = g_AuthServerPort;
 
     // anchor: launcher.exe:0x41b1f5..0x41b207 - return status based on address list count
     // Return value: 0x12000001 if list is empty, 0 if list has entries

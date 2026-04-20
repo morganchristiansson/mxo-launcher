@@ -15,6 +15,7 @@
 
 #include "loginstate.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
+#include "../../../runtime/src/libltnet/sys/pc/pcsocket.h"
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
@@ -166,9 +167,20 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d1ee / byte ptr [ESI + 0x2c] = 0
     authConnectionFlag2c_ = 0u;
 
+    // Refresh address list if empty (state2 may have called Reset() during retry)
+    // Ensure Winsock is initialized before DNS resolution
+    (void)mxo::libltnet::CLTSocketLayer::Init();
+    // anchor: launcher.exe:0x41b1e8..0x41b1ef / CLTIPAddressList_Reinit pattern
+    if (authAddressList4c_.Empty()) {
+        uint32_t reinitFlags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
+        if (g_IgnoreHostsFileForAuth != 0) {
+            reinitFlags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
+        }
+        authAddressList4c_.Reinit(g_qsAuthServerDNSName, reinitFlags);
+    }
+
     // Inline: get next IPv4 - anchor: launcher.exe:0x41d1f2
     // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
-    // Original does NOT reinitialize - assumes list already populated from Initialize
     const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
     if (nextIpv4 != 0u) {
         authEndpoint_.ipv4NetworkOrder = nextIpv4;
@@ -203,9 +215,9 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(authConnectionFlag2c_));
 
-    // Call EnsureConnected via vtable+0x1c - anchor: launcher.exe:0x41d232
-    // anchor: launcher.exe:0x41d232 / call dword ptr [ECX + 0x1c]
-    return connection->EnsureConnected();
+    // Call Connect via vtable+0x1c - anchor: launcher.exe:0x41d232
+    // anchor: launcher.exe:0x41d232 / call dword ptr [ECX + 0x1c] = Connect(endpoint)
+    return connection->Connect(authEndpoint_);
 }
 
 // UNANCHORED: source-owned early-auth helper that stages state1 then dispatches slot 3.
