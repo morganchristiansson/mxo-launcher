@@ -2840,47 +2840,53 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
 
     // anchor: launcher.exe:0x441f3b-0x441f3e - construct packet builder on stack
     // DefaultCtor creates a fresh messageRef and sets payloadBegin10 = messageStorage->PayloadBase()
-    Packet_CertConnectRequest_0x4b6524 packetBuilder;
+    Packet_CertConnectRequest_0x4b6524 builderEnvelope;
 
     // anchor: launcher.exe:0x441f5c - grow messageRef payload by 3 bytes (opcode + 2-byte field)
     // The messageRef was created by DefaultCtor with initial payload length 0
-    packetBuilder.messageRef08->GrowPayloadByteCount(3);
+    builderEnvelope.messageRef08->GrowPayloadByteCount(3);
 
     // anchor: launcher.exe:0x441f64, 0x441f6a - write CERT_ConnectRequest opcode (0x01) and zero word
     // payloadBegin10 was set by DefaultCtor to messageStorage->PayloadBase()
-    uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadBegin10);
-    payload[0] = 0x01u;  // CERT_ConnectRequest opcode
-    *reinterpret_cast<uint16_t*>(payload + 1) = 0u;
+    uint8_t* packetPayloadPtr = static_cast<uint8_t*>(builderEnvelope.payloadBegin10);
+    packetPayloadPtr[0] = 0x01u;  // CERT_ConnectRequest opcode
+    *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = 0u;
 
     // anchor: launcher.exe:0x441f73 - reserve length-prefixed tail for bootstrap reply copy
     // Original: LocalPacketBuilder_ReserveLengthPrefixedTail(this, 0x136)
     // This helper is used by 3 packet builder subclasses, grows by (param_1 + 2) internally
     // After GrowPayloadByteCount(3), payloadBegin10 points to byte 3, reservation goes at byte 3+3=6
-    uint8_t* reservationHeader = static_cast<uint8_t*>(packetBuilder.payloadBegin10) + 3u;
+    uint8_t* reservationHeader = packetPayloadPtr + 3u;
     // Grow by (contentBytes + 2) for length prefix - matches original helper behavior
-    packetBuilder.messageRef08->messageStorage0c->GrowPayloadByteCount(kReplyCopyByteCount + 2u);
+    builderEnvelope.messageRef08->messageStorage0c->GrowPayloadByteCount(kReplyCopyByteCount + 2u);
     // Write the length prefix (little-endian)
     reservationHeader[0] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
     reservationHeader[1] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
-    packetBuilder.reservationHeader14 = reservationHeader;
-    packetBuilder.reservedContentByteCount18 = kReplyCopyByteCount;
+    builderEnvelope.reservationHeader14 = reservationHeader;
+    builderEnvelope.reservedContentByteCount18 = kReplyCopyByteCount;
 
     // anchor: launcher.exe:0x441f8b-0x441f97 - copy 0x136 bytes from bootstrapReplyCopy98_
     // Original uses REP MOVSD (0x4d dwords) + MOVSW (1 word) = 0x136 bytes
-    uint8_t* destination = reservationHeader + sizeof(uint16_t);
-    std::copy(bootstrapReplyCopy98_.begin(), bootstrapReplyCopy98_.end(), destination);
+    uint8_t* copyDest = reservationHeader + sizeof(uint16_t);
+    const uint8_t* bootstrapReplySrc = bootstrapReplyCopy98_.data();
+    for (int copyLoopCounter = 0x4d; copyLoopCounter != 0; --copyLoopCounter) {
+        *reinterpret_cast<uint32_t*>(copyDest) = *reinterpret_cast<const uint32_t*>(bootstrapReplySrc);
+        bootstrapReplySrc += 4;
+        copyDest += 4;
+    }
+    *reinterpret_cast<uint16_t*>(copyDest) = *reinterpret_cast<const uint16_t*>(bootstrapReplySrc);
 
     // anchor: launcher.exe:0x441f9c - send packet via vtable slot 9
-    // Original: (**(code **)(vftptr + 0x24))(&packetBuilder, 0)
+    // Original: (**(code **)(vftptr + 0x24))(&builderEnvelope, 0)
     // Passes packet builder directly, return value ignored
-    SendPacketMessageRef(*packetBuilder.messageRef08);
+    SendPacketMessageRef(*builderEnvelope.messageRef08);
 
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent "
         "payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
         "this={} ownerContext={} remoteHost='{}'",
-        fmt::ptr(packetBuilder.payloadBegin10),
-        static_cast<unsigned>(packetBuilder.reservedContentByteCount18),
+        fmt::ptr(builderEnvelope.payloadBegin10),
+        static_cast<unsigned>(builderEnvelope.reservedContentByteCount18),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
