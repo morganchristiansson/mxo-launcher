@@ -1171,9 +1171,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   routing through a fake mediator-owned auth-bootstrap method
 
     void ResetAuthConnectRetryStateScaffold();
-    // Current source-owned mirror of owner `+0x4c` auth address-list reinit used by startup
-    // helper `0x41b160` after launcher config has already seeded the auth host name.
-    void RefreshAuthAddressListForCurrentHostScaffold();
 
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
@@ -1641,7 +1638,6 @@ public:
     void* latestObserver170_ = nullptr;         // most recent register call observer
     void* latestObserver174_ = nullptr;         // most recent unregister call observer
 
-    std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;
     bool ignoreHostsFileForAuth_;
 
@@ -1699,9 +1695,7 @@ public:
     // - `+0x58` = current iterator pointer
     // Nearby owner-side state that is not part of the helper object itself remains explicit:
     // - owner `+0x28` = auth connect attempt count / retry gate state
-    // - source-side resolved-host cache is kept separately for rebuild-change detection
     mxo::liblttcp::CLTIPAddressList authAddressList4c_{};
-    std::string authAddressListResolvedHostName4c_;
     uint32_t authConnectAttemptCount28_ = 0;
 
     // Current active replacement path no longer uses a synthetic startup world-list sidecar.

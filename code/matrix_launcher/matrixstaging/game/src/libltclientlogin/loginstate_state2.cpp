@@ -184,7 +184,6 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         // Inline state switch
-        g_CurrentLoginMediator->authAddressListResolvedHostName4c_ = g_CurrentLoginMediator->authServerDnsName_;
         g_CurrentLoginMediator->authAddressList4c_.Reset();
         g_CurrentLoginMediator->authConnectAttemptCount28_ = 0u;
         CLTLoginState* const upstreamState = g_CurrentLoginMediator->currentState_;

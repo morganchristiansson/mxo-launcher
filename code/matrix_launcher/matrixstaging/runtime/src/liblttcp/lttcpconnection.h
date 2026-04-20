@@ -36,6 +36,11 @@ public:
     // Original body zeros the full 16-byte block first, then writes `family = AF_INET`.
     LTTCPEndpointKey();
 
+    // anchor: launcher.exe:0x44b090
+    // Parameterized constructor: zeroes all 16 bytes, sets family=AF_INET, stores ipv4,
+    // and converts port to network order via htons (IAT slot at 0x004a9818).
+    LTTCPEndpointKey(uint32_t ipv4NetworkOrder, uint16_t portHostOrder);
+
     // anchor: launcher.exe:0x44b020
     // Original helper compares the 16-byte key as four dwords (`repe cmpsd`) and returns true
     // when any dword differs.

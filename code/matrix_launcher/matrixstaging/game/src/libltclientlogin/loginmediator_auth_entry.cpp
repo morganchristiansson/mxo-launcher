@@ -78,29 +78,10 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
     g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
 }
 
-// UNANCHORED: source-owned host-resolution mirror for the auth-side dword IPv4 list rooted at owner `+0x4c`.
-void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
-    const bool hostChanged = (authAddressListResolvedHostName4c_ != authServerDnsName_);
-    if (!hostChanged && !authAddressList4c_.Empty()) {
-        return;
-    }
-
-    authAddressListResolvedHostName4c_ = authServerDnsName_;
-
-    if (authServerDnsName_.empty()) {
-        authAddressList4c_.Reset();
-        return;
-    }
-
-    uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
-    if (ignoreHostsFileForAuth_) {
-        flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
-    }
-
-    (void)authAddressList4c_.Reinit(authServerDnsName_.c_str(), flags);
-}
-
 // Auth endpoint iteration - anchor: launcher.exe:0x41d1e8-0x41d232
+// Faithful: original uses global directly without any host-change cache.
+// The original anchor at launcher.exe:0x41b1e8..0x41b1ef directly reads g_qsAuthServerDNSName.
+// (inline refresh happens in Initialize and BeginAuthConnection)
 //     BuildMarginEndpoint();
 //     if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
 //         BuildMarginEndpoint();
@@ -187,18 +168,14 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
 
     // Inline: refresh address list and get next IPv4 - anchor: launcher.exe:0x41d1f2
     // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
-    // First refresh the address list (original calls PrepareNextAuthEndpointForConnectAttemptScaffold)
-    const bool hostChanged = (authAddressListResolvedHostName4c_ != authServerDnsName_);
-    if (!hostChanged && !authAddressList4c_.Empty()) {
-        // skip refresh
-    } else {
-        authAddressListResolvedHostName4c_ = authServerDnsName_;
-        if (!authServerDnsName_.empty()) {
+    // First refresh the address list if empty - original directly uses global without cache
+    if (authAddressList4c_.Empty()) {
+        if (g_qsAuthServerDNSName != nullptr && g_qsAuthServerDNSName[0] != '\0') {
             uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
             if (ignoreHostsFileForAuth_) {
                 flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
             }
-            (void)authAddressList4c_.Reinit(authServerDnsName_.c_str(), flags);
+            (void)authAddressList4c_.Reinit(g_qsAuthServerDNSName, flags);
         } else {
             authAddressList4c_.Reset();
         }
@@ -228,11 +205,11 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: 0x41d231 / PUSH EDX - endpoint
     // anchor: 0x41d232 / CALL dword ptr [EAX+0x1c] - EnsureConnected
     connection->remoteEndpoint_ = authEndpoint_;
-    connection->SetRemoteHostName(authServerDnsName_.c_str());
+    connection->SetRemoteHostName(g_qsAuthServerDNSName);
 
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",
-        authServerDnsName_.empty() ? "<empty>" : authServerDnsName_.c_str(),
+        g_qsAuthServerDNSName ? g_qsAuthServerDNSName : "<empty>",
         static_cast<unsigned>(authConnectAttemptCount28_),
         static_cast<unsigned>(authAddressList4c_.Count()),
         static_cast<unsigned>(authEndpoint_.ipv4NetworkOrder),
@@ -254,8 +231,7 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
         return 0u;
     }
 
-    // Inline reset - original resets fields directly
-    authAddressListResolvedHostName4c_ = authServerDnsName_;
+    // Inline reset - original resets address list directly
     authAddressList4c_.Reset();
     authConnectAttemptCount28_ = 0;
 

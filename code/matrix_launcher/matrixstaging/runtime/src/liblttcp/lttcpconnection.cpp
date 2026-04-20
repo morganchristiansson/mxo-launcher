@@ -214,6 +214,18 @@ LTTCPEndpointKey::LTTCPEndpointKey()
     family = AF_INET;
 }
 
+// anchor: launcher.exe:0x44b090
+LTTCPEndpointKey::LTTCPEndpointKey(uint32_t ipv4NetOrder, uint16_t portHostOrder)
+    : family(0),
+      portNetworkOrder(0),
+      ipv4NetworkOrder(0),
+      reserved0(0),
+      reserved1(0) {
+    family = AF_INET;
+    ipv4NetworkOrder = ipv4NetOrder;
+    portNetworkOrder = htons(portHostOrder);
+}
+
 // anchor: launcher.exe:0x44b020
 bool LTTCPEndpointKey::DiffersFrom(const LTTCPEndpointKey& other) const {
     return std::memcmp(this, &other, sizeof(*this)) != 0;

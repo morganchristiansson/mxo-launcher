@@ -1479,8 +1479,7 @@ void DiagnosticConfigureLoginControllerNetwork(
     mxo::ltlogin::g_qsAuthServerDNSName = authDnsName ? authDnsName : "";
     mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
     mxo::ltlogin::g_AuthServerPort = authPortHostOrder;
-    // Also mirror to instance fields for replacement code paths
-    mediator->authServerDnsName_ = mxo::ltlogin::g_qsAuthServerDNSName;
+    // Mirror to instance fields for replacement code paths (authServerDnsName_ removed - uses global directly)
     mediator->authServerPortHostOrder_ = authPortHostOrder;
     mediator->ignoreHostsFileForAuth_ = ignoreHostsFileForAuth != 0;
 
