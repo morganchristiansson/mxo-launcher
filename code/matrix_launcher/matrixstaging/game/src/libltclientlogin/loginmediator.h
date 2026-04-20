@@ -242,7 +242,7 @@ public:
         void* helper78A8 = nullptr;  // slot 16 / phase-code 16 / CLTLoginState_State16_0x4b0bb0
         void* helper78AC = nullptr;  // slot 17 / phase-code 17 / CLTLoginState_State17_0x4b0bd8
         void* helper78B0 = nullptr;  // slot 18 / phase-code 18 / CLTLoginState_State18_0x4b0c00
-        void* helper78B4 = nullptr;  // slot 19 / phase-code 19 / CLTLoginState_State19
+        void* helper78B4 = nullptr;  // slot 19 / phase-code 19 / CLTLoginState_State19_0x4b0c28
     };
 
     struct MarginRouteState {
@@ -1057,7 +1057,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // launcher.exe:0x420920 = InitializeHelperDispatchSlot18 (slot at 0x4f78b0)
     //   Original: allocates 8 bytes, stores vtable 0x4b0c00 (`CLTLoginState_State18_0x4b0c00`)
     // launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19 (slot at 0x4f78b4)
-    //   Original: allocates 4 bytes, stores vtable 0x4b0c28 (`CLTLoginState_State19`)
+    //   Original: allocates 4 bytes, stores vtable 0x4b0c28 (`CLTLoginState_State19_0x4b0c28`)
     // Slot anchors from Ghidra decompilation:
     // launcher.exe:0x4f7868 = slot 0, launcher.exe:0x4f78a0 = slot 1, launcher.exe:0x4f786c = slot 2,
     // launcher.exe:0x4f7870 = slot 3, launcher.exe:0x4f7874 = slot 4, launcher.exe:0x4f7878 = slot 5,
@@ -1068,7 +1068,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // launcher.exe:0x4f78a8 = slot 16 (`CLTLoginState_State16_0x4b0bb0`, vtable `0x4b0bb0`)
     // launcher.exe:0x4f78ac = slot 17 (`CLTLoginState_State17_0x4b0bd8`, vtable `0x4b0bd8`)
     // launcher.exe:0x4f78b0 = slot 18 (`CLTLoginState_State18_0x4b0c00`, vtable `0x4b0c00`)
-    // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State19`, vtable `0x4b0c28`)
+    // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State19_0x4b0c28`, vtable `0x4b0c28`)
     // ==============================================================================
 
     // launcher.exe:0x4d3584 = ILTLoginMediator_0x4af2b8_SiblingObject (world list data provider)

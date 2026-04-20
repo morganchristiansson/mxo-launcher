@@ -44,7 +44,7 @@ static CLTLoginState_State15_0x4b0b88 g_State15_0x4b0b88 = {};
 static CLTLoginState_State16_0x4b0bb0 g_State16_0x4b0bb0 = {};
 static CLTLoginState_State17_0x4b0bd8 g_State17_0x4b0bd8 = {};
 static CLTLoginState_State18_0x4b0c00 g_State18 = {};
-static CLTLoginState_State19 g_State19 = {};
+static CLTLoginState_State19_0x4b0c28 g_State19 = {};
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::LoginHelperStateByIdScaffold(uint32_t helperStateId) const {
