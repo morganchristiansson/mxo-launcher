@@ -12,13 +12,25 @@ std::unique_ptr<CryptoInitHelper_0x4b42bc> g_CryptoContext_0x4f7bf4;
 // Initialization flag
 uint32_t g_CryptoInitializedFlag_0x4f7c20 = 0;
 
+// anchor: launcher.exe:0x437900
+CLTReferenceCountedBase_0x4b42b0::CLTReferenceCountedBase_0x4b42b0(char initFlag) {
+    // Original: sets vtable to 0x4b42b0, optionally calls virt_meth_0x437b40
+    // FIDELITY: C++ handles vtable; stubbed initFlag check
+    (void)initFlag;
+}
+
 CryptoInitHelper_0x4b42bc::CryptoInitHelper_0x4b42bc(uint32_t param1)
-    : mbr_0x10(param1),
+    : CLTReferenceCountedBase_0x4b42b0('\x01'),  // First base ctor with flag 1
+      mbr_0x10(param1),
       mbr_0x14(0),
       mbr_0x1c(0x40),
       mbr_0x20(nullptr),
       mbr_0x24(0),
       mbr_0x28(param1) {
+    // FIDELITY NOTE: Original calls cls_0x4b42b0 ctor twice (virtual inheritance):
+    //   1. cls_0x4b42b0::cls_0x4b42b0(&this->cls_0x4b42b0,'\x01');
+    //   2. cls_0x4b42b0::cls_0x4b42b0(this_00,'\0');
+    // It also installs multiple vtables during construction (0x4b42bc, 0x4b9fa0, 0x4bace0, etc.)
     
     // anchor: launcher.exe:0x4686e0 - constructor
     // Initialize memory blocks

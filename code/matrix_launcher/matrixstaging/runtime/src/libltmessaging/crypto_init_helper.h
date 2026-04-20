@@ -8,10 +8,30 @@ namespace mxo::liblttcp {
 
 using byte = uint8_t;
 
+// Reference-counted base class
+// anchor: launcher.exe:0x4b42b0 vtable (12 bytes = 3 slots)
+// Constructor: 0x437900, Destructor: 0x41cda0
+// FIDELITY: Original has this base class at multiple offsets via virtual inheritance
+class CLTReferenceCountedBase_0x4b42b0 {
+public:
+    // anchor: launcher.exe:0x437900
+    CLTReferenceCountedBase_0x4b42b0(char initFlag);
+    virtual ~CLTReferenceCountedBase_0x4b42b0() = default;
+    
+    // Virtual table at 0x4b42b0 has 3 slots:
+    // +0x0: dtor ~CLTReferenceCountedBase_0x4b42b0 (0x41cda0)
+    // +0x4: unknown method
+    // +0x8: ResetUnknownString (0x41d880) - "auth string helper"
+};
+
 // Crypto initialization helper class
-// anchor: launcher.exe:0x4b42bc vtable
-// Used for static initialization of crypto context
-class CryptoInitHelper_0x4b42bc {
+// anchor: launcher.exe:0x4b42bc vtable (64 bytes)
+// FIDELITY NOTE: Original uses multiple inheritance with virtual bases:
+//   - cls_0x4b42b0 appears at offset 0 AND offset 4 (two subobjects)
+//   - mbr_0x8 is another vtable pointer (0x4b41e0)
+//   - Constructor installs multiple vtables during setup
+// Current source uses simplified single-inheritance model
+class CryptoInitHelper_0x4b42bc : public CLTReferenceCountedBase_0x4b42b0 {
 public:
     CryptoInitHelper_0x4b42bc(uint32_t param1);
     ~CryptoInitHelper_0x4b42bc();
