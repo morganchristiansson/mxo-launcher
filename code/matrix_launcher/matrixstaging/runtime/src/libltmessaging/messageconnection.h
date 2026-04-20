@@ -561,7 +561,7 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
 
 } // namespace mxo::liblttcp
 
-// CertConnectRequestPacketBuilder_0x4b6524 - CERT_ConnectRequest packet builder (opcode 0x01)
+// Packet_CertConnectRequest_0x4b6524 - CERT_ConnectRequest packet builder (opcode 0x01)
 // anchor: launcher.exe vtable `0x004b6524`
 // Faithful mirror of the local packet builder used in CMarginConnection_SendStoredBootstrapReplyCopy98
 // to construct CERT_ConnectRequest packets with length-prefixed blob payloads.
@@ -576,14 +576,14 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
 
 namespace mxo::liblttcp {
 
-class CertConnectRequestPacketBuilder_0x4b6524 : public ltlogin::Packet_0x4af2a4 {
+class Packet_CertConnectRequest_0x4b6524 : public ltlogin::Packet_0x4af2a4 {
 public:
-    // Additional fields for CertConnectRequestPacketBuilder_0x4b6524 (follow base class fields)
+    // Additional fields for Packet_CertConnectRequest_0x4b6524 (follow base class fields)
     uint8_t* reservationHeader14 = nullptr;   // +0x14 (after base's worldId24 at +0x24, but MSVC2003 layout differs)
     uint16_t reservedContentByteCount18 = 0u; // +0x18
     uint16_t reservedPadding1a = 0u;          // +0x1a
 
-    CertConnectRequestPacketBuilder_0x4b6524() {
+    Packet_CertConnectRequest_0x4b6524() {
         // anchor: launcher.exe:0x441f30 - constructor setup
         // Compiler sets vtable to 0x004b6524 automatically via C++ vptr
         nopatchLauncherVersionValue04 = 0;
@@ -662,7 +662,7 @@ public:
 
     // Virtual method overrides matching vtable 0x4b6524
     // anchor: launcher.exe:0x443aa0 / vtable slot 0 (inherited destructor)
-    ~CertConnectRequestPacketBuilder_0x4b6524() override = default;
+    ~Packet_CertConnectRequest_0x4b6524() override = default;
 
     // anchor: launcher.exe:0x437b50 / vtable slot 1 (inherited, returns 0)
     // StubReturn0() inherited from base
@@ -769,8 +769,8 @@ public:
 // Note: Modern C++ adds vptr (4 bytes) but original MSVC2003 binary has no leading vptr.
 // With vptr on i686: sizeof = 4 (vptr) + base fields (0x28) + derived fields (0x8) + padding = 48 (0x30)
 // Original binary layout: base(0x14) + derived(0x8) = 0x1c (28 bytes) without vptr
-static_assert(sizeof(CertConnectRequestPacketBuilder_0x4b6524) == 0x30,
-              "CertConnectRequestPacketBuilder_0x4b6524 size mismatch (expected 0x30 with vptr)");
+static_assert(sizeof(Packet_CertConnectRequest_0x4b6524) == 0x30,
+              "Packet_CertConnectRequest_0x4b6524 size mismatch (expected 0x30 with vptr)");
 
 class CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:

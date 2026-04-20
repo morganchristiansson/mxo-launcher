@@ -2834,7 +2834,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     constexpr uint16_t kLeadingType1PrefixByteCount = 3u;
 
     // Use the new idiomatic C++ class for CERT_ConnectRequest packet building
-    CertConnectRequestPacketBuilder_0x4b6524 packetBuilder;
+    Packet_CertConnectRequest_0x4b6524 packetBuilder;
     CMessageConnectionMessageRef_0x4ba23c messageRef = {};
     messageRef.ResetForPacketBuilder(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
