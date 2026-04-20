@@ -665,9 +665,9 @@ public:
     };
 
     // anchor: launcher.exe:0x4b533c / vtable
-    // Inherits from PacketBuilder_0x4af2a4, then retables to own vtable in ctor.
+    // Inherits from Packet_0x4af2a4, then retables to own vtable in ctor.
     // Methods: dtor (0x443aa0), debug (0x43ded0), reset (0x439a70)
-    class WorldDescriptorState_0x4b533c : public PacketBuilder_0x4af2a4 {
+    class WorldDescriptorState_0x4b533c : public Packet_0x4af2a4 {
     public:
         // Current best source-owned mirror of the `0x14`-byte heap object allocated by the
         // broader auth writer `0x43f300` and stored under owner `+0xd84[index]`.
@@ -699,7 +699,7 @@ public:
         uint8_t privateFlag1e = 0;
         uint8_t populationLevel1f = 0;
 
-        // Implement all virtual methods from parent PacketBuilder_0x4af2a4:
+        // Implement all virtual methods from parent Packet_0x4af2a4:
         // slot0: dtor (inherits)
         // slot1: stub returns 0
         // anchor: launcher.exe:0x43ded0 / vtable +0x08

@@ -386,14 +386,14 @@ namespace mxo::liblttcp {
  * Derived packet builder used by CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
  * (0x4429b0) to construct the CERT_ChallengeResponse packet with SessionKey and Secret fields.
  *
- * VTable layout at 0x4b6538 (5 slots, inherits from PacketBuilder_0x4af2a4):
+ * VTable layout at 0x4b6538 (5 slots, inherits from Packet_0x4af2a4):
  * - Slot 0 (+0x00): 0x443aa0 - destructor (inherited)
  * - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
  * - Slot 2 (+0x08): 0x442690 - DebugString (OVERRIDDEN - "SessionKey:" and "Secret:" output)
  * - Slot 3 (+0x0c): 0x4419c0 - InitializePayloadSize (OVERRIDDEN - packet 0x11 setup, size 0x21)
  * - Slot 4 (+0x10): 0x441470 - EnsureStreamPacketEncryptionModule (OVERRIDDEN)
  */
-class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 : public ltlogin::PacketBuilder_0x4af2a4 {
+class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 : public ltlogin::Packet_0x4af2a4 {
 public:
     // Additional field for challenge response extraction (follows base class fields)
     // packetPayloadPtr points to payload for extracting SessionKey/Secret bytes
@@ -480,7 +480,7 @@ static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x2c,
  * but we use a simpler default-constructed version since we're using static helpers.
  *
  * anchor: launcher.exe:0x439840 - CLTLoginMediatorPacketBuilderEnvelope_ctor
- * Sets vftable to PacketBuilder_0x4af2a4__vftable, creates message ref at +0x8, sets +0x4
+ * Sets vftable to Packet_0x4af2a4__vftable, creates message ref at +0x8, sets +0x4
  */
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() {
     // Default initialization - mirror original at 0x439840
@@ -553,7 +553,7 @@ static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPay
 // This class is used specifically for building the CERT challenge response packet (opcode 0x03).
 // The vtable at 0x4b6560 is a copy of MarginConnectionChallengeParsedResult_0x4b654c vtable
 // but used in a different context for response packet building.
-class Packet_CertChallengeResponse_0x4b6560 : public ltlogin::PacketBuilder_0x4af2a4 {
+class Packet_CertChallengeResponse_0x4b6560 : public ltlogin::Packet_0x4af2a4 {
 public:
     // FIDELITY: Default constructor mirrors original at 0x439840
     // Creates new message ref, sets up payload base at +0xc offset
@@ -564,7 +564,7 @@ public:
 };
 
 // Size matches base PacketBuilder (0x26 = 38 bytes)
-static_assert(sizeof(Packet_CertChallengeResponse_0x4b6560) == sizeof(ltlogin::PacketBuilder_0x4af2a4),
+static_assert(sizeof(Packet_CertChallengeResponse_0x4b6560) == sizeof(ltlogin::Packet_0x4af2a4),
               "Packet_CertChallengeResponse_0x4b6560 size mismatch");
 
 inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6560() {
@@ -594,7 +594,7 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
 // Faithful mirror of the local packet builder used in CMarginConnection_SendStoredBootstrapReplyCopy98
 // to construct CERT_ConnectRequest packets with length-prefixed blob payloads.
 //
-// VTable layout at 0x4b6524 (5 slots, inherits from PacketBuilder_0x4af2a4):
+// VTable layout at 0x4b6524 (5 slots, inherits from Packet_0x4af2a4):
 // - Slot 0 (+0x00): 0x443aa0 - destructor (inherited)
 // - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
 // - Slot 2 (+0x08): 0x4425f0 - DebugString (OVERRIDDEN - "Certificate:..." output)
@@ -604,7 +604,7 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
 
 namespace mxo::liblttcp {
 
-class CertConnectRequestPacketBuilder_0x4b6524 : public ltlogin::PacketBuilder_0x4af2a4 {
+class CertConnectRequestPacketBuilder_0x4b6524 : public ltlogin::Packet_0x4af2a4 {
 public:
     // Additional fields for CertConnectRequestPacketBuilder_0x4b6524 (follow base class fields)
     uint8_t* reservationHeader14 = nullptr;   // +0x14 (after base's worldId24 at +0x24, but MSVC2003 layout differs)

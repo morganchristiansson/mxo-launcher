@@ -51,7 +51,7 @@ struct Arg6SelectionConfig;
 // - +0x08: append debug string (builder-specific)
 // - +0x0c: reset/init helper (builder-specific)
 // - +0x10: return builder +0x10 packet-payload base (0x00481760)
-class PacketBuilder_0x4af2a4 {
+class Packet_0x4af2a4 {
 public:
     // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
     // +0x00: vtable pointer (C++ implicit)
@@ -61,7 +61,7 @@ public:
 
     // Payload pointers (set by derived classes):
     void* payloadBegin10 = nullptr;               // +0x10
-    const char* heapString14 = nullptr;           // +0x14 (char* in original, at PacketBuilder_0x4af2a4 offset)
+    const char* heapString14 = nullptr;           // +0x14 (char* in original, at Packet_0x4af2a4 offset)
     uint16_t payloadLength14 = 0;                 // +0x18
     uint8_t statusByte16 = 0;                     // +0x1a
 
@@ -72,7 +72,7 @@ public:
 
     // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
     // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
-    virtual ~PacketBuilder_0x4af2a4() = default;
+    virtual ~Packet_0x4af2a4() = default;
     // anchor: launcher.exe:0x437b50 / vtable +0x04
     // Stub method returning 0 - inherited by all derived builders
     virtual uint32_t StubReturn0() { return 0; }
@@ -92,7 +92,7 @@ public:
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
 // Character slot record class. VTable at 0x4b5328 semantically inherits from
-// PacketBuilder_0x4af2a4's vtable at 0x4af2a4 (first 4 slots match, slot 4 is overridden).
+// Packet_0x4af2a4's vtable at 0x4af2a4 (first 4 slots match, slot 4 is overridden).
 // Ghidra shows SlotRecord_0x4b5328 contains PacketBuilder component at offset 0.
 // Full object size: 0x32 (50 bytes) - verified against launcher.exe
 // VTable methods (5 slots at 0x4b5328):
@@ -102,13 +102,13 @@ public:
 // - +0x0c: reset/prepare (0x439940) - overrides PacketBuilder reset
 // - +0x10: return payload base (0x481760) - same as PacketBuilder
 // Note: Uses explicit vtable pointer (void** vtable00) for MSVC2003 ABI compatibility.
-// Future: Could inherit from PacketBuilder_0x4af2a4 with C++ virtual, but would need
+// Future: Could inherit from Packet_0x4af2a4 with C++ virtual, but would need
 // to verify object layout matches (vptr placement, field offsets, total size).
 class SlotRecordState_0x4b5328 {
 public:
     // PacketBuilder layout at +0x00:
     // Note: Removed explicit vtable00 field - C++ vptr is implicit with virtual methods
-    // This is a key step towards C++ inheritance from PacketBuilder_0x4af2a4
+    // This is a key step towards C++ inheritance from Packet_0x4af2a4
     uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04 (vptr is at +0x00, implicit)
     liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                             // +0x0c
@@ -126,7 +126,7 @@ public:
     uint8_t status3a = 0;                                     // +0x3a (slot-record specific)
     uint16_t worldId3c = 0;                                   // +0x3c (slot-record specific)
 
-    // Virtual methods (override PacketBuilder_0x4af2a4)
+    // Virtual methods (override Packet_0x4af2a4)
     ~SlotRecordState_0x4b5328() = default;
     uint32_t StubReturn0() { return 0; }
     const char* DebugString() const { return nullptr; }

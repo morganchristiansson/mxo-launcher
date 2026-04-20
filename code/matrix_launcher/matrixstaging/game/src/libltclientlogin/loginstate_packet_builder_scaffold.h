@@ -6,7 +6,7 @@
 #include <cstdint>
 
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
-#include "loginmediator_base.h"  // PacketBuilder_0x4af2a4
+#include "loginmediator_base.h"  // Packet_0x4af2a4
 
 namespace mxo::ltlogin {
 
@@ -46,11 +46,11 @@ static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, gameSessionId2c) == 
 }  // namespace ltlogin
 
 // Packet builder envelope base - static-RE faithful implementation.
-// Inherits from PacketBuilder_0x4af2a4 and adds send-payload helpers.
+// Inherits from Packet_0x4af2a4 and adds send-payload helpers.
 // anchor: launcher.exe:0x439840
 namespace mxo::ltlogin {
 
-class PacketBuilderEnvelopeBase : public PacketBuilder_0x4af2a4 {
+class PacketBuilderEnvelopeBase : public Packet_0x4af2a4 {
 public:
     PacketBuilderEnvelopeBase() {
         // Initialize message ref for packet building
@@ -87,7 +87,7 @@ public:
     }
 
 protected:
-    // Implement pure virtual methods from PacketBuilder_0x4af2a4
+    // Implement pure virtual methods from Packet_0x4af2a4
     uint32_t StubReturn0() override { return 0; }
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
@@ -404,7 +404,7 @@ struct State8StructuredMarginPacketFixedPayload {
     static constexpr size_t kFixedByteCount = 0xbb;
 };
 
-class State8StructuredMarginPacketBuilder_0x4af2a4 final : public PacketBuilderEnvelopeBase {
+class State8StructuredMarginPacket_0x4af2a4 final : public PacketBuilderEnvelopeBase {
 public:
     // anchor: launcher.exe:0x43ac10 = CLTLoginMediatorPacket0x0f_ResetAndInitialize
     void ResetAndInitialize() {
