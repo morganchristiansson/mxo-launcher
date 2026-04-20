@@ -2617,12 +2617,27 @@ CMarginConnectionAuthBootstrapCrypto_0x4b6778::~CMarginConnectionAuthBootstrapCr
 }
 
 // anchor: launcher.exe:0x468130 / vtable+0x24 -> actual RSA decryption
-// FIDELITY: Perform RSA decryption using the original static helper
+// FIDELITY NOTE: Original uses cryptoContext for BigInt memory allocation and custom arithmetic.
+// The cryptoContext provides allocator functions at vtable+0xc (0x468050) for BigInt operations.
+// We use CryptoPP which handles memory internally, so cryptoContext is not strictly needed,
+// but we pass it through for API compatibility with the original vtable signature.
 bool CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption(
     const void* encryptedBytes,
     size_t encryptedByteCount,
     void* outputBuffer) {
-    // Use the original static helper that was working
+    // FIDELITY: Detailed logging for decryption diagnostics
+    spdlog::debug("PerformRSADecryption: BEGIN encryptedByteCount={} this={}",
+        encryptedByteCount, fmt::ptr(this));
+    
+    // Log the first 16 bytes of encrypted input (the challenge blob)
+    const auto* encBytes = static_cast<const uint8_t*>(encryptedBytes);
+    spdlog::debug("PerformRSADecryption: encrypted input [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        encBytes[0], encBytes[1], encBytes[2], encBytes[3],
+        encBytes[4], encBytes[5], encBytes[6], encBytes[7],
+        encBytes[8], encBytes[9], encBytes[10], encBytes[11],
+        encBytes[12], encBytes[13], encBytes[14], encBytes[15]);
+
+    // Use the static helper for actual decryption
     std::array<uint8_t, 16> decryptedChallengeBytes{};
     std::vector<uint8_t> fullDecryptedBytes;
     const bool decryptSuccess = CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
@@ -2633,44 +2648,69 @@ bool CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption(
         &fullDecryptedBytes);
 
     if (!decryptSuccess) {
-        spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption: static helper decryption failed");
+        spdlog::warn("PerformRSADecryption: FAILED - static helper returned false");
         return false;
     }
 
-    // Write result to output buffer: output[0] = success flag, output[4] = byte count
+    // Write result to output buffer matching original format:
+    // [0] = success flag, [4-7] = byte count, [8+] = decrypted bytes
     auto* outBytes = static_cast<uint8_t*>(outputBuffer);
     outBytes[0] = 1;  // success flag
-    *reinterpret_cast<uint32_t*>(outBytes + 4) = static_cast<uint32_t>(fullDecryptedBytes.size());  // full byte count
+    *reinterpret_cast<uint32_t*>(outBytes + 4) = static_cast<uint32_t>(fullDecryptedBytes.size());
 
-    // Copy full decrypted bytes after the header (original writes to message payload)
-    if (fullDecryptedBytes.size() <= 32) {
-        std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.end(), outBytes + 8);
-    } else {
-        std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.begin() + 32, outBytes + 8);
-    }
+    // Copy full decrypted bytes after the header
+    const size_t bytesToCopy = std::min(fullDecryptedBytes.size(), size_t{96});
+    std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.begin() + bytesToCopy, outBytes + 8);
 
-    spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption: static helper succeeded, full buffer size={}", fullDecryptedBytes.size());
+    // FIDELITY: Log the complete output buffer structure
+    spdlog::debug("PerformRSADecryption: SUCCESS output[0]=0x{:02x} output[4]=0x{:08x} bytesCopied={}",
+        outBytes[0], *reinterpret_cast<uint32_t*>(outBytes + 4), bytesToCopy);
+    spdlog::debug("PerformRSADecryption: output decrypted bytes [8-23]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        outBytes[8], outBytes[9], outBytes[10], outBytes[11],
+        outBytes[12], outBytes[13], outBytes[14], outBytes[15],
+        outBytes[16], outBytes[17], outBytes[18], outBytes[19],
+        outBytes[20], outBytes[21], outBytes[22], outBytes[23]);
+    
+    // Log the 16 extracted challenge bytes that will become seed
+    spdlog::info("PerformRSADecryption: extracted challenge bytes (seed source) [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        decryptedChallengeBytes[0], decryptedChallengeBytes[1], decryptedChallengeBytes[2], decryptedChallengeBytes[3],
+        decryptedChallengeBytes[4], decryptedChallengeBytes[5], decryptedChallengeBytes[6], decryptedChallengeBytes[7],
+        decryptedChallengeBytes[8], decryptedChallengeBytes[9], decryptedChallengeBytes[10], decryptedChallengeBytes[11],
+        decryptedChallengeBytes[12], decryptedChallengeBytes[13], decryptedChallengeBytes[14], decryptedChallengeBytes[15]);
 
     return true;
 }
 
 // anchor: launcher.exe:0x437810 / vtable +0x1c
 // FIDELITY: Validates payload size (0x437816-0x437824) then calls vtable+0x24 (0x468130) for RSA decrypt
+// CRYPTO CONTEXT NOTE: The cryptoContext parameter is passed by the original at 0x442a64 but
+// the original's PerformRSADecryption (0x468130) only uses it for BigInt memory allocation
+// through vtable+0xc (0x468050). Since we use CryptoPP which handles memory internally,
+// we accept the parameter for API compatibility but don't use it directly.
 void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     void* outputBuffer,
-    const void* /*cryptoContext*/,
-    uint32_t /*keySizeBytes*/,
-    uint16_t /*expectedOutputSize*/,
+    const void* cryptoContext,
+    uint32_t keySizeBytes,
+    uint16_t expectedOutputSize,
     const void* encryptedChallengeData,
     size_t payloadSize) {
+    
+    spdlog::debug("DecryptChallenge(vtable+0x1c): BEGIN payloadSize={} keySizeBytes={} expectedOutputSize={} cryptoContext={}",
+        payloadSize, keySizeBytes, expectedOutputSize, fmt::ptr(cryptoContext));
+
     // anchor: launcher.exe:0x437816-0x437824: Get expected size from bootstrap state BigInt
     // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
     const uint32_t modulusBitCount = field_0xc.field_0x8.GetBitCount();
     const uint32_t expectedPayloadSize = (modulusBitCount + 7) / 8;  // bits to bytes
 
+    spdlog::debug("DecryptChallenge: modulusBitCount={} expectedPayloadSize={} actualPayloadSize={}",
+        modulusBitCount, expectedPayloadSize, payloadSize);
+
     // anchor: launcher.exe:0x437827-0x43783b: Size mismatch check - early return with zeroed output
     // Original: if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
     if (payloadSize != expectedPayloadSize) {
+        spdlog::warn("DecryptChallenge: SIZE MISMATCH expected={} actual={} - returning zeroed output", 
+            expectedPayloadSize, payloadSize);
         auto* outBytes = static_cast<uint8_t*>(outputBuffer);
         outBytes[0] = 0;
         *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
@@ -2678,13 +2718,19 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     }
 
     // anchor: launcher.exe:0x43783e-0x437853: Call vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
+    spdlog::debug("DecryptChallenge: calling PerformRSADecryption(vtable+0x24)");
     const bool decryptSuccess = PerformRSADecryption(
         encryptedChallengeData,
         payloadSize,
         outputBuffer);
 
     if (!decryptSuccess) {
-        spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge: decryption failed");
+        spdlog::warn("DecryptChallenge: PerformRSADecryption returned false");
+    } else {
+        // Log the result structure that will be checked by caller at offset +4
+        const auto* outBytes = static_cast<const uint8_t*>(outputBuffer);
+        spdlog::debug("DecryptChallenge: SUCCESS result[0]=0x{:02x} result[4]=0x{:08x}",
+            outBytes[0], *reinterpret_cast<const uint32_t*>(outBytes + 4));
     }
 
     return outputBuffer;
@@ -2973,9 +3019,10 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
             return false;
         }
 
-        // Extract 16 bytes from offset 1,5,9,13 (DWORD aligned positions in decrypted blob)
-        // Each DWORD is stored at byte positions [1-4], [5-8], [9-12], [13-16] (little-endian)
-        if (decryptedBytes.size() < 0x11u) {  // Need at least 17 bytes
+        // FIDELITY: Extract 16 bytes from offsets 1-16 (matching launcher.exe:0x442ac6-0x442ae0)
+        // The original extracts bytes at positions [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+        // These form 4 DWORDs at offsets +1, +5, +9, +13 which are copied to this+0x85, 0x89, 0x8d, 0x91
+        if (decryptedBytes.size() < 0x11u) {  // Need at least 17 bytes (offset 0-16)
             spdlog::warn(
                 "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: decrypted too short {} < 17",
                 decryptedBytes.size());
@@ -2987,7 +3034,20 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
             *outFullDecryptedBytes = decryptedBytes;
         }
 
-        // The original extracts: [1-4], [5-8], [9-12], [13-16] as little-endian DWORDs
+        // FIDELITY VERIFICATION: Log the full decrypted buffer to verify extraction offsets
+        spdlog::debug("DecryptChallenge: full decrypted buffer [0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            decryptedBytes[0], decryptedBytes[1], decryptedBytes[2], decryptedBytes[3],
+            decryptedBytes[4], decryptedBytes[5], decryptedBytes[6], decryptedBytes[7],
+            decryptedBytes[8], decryptedBytes[9], decryptedBytes[10], decryptedBytes[11],
+            decryptedBytes[12], decryptedBytes[13], decryptedBytes[14], decryptedBytes[15],
+            decryptedBytes[16], decryptedBytes[17], decryptedBytes[18], decryptedBytes[19],
+            decryptedBytes[20], decryptedBytes[21], decryptedBytes[22], decryptedBytes[23],
+            decryptedBytes[24], decryptedBytes[25], decryptedBytes[26], decryptedBytes[27],
+            decryptedBytes[28], decryptedBytes[29], decryptedBytes[30], decryptedBytes[31]);
+
+        // FIDELITY: Extract bytes at offsets 1-16 (NOT 0-15) - this matches original
+        // The original at 0x442ac6 reads from EDI+1, EDI+5, EDI+9, EDI+0xd
+        // where EDI points to the decrypted buffer
         (*outDecryptedChallengeBytes)[0] = decryptedBytes[1];
         (*outDecryptedChallengeBytes)[1] = decryptedBytes[2];
         (*outDecryptedChallengeBytes)[2] = decryptedBytes[3];
@@ -3005,14 +3065,18 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
         (*outDecryptedChallengeBytes)[14] = decryptedBytes[15];
         (*outDecryptedChallengeBytes)[15] = decryptedBytes[16];
 
-        spdlog::debug(
-            "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge decrypted size={} firstDword=0x{:08x}",
-            decryptedBytes.size(),
-            static_cast<unsigned>(
-                static_cast<uint32_t>((*outDecryptedChallengeBytes)[0]) |
-                (static_cast<uint32_t>((*outDecryptedChallengeBytes)[1]) << 8u) |
-                (static_cast<uint32_t>((*outDecryptedChallengeBytes)[2]) << 16u) |
-                (static_cast<uint32_t>((*outDecryptedChallengeBytes)[3]) << 24u)));
+        // FIDELITY: Log as DWORDs to match how original uses them
+        const uint32_t dword0 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[0]);
+        const uint32_t dword1 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[4]);
+        const uint32_t dword2 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[8]);
+        const uint32_t dword3 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[12]);
+        
+        spdlog::info(
+            "DecryptChallenge: extracted challenge bytes as DWORDs: 0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}",
+            dword0, dword1, dword2, dword3);
+        spdlog::info(
+            "DecryptChallenge: these DWORDs go to connection+0x85=0x{:08x}, +0x89=0x{:08x}, +0x8d=0x{:08x}, +0x91=0x{:08x}",
+            dword0, dword1, dword2, dword3);
 
         return true;
     } catch (const CryptoPP::Exception& ex) {
@@ -3085,6 +3149,25 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     if (!parsedMessageResult) {
         return 0u;
     }
+
+    // FIDELITY: Comprehensive logging for HandleCode2ForBootstrap (launcher.exe:0x4429b0)
+    spdlog::info("HandleCode2ForBootstrap: BEGIN this={} parsedMessageResult={}",
+        fmt::ptr(this), fmt::ptr(parsedMessageResult));
+    
+    // Log encrypted payload info from parsed message
+    const uint8_t* encPayload = parsedMessageResult->GetEncryptedPayload();
+    const size_t encSize = parsedMessageResult->GetEncryptedPayloadSize();
+    if (encPayload && encSize >= 16) {
+        spdlog::info("HandleCode2ForBootstrap: encrypted payload size={} bytes [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            encSize, encPayload[0], encPayload[1], encPayload[2], encPayload[3],
+            encPayload[4], encPayload[5], encPayload[6], encPayload[7],
+            encPayload[8], encPayload[9], encPayload[10], encPayload[11],
+            encPayload[12], encPayload[13], encPayload[14], encPayload[15]);
+    }
+    
+    // Log message context fields
+    spdlog::debug("HandleCode2ForBootstrap: messageContext=0x{:08x} messageContextWord=0x{:04x}",
+        parsedMessageResult->messageContext14, parsedMessageResult->messageContextWord18);
 
     // anchor: launcher.exe:0x4429b9-0x442a17: Static crypto context initialization (inline)
     // Original: if ((_g_CryptoInitializedFlag_0x4f7c20 & 1) == 0) { ...init... }
@@ -3227,6 +3310,21 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     const bool decryptSuccess = decryptOutput[0] != 0;
     const uint32_t decryptedByteCount = *reinterpret_cast<const uint32_t*>(decryptOutput.data() + 4);
 
+    // FIDELITY: Log the decrypt result structure
+    spdlog::info("HandleCode2ForBootstrap: decrypt result success={} byteCount={}", 
+        decryptSuccess ? 1 : 0, decryptedByteCount);
+    if (decryptSuccess && decryptedByteCount > 0) {
+        spdlog::debug("HandleCode2ForBootstrap: decrypt output [0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            decryptOutput[0], decryptOutput[1], decryptOutput[2], decryptOutput[3],
+            decryptOutput[4], decryptOutput[5], decryptOutput[6], decryptOutput[7],
+            decryptOutput[8], decryptOutput[9], decryptOutput[10], decryptOutput[11],
+            decryptOutput[12], decryptOutput[13], decryptOutput[14], decryptOutput[15],
+            decryptOutput[16], decryptOutput[17], decryptOutput[18], decryptOutput[19],
+            decryptOutput[20], decryptOutput[21], decryptOutput[22], decryptOutput[23],
+            decryptOutput[24], decryptOutput[25], decryptOutput[26], decryptOutput[27],
+            decryptOutput[28], decryptOutput[29], decryptOutput[30], decryptOutput[31]);
+    }
+
     if (!decryptSuccess) {
         // anchor: launcher.exe:0x442a46-0x442a57: Error path - MessageBox + vtable+0xc close
         // Original: MessageBoxA(0, "Failed to decrypt challenge blob from server!", "Error", 0)
@@ -3310,7 +3408,16 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442add: MOV EAX,dword ptr [EDI + 0xd]
     //   0x442ae0: MOV dword ptr [ECX + 0xc],EAX
     // FIDELITY: No ExtractChallengeBytes() helper - all inline dword copies
+    // The original extracts from envelope.packetPayloadPtr at offsets 1-16
     if (envelope.packetPayloadPtr) {
+        // FIDELITY VERIFICATION: Log source bytes before extraction
+        spdlog::debug("HandleCode2ForBootstrap: seed extraction source envelope.packetPayloadPtr[0-20]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            envelope.packetPayloadPtr[0], envelope.packetPayloadPtr[1], envelope.packetPayloadPtr[2], envelope.packetPayloadPtr[3],
+            envelope.packetPayloadPtr[4], envelope.packetPayloadPtr[5], envelope.packetPayloadPtr[6], envelope.packetPayloadPtr[7],
+            envelope.packetPayloadPtr[8], envelope.packetPayloadPtr[9], envelope.packetPayloadPtr[10], envelope.packetPayloadPtr[11],
+            envelope.packetPayloadPtr[12], envelope.packetPayloadPtr[13], envelope.packetPayloadPtr[14], envelope.packetPayloadPtr[15],
+            envelope.packetPayloadPtr[16], envelope.packetPayloadPtr[17], envelope.packetPayloadPtr[18], envelope.packetPayloadPtr[19]);
+            
         messageCode5SeedBytes85_[0] = envelope.packetPayloadPtr[1];
         messageCode5SeedBytes85_[1] = envelope.packetPayloadPtr[2];
         messageCode5SeedBytes85_[2] = envelope.packetPayloadPtr[3];
@@ -3327,6 +3434,21 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         messageCode5SeedBytes85_[13] = envelope.packetPayloadPtr[14];
         messageCode5SeedBytes85_[14] = envelope.packetPayloadPtr[15];
         messageCode5SeedBytes85_[15] = envelope.packetPayloadPtr[16];
+        
+        // FIDELITY: Log extracted seed bytes (will be used for this+0x85, 0x89, 0x8d, 0x91)
+        spdlog::info("HandleCode2ForBootstrap: extracted seed bytes for this+0x85 [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
+            messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
+            messageCode5SeedBytes85_[8], messageCode5SeedBytes85_[9], messageCode5SeedBytes85_[10], messageCode5SeedBytes85_[11],
+            messageCode5SeedBytes85_[12], messageCode5SeedBytes85_[13], messageCode5SeedBytes85_[14], messageCode5SeedBytes85_[15]);
+            
+        // Log as DWORDs to match how they get written to connection fields
+        const uint32_t seedDword0 = *reinterpret_cast<const uint32_t*>(&messageCode5SeedBytes85_[0]);
+        const uint32_t seedDword1 = *reinterpret_cast<const uint32_t*>(&messageCode5SeedBytes85_[4]);
+        const uint32_t seedDword2 = *reinterpret_cast<const uint32_t*>(&messageCode5SeedBytes85_[8]);
+        const uint32_t seedDword3 = *reinterpret_cast<const uint32_t*>(&messageCode5SeedBytes85_[12]);
+        spdlog::info("HandleCode2ForBootstrap: seed DWORDs this+0x85=0x{:08x} this+0x89=0x{:08x} this+0x8d=0x{:08x} this+0x91=0x{:08x}",
+            seedDword0, seedDword1, seedDword2, seedDword3);
     }
     // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
     // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
@@ -3394,34 +3516,40 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         return 0u;
     }
 
-    // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
-    spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
-        messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
-        messageCode5SeedBytes85_[8], messageCode5SeedBytes85_[9], messageCode5SeedBytes85_[10], messageCode5SeedBytes85_[11],
-        messageCode5SeedBytes85_[12], messageCode5SeedBytes85_[13], messageCode5SeedBytes85_[14], messageCode5SeedBytes85_[15]);
+    // FIDELITY: Log response packet details before sending (already have responsePayload from above)
+    const size_t responsePayloadSize = responseMessageRef->messageStorage0c->PayloadByteCount();
+    
+    spdlog::info("HandleCode2ForBootstrap: RESPONSE PACKET opcode=0x{:02x} size={} bytes", 
+        responsePayload ? responsePayload[0] : 0, responsePayloadSize);
+    if (responsePayload && responsePayloadSize >= 17) {
+        spdlog::info("HandleCode2ForBootstrap: response payload [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            responsePayload[0], responsePayload[1], responsePayload[2], responsePayload[3],
+            responsePayload[4], responsePayload[5], responsePayload[6], responsePayload[7],
+            responsePayload[8], responsePayload[9], responsePayload[10], responsePayload[11],
+            responsePayload[12], responsePayload[13], responsePayload[14], responsePayload[15]);
+            
+        // Verify response bytes match expected challenge
+        const bool responseMatchesChallenge = 
+            (responsePayload[1] == messageCode5SeedBytes85_[0]) &&
+            (responsePayload[2] == messageCode5SeedBytes85_[1]) &&
+            (responsePayload[3] == messageCode5SeedBytes85_[2]) &&
+            (responsePayload[4] == messageCode5SeedBytes85_[3]);
+        spdlog::info("HandleCode2ForBootstrap: response byte[1-4] match seed byte[0-3]: {}", 
+            responseMatchesChallenge ? "YES" : "NO");
+    }
 
     // Send via connection vtable+0x24 - anchor: launcher.exe:0x442b30
     // Original calls: connection->vtable+0x24(envelope)
     // In our code, use SendPacketMessageRef with the response message ref
-    spdlog::debug("HandleCode2ForBootstrap: about to send responseMessageRef={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
-        reinterpret_cast<uintptr_t>(responseMessageRef),
-        responseMessageRef->messageStorage0c->PayloadBase()[0],
-        responseMessageRef->messageStorage0c->PayloadBase()[1],
-        responseMessageRef->messageStorage0c->PayloadBase()[2],
-        responseMessageRef->messageStorage0c->PayloadBase()[3]);
+    spdlog::debug("HandleCode2ForBootstrap: about to send responseMessageRef={:08x}",
+        reinterpret_cast<uintptr_t>(responseMessageRef));
     SendPacketMessageRef(*responseMessageRef);
     const uint32_t sendResult = 0;  // Success
 
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
+        "HandleCode2ForBootstrap: SUCCESS sendResult=0x{:08x} decryptedByteCount={} this={} ownerContext={}",
         sendResult,
         static_cast<unsigned>(decryptedByteCount),
-        static_cast<unsigned>(
-        static_cast<uint32_t>(decryptOutput[8]) |
-        (static_cast<uint32_t>(decryptOutput[9]) << 8u) |
-        (static_cast<uint32_t>(decryptOutput[10]) << 16u) |
-        (static_cast<uint32_t>(decryptOutput[11]) << 24u)),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()));
 
