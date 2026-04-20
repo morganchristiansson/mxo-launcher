@@ -2871,11 +2871,9 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     std::copy(bootstrapReplyCopy98_.begin(), bootstrapReplyCopy98_.end(), destination);
 
     // anchor: launcher.exe:0x441f9c - send packet via vtable slot 9
-    // Original calls (**(code **)(vftptr + 0x24))(&packetBuilder, 0)
-    // Return value is ignored in the original
-    CMessageConnectionPacketBuilderEnvelope envelope;
-    envelope.messageRef08 = packetBuilder.messageRef08;
-    ForwardPacketBuilderEnvelopeToSendPacket(envelope);
+    // Original: (**(code **)(vftptr + 0x24))(&packetBuilder, 0)
+    // Passes packet builder directly, return value ignored
+    SendPacketMessageRef(*packetBuilder.messageRef08);
 
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent "
