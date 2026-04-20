@@ -465,7 +465,7 @@ struct State6Packet0x06FixedPayload {
     static constexpr size_t kFixedByteCount = 0x23;
 };
 
-class State6Packet0x06Builder final : public PacketBuilderEnvelopeBase {
+class State6Packet0x06Builder_0x4b5364 final : public PacketBuilderEnvelopeBase {
 public:
     // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
     void ResetAndInitialize() {

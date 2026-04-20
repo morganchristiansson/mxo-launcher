@@ -202,7 +202,7 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // - payload `+0x0a/+0x0e` = fixed dwords `0x11186887` / `0x7460a4b0`
     // - payload `+0x12..+0x21` = packed-GOB LTGUID from `0x438e60` fallback family
     // - payload `+0x22` = owner current helper phase byte
-    State6Packet0x06Builder packetBuilder;
+    State6Packet0x06Builder_0x4b5364 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
