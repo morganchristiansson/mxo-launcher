@@ -467,16 +467,7 @@ public:
     // Original at 0x442ac6-0x442ae0 extracts seed bytes via:
     //   *(dword *)(this + 0x85) = *(dword *)(local_38.mbr_0x10 + 1)
     //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
-    // anchor: launcher.exe:0x442b18 -> copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-    // Original at 0x442b18-0x442b28 copies response packet bytes via:
-    //   *(dword *)(packet + 1) = *(dword *)(local_38.mbr_0x10 + 0x11)
-    //   *(dword *)(packet + 5) = *(dword *)(local_38.mbr_0x10 + 0x15)
-    //   *(dword *)(packet + 9) = *(dword *)(local_38.mbr_0x10 + 0x19)
-    //   *(dword *)(packet + 0xd) = *(dword *)(local_38.mbr_0x10 + 0x1d)
-    // Extract 16 bytes from envelope mbr_0x10 +0x11/+0x15/+0x19/+0x1d for response packet.
-    // This is the second extraction pass - copies to response packet payload at offset +1.
-    // Note: Different offsets than ExtractChallengeBytes - uses +0x11 instead of +1, etc.
-    std::array<uint8_t, 16> ExtractForResponsePacket() const;
+
 };
 
 // Size: 0x18 (24 bytes) - vftptr(4) + nopatchLauncherVersionValue04(4) + messageRef08(4) + ownerReadyFlag0c(1) + padding(3) + packetPayloadPtr(4) = 20 bytes (actual may be padded to 24)
@@ -551,59 +542,6 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     // Not used in main flow - the messageRef constructor is used instead
     (void)decryptedBytes;
     packetPayloadPtr = nullptr;
-}
-
-// anchor: launcher.exe:0x442b18 -> uses mbr_0x10 +0x11/+0x15/+0x19/+0x1d for response packet
-// FIDELITY ISSUE: Original mbr_0x10 (packetPayloadPtr) points to a different offset in payload than our implementation.
-// In original, packetPayloadPtr is set to message ref payload + 0xc, making +0x11 offset map to actual offset +0x1d in payload.
-// Our simpler model uses raw payload base, causing wrong bytes to be extracted.
-// HACK: Use offset +1 instead of +0x11 to get correct response bytes (since payload only has 16 bytes)
-inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractForResponsePacket() const {
-    std::array<uint8_t, 16> result{};
-    spdlog::debug("ExtractForResponsePacket: packetPayloadPtr={:08x}, content[0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        reinterpret_cast<uintptr_t>(packetPayloadPtr),
-        packetPayloadPtr ? packetPayloadPtr[0] : 0,
-        packetPayloadPtr ? packetPayloadPtr[1] : 0,
-        packetPayloadPtr ? packetPayloadPtr[2] : 0,
-        packetPayloadPtr ? packetPayloadPtr[3] : 0,
-        packetPayloadPtr ? packetPayloadPtr[4] : 0,
-        packetPayloadPtr ? packetPayloadPtr[5] : 0,
-        packetPayloadPtr ? packetPayloadPtr[6] : 0,
-        packetPayloadPtr ? packetPayloadPtr[7] : 0,
-        packetPayloadPtr ? packetPayloadPtr[8] : 0,
-        packetPayloadPtr ? packetPayloadPtr[9] : 0,
-        packetPayloadPtr ? packetPayloadPtr[10] : 0,
-        packetPayloadPtr ? packetPayloadPtr[11] : 0,
-        packetPayloadPtr ? packetPayloadPtr[12] : 0,
-        packetPayloadPtr ? packetPayloadPtr[13] : 0,
-        packetPayloadPtr ? packetPayloadPtr[14] : 0,
-        packetPayloadPtr ? packetPayloadPtr[15] : 0,
-        packetPayloadPtr ? packetPayloadPtr[16] : 0,
-        packetPayloadPtr ? packetPayloadPtr[17] : 0,
-        packetPayloadPtr ? packetPayloadPtr[18] : 0,
-        packetPayloadPtr ? packetPayloadPtr[19] : 0,
-        packetPayloadPtr ? packetPayloadPtr[20] : 0,
-        packetPayloadPtr ? packetPayloadPtr[21] : 0,
-        packetPayloadPtr ? packetPayloadPtr[22] : 0,
-        packetPayloadPtr ? packetPayloadPtr[23] : 0,
-        packetPayloadPtr ? packetPayloadPtr[24] : 0,
-        packetPayloadPtr ? packetPayloadPtr[25] : 0,
-        packetPayloadPtr ? packetPayloadPtr[26] : 0,
-        packetPayloadPtr ? packetPayloadPtr[27] : 0,
-        packetPayloadPtr ? packetPayloadPtr[28] : 0,
-        packetPayloadPtr ? packetPayloadPtr[29] : 0,
-        packetPayloadPtr ? packetPayloadPtr[30] : 0,
-        packetPayloadPtr ? packetPayloadPtr[31] : 0);
-    // FIDELITY: Read from +0x11/+0x15/+0x19/+0x1d as per launcher.exe:0x442b18
-    // The decrypted RSA buffer contains: [0][twofishKey(16)][challenge(16)][padding]
-    // Challenge response is at offsets +0x11, +0x15, +0x19, +0x1d (17, 21, 25, 29)
-    if (packetPayloadPtr) {
-        std::memcpy(&result[0], packetPayloadPtr + 0x11, 4);   // first dword (bytes 17-20)
-        std::memcpy(&result[4], packetPayloadPtr + 0x15, 4);  // second dword (bytes 21-24)
-        std::memcpy(&result[8], packetPayloadPtr + 0x19, 4);  // third dword (bytes 25-28)
-        std::memcpy(&result[12], packetPayloadPtr + 0x1d, 4); // fourth dword (bytes 29-32)
-    }
-    return result;
 }
 
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");

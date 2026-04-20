@@ -3246,22 +3246,17 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
     // anchor: launcher.exe:0x442a48: Success path - GrowPayloadByteCount via vtable+0x24
     // Original: (*(local_8.messageRef00)->vftptr_0x0->GrowPayloadByteCount_24)(local_8.messageRef00, *(int *)(iVar3 + 4));
-    // Use GrowPayloadByteCount NOT ResetPayloadByteCount!
-    // IMPORTANT: The original uses GrowPayloadByteCount to INCREASE the size, not reset!
+    // FIDELITY: Original calls GrowPayloadByteCount (not ResetPayloadByteCount)
     if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
-        // IMPORTANT: Original calls GrowPayloadByteCount with decryptedByteCount, which ADDS to current size
-        // But we need to grow to decryptedByteCount, not ADD decryptedByteCount to existing size
-        // The message ref was created with ResetForPacketBuilder(false, 0), so has 0 size
-        // So we need to set the size directly - use ResetPayloadByteCount
-        // FIDELITY: We need the full decrypted buffer (96 bytes) to extract both seed and challenge
-        // The decrypted buffer contains: [0][twofishKey(16)][challenge(16)][padding]
-        const size_t fullDecryptedSize = 96u;  // RSA decryption produces 96 bytes
-        localMessageRef.messageStorage0c->ResetPayloadByteCount(fullDecryptedSize);
+        // FIDELITY: GrowPayloadByteCount adds to existing size. Message ref was created with size 0,
+        // so growing by decryptedByteCount sets the size to decryptedByteCount.
+        // We need the full 96-byte decrypted buffer for seed extraction.
+        localMessageRef.messageStorage0c->GrowPayloadByteCount(static_cast<uint16_t>(decryptedByteCount));
         uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBase();
         if (payloadBase) {
             std::copy(
                 decryptOutput.begin() + 8,
-                decryptOutput.begin() + 8 + fullDecryptedSize,
+                decryptOutput.begin() + 8 + decryptedByteCount,
                 payloadBase);
         }
     }
@@ -3374,73 +3369,36 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         return 0u;
     }
 
-    // Set up response packet: [opcode=3][response bytes from seed envelope at +0x11/+0x15/+0x19/+0x1d]
+    // anchor: launcher.exe:0x442b0f-0x442b2f -> Build response packet inline
+    // Original disassembly:
+    //   0x442b0f: MOV EAX,dword ptr [EBP + -0x10]  ; EAX = responseEnvelope.packetPayloadPtr
+    //   0x442b12: MOV byte ptr [EAX],0x3           ; opcode = 3
+    //   0x442b15: MOV ECX,dword ptr [EBP + -0x10]  ; ECX = responsePayload base
+    //   0x442b18: ADD EDI,0x11                      ; EDI = seedEnvelope.packetPayloadPtr + 0x11
+    //   0x442b1b: MOV EDX,dword ptr [EDI]          ; first dword from seed+0x11
+    //   0x442b1d: INC ECX                           ; ECX = responsePayload + 1
+    //   0x442b1e: MOV dword ptr [ECX],EDX          ; copy to response+1
+    //   0x442b20: MOV EAX,dword ptr [EDI + 0x4]    ; second dword from seed+0x15
+    //   0x442b23: MOV dword ptr [ECX + 0x4],EAX    ; copy to response+5
+    //   0x442b26: MOV EDX,dword ptr [EDI + 0x8]    ; third dword from seed+0x19
+    //   0x442b29: MOV dword ptr [ECX + 0x8],EDX    ; copy to response+9
+    //   0x442b2c: MOV EAX,dword ptr [EDI + 0xc]    ; fourth dword from seed+0x1d
+    //   0x442b2f: MOV dword ptr [ECX + 0xc],EAX    ; copy to response+0xd
+    // FIDELITY: No ExtractForResponsePacket() helper - all inline dword copies
+    // Packet structure: [opcode=3][16 challenge response bytes] = 17 bytes total
     uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
-    if (!responsePayload) {
-        spdlog::warn("HandleCode2ForBootstrap: responseMessageRef has no payload pointer");
+    if (envelope.packetPayloadPtr && responsePayload) {
+        responsePayload[0] = 0x03;  // opcode
+        // Copy 4 dwords from envelope.packetPayloadPtr+0x11/0x15/0x19/0x1d to responsePayload+1/5/9/0xd
+        *reinterpret_cast<uint32_t*>(responsePayload + 1) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x11);
+        *reinterpret_cast<uint32_t*>(responsePayload + 5) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x15);
+        *reinterpret_cast<uint32_t*>(responsePayload + 9) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x19);
+        *reinterpret_cast<uint32_t*>(responsePayload + 13) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x1d);
+        responseMessageRef->GrowPayloadByteCount(17);  // 1 opcode + 16 response bytes
+    } else {
+        spdlog::warn("HandleCode2ForBootstrap: missing envelope.packetPayloadPtr or responsePayload for response packet");
         return 0u;
     }
-
-    // DEBUG: Log the extraction that happens in ExtractForResponsePacket
-    spdlog::debug("HandleCode2ForBootstrap: ExtractForResponsePacket reads from mbr_0x10_ptr+0x11={:08x}",
-        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr ? envelope.packetPayloadPtr + 0x11 : 0));
-    spdlog::debug("HandleCode2ForBootstrap: bytes at +0x11..+0x1f: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x11) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x11] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x12) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x12] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x13) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x13] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x14) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x14] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x15) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x15] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x16) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x16] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x17) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x17] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x18) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x18] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x19) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x19] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1a) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1a] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1b) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1b] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1c] : 0,
-        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1d] : 0);
-
-    // FIDELITY: Original launcher.exe sends exactly 16 bytes of challenge response
-    // The server expects exactly 16 bytes matching the original challenge
-    // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte at responseEnvelope.packetPayloadPtr[0]
-    // then copies 16 bytes from seedEnvelope.packetPayloadPtr+0x11/+0x15/+0x19/+0x1d to +1/+5/+9/+0xd
-    // The opcode is for internal tracking, but the actual payload sent to server is 16 bytes
-
-    spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
-        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
-    std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
-    spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
-        responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
-    // FIDELITY: CERT packet structure requires opcode and special field
-    // [opcode=3][specialField=3][challenge response (16 bytes)] = 19 bytes total
-    // The special field=3 tells server not to decrypt this packet (see MarginSocket::ProcessData)
-    responsePayload[0] = 0x03;  // CERT_ChallengeResponse opcode
-    *reinterpret_cast<uint16_t*>(responsePayload + 1) = 3;  // special field = 3 (unencrypted)
-    std::copy_n(responseBytes.data(), 16, responsePayload + 3);  // Copy 16 bytes after header
-    responseMessageRef->SetPayloadByteCount(19);  // 1 + 2 + 16 = 19 bytes total
-
-    spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        responseMessageRef->messageStorage0c->PayloadBase()[0],
-        responseMessageRef->messageStorage0c->PayloadBase()[1],
-        responseMessageRef->messageStorage0c->PayloadBase()[2],
-        responseMessageRef->messageStorage0c->PayloadBase()[3],
-        responseMessageRef->messageStorage0c->PayloadBase()[4],
-        responseMessageRef->messageStorage0c->PayloadBase()[5],
-        responseMessageRef->messageStorage0c->PayloadBase()[6],
-        responseMessageRef->messageStorage0c->PayloadBase()[7],
-        responseMessageRef->messageStorage0c->PayloadBase()[8],
-        responseMessageRef->messageStorage0c->PayloadBase()[9],
-        responseMessageRef->messageStorage0c->PayloadBase()[10],
-        responseMessageRef->messageStorage0c->PayloadBase()[11],
-        responseMessageRef->messageStorage0c->PayloadBase()[12],
-        responseMessageRef->messageStorage0c->PayloadBase()[13],
-        responseMessageRef->messageStorage0c->PayloadBase()[14],
-        responseMessageRef->messageStorage0c->PayloadBase()[15],
-        responseMessageRef->messageStorage0c->PayloadBase()[16],
-        responseMessageRef->messageStorage0c->PayloadBase()[17],
-        responseMessageRef->messageStorage0c->PayloadBase()[18],
-        responseMessageRef->messageStorage0c->PayloadBase()[19],
-        responseMessageRef->messageStorage0c->PayloadBase()[20],
-        responseMessageRef->messageStorage0c->PayloadBase()[21]);
 
     // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
     spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
