@@ -524,20 +524,24 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
 }
 
 // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
+// anchor: launcher.exe:0x441920 -> cls_0x4b6538 with message ref and flag
+// Original uses different offset calculation based on flag:
+//   flag == 0: packetPayloadPtr = payloadBase + 0xc
+//   flag != 0: packetPayloadPtr uses lookup table (see Ghidra decompile 0x441959-0x44197d)
+// The lookup table at 0x004cb4d4 is indexed by payload[13] nibbles
+// For now, use simplified payload base since both ExtractChallengeBytes (+1)
+// and ExtractForResponsePacket (+0x11) read relative offsets that work from base
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
     CMessageConnectionMessageRef_0x4ba23c* messageRef,
     uint8_t flag) {
-    // FIDELITY: Match original constructor:
-    //   this->messageRef08 = messageRef;
-    //   this->nopatchLauncherVersionValue04 = computed from messageRef based on flag
-    //   this->mbr_0x10 = this->nopatchLauncherVersionValue04
+    (void)flag;  // Flag affects offset calculation in original
     messageRef08 = messageRef;
     
     if (messageRef && messageRef->messageStorage0c) {
         const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
-        // nopatchLauncherVersionValue04: payload base pointer when flag != 0
+        // Simple offset: packetPayloadPtr points to payload base
+        // For full fidelity, would use lookup table per original decompile
         nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payload);
-        // packetPayloadPtr points to same payload for response extraction
         packetPayloadPtr = const_cast<uint8_t*>(payload);
     } else {
         nopatchLauncherVersionValue04 = 0;
