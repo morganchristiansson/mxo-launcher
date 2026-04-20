@@ -2854,12 +2854,11 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
 
     // anchor: launcher.exe:0x441f73 - reserve length-prefixed tail for bootstrap reply copy
     // Original: LocalPacketBuilder_ReserveLengthPrefixedTail(this, 0x136)
-    // The original helper grows by (param_1 + 2) internally, so we do the same: 0x136 + 2 = 0x138
-    uint8_t* packetPayload = static_cast<uint8_t*>(packetBuilder.payloadBegin10);
-    const uint16_t currentPayloadByteCount = packetBuilder.messageRef08->messageStorage0c->PayloadByteCount();
-    uint8_t* reservationHeader = packetPayload + currentPayloadByteCount;
-    const uint16_t requestedGrowth = kReplyCopyByteCount + sizeof(uint16_t);
-    packetBuilder.messageRef08->messageStorage0c->GrowPayloadByteCount(requestedGrowth);
+    // This helper is used by 3 packet builder subclasses, grows by (param_1 + 2) internally
+    // After GrowPayloadByteCount(3), payloadBegin10 points to byte 3, reservation goes at byte 3+3=6
+    uint8_t* reservationHeader = static_cast<uint8_t*>(packetBuilder.payloadBegin10) + 3u;
+    // Grow by (contentBytes + 2) for length prefix - matches original helper behavior
+    packetBuilder.messageRef08->messageStorage0c->GrowPayloadByteCount(kReplyCopyByteCount + 2u);
     // Write the length prefix (little-endian)
     reservationHeader[0] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
     reservationHeader[1] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
@@ -2875,19 +2874,15 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     // Original calls (**(code **)(vftptr + 0x24))(&packetBuilder, 0)
     // Return value is ignored in the original
     CMessageConnectionPacketBuilderEnvelope envelope;
-    envelope.vtable00 = const_cast<void**>(reinterpret_cast<const void**>(0x004b6524));
-    envelope.payloadBase04 = static_cast<uint8_t*>(packetBuilder.payloadBegin10);
     envelope.messageRef08 = packetBuilder.messageRef08;
     ForwardPacketBuilderEnvelopeToSendPacket(envelope);
 
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent packetBuilderVtable=0x{:08x} "
-        "payloadBase10={} reservedReplyCopyBytes=0x{:03x} totalPayloadBytes=0x{:03x} "
+        "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent "
+        "payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
         "this={} ownerContext={} remoteHost='{}'",
-        0x004b6524u,
         fmt::ptr(packetBuilder.payloadBegin10),
         static_cast<unsigned>(packetBuilder.reservedContentByteCount18),
-        static_cast<unsigned>(packetBuilder.messageRef08->messageStorage0c->PayloadByteCount()),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
