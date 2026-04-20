@@ -3106,17 +3106,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442a05: CALL 0x468dc0                 ; meth_0x468dc0(0, &DAT_00000020)
     //   0x442a0a: PUSH 0x4a6e80
     //   0x442a0f: CALL 0x48bc66                 ; _atexit(FUN_004a6e80)
-    if ((g_CryptoInitializedFlag_0x4f7c20 & 1) == 0) {
-        g_CryptoInitializedFlag_0x4f7c20 |= 1;
-        // Create crypto context at global 0x4f7bf4 with size 0x180
-        g_CryptoContext_0x4f7bf4 = std::make_unique<CryptoInitHelper_0x4b42bc>(0x180);
-        // Set vtables (handled by C++ vtable mechanism in our implementation)
-        // Call meth_0x468dc0(0, nullptr) - original passes &DAT_00000020
-        if (g_CryptoContext_0x4f7bf4) {
-            g_CryptoContext_0x4f7bf4->InitializeCryptoState(0, nullptr);
-        }
-        // Note: atexit handler omitted - C++ handles cleanup via unique_ptr
-    }
+    //
+    // FIDELITY: Call EnsureCryptoContextInitialized() which replicates the original
+    // sequence: constructor call, manual vtable pointer setup, InitializeCryptoState call
+    EnsureCryptoContextInitialized();
 
     // anchor: launcher.exe:0x4429b0 -> this+0xa0 bootstrap prep state
     // Original: Loads [this+0xa0], calls prep-object vtable +0x1c (0x437810)
@@ -3216,7 +3209,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer (96 bytes)]
 
     // Get crypto context pointer - matching original global at 0x004f7bf4
-    void* cryptoContext = g_CryptoContext_0x4f7bf4 ? g_CryptoContext_0x4f7bf4.get() : nullptr;
+    // anchor: &DAT_004f7bf4 - the crypto context with vtables 0x4b695c/0x4b68a8/0x4b41e0
+    void* cryptoContext = &g_CryptoInitHelper_0x4f7bf4;
 
     bootstrapPrepStateA0_->DecryptChallenge(
         decryptOutput.data(),
