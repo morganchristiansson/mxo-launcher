@@ -426,9 +426,12 @@ public:
         }
     }
 
-    // anchor: launcher.exe:0x4419c0 / vtable slot 3 (OVERRIDDEN)
+    // anchor: launcher.exe:0x4419c0 / vtable slot 3 (OVERRIDDEN) -> InitializePayloadSize
     // InitializePayloadSize - setup for packet 0x11 (challenge response)
-    // Original at 0x4419c0: allocates payload size 0x21, sets opcode byte to 0x00
+    // Original at 0x4419c0 uses g_MessageOffsetLookupTable with payload[13] nibbles:
+    //   offset = g_MessageOffsetLookupTable[(payload[13] >> 4) & 7] + 0x12 + g_MessageOffsetLookupTable[payload[13] & 7]
+    // Then allocates 0x21 bytes and sets opcode byte to 0x00
+    // FIDELITY TODO: Source stub - should implement lookup table logic from binary
     void InitializePayloadSize() override {
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(0x21);
@@ -449,7 +452,7 @@ public:
     // Allow default construction for stack-local envelope instances
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538();
 
-    // anchor: launcher.exe:0x441920 -> PacketBuilder_CertChallengeResponse_FromMessageRef
+    // anchor: launcher.exe:0x441920 -> CLTLoginMediatorPacketBuilderEnvelope_ctor_MessageRefAndFlag
     // Original signature: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
     // FIDELITY: Proper constructor matching original:
     //   this->messageRef08 = messageRef;
@@ -509,8 +512,8 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     }
 }
 
-// anchor: launcher.exe:0x441920 -> PacketBuilder_CertChallengeResponse_FromMessageRef
-// PacketBuilder_CertChallengeResponse_0x4b6538 ctor with message ref and flag
+// anchor: launcher.exe:0x441920 -> CLTLoginMediatorPacketBuilderEnvelope_ctor_MessageRefAndFlag
+// CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 ctor with message ref and flag
 // Original uses different offset calculation based on flag:
 //   flag == 0: packetPayloadPtr = payloadBase + 0xc
 //   flag != 0: packetPayloadPtr uses lookup table (see Ghidra decompile 0x441959-0x44197d)
