@@ -500,10 +500,10 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
         // nopatchLauncherVersionValue04 = message ref payload base + 0xc (actual payload data offset within storage)
         if (newMessageRef->messageStorage0c) {
             uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBase();
-            // Original adds +0x0c to get to actual payload data
+            // FIDELITY: Original sets field_0x4 = payloadBase + 0xc
+            // The 0xc offset accounts for header bytes in the message storage
             nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
-            // Set packetPayloadPtr to point to payload for response extraction
-            packetPayloadPtr = payloadBase;
+            packetPayloadPtr = payloadBase + 0xc;  // Match original field_0x4
         }
     }
 }

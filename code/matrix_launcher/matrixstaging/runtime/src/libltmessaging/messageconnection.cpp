@@ -3501,16 +3501,20 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442b2c: MOV EAX,dword ptr [EDI + 0xc]    ; fourth dword from seed+0x1d
     //   0x442b2f: MOV dword ptr [ECX + 0xc],EAX    ; copy to response+0xd
     // FIDELITY: No ExtractForResponsePacket() helper - all inline dword copies
-    // Packet structure: [opcode=3][16 challenge response bytes] = 17 bytes total
+    // Packet structure: [opcode=0x03][0x00][0x00][16 challenge response bytes] = 19 bytes total
+    // The 2 zero bytes after opcode are the "special bytes" that were being skipped
     uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
     if (envelope.packetPayloadPtr && responsePayload) {
         responsePayload[0] = 0x03;  // opcode
-        // Copy 4 dwords from envelope.packetPayloadPtr+0x11/0x15/0x19/0x1d to responsePayload+1/5/9/0xd
-        *reinterpret_cast<uint32_t*>(responsePayload + 1) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x11);
-        *reinterpret_cast<uint32_t*>(responsePayload + 5) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x15);
-        *reinterpret_cast<uint32_t*>(responsePayload + 9) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x19);
-        *reinterpret_cast<uint32_t*>(responsePayload + 13) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x1d);
-        responseMessageRef->GrowPayloadByteCount(17);  // 1 opcode + 16 response bytes
+        responsePayload[1] = 0x00;  // special byte 1
+        responsePayload[2] = 0x00;  // special byte 2
+        // Copy 16 bytes (4 dwords) from envelope.packetPayloadPtr+0x11/0x15/0x19/0x1d 
+        // to responsePayload+3/7/0xb/0xf (after opcode + 2 special bytes)
+        *reinterpret_cast<uint32_t*>(responsePayload + 3) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x11);
+        *reinterpret_cast<uint32_t*>(responsePayload + 7) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x15);
+        *reinterpret_cast<uint32_t*>(responsePayload + 11) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x19);
+        *reinterpret_cast<uint32_t*>(responsePayload + 15) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x1d);
+        responseMessageRef->GrowPayloadByteCount(19);  // 1 opcode + 2 special + 16 response bytes
     } else {
         spdlog::warn("HandleCode2ForBootstrap: missing envelope.packetPayloadPtr or responsePayload for response packet");
         return 0u;
