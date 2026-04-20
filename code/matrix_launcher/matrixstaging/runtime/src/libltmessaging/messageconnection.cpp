@@ -2037,29 +2037,6 @@ uint32_t CMessageConnection_0x4b7928::SendPacket(const void* packetData, uint32_
     return CLTTCPConnection::SendBuffer(packetData, packetByteCount, completionContext);
 }
 
-// anchor family: launcher.exe:0x449cd0
-// Source-owned bool-return wrapper over the inherited `CLTTCPConnection_Connect` path.
-uint32_t CMessageConnection_0x4b7928::EnsureConnected() {
-    if (!Engine()) {
-        spdlog::debug(
-            "CMessageConnection::EnsureConnected failed because engine is null this={} ownerContext={} remoteHost='{}'",
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-        return 0;
-    }
-
-    const uint32_t result = CLTTCPConnection::Connect(this->remoteEndpoint_);
-    if (result == 0u) {
-        spdlog::debug(
-            "CMessageConnection::EnsureConnected connect failed this={} ownerContext={} remoteHost='{}'",
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    }
-    return result;
-}
-
 // anchor: launcher.exe:0x455cd0 - CMessageConnectionMessage_CreateRef
 void CMessageConnectionMessage_CreateRef(
     MessageConnectionMessageRefHelper_0x4489d0* messageRefHelper,

@@ -1254,11 +1254,6 @@ public:
     // engine field; no separate leaf-owned engine slot is evidenced here.
     CLTThreadPerClientTCPEngine_0x4b2768* Engine() const;
 
-    // anchor family: launcher.exe:0x449cd0
-    // Source-owned bool-return wrapper over the inherited `CLTTCPConnection::Connect` body that
-    // reads connection `remoteEndpoint_` directly and then calls engine slot `+0x18`.
-    uint32_t EnsureConnected();
-
     // anchor family: launcher.exe:0x449d20
     // Source-owned raw-byte wrapper over the inherited `CLTTCPConnection::SendBuffer` path.
     // Keep this distinct from the local packet-builder / message-ref send family rooted at:

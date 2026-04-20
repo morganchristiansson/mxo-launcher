@@ -207,7 +207,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // Original only sets endpoint and calls EnsureConnected - no SetRemoteHostName
 
     spdlog::info(
-        "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",
+        "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> Connect()",
         g_qsAuthServerDNSName ? g_qsAuthServerDNSName : "<empty>",
         static_cast<unsigned>(authConnectAttemptCount28_),
         static_cast<unsigned>(authAddressList4c_.Count()),
