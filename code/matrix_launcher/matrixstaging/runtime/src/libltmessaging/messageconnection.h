@@ -477,40 +477,7 @@ public:
 static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x2c,
               "CLTLoginMediatorPacketBuilderEnvelope size mismatch");
 
-/**
- * Implementation: Default constructor for stack-local envelope instances.
- * This mirrors the original cls_0x4b6538 constructor that takes messageRef and '\x01' flag,
- * but we use a simpler default-constructed version since we're using static helpers.
- *
- * anchor: launcher.exe:0x439840 - PacketBuilder_0x4af2a4_DefaultCtor
- * Note: This is the base PacketBuilder ctor, NOT specific to CLTLoginMediatorPacketBuilderEnvelope
- * Sets vftable to Packet_0x4af2a4__vftable, creates message ref at +0x8, sets +0x4
- */
-inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() {
-    // Default initialization - mirror original at 0x439840
-    // The original sets vftable to PacketBuilder vtable
-    // Then creates a message ref and stores it at messageRef08 (+0x08)
-    // Then sets nopatchLauncherVersionValue04 = *(int *)(this->messageRef08 + 0xc) + 0xc
-    // Which means: get messageStorage at +0x0c, get its payload base at +0x0c, add +0x0c = actual payload start
-
-    // Create message ref as per original 0x439840
-    CMessageConnectionMessageRef_0x4ba23c* newMessageRef = new CMessageConnectionMessageRef_0x4ba23c();
-    if (newMessageRef) {
-        newMessageRef->AddRef();
-        // Initialize message storage
-        newMessageRef->ResetForPacketBuilder(false, 0);
-        // Store message ref at messageRef08
-        messageRef08 = newMessageRef;
-        // nopatchLauncherVersionValue04 = message ref payload base + 0xc (actual payload data offset within storage)
-        if (newMessageRef->messageStorage0c) {
-            uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBase();
-            // FIDELITY: Original sets field_0x4 = payloadBase + 0xc
-            // The 0xc offset accounts for header bytes in the message storage
-            nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
-            packetPayloadPtr = payloadBase + 0xc;  // Match original field_0x4
-        }
-    }
-}
+// Default constructor is inherited from base Packet_0x4af2a4 (anchor: launcher.exe:0x439840)
 
 // anchor: launcher.exe:0x441920 -> CLTLoginMediatorPacketBuilderEnvelope_ctor_MessageRefAndFlag
 // CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 ctor with message ref and flag

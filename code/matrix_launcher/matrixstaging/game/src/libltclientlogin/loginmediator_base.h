@@ -87,6 +87,23 @@ public:
     // anchor: launcher.exe:0x481760 / vtable +0x10
     // Returns payload base pointer (payloadBegin10 field)
     virtual void* GetPayloadBase() { return payloadBegin10; }
+
+    // anchor: launcher.exe:0x439840 - PacketBuilder_0x4af2a4_DefaultCtor
+    // Default constructor - creates message ref, sets up payload base at +0xc offset
+    Packet_0x4af2a4() {
+        // Create message ref as per original 0x439840
+        messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+        if (messageRef08) {
+            messageRef08->AddRef();
+            messageRef08->ResetForPacketBuilder(false, 0);
+            if (messageRef08->messageStorage0c) {
+                uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
+                // Original sets field_0x4 = payloadBase + 0xc
+                nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
+                payloadBegin10 = payloadBase + 0xc;
+            }
+        }
+    }
 };
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
