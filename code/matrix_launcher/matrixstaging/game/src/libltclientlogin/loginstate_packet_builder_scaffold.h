@@ -106,7 +106,7 @@ protected:
         if (!messageStorage) {
             return;
         }
-        statusByte16 = 0u;
+        statusByte1a = 0u;
         messageStorage->ResetPayloadByteCount(static_cast<uint16_t>(fixedByteCount));
         payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
     }

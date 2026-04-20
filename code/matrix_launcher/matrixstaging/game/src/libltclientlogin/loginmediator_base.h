@@ -44,7 +44,7 @@ struct Arg6SelectionConfig;
 // Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef
 // for internal message storage. This is the shared base pattern used by
 // CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
-// Full object size: 0x32 (50 bytes)
+// Note: Ghidra decompiler shows this as a component within SlotRecord_0x4b5328.
 // VTable methods (inherited by derived classes):
 // - +0x00: dtor / release retained outer message-ref (0x00443aa0)
 // - +0x04: stub returns 0 (0x00437b50)
@@ -55,15 +55,16 @@ class Packet_0x4af2a4 {
 public:
     // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
     // +0x00: vtable pointer (C++ implicit)
-    uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04
+    uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04: payload base pointer (set to messageStorage->payloadBytes0c + 0xc)
     ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                  // +0x0c
 
     // Payload pointers (set by derived classes):
-    void* payloadBegin10 = nullptr;               // +0x10
-    const char* heapString14 = nullptr;           // +0x14 (char* in original, at Packet_0x4af2a4 offset)
-    uint16_t payloadLength14 = 0;                 // +0x18
-    uint8_t statusByte16 = 0;                     // +0x1a
+    void* payloadBegin10 = nullptr;               // +0x10: alias of nopatchLauncherVersionValue04 in some contexts
+    const char* heapString14 = nullptr;           // +0x14: heap-allocated string pointer (debug/cert info)
+    uint16_t payloadLength18 = 0;                 // +0x18: payload length in bytes
+    uint8_t statusByte1a = 0;                     // +0x1a: status/packet type byte
+    uint8_t padding1b = 0;                        // +0x1b: alignment padding
 
     // Character slot fields (used by derived slot record):
     uint32_t characterIdLow1c = 0;                 // +0x1c
@@ -88,10 +89,23 @@ public:
     // Returns payload base pointer (payloadBegin10 field)
     virtual void* GetPayloadBase() { return payloadBegin10; }
 
-    // anchor: launcher.exe:0x439840 - PacketBuilder_0x4af2a4_DefaultCtor
+    // anchor: launcher.exe:0x439840 - Packet_0x4af2a4_DefaultCtor
     // Default constructor - creates message ref, sets up payload base at +0xc offset
+    // 
+    // DECOMPILER ARTIFACT NOTE (Ghidra 0x439840):
+    // The decompiler incorrectly shows:
+    //   messageRefHelper_local.messageRef00 = (CMessageConnectionMessageRef_0x4ba23c *)this;
+    // before calling CMessageConnectionMessage_CreateRef(&messageRefHelper_local, 0).
+    // Actual behavior: messageRefHelper_local is an uninitialized 4-byte stack local.
+    // CMessageConnectionMessage_CreateRef creates a NEW message ref and stores it in
+    // messageRefHelper_local.messageRef00, then the AddRef/Release dance updates this->messageRef08.
     Packet_0x4af2a4() {
         // Create message ref as per original 0x439840
+        // Note: Uses CMessageConnectionMessage_CreateRef helper which:
+        // 1. Calls CMessageConnectionMessage_Create() to allocate new ref
+        // 2. Sets messageContext14 = 0
+        // 3. Stores in helper->messageRef00
+        // 4. Calls AddRef on the new ref
         messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
         if (messageRef08) {
             messageRef08->AddRef();
@@ -110,7 +124,7 @@ public:
 // anchor: launcher.exe:0x439910 / dtor
 // Character slot record class. VTable at 0x4b5328 semantically inherits from
 // Packet_0x4af2a4's vtable at 0x4af2a4 (first 4 slots match, slot 4 is overridden).
-// Ghidra shows SlotRecord_0x4b5328 contains PacketBuilder component at offset 0.
+// Ghidra decompiler shows SlotRecord_0x4b5328 contains Packet_0x4af2a4 as a component (composition).
 // Full object size: 0x32 (50 bytes) - verified against launcher.exe
 // VTable methods (5 slots at 0x4b5328):
 // - +0x00: dtor (0x439910) - overrides PacketBuilder dtor
@@ -123,17 +137,20 @@ public:
 // to verify object layout matches (vptr placement, field offsets, total size).
 class SlotRecordState_0x4b5328 {
 public:
-    // PacketBuilder layout at +0x00:
+    // PacketBuilder layout at +0x00 (composition - Ghidra shows as cls_0x4af2a4 member):
     // Note: Removed explicit vtable00 field - C++ vptr is implicit with virtual methods
     // This is a key step towards C++ inheritance from Packet_0x4af2a4
     uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04 (vptr is at +0x00, implicit)
     liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                             // +0x0c
     void* payloadBegin10 = nullptr;                            // +0x10
-    const char* heapString14 = nullptr;                        // +0x14 - THIS IS WHAT GETS ACCESSED!
-    uint16_t padding16 = 0;                                   // +0x16
-    uint8_t statusByte16 = 0;                                  // +0x18
+    const char* heapString14 = nullptr;                        // +0x14
+    uint16_t padding16 = 0;                                    // +0x16
+    uint8_t statusByte18 = 0;                                  // +0x18: status/packet type byte
+    uint8_t padding19 = 0;                                     // +0x19: alignment padding
     // ... rest of PacketBuilder fields through +0x31
+    // Note: Packet_0x4af2a4 has characterIdLow1c/worldId24 at +0x1c/+0x24,
+    // but SlotRecordState_0x4b5328 uses different fields at +0x32+
 
     // Slot-record specific fields at +0x32 (extend PacketBuilder layout):
     // These fields semantically override PacketBuilder's characterId/worldId fields
