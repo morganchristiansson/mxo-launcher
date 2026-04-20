@@ -11,7 +11,7 @@ using byte = uint8_t;
 // Reference-counted base class
 // anchor: launcher.exe:0x4b42b0 vtable (12 bytes = 3 slots)
 // Constructor: 0x437900, Destructor: 0x41cda0
-// FIDELITY: Original has this base class at multiple offsets via virtual inheritance
+// Used as base at offset 0 and as embedded subobject at offset 4
 class CLTReferenceCountedBase_0x4b42b0 {
 public:
     // anchor: launcher.exe:0x437900
@@ -22,6 +22,19 @@ public:
     // +0x0: dtor ~CLTReferenceCountedBase_0x4b42b0 (0x41cda0)
     // +0x4: unknown method
     // +0x8: ResetUnknownString (0x41d880) - "auth string helper"
+    
+    // Anchor for vtable pointer storage (matches original offset 0 in subobject)
+    // In original this is just the vtable pointer, no other members
+};
+
+// Second reference-counted subobject at offset 4
+// anchor: launcher.exe:0x4b9fa0 / 0x4bace0 vtables at offset 4
+// This is the same class as CLTReferenceCountedBase_0x4b42b0 but with different vtables
+// during construction. We use a distinct type for C++ multiple inheritance fidelity.
+class CLTReferenceCountedBase2_0x4b42b0 {
+public:
+    CLTReferenceCountedBase2_0x4b42b0(char initFlag);
+    virtual ~CLTReferenceCountedBase2_0x4b42b0() = default;
 };
 
 // Child object base class for owner dispatch
@@ -49,12 +62,29 @@ public:
 
 // Crypto initialization helper class
 // anchor: launcher.exe:0x4b42bc vtable (64 bytes)
-// FIDELITY NOTE: Original uses multiple inheritance with virtual bases:
-//   - cls_0x4b42b0 appears at offset 0 AND offset 4 (two subobjects)
-//   - cls_0x4b41e0 at offset 8 (mbr_0x8) - installed after intermediate init
-//   - Constructor installs multiple vtables during setup (0x4b42bc, 0x4b9fa0, 0x4bace0)
-// Current source uses simplified inheritance model with single CLTReferenceCountedBase
-class CryptoInitHelper_0x4b42bc : public CLTReferenceCountedBase_0x4b42b0 {
+// 
+// FIDELITY: Original object layout from constructor (0x4686e0):
+//   offset 0x00: cls_0x4b42b0 subobject #1 (initialized with flag 1)
+//                vtable progression: 0x4b42bc -> 0x4bacbc
+//   offset 0x04: cls_0x4b42b0 subobject #2 (initialized with flag 0)
+//                vtable progression: 0x4b9fa0 -> 0x4bace0
+//   offset 0x08: cls_0x4b41e0 vtable pointer
+//                progression: 0x4b3e18 (briefly) -> 0x4b41e0
+//   offset 0x10: mbr_0x10 (param_1, allocation size)
+//   offset 0x14: mbr_0x14 (allocated buffer pointer)
+//   offset 0x1c: mbr_0x1c (0x40 - second buffer size)
+//   offset 0x20: mbr_0x20 (second allocated buffer)
+//   offset 0x24: mbr_0x24 (0)
+//   offset 0x28: mbr_0x28 (param_1 copy)
+//
+// C++ IMPLEMENTATION: Using multiple inheritance to match offsets:
+//   - CLTReferenceCountedBase_0x4b42b0 at offset 0 (primary base)
+//   - CLTReferenceCountedBase2_0x4b42b0 at offset 4 (second subobject)
+//   - CLTChildObjectBase_0x4b41e0 at offset 8 (third base)
+class CryptoInitHelper_0x4b42bc 
+    : public CLTReferenceCountedBase_0x4b42b0   // offset 0
+    , public CLTReferenceCountedBase2_0x4b42b0 // offset 4
+    , public CLTChildObjectBase_0x4b41e0 {      // offset 8
 public:
     CryptoInitHelper_0x4b42bc(uint32_t param1);
     ~CryptoInitHelper_0x4b42bc();

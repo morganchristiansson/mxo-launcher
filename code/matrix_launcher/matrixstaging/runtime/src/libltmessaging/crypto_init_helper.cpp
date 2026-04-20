@@ -15,7 +15,14 @@ uint32_t g_CryptoInitializedFlag_0x4f7c20 = 0;
 // anchor: launcher.exe:0x437900
 CLTReferenceCountedBase_0x4b42b0::CLTReferenceCountedBase_0x4b42b0(char initFlag) {
     // Original: sets vtable to 0x4b42b0, optionally calls virt_meth_0x437b40
-    // FIDELITY: C++ handles vtable; stubbed initFlag check
+    // FIDELITY: C++ handles vtable; this subobject gets 0x4b42bc then 0x4bacbc
+    (void)initFlag;
+}
+
+// anchor: launcher.exe:0x437900 (same ctor, different vtable progression)
+CLTReferenceCountedBase2_0x4b42b0::CLTReferenceCountedBase2_0x4b42b0(char initFlag) {
+    // Original: sets vtable to 0x4b9fa0, then 0x4bace0
+    // FIDELITY: Second subobject at offset 4, initialized with flag 0
     (void)initFlag;
 }
 
@@ -41,22 +48,26 @@ void CLTChildObjectBase_0x4b41e0::NotifyOwner() {
 }
 
 CryptoInitHelper_0x4b42bc::CryptoInitHelper_0x4b42bc(uint32_t param1)
-    : CLTReferenceCountedBase_0x4b42b0('\x01'),  // First base at offset 0
+    : CLTReferenceCountedBase_0x4b42b0('\x01'),   // offset 0: subobject #1, flag 1
+      CLTReferenceCountedBase2_0x4b42b0('\x00'),  // offset 4: subobject #2, flag 0
+      CLTChildObjectBase_0x4b41e0(),              // offset 8: dispatch base
       mbr_0x10(param1),
       mbr_0x14(0),
       mbr_0x1c(0x40),
       mbr_0x20(nullptr),
       mbr_0x24(0),
       mbr_0x28(param1) {
-    // FIDELITY NOTE: Original has complex multiple/virtual inheritance:
-    //   1. cls_0x4b42b0 at offset 0 (flag '\x01') - our CLTReferenceCountedBase_0x4b42b0
-    //   2. cls_0x4b42b0 at offset 4 (flag '\x0') - second subobject  
-    //   3. cls_0x4b41e0 at offset 8 - CLTChildObjectBase_0x4b41e0 dispatch base
-    //   
-    // Constructor installs multiple vtables during setup:
-    //   - 0x4b42bc (primary), 0x4b9fa0, 0x4bace0, 0x4bacbc, etc.
-    //   - Intermediate vtable 0x4b3e18 briefly installed at offset 8
-    //   - Final vtable 0x4b41e0 at offset 8
+    // FIDELITY NOTE: Original constructor at 0x4686e0 installs multiple vtables:
+    //   offset 0: 0x4b42bc -> 0x4bacbc (our primary vtable chain)
+    //   offset 4: 0x4b9fa0 -> 0x4bace0 (second subobject vtables)
+    //   offset 8: 0x4b3e18 -> 0x4b41e0 (CLTChildObjectBase vtable progression)
+    //
+    // C++ multiple inheritance gives us proper layout:
+    //   [0-3]: CLTReferenceCountedBase_0x4b42b0 vtable
+    //   [4-7]: CLTReferenceCountedBase2_0x4b42b0 vtable  
+    //   [8-11]: CLTChildObjectBase_0x4b41e0 vtable pointer
+    //   [12-15]: padding
+    //   [16+]: CryptoInitHelper-specific fields (mbr_0x10, mbr_0x14, etc.)
     
     // anchor: launcher.exe:0x4686e0 - constructor
     // Initialize memory blocks
