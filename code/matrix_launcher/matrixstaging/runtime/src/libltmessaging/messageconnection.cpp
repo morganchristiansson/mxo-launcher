@@ -835,18 +835,30 @@ static void CMessageConnection_0x4b7928_ApplySendMessageRefMutations(
         return;
     }
 
-    // anchor: launcher.exe:0x448cf0
-    // The send-mode branch tests inner `+0x12` (`payload + 0x06`) and, only when that dword is
-    // still zero, writes:
-    // - inner `+0x12 .. +0x15` = 00 00 00 00
-    // - inner `+0x16` = 0xff
-    // - inner `+0x17` = 0xff
+    // anchor: launcher.exe:0x448cf0 / mutation block at 0x448d08
+    // Mirror of original mutation logic for headerless send mode:
+    // - Tests payload offset +6 (inner storage +0x12) as a dword locator
+    // - If locator is zero, writes 4 bytes from g_messageConnectionZeroTransactionId
+    //   (launcher.exe:0x4f7ce8 = 00 00 00 00) to payload offset +6
+    // - Then writes g_messageConnectionDefaultFieldHighByte (launcher.exe:0x4cbd99 = 0xff)
+    //   to payload offset +10 (inner storage +0x16)
+    // - And writes g_messageConnectionDefaultFieldLowByte (launcher.exe:0x4cbd98 = 0xff)
+    //   to payload offset +11 (inner storage +0x17)
+    //
+    // Packet layout context:
+    // - Offset 0: Frame byte (header flag in high bit)
+    // - Offset 1-2: Protocol/Opcode (2 bytes) - this is the "2 byte field at offset 1"
+    // - Offset 3: Additional flags
+    // - Offset 4-7: Transaction ID (4 bytes, written by this mutation if zero)
+    // - Offset 8-9: Reserved/padding (not touched by mutation)
+    // - Offset 10-11: Default field values (0xFF 0xFF written by this mutation)
     CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRef->messageStorage0c;
     uint8_t* const payloadBase = messageStorage.PayloadBase();
     if (!payloadBase) {
         return;
     }
 
+    // anchor: launcher.exe:0x448d0e - check locator at payload+6 (storage+0x12)
     const uint32_t locatorDword06 =
         static_cast<uint32_t>(payloadBase[6]) |
         (static_cast<uint32_t>(payloadBase[7]) << 8u) |
@@ -856,9 +868,15 @@ static void CMessageConnection_0x4b7928_ApplySendMessageRefMutations(
         return;
     }
 
+    // anchor: launcher.exe:0x448d18 - copy 4 bytes from g_messageConnectionZeroTransactionId
+    // The original uses a byte-by-byte copy loop; we use fill_n for equivalent semantics
     std::fill_n(payloadBase + 6u, 4u, 0u);
-    payloadBase[10] = 0xffu;
-    payloadBase[11] = 0xffu;
+
+    // anchor: launcher.exe:0x448d35 / 0x448d3e - write 0xFF bytes
+    // These correspond to g_messageConnectionDefaultFieldHighByte (0x4cbd99) and
+    // g_messageConnectionDefaultFieldLowByte (0x4cbd98) respectively
+    payloadBase[10] = 0xffu;  // inner +0x16
+    payloadBase[11] = 0xffu;  // inner +0x17
 }
 
 // anchor: launcher.exe:0x448cf0 post-submit/or-discard cleanup on the original input message-ref
@@ -1063,12 +1081,21 @@ uint32_t CMessageConnection_0x4b7928::SubmitMessageRefBytes(
         reinterpret_cast<void*>(1u));
 }
 
-// anchor: launcher.exe:0x448cf0
+// anchor: launcher.exe:0x448cf0 / CMessageConnection_SendPacket
 // Faithful mirror of the original message-ref-based `CMessageConnection::SendPacket` family.
 // Inherited margin/auth send path reached from mediator send helper via connection wrapper
 // 0x41cf30. Consumes the envelope/shared message object extracted from the stack-local packet
 // builder, performs packet-agenda filtering, then reaches CMessageConnection_SubmitEnvelopeBytes
 // (0x448a00).
+//
+// Ghidra globals documentation:
+// - g_bMessageConnectionGlobalSendLoggingEnabled (launcher.exe:0x4f8364) - master toggle for send logging
+// - g_bMessageConnectionSendPacketLoggingEnabled (launcher.exe:0x4d3e90) - per-send logging toggle
+// - g_pLogRouterInstance (launcher.exe:0x4d3d68) - LogRouter singleton for dispatch
+// - g_pMessageConnectionAlternatePacketNameCallback (launcher.exe:0x4f7cec) - alternate packet name decoder
+// - g_messageConnectionZeroTransactionId (launcher.exe:0x4f7ce8, 4 bytes) - zero fill for mutation
+// - g_messageConnectionDefaultFieldHighByte (launcher.exe:0x4cbd99) - 0xff constant for mutation
+// - g_messageConnectionDefaultFieldLowByte (launcher.exe:0x4cbd98) - 0xff constant for mutation
 void CMessageConnection_0x4b7928::SendPacketMessageRef(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     if (!Engine() || !messageRef.messageStorage0c) {
@@ -1077,10 +1104,13 @@ void CMessageConnection_0x4b7928::SendPacketMessageRef(
 
     // Apply send message ref mutations (headerless mode specific)
     // anchor: launcher.exe:0x448d03 - mutation logic for headerless messages
+    // This mutation writes to payload offsets +6..+11 when the locator at +6 is zero.
+    // The 2-byte field at payload offset 1 (Protocol/Opcode) is NOT touched here.
+    // That field is set by the packet builder before reaching this function.
     CMessageConnection_0x4b7928_ApplySendMessageRefMutations(&messageRef);
 
-    // Apply packet agenda filtering
-    // anchor: launcher.exe:0x448f5e - agenda processing logic
+    // Apply packet agenda filtering (compression/encryption modules)
+    // anchor: launcher.exe:0x448f5e - agenda processing via packetAgenda74
     bool agendaTouched = false;
     CMessageConnectionMessageRef_0x4ba23c* messageRefForSubmit =
         ApplySendPacketAgenda(messageRef, &agendaTouched);
@@ -1089,45 +1119,50 @@ void CMessageConnection_0x4b7928::SendPacketMessageRef(
     // anchor: launcher.exe:0x448f63 - null check and agenda processing
     if (!messageRefForSubmit || !messageRefForSubmit->messageStorage0c) {
         // Packet discarded by agenda - log appropriately based on message type
+        // anchor: launcher.exe:0x448f94 - discarded packet logging path
         spdlog::warn("SendPacketMessageRef: packet DISCARDED by agenda! agendaTouched={}", agendaTouched);
-        // anchor: launcher.exe:0x448f94 - discarded packet logging
         if (g_LogRouter) {
+            // Logging mirrors original LogRouter_DispatchMappedSourceLocMessageWithLevelGateV calls
+            // The original checks g_bMessageConnectionGlobalSendLoggingEnabled and
+            // g_bMessageConnectionSendPacketLoggingEnabled before dispatching.
             if (messageRef.headerless10 == 0u) {
+                // Headered (non-headerless) message logging path
+                // anchor: launcher.exe:0x448da1 - headered logging with g_pMessageConnectionAlternatePacketNameCallback
+                if (g_PacketNameDecoderAlternate != nullptr) {
+                    // TODO: Implement proper alternate packet name decoder invocation
+                    // Original: (*g_pMessageConnectionAlternatePacketNameCallback)(packetMessageRef, 1)
+                }
+                // TODO: Implement proper packet/msg IDs, endpoints, and TTL extraction
+                spdlog::info("Sending message {} (P: {}, M: {}) from LKAIP: {}.{}.{}.{}, LKAProcId: {} to LKAIP: {}.{}.{}.{}, LKAProcId: {} (ttl = {}).\n",
+                    "UNKNOWN", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            } else {
                 // Headerless message logging path
-                // anchor: launcher.exe:0x448d5e - headerless logging setup
+                // anchor: launcher.exe:0x448d5e - headerless logging with packetNameCallback70
                 if (packetNameCallback_ != 0) {
                     // TODO: Implement proper packet name callback invocation
-                    // packetNameCallback_ is a uintptr_t function pointer that needs proper typing
+                    // packetNameCallback_ is a uintptr_t function pointer at connection+0x70
+                    // Original: (*packetNameCallback70)(packetMessageRef, 0)
                 }
                 // TODO: Implement proper endpoint extraction and packet name decoding
                 spdlog::info("Sending headerless message {} (M: {}) to {}.{}.{}.{}:{}.\n",
                     "UNKNOWN", 0, 0, 0, 0, 0, 0);
-            } else {
-                // Headered message logging path
-                // anchor: launcher.exe:0x448e50 - headered logging setup
-                if (g_PacketNameDecoderAlternate != nullptr) {
-                    // TODO: Implement proper alternate packet name decoder invocation
-                }
-                // TODO: Implement proper packet/msg IDs, endpoints, and TTL
-                spdlog::info("Sending message {} (P: {}, M: {}) from LKAIP: {}.{}.{}.{}, LKAProcId: {} to LKAIP: {}.{}.{}.{}, LKAProcId: {} (ttl = {}).\n",
-                    "UNKNOWN", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             }
         }
 
         // Clear high bit on original message ref when headerless
-        // anchor: launcher.exe:0x448f87 - high bit clearing logic
+        // anchor: launcher.exe:0x448f87 - high bit clearing logic on payloadBytes0c[0]
         CMessageConnection_0x4b7928_ClearSendMessageRefFirstPayloadByteHighBit(&messageRef);
         return;
     }
 
     // Submit the message through the engine
-    // anchor: launcher.exe:0x448f72 - submit bytes call
+    // anchor: launcher.exe:0x448f72 - CMessageConnection_SubmitEnvelopeBytes call
     if (messageRefForSubmit->messageStorage0c) {
         SubmitMessageRefBytes(*messageRefForSubmit);
     }
 
     // Clear high bit on original message ref after submit (headerless only)
-    // anchor: launcher.exe:0x448f87 - final high bit clearing
+    // anchor: launcher.exe:0x448f87 - final high bit clearing: payloadBytes0c[0] &= 0x7f
     if (messageRef.headerless10 != 0u && messageRef.messageStorage0c) {
         uint8_t* const payloadBase = messageRef.messageStorage0c->PayloadBase();
         if (payloadBase) {
