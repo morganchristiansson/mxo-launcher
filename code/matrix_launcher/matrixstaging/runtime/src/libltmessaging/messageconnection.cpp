@@ -2351,16 +2351,16 @@ struct CMarginConnectionBootstrapPrepStateA0OwnedState {
     std::vector<uint32_t> mbr_0xa0OwnedDigits;
 };
 
-static std::unordered_map<const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778*, CMarginConnectionBootstrapPrepStateA0OwnedState>
+static std::unordered_map<const CMarginConnectionAuthBootstrapCrypto_0x4b6778*, CMarginConnectionBootstrapPrepStateA0OwnedState>
     g_marginConnectionBootstrapPrepStateA0OwnedStateByObject;
 
 static CMarginConnectionBootstrapPrepStateA0OwnedState& MutableCMarginConnectionBootstrapPrepStateA0OwnedState(
-    const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* object) {
+    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* object) {
     return g_marginConnectionBootstrapPrepStateA0OwnedStateByObject[object];
 }
 
 static void ReleaseCMarginConnectionBootstrapPrepStateA0OwnedState(
-    const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* object) {
+    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* object) {
     g_marginConnectionBootstrapPrepStateA0OwnedStateByObject.erase(object);
 }
 
@@ -2492,8 +2492,8 @@ void CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70::InitializeFromBoot
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3) {
-    auto* owner = reinterpret_cast<CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778*>(
-        reinterpret_cast<uint8_t*>(this) - offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778, field_0xc));
+    auto* owner = reinterpret_cast<CMarginConnectionAuthBootstrapCrypto_0x4b6778*>(
+        reinterpret_cast<uint8_t*>(this) - offsetof(CMarginConnectionAuthBootstrapCrypto_0x4b6778, field_0xc));
     auto& ownedState = MutableCMarginConnectionBootstrapPrepStateA0OwnedState(owner);
 
     field_0xb4 = 0x004b630cu;
@@ -2584,15 +2584,15 @@ void CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70::InitializeFromBoot
 }
 
 // Forward declare the static helper (defined later in anonymous namespace around line 2696)
-namespace { static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
-    const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* prepState,
+namespace { static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
+    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* prepState,
     const void* encryptedBytes,
     size_t encryptedByteCount,
     std::array<uint8_t, 16>* outDecryptedChallengeBytes,
     std::vector<uint8_t>* outFullDecryptedBytes = nullptr); }
 
 // anchor: launcher.exe:0x443220 / constructor reached from `0x443340`
-CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778(
+CMarginConnectionAuthBootstrapCrypto_0x4b6778::CMarginConnectionAuthBootstrapCrypto_0x4b6778(
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
@@ -2611,45 +2611,21 @@ CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::CMarginConnectionBootstr
 }
 
 // anchor: launcher.exe:0x443390
-CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::~CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778() {
+CMarginConnectionAuthBootstrapCrypto_0x4b6778::~CMarginConnectionAuthBootstrapCrypto_0x4b6778() {
     // Original called ReleaseCMarginConnectionBootstrapPrepStateA0OwnedState(this)
     // C++ destructor handles cleanup
 }
 
-// anchor: launcher.exe:0x437810 -> validates payload size using mbr_0x4 + mbr_0x14 lookups
-// FIDELITY: Get expected payload size from bootstrap state BigInt objects
-uint32_t CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState() const {
-    // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
-    // This calls meth_0x45a440 on the modulus BigInt to get bit count
-
-    // Get modulus bit count
-    const uint32_t modulusBitCount = field_0xc.field_0x8.GetBitCount();
-    if (modulusBitCount == 0) {
-        spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState: zero modulus bit count");
-        return 0;
-    }
-
-    // Convert bits to bytes (this is the expected ciphertext size for RSA)
-    const uint32_t expectedCiphertextByteCount = (modulusBitCount + 7) / 8;
-
-    spdlog::debug(
-        "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState: modulus bits={} expected ciphertext bytes={}",
-        modulusBitCount,
-        expectedCiphertextByteCount);
-
-    return expectedCiphertextByteCount;
-}
-
-// anchor: launcher.exe:0x468130 -> actual RSA decryption (vtable+0x24)
+// anchor: launcher.exe:0x468130 / vtable+0x24 -> actual RSA decryption
 // FIDELITY: Perform RSA decryption using the original static helper
-bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption(
+bool CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption(
     const void* encryptedBytes,
     size_t encryptedByteCount,
     void* outputBuffer) {
     // Use the original static helper that was working
     std::array<uint8_t, 16> decryptedChallengeBytes{};
     std::vector<uint8_t> fullDecryptedBytes;
-    const bool decryptSuccess = CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
+    const bool decryptSuccess = CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
         this,
         encryptedBytes,
         encryptedByteCount,
@@ -2657,7 +2633,7 @@ bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryptio
         &fullDecryptedBytes);
 
     if (!decryptSuccess) {
-        spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper decryption failed");
+        spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption: static helper decryption failed");
         return false;
     }
 
@@ -2673,54 +2649,42 @@ bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryptio
         std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.begin() + 32, outBytes + 8);
     }
 
-    spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper succeeded, full buffer size={}", fullDecryptedBytes.size());
+    spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption: static helper succeeded, full buffer size={}", fullDecryptedBytes.size());
 
     return true;
 }
 
-// Implementation of vtable+0x1c method (decrypt via vtable dispatch)
-// anchor: launcher.exe:0x437810 (cls_0x4b6778::vftable_4b6778 +0x1c)
-// FIDELITY: Now properly validates payload size and uses vtable dispatch to virt_meth_0x468130
-void* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c(
+// anchor: launcher.exe:0x437810 / vtable +0x1c
+// FIDELITY: Validates payload size (0x437816-0x437824) then calls vtable+0x24 (0x468130) for RSA decrypt
+void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     void* outputBuffer,
     const void* /*cryptoContext*/,
-    uint32_t /*messageContext*/,
-    uint16_t /*messageContextWord*/,
-    const void* encryptedPayload,
+    uint32_t /*keySizeBytes*/,
+    uint16_t /*expectedOutputSize*/,
+    const void* encryptedChallengeData,
     size_t payloadSize) {
-    // anchor: launcher.exe:0x437810 -> validates payload size matches expected
+    // anchor: launcher.exe:0x437816-0x437824: Get expected size from bootstrap state BigInt
     // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
-    //           if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
+    const uint32_t modulusBitCount = field_0xc.field_0x8.GetBitCount();
+    const uint32_t expectedPayloadSize = (modulusBitCount + 7) / 8;  // bits to bytes
 
-    // Get expected payload size from bootstrap state
-    const uint32_t expectedPayloadSize = GetExpectedPayloadSizeFromBootstrapState();
-
-    // Validate payload size matches expected
+    // anchor: launcher.exe:0x437827-0x43783b: Size mismatch check - early return with zeroed output
+    // Original: if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
     if (payloadSize != expectedPayloadSize) {
-        spdlog::warn(
-            "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c payload size mismatch: expected={} actual={}",
-            expectedPayloadSize,
-            static_cast<unsigned>(payloadSize));
-
-        // Original sets output[0] = 0, output[4] = 0 and returns
         auto* outBytes = static_cast<uint8_t*>(outputBuffer);
         outBytes[0] = 0;
         *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
         return outputBuffer;
     }
 
-    // anchor: launcher.exe:0x437810 -> calls vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
-    // Original: (*(this->cls_0x4b42b0).vftptr_0x0[3].~cls_0x4b0000_0)((cls_0x4b0000 *)this,(byte)param_1)
-
-    // Call the actual decrypt method using proper vtable dispatch
+    // anchor: launcher.exe:0x43783e-0x437853: Call vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
     const bool decryptSuccess = PerformRSADecryption(
-        encryptedPayload,
+        encryptedChallengeData,
         payloadSize,
         outputBuffer);
 
-    // Debug: log decryption result
     if (!decryptSuccess) {
-        spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c: decryption failed");
+        spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge: decryption failed");
     }
 
     return outputBuffer;
@@ -2729,36 +2693,12 @@ void* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x
 // anchor: launcher.exe:0x443340 -> connection `+0xa0`
 // State5 only constructs/stores this object. The first later original consumer is
 // `0x4429b0`, which loads connection `+0xa0` and calls prep-object vtable
-// `+0x1c / 0x437810`.
-
-// anchor: launcher.exe:0x437810 / vtable +0x1c
-// Interface implementation for DecryptChallengeBlob
-uint8_t* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptChallengeBlob(
-    uint8_t* outBuffer,
-    void* prepHelper,
-    uint32_t contextDword,
-    uint32_t field18,
-    uint8_t* payloadBytes) {
-    // anchor: launcher.exe:0x4429d0 - call to bootstrap prep DecryptChallengeBlob
-    // This method is called from CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
-    // We delegate to the existing DecryptViaVtable0x1c method
-
-    const size_t payloadSize = 16;  // Challenge bytes are always 16 bytes
-    void* result = DecryptViaVtable0x1c(
-        outBuffer,
-        prepHelper,
-        contextDword,
-        static_cast<uint16_t>(field18),
-        payloadBytes,
-        payloadSize);
-
-    return static_cast<uint8_t*>(result);
-}
+// `+0x1c / 0x437810 (DecryptChallenge)`.
 
 namespace {
 // Forward declare the static helper (defined later in this anonymous namespace)
-static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
-    const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* prepState,
+static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
+    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* prepState,
     const void* encryptedBytes,
     size_t encryptedByteCount,
     std::array<uint8_t, 16>* outDecryptedChallengeBytes);
@@ -2776,7 +2716,7 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
         static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockD8);
 
     connection_.bootstrapPrepStateA0_.reset(new (std::nothrow)
-        CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778(param_1, param_2, param_3, 1));
+        CMarginConnectionAuthBootstrapCrypto_0x4b6778(param_1, param_2, param_3, 1));
     if (!connection_.bootstrapPrepStateA0_) {
         spdlog::warn(
             "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={} remoteHost='{}'",
@@ -2789,7 +2729,7 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     const auto* prepState = connection_.bootstrapPrepStateA0_.get();
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored connection+0xa0 prep object size=0x{:02x} modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778)),
+        static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapCrypto_0x4b6778)),
         static_cast<unsigned>(prepState->field_0xc.field_0x8.mbr_0x8),
         static_cast<unsigned>(prepState->field_0xc.field_0x1c.mbr_0x8),
         static_cast<unsigned>(prepState->field_0xc.field_0x3c.mbr_0x8),
@@ -2954,8 +2894,8 @@ namespace {
 // anchor: launcher.exe:0x465d70 / decrypt helper reached from 0x437810 -> 0x468130
 // RSA private key decryption using the bootstrap state (modulus, exponent, private exponent)
 // The decrypted output format: 16 bytes at offset 1,5,9,13 are used as seed bytes
-static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
-    const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* prepState,
+static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
+    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* prepState,
     const void* encryptedBytes,
     size_t encryptedByteCount,
     std::array<uint8_t, 16>* outDecryptedChallengeBytes,
@@ -2973,18 +2913,18 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
         const CryptoPP::Integer privateExponent =
             CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x3c);
 
-        spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: modulus bits={} exponent bits={} d bits={}",
+        spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: modulus bits={} exponent bits={} d bits={}",
             modulus.BitCount(), publicExponent.BitCount(), privateExponent.BitCount());
 
         if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
             spdlog::warn(
-                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: zero BigInt component modulus={} exponent={} privateExp={}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: zero BigInt component modulus={} exponent={} privateExp={}",
                 modulus.IsZero() ? "zero" : "non-zero",
                 publicExponent.IsZero() ? "zero" : "non_zero",
                 privateExponent.IsZero() ? "zero" : "non_zero");
             // Debug: log the raw BigInt digit counts to understand what's in the fields
             spdlog::warn(
-                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: raw BigInt caps field_0x8={} field_0x1c={} field_0x3c={}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: raw BigInt caps field_0x8={} field_0x1c={} field_0x3c={}",
                 static_cast<unsigned>(prepState->field_0xc.field_0x8.mbr_0x8),
                 static_cast<unsigned>(prepState->field_0xc.field_0x1c.mbr_0x8),
                 static_cast<unsigned>(prepState->field_0xc.field_0x3c.mbr_0x8));
@@ -3024,11 +2964,11 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
             plaintext.Encode(decryptedBytes.data(), encodedSize);
 
             spdlog::debug(
-                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: raw RSA decrypted bytes={}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: raw RSA decrypted bytes={}",
                 decryptedBytes.size());
         } catch (const CryptoPP::Exception& ex) {
             spdlog::warn(
-                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: RSA decryption failed: {}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: RSA decryption failed: {}",
                 ex.what());
             return false;
         }
@@ -3037,7 +2977,7 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
         // Each DWORD is stored at byte positions [1-4], [5-8], [9-12], [13-16] (little-endian)
         if (decryptedBytes.size() < 0x11u) {  // Need at least 17 bytes
             spdlog::warn(
-                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: decrypted too short {} < 17",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: decrypted too short {} < 17",
                 decryptedBytes.size());
             return false;
         }
@@ -3066,7 +3006,7 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
         (*outDecryptedChallengeBytes)[15] = decryptedBytes[16];
 
         spdlog::debug(
-            "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge decrypted size={} firstDword=0x{:08x}",
+            "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge decrypted size={} firstDword=0x{:08x}",
             decryptedBytes.size(),
             static_cast<unsigned>(
                 static_cast<uint32_t>((*outDecryptedChallengeBytes)[0]) |
@@ -3077,7 +3017,7 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
         return true;
     } catch (const CryptoPP::Exception& ex) {
         spdlog::warn(
-            "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge CryptoPP exception: {}",
+            "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge CryptoPP exception: {}",
             ex.what());
         return false;
     }
@@ -3119,7 +3059,7 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
 // SOURCE DIVERGENCE NOTES:
 // - Current source takes raw bytes (packetBytes, packetSize) instead of parsed message object.
 //   Original extracts encrypted blob from message ref at param_1+0x14/0x18 context.
-// - Source uses static helper CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge
+// - Source uses static helper CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge
 //   instead of calling through prep object vtable+0x1c -> 0x437810 -> 0x468130.
 // - Source does not create local message ref via CMessageConnectionMessage_CreateRef.
 //   Original creates local_8 (cls_0x4489d0), decrypts into its storage, grows payload.
@@ -3196,10 +3136,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     const void* ciphertextPtr = encryptedPayload + 4u;  // Skip 4-byte header
     size_t ciphertextSize = encryptedPayloadSize > 4u ? encryptedPayloadSize - 4u : 0u;
 
-    // anchor: launcher.exe:0x442a33 -> DecryptViaVtable0x1c with proper parameters
+    // anchor: launcher.exe:0x442a33 -> DecryptChallenge with proper parameters
     std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer (96 bytes)]
 
-    bootstrapPrepStateA0_->DecryptViaVtable0x1c(
+    bootstrapPrepStateA0_->DecryptChallenge(
         decryptOutput.data(),
         nullptr,  // cryptoContext (TODO: implement proper crypto context)
         messageContext,
