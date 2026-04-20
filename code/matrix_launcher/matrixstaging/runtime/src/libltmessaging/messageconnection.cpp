@@ -3086,6 +3086,38 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         return 0u;
     }
 
+    // anchor: launcher.exe:0x4429b9-0x442a17: Static crypto context initialization (inline)
+    // Original: if ((_g_CryptoInitializedFlag_0x4f7c20 & 1) == 0) { ...init... }
+    // Disassembly:
+    //   0x4429b9: MOV CL,byte ptr [0x004f7c20]  ; load flag
+    //   0x4429bf: MOV EAX,0x1
+    //   0x4429c4: TEST AL,CL
+    //   0x4429c6: JNZ 0x442a17                  ; skip if initialized
+    //   0x4429c9: OR dword ptr [0x4f7c20],EAX   ; set flag bit 0
+    //   0x4429cf: PUSH 0x180
+    //   0x4429d4: MOV ECX,0x4f7bf4
+    //   0x4429d9: CALL 0x4686e0                 ; CryptoInitHelper_0x4b42bc ctor
+    //   0x4429de: PUSH 0x20
+    //   0x4429e0: PUSH 0x0
+    //   0x4429e2: MOV ECX,0x4f7bf4
+    //   0x4429e7: MOV [0x4f7bf4],0x4b695c       ; vtable 0x4b695c at +0x00
+    //   0x4429f1: MOV [0x4f7bf8],0x4b68a8       ; vtable 0x4b68a8 at +0x04
+    //   0x4429fb: MOV [0x4f7bfc],0x4b41e0       ; vtable 0x4b41e0 at +0x08
+    //   0x442a05: CALL 0x468dc0                 ; meth_0x468dc0(0, &DAT_00000020)
+    //   0x442a0a: PUSH 0x4a6e80
+    //   0x442a0f: CALL 0x48bc66                 ; _atexit(FUN_004a6e80)
+    if ((g_CryptoInitializedFlag_0x4f7c20 & 1) == 0) {
+        g_CryptoInitializedFlag_0x4f7c20 |= 1;
+        // Create crypto context at global 0x4f7bf4 with size 0x180
+        g_CryptoContext_0x4f7bf4 = std::make_unique<CryptoInitHelper_0x4b42bc>(0x180);
+        // Set vtables (handled by C++ vtable mechanism in our implementation)
+        // Call meth_0x468dc0(0, nullptr) - original passes &DAT_00000020
+        if (g_CryptoContext_0x4f7bf4) {
+            g_CryptoContext_0x4f7bf4->InitializeCryptoState(0, nullptr);
+        }
+        // Note: atexit handler omitted - C++ handles cleanup via unique_ptr
+    }
+
     // anchor: launcher.exe:0x4429b0 -> this+0xa0 bootstrap prep state
     // Original: Loads [this+0xa0], calls prep-object vtable +0x1c (0x437810)
     if (!bootstrapPrepStateA0_) {
@@ -3136,246 +3168,248 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     const void* ciphertextPtr = encryptedPayload + 4u;  // Skip 4-byte header
     size_t ciphertextSize = encryptedPayloadSize > 4u ? encryptedPayloadSize - 4u : 0u;
 
-    // anchor: launcher.exe:0x442a33 -> DecryptChallenge with proper parameters
+    // anchor: launcher.exe:0x442a33 -> DecryptChallenge with &DAT_004f7bf4 crypto context
+    // Original passes: (local_10, &DAT_004f7bf4, local_c, messageContextWord, encryptedPayload)
+    // Where &DAT_004f7bf4 is the global CryptoInitHelper_0x4b42bc with vtables 0x4b695c/0x4b68a8/0x4b41e0
     std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer (96 bytes)]
+
+    // Get crypto context pointer - matching original global at 0x004f7bf4
+    void* cryptoContext = g_CryptoContext_0x4f7bf4 ? g_CryptoContext_0x4f7bf4.get() : nullptr;
 
     bootstrapPrepStateA0_->DecryptChallenge(
         decryptOutput.data(),
-        nullptr,  // cryptoContext (TODO: implement proper crypto context)
+        cryptoContext,  // anchor: &DAT_004f7bf4
         messageContext,
         messageContextWord,
         ciphertextPtr,
         ciphertextSize);
 
-    // Check decrypt result: output[0] = success flag, output[4] = byte count
+    // anchor: launcher.exe:0x442a3d-0x442a44: Check decrypt result at *(int*)(iVar3 + 4)
+    // Original: iVar3 = DecryptChallenge(...); if (*(int *)(iVar3 + 4) == 0) -> error path
+    // The decrypt returns a pointer to result structure where offset +4 is the byte count
+    // Our implementation writes directly to decryptOutput: [0]=success, [4]=byteCount
     const bool decryptSuccess = decryptOutput[0] != 0;
-    const uint16_t decryptedByteCount = *reinterpret_cast<const uint32_t*>(decryptOutput.data() + 4);
+    const uint32_t decryptedByteCount = *reinterpret_cast<const uint32_t*>(decryptOutput.data() + 4);
 
-    if (decryptSuccess) {
-        // anchor: launcher.exe:0x442a48 -> GrowPayloadByteCount via vtable+0x24
-        // Original: (**(code **)(*(int *)local_8.messageRef00 + 0x24))(local_8.messageRef00, *(int *)(iVar2 + 4))
-        // Use GrowPayloadByteCount NOT ResetPayloadByteCount!
-        // IMPORTANT: The original uses GrowPayloadByteCount to INCREASE the size, not reset!
-        if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
-            // IMPORTANT: Original calls GrowPayloadByteCount with decryptedByteCount, which ADDS to current size
-            // But we need to grow to decryptedByteCount, not ADD decryptedByteCount to existing size
-            // The message ref was created with ResetForPacketBuilder(false, 0), so has 0 size
-            // So we need to set the size directly - use ResetPayloadByteCount
-            // FIDELITY: We need the full decrypted buffer (96 bytes) to extract both seed and challenge
-            // The decrypted buffer contains: [0][twofishKey(16)][challenge(16)][padding]
-            const size_t fullDecryptedSize = 96u;  // RSA decryption produces 96 bytes
-            localMessageRef.messageStorage0c->ResetPayloadByteCount(fullDecryptedSize);
-            uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBase();
-            if (payloadBase) {
-                std::copy(
-                    decryptOutput.begin() + 8,
-                    decryptOutput.begin() + 8 + fullDecryptedSize,
-                    payloadBase);
-            }
+    if (!decryptSuccess) {
+        // anchor: launcher.exe:0x442a46-0x442a57: Error path - MessageBox + vtable+0xc close
+        // Original: MessageBoxA(0, "Failed to decrypt challenge blob from server!", "Error", 0)
+        // Then: (**(code **)(*(int *)this + 0xc))(1) -> close connection
+        MessageBoxA(nullptr, "Failed to decrypt challenge blob from server!", "Error", 0);
+        // FIDELITY: Call vtable+0xc to close connection with param 1
+        // Original: (**(code **)(*(int *)this + 0xc))(1)
+        Close(true);
+        return 0u;
+    }
+
+    // anchor: launcher.exe:0x442a48: Success path - GrowPayloadByteCount via vtable+0x24
+    // Original: (*(local_8.messageRef00)->vftptr_0x0->GrowPayloadByteCount_24)(local_8.messageRef00, *(int *)(iVar3 + 4));
+    // Use GrowPayloadByteCount NOT ResetPayloadByteCount!
+    // IMPORTANT: The original uses GrowPayloadByteCount to INCREASE the size, not reset!
+    if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
+        // IMPORTANT: Original calls GrowPayloadByteCount with decryptedByteCount, which ADDS to current size
+        // But we need to grow to decryptedByteCount, not ADD decryptedByteCount to existing size
+        // The message ref was created with ResetForPacketBuilder(false, 0), so has 0 size
+        // So we need to set the size directly - use ResetPayloadByteCount
+        // FIDELITY: We need the full decrypted buffer (96 bytes) to extract both seed and challenge
+        // The decrypted buffer contains: [0][twofishKey(16)][challenge(16)][padding]
+        const size_t fullDecryptedSize = 96u;  // RSA decryption produces 96 bytes
+        localMessageRef.messageStorage0c->ResetPayloadByteCount(fullDecryptedSize);
+        uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBase();
+        if (payloadBase) {
+            std::copy(
+                decryptOutput.begin() + 8,
+                decryptOutput.begin() + 8 + fullDecryptedSize,
+                payloadBase);
         }
+    }
 
-        // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
-        // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
-        // The message ref already has decrypted payload from above, now construct envelope with it
-        CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
+    // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
+    // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
+    // The message ref already has decrypted payload from above, now construct envelope with it
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
 
-        spdlog::debug("HandleCode2ForBootstrap: localMessageRef={:08x}, storage={:08x}, payloadBase={:08x}",
+    spdlog::debug("HandleCode2ForBootstrap: localMessageRef={:08x}, storage={:08x}, payloadBase={:08x}",
             reinterpret_cast<uintptr_t>(&localMessageRef),
             reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c),
             reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBase()));
 
-        spdlog::debug("HandleCode2ForBootstrap: after envelope construct, payload[0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            localMessageRef.messageStorage0c->PayloadBase()[0],
-            localMessageRef.messageStorage0c->PayloadBase()[1],
-            localMessageRef.messageStorage0c->PayloadBase()[2],
-            localMessageRef.messageStorage0c->PayloadBase()[3],
-            localMessageRef.messageStorage0c->PayloadBase()[4],
-            localMessageRef.messageStorage0c->PayloadBase()[5],
-            localMessageRef.messageStorage0c->PayloadBase()[6],
-            localMessageRef.messageStorage0c->PayloadBase()[7],
-            localMessageRef.messageStorage0c->PayloadBase()[8],
-            localMessageRef.messageStorage0c->PayloadBase()[9],
-            localMessageRef.messageStorage0c->PayloadBase()[10],
-            localMessageRef.messageStorage0c->PayloadBase()[11],
-            localMessageRef.messageStorage0c->PayloadBase()[12],
-            localMessageRef.messageStorage0c->PayloadBase()[13],
-            localMessageRef.messageStorage0c->PayloadBase()[14],
-            localMessageRef.messageStorage0c->PayloadBase()[15]);
+    spdlog::debug("HandleCode2ForBootstrap: after envelope construct, payload[0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        localMessageRef.messageStorage0c->PayloadBase()[0],
+        localMessageRef.messageStorage0c->PayloadBase()[1],
+        localMessageRef.messageStorage0c->PayloadBase()[2],
+        localMessageRef.messageStorage0c->PayloadBase()[3],
+        localMessageRef.messageStorage0c->PayloadBase()[4],
+        localMessageRef.messageStorage0c->PayloadBase()[5],
+        localMessageRef.messageStorage0c->PayloadBase()[6],
+        localMessageRef.messageStorage0c->PayloadBase()[7],
+        localMessageRef.messageStorage0c->PayloadBase()[8],
+        localMessageRef.messageStorage0c->PayloadBase()[9],
+        localMessageRef.messageStorage0c->PayloadBase()[10],
+        localMessageRef.messageStorage0c->PayloadBase()[11],
+        localMessageRef.messageStorage0c->PayloadBase()[12],
+        localMessageRef.messageStorage0c->PayloadBase()[13],
+        localMessageRef.messageStorage0c->PayloadBase()[14],
+        localMessageRef.messageStorage0c->PayloadBase()[15]);
 
-        // DEBUG: Log what's in the envelope mbr_0x10_ptr after construction
-        spdlog::debug("HandleCode2ForBootstrap: decryptedByteCount={}, payloadBase={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
-            decryptedByteCount,
-            localMessageRef.messageStorage0c ? reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBase()) : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[0] : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[1] : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[2] : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[3] : 0);
+    // DEBUG: Log what's in the envelope mbr_0x10_ptr after construction
+    spdlog::debug("HandleCode2ForBootstrap: decryptedByteCount={}, payloadBase={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
+        decryptedByteCount,
+        localMessageRef.messageStorage0c ? reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBase()) : 0,
+        localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[0] : 0,
+        localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[1] : 0,
+        localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[2] : 0,
+        localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[3] : 0);
 
-        spdlog::debug("HandleCode2ForBootstrap: envelope.packetPayloadPtr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
-            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr),
-            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[0] : 0,
-            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[1] : 0,
-            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[2] : 0,
-            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[3] : 0);
+    spdlog::debug("HandleCode2ForBootstrap: envelope.packetPayloadPtr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
+        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr),
+        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[0] : 0,
+        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[1] : 0,
+        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[2] : 0,
+        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[3] : 0);
 
-        // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
-        // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
-        spdlog::debug("HandleCode2ForBootstrap: before ExtractChallengeBytes, envelope={:08x}, mbr_0x10_ptr={:08x}",
-            reinterpret_cast<uintptr_t>(&envelope),
-            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
-        auto seedBytes = envelope.ExtractChallengeBytes();
-        SetMessageCode5SeedBytes85(seedBytes);
+    // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
+    // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
+    spdlog::debug("HandleCode2ForBootstrap: before ExtractChallengeBytes, envelope={:08x}, mbr_0x10_ptr={:08x}",
+        reinterpret_cast<uintptr_t>(&envelope),
+        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
+    auto seedBytes = envelope.ExtractChallengeBytes();
+    SetMessageCode5SeedBytes85(seedBytes);
 
-        // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
-        // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
-        // Current: Already handled in SetMessageCode5SeedBytes85
+    // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
+    // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
+    // Current: Already handled in SetMessageCode5SeedBytes85
 
-        // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
-        // Original flow:
-        // 1. CLTLoginMediatorPacketBuilderEnvelope_Initialize(&local_24)
-        // 2. Set opcode 0x11
-        // 3. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-        // 4. Send via connection vtable+0x24
+    // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
+    // Original flow:
+    // 1. CLTLoginMediatorPacketBuilderEnvelope_Initialize(&local_24)
+    // 2. Set opcode 0x11
+    // 3. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+    // 4. Send via connection vtable+0x24
 
-        // FIDELITY: Build response packet inline to match launcher.exe:0x442ab9-0x442b03
-        // The original at 0x442ab9 creates a response envelope on the stack and populates it directly
+    // FIDELITY: Build response packet inline to match launcher.exe:0x442ab9-0x442b03
+    // The original at 0x442ab9 creates a response envelope on the stack and populates it directly
 
-        // Create response envelope (default constructor as per original)
-        CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
-        // Original at 0x442af4 sets: responseEnvelope.mbr_0x10 = responseEnvelope.mbr_0x4
-        // In original, mbr_0x10 is a pointer field (not a 16-byte buffer as in our C++ class)
-        // The original copies the message ref pointer from mbr_0x8 to mbr_0x10, then later
-        // accesses packet payload through that pointer. Our C++ class can't replicate this
-        // exactly because mbr_0x10 is a buffer. We use the message ref from builder00 instead.
-        // FIDELITY: In our C++ version, the builder00 already has an initialized messageRef
-        // from default construction, so we use it directly
+    // Create response envelope (default constructor as per original)
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
+    // Original at 0x442af4 sets: responseEnvelope.mbr_0x10 = responseEnvelope.mbr_0x4
+    // In original, mbr_0x10 is a pointer field (not a 16-byte buffer as in our C++ class)
+    // The original copies the message ref pointer from mbr_0x8 to mbr_0x10, then later
+    // accesses packet payload through that pointer. Our C++ class can't replicate this
+    // exactly because mbr_0x10 is a buffer. We use the message ref from builder00 instead.
+    // FIDELITY: In our C++ version, the builder00 already has an initialized messageRef
+    // from default construction, so we use it directly
 
-        // The original at 0x442b00 sets opcode 3:
-        //   *(undefined1 *)responseEnvelope.mbr_0x10 = 3;
-        // Get the message ref from response envelope (stored at mbr_0x8) and set up the packet
-        CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = static_cast<CMessageConnectionMessageRef_0x4ba23c*>(responseEnvelope.messageRef08);
-        if (!responseMessageRef) {
-            // Should not happen - envelope has default-constructed message ref
-            spdlog::warn("HandleCode2ForBootstrap: responseEnvelope has no messageRef");
-            return 0u;
-        }
-
-        // Set up response packet: [opcode=3][response bytes from seed envelope at +0x11/+0x15/+0x19/+0x1d]
-        uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
-        if (!responsePayload) {
-            spdlog::warn("HandleCode2ForBootstrap: responseMessageRef has no payload pointer");
-            return 0u;
-        }
-
-        // DEBUG: Log the extraction that happens in ExtractForResponsePacket
-        spdlog::debug("HandleCode2ForBootstrap: ExtractForResponsePacket reads from mbr_0x10_ptr+0x11={:08x}",
-            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr ? envelope.packetPayloadPtr + 0x11 : 0));
-        spdlog::debug("HandleCode2ForBootstrap: bytes at +0x11..+0x1f: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x11) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x11] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x12) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x12] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x13) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x13] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x14) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x14] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x15) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x15] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x16) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x16] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x17) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x17] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x18) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x18] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x19) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x19] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1a) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1a] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1b) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1b] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1c] : 0,
-            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1d] : 0);
-
-        // FIDELITY: Original launcher.exe sends exactly 16 bytes of challenge response
-        // The server expects exactly 16 bytes matching the original challenge
-        // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte at responseEnvelope.packetPayloadPtr[0]
-        // then copies 16 bytes from seedEnvelope.packetPayloadPtr+0x11/+0x15/+0x19/+0x1d to +1/+5/+9/+0xd
-        // The opcode is for internal tracking, but the actual payload sent to server is 16 bytes
-
-        spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
-            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
-        std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
-        spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
-            responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
-        // FIDELITY: CERT packet structure requires opcode and special field
-        // [opcode=3][specialField=3][challenge response (16 bytes)] = 19 bytes total
-        // The special field=3 tells server not to decrypt this packet (see MarginSocket::ProcessData)
-        responsePayload[0] = 0x03;  // CERT_ChallengeResponse opcode
-        *reinterpret_cast<uint16_t*>(responsePayload + 1) = 3;  // special field = 3 (unencrypted)
-        std::copy_n(responseBytes.data(), 16, responsePayload + 3);  // Copy 16 bytes after header
-        responseMessageRef->SetPayloadByteCount(19);  // 1 + 2 + 16 = 19 bytes total
-
-        spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            responseMessageRef->messageStorage0c->PayloadBase()[0],
-            responseMessageRef->messageStorage0c->PayloadBase()[1],
-            responseMessageRef->messageStorage0c->PayloadBase()[2],
-            responseMessageRef->messageStorage0c->PayloadBase()[3],
-            responseMessageRef->messageStorage0c->PayloadBase()[4],
-            responseMessageRef->messageStorage0c->PayloadBase()[5],
-            responseMessageRef->messageStorage0c->PayloadBase()[6],
-            responseMessageRef->messageStorage0c->PayloadBase()[7],
-            responseMessageRef->messageStorage0c->PayloadBase()[8],
-            responseMessageRef->messageStorage0c->PayloadBase()[9],
-            responseMessageRef->messageStorage0c->PayloadBase()[10],
-            responseMessageRef->messageStorage0c->PayloadBase()[11],
-            responseMessageRef->messageStorage0c->PayloadBase()[12],
-            responseMessageRef->messageStorage0c->PayloadBase()[13],
-            responseMessageRef->messageStorage0c->PayloadBase()[14],
-            responseMessageRef->messageStorage0c->PayloadBase()[15],
-            responseMessageRef->messageStorage0c->PayloadBase()[16],
-            responseMessageRef->messageStorage0c->PayloadBase()[17],
-            responseMessageRef->messageStorage0c->PayloadBase()[18],
-            responseMessageRef->messageStorage0c->PayloadBase()[19],
-            responseMessageRef->messageStorage0c->PayloadBase()[20],
-            responseMessageRef->messageStorage0c->PayloadBase()[21]);
-
-        // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
-        spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
-            messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
-            messageCode5SeedBytes85_[8], messageCode5SeedBytes85_[9], messageCode5SeedBytes85_[10], messageCode5SeedBytes85_[11],
-            messageCode5SeedBytes85_[12], messageCode5SeedBytes85_[13], messageCode5SeedBytes85_[14], messageCode5SeedBytes85_[15]);
-
-        // Send via connection vtable+0x24 - anchor: launcher.exe:0x442b30
-        // Original calls: connection->vtable+0x24(envelope)
-        // In our code, use SendPacketMessageRef with the response message ref
-        spdlog::debug("HandleCode2ForBootstrap: about to send responseMessageRef={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
-            reinterpret_cast<uintptr_t>(responseMessageRef),
-            responseMessageRef->messageStorage0c->PayloadBase()[0],
-            responseMessageRef->messageStorage0c->PayloadBase()[1],
-            responseMessageRef->messageStorage0c->PayloadBase()[2],
-            responseMessageRef->messageStorage0c->PayloadBase()[3]);
-        SendPacketMessageRef(*responseMessageRef);
-        const uint32_t sendResult = 0;  // Success
-
-        spdlog::info(
-            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
-            sendResult,
-            static_cast<unsigned>(decryptedByteCount),
-            static_cast<unsigned>(
-                static_cast<uint32_t>(decryptOutput[8]) |
-                (static_cast<uint32_t>(decryptOutput[9]) << 8u) |
-                (static_cast<uint32_t>(decryptOutput[10]) << 16u) |
-                (static_cast<uint32_t>(decryptOutput[11]) << 24u)),
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()));
-
-        return sendResult != 0u ? 1u : 0u;
+    // The original at 0x442b00 sets opcode 3:
+    //   *(undefined1 *)responseEnvelope.mbr_0x10 = 3;
+    // Get the message ref from response envelope (stored at mbr_0x8) and set up the packet
+    CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = static_cast<CMessageConnectionMessageRef_0x4ba23c*>(responseEnvelope.messageRef08);
+    if (!responseMessageRef) {
+        // Should not happen - envelope has default-constructed message ref
+        spdlog::warn("HandleCode2ForBootstrap: responseEnvelope has no messageRef");
+        return 0u;
     }
 
-    // anchor: launcher.exe:0x442a3d -> decryption failure handling
-    // Original: MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
-    //           then (**(code **)(*(int *)this + 0xc))(1) to close connection
-    spdlog::error(
-        "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed this={} ownerContext={}",
+    // Set up response packet: [opcode=3][response bytes from seed envelope at +0x11/+0x15/+0x19/+0x1d]
+    uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
+    if (!responsePayload) {
+        spdlog::warn("HandleCode2ForBootstrap: responseMessageRef has no payload pointer");
+        return 0u;
+    }
+
+    // DEBUG: Log the extraction that happens in ExtractForResponsePacket
+    spdlog::debug("HandleCode2ForBootstrap: ExtractForResponsePacket reads from mbr_0x10_ptr+0x11={:08x}",
+        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr ? envelope.packetPayloadPtr + 0x11 : 0));
+    spdlog::debug("HandleCode2ForBootstrap: bytes at +0x11..+0x1f: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x11) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x11] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x12) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x12] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x13) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x13] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x14) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x14] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x15) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x15] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x16) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x16] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x17) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x17] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x18) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x18] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x19) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x19] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1a) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1a] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1b) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1b] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1c] : 0,
+        envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1d] : 0);
+
+    // FIDELITY: Original launcher.exe sends exactly 16 bytes of challenge response
+    // The server expects exactly 16 bytes matching the original challenge
+    // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte at responseEnvelope.packetPayloadPtr[0]
+    // then copies 16 bytes from seedEnvelope.packetPayloadPtr+0x11/+0x15/+0x19/+0x1d to +1/+5/+9/+0xd
+    // The opcode is for internal tracking, but the actual payload sent to server is 16 bytes
+
+    spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
+        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
+    std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
+    spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
+        responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
+    // FIDELITY: CERT packet structure requires opcode and special field
+    // [opcode=3][specialField=3][challenge response (16 bytes)] = 19 bytes total
+    // The special field=3 tells server not to decrypt this packet (see MarginSocket::ProcessData)
+    responsePayload[0] = 0x03;  // CERT_ChallengeResponse opcode
+    *reinterpret_cast<uint16_t*>(responsePayload + 1) = 3;  // special field = 3 (unencrypted)
+    std::copy_n(responseBytes.data(), 16, responsePayload + 3);  // Copy 16 bytes after header
+    responseMessageRef->SetPayloadByteCount(19);  // 1 + 2 + 16 = 19 bytes total
+
+    spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        responseMessageRef->messageStorage0c->PayloadBase()[0],
+        responseMessageRef->messageStorage0c->PayloadBase()[1],
+        responseMessageRef->messageStorage0c->PayloadBase()[2],
+        responseMessageRef->messageStorage0c->PayloadBase()[3],
+        responseMessageRef->messageStorage0c->PayloadBase()[4],
+        responseMessageRef->messageStorage0c->PayloadBase()[5],
+        responseMessageRef->messageStorage0c->PayloadBase()[6],
+        responseMessageRef->messageStorage0c->PayloadBase()[7],
+        responseMessageRef->messageStorage0c->PayloadBase()[8],
+        responseMessageRef->messageStorage0c->PayloadBase()[9],
+        responseMessageRef->messageStorage0c->PayloadBase()[10],
+        responseMessageRef->messageStorage0c->PayloadBase()[11],
+        responseMessageRef->messageStorage0c->PayloadBase()[12],
+        responseMessageRef->messageStorage0c->PayloadBase()[13],
+        responseMessageRef->messageStorage0c->PayloadBase()[14],
+        responseMessageRef->messageStorage0c->PayloadBase()[15],
+        responseMessageRef->messageStorage0c->PayloadBase()[16],
+        responseMessageRef->messageStorage0c->PayloadBase()[17],
+        responseMessageRef->messageStorage0c->PayloadBase()[18],
+        responseMessageRef->messageStorage0c->PayloadBase()[19],
+        responseMessageRef->messageStorage0c->PayloadBase()[20],
+        responseMessageRef->messageStorage0c->PayloadBase()[21]);
+
+    // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
+    spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
+        messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
+        messageCode5SeedBytes85_[8], messageCode5SeedBytes85_[9], messageCode5SeedBytes85_[10], messageCode5SeedBytes85_[11],
+        messageCode5SeedBytes85_[12], messageCode5SeedBytes85_[13], messageCode5SeedBytes85_[14], messageCode5SeedBytes85_[15]);
+
+    // Send via connection vtable+0x24 - anchor: launcher.exe:0x442b30
+    // Original calls: connection->vtable+0x24(envelope)
+    // In our code, use SendPacketMessageRef with the response message ref
+    spdlog::debug("HandleCode2ForBootstrap: about to send responseMessageRef={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
+        reinterpret_cast<uintptr_t>(responseMessageRef),
+        responseMessageRef->messageStorage0c->PayloadBase()[0],
+        responseMessageRef->messageStorage0c->PayloadBase()[1],
+        responseMessageRef->messageStorage0c->PayloadBase()[2],
+        responseMessageRef->messageStorage0c->PayloadBase()[3]);
+    SendPacketMessageRef(*responseMessageRef);
+    const uint32_t sendResult = 0;  // Success
+
+    spdlog::info(
+        "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
+        sendResult,
+        static_cast<unsigned>(decryptedByteCount),
+        static_cast<unsigned>(
+        static_cast<uint32_t>(decryptOutput[8]) |
+        (static_cast<uint32_t>(decryptOutput[9]) << 8u) |
+        (static_cast<uint32_t>(decryptOutput[10]) << 16u) |
+        (static_cast<uint32_t>(decryptOutput[11]) << 24u)),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()));
 
-    // FIDELITY: Call connection vtable+0xc to close on failure
-    // Original: (**(code **)(*(int *)this + 0xc))(1)
-    // This corresponds to Close(bool graceful) with graceful=1
-    Close(/*graceful=*/true);
-
-    return 0u;
+    return sendResult != 0u ? 1u : 0u;
 }
 
 // anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850

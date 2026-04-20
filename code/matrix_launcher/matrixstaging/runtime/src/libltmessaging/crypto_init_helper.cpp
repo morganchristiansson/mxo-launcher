@@ -65,7 +65,7 @@ void CryptoInitHelper_0x4b42bc::virt_meth_0x4687a0() {
     // For now, this is a stub
 }
 
-void CryptoInitHelper_0x4b42bc::virt_meth_0x468dc0(uint32_t param1, void** param2) {
+void CryptoInitHelper_0x4b42bc::InitializeCryptoState(uint32_t param1, void** param2) {
     // anchor: launcher.exe:0x468dc0
     // Implementation would go here
     // For now, this is a stub
@@ -87,7 +87,7 @@ void EnsureCryptoContextInitialized() {
         // Additional initialization
         // anchor: launcher.exe:0x468dc0 - meth_0x468dc0
         if (g_CryptoContext_0x4f7bf4) {
-            g_CryptoContext_0x4f7bf4->virt_meth_0x468dc0(0, nullptr);
+            g_CryptoContext_0x4f7bf4->InitializeCryptoState(0, nullptr);
         }
         
         // Set up atexit handler (not implemented in this stub)

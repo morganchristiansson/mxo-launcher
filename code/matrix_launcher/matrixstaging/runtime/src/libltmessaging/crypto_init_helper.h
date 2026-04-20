@@ -19,7 +19,7 @@ public:
     // Virtual methods from vtable
     virtual void virt_meth_0x468790(byte param1);
     virtual void virt_meth_0x4687a0();
-    virtual void virt_meth_0x468dc0(uint32_t param1, void** param2);
+    virtual void InitializeCryptoState(uint32_t param1, void** param2);
     
 private:
     uint32_t mbr_0x10;
