@@ -43,12 +43,12 @@ static ParsedState7Opcode0eReplyScaffold ParseState7Opcode0eReplyScaffold(
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b50b4
-const char* CLTLoginState_State7::DebugName() const {
-    return "CLTLoginState_State7";
+const char* CLTLoginState_State7_0x4b50b4::DebugName() const {
+    return "CLTLoginState_State7_0x4b50b4";
 }
 
 // anchor: launcher.exe:0x0043ba20 (vtable 0x004b50b4 slot 3)
-void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     (void)upstreamOrArg;
     if (!g_CurrentLoginMediator) {
         return;
@@ -67,14 +67,14 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(4u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
+            "DIAGNOSTIC: CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return;
     }
     if (g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0u) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(6u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
+            "DIAGNOSTIC: CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return;
     }
@@ -93,7 +93,7 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     g_CurrentLoginMediator->PostEvent(0x07u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
+        "DIAGNOSTIC: CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
         State7Packet0x0dFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
@@ -105,7 +105,7 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)
-uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+uint32_t CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     (void)workItem;
     if (!g_CurrentLoginMediator) {
         return 0u;
@@ -116,7 +116,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     if (!parsed.valid) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State7::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005",
+            "CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}, mirrored original owner+0x80=0x12000005",
             static_cast<unsigned>(stagedMarginBytes.size()),
             stagedMarginBytes.empty() ? 0u : static_cast<unsigned>(stagedMarginBytes[0]));
         return 0u;
@@ -134,13 +134,13 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     if (parsed.result09 < 1u) {
         g_CurrentLoginMediator->PostEvent(0x08u);
         spdlog::info(
-            "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e success result09=0x{:08x} -> switch helper state3 then PostEvent(0x08) currentState={}",
+            "CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage opcode-0x0e success result09=0x{:08x} -> switch helper state3 then PostEvent(0x08) currentState={}",
             static_cast<unsigned>(parsed.result09),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     } else {
         g_CurrentLoginMediator->PostError(0x09u);
         spdlog::info(
-            "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e failure result09=0x{:08x} -> switch helper state3 then PostError(0x09) currentState={}",
+            "CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage opcode-0x0e failure result09=0x{:08x} -> switch helper state3 then PostError(0x09) currentState={}",
             static_cast<unsigned>(parsed.result09),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     }
@@ -148,7 +148,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
 }
 
 // anchor: launcher.exe:0x00438c80 (vtable 0x004b50b4 slot 7)
-uint32_t CLTLoginState_State7::GetStateId() const {
+uint32_t CLTLoginState_State7_0x4b50b4::GetStateId() const {
     return 7;
 }
 

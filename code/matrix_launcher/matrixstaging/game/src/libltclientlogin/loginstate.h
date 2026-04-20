@@ -291,10 +291,10 @@ public:
 // anchor: launcher.exe vtable 0x004b50b4
 // docs: ../../docs/launcher.exe/VTABLES/0x004b50b4.md
 // Provisional better-name suggestion: `CLTLoginState_MarginRouteProbePending`
-class CLTLoginState_State7 : public CLTLoginState {
+class CLTLoginState_State7_0x4b50b4 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x00439620 (vtable 0x004b50b4 slot 10 initializer)
-    CLTLoginState_State7() = default;
+    CLTLoginState_State7_0x4b50b4() = default;
 
     // anchor: launcher.exe vtable 0x004b50b4
     const char* DebugName() const override;

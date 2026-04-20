@@ -123,7 +123,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     friend class CLTLoginState_AuthenticatePending_0x4b5014;
     friend class CLTLoginState_State4_0x4b503c;
     friend class CLTLoginState_State6_0x4b508c;
-    friend class CLTLoginState_State7;
+    friend class CLTLoginState_State7_0x4b50b4;
     friend class CLTLoginState_State8_0x4b5104;
     friend class CLTLoginState_State10_0x4b512c;
     friend class CLTLoginState_State11_0x4b5154;
