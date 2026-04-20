@@ -384,10 +384,10 @@ public:
 // anchor: launcher.exe vtable 0x004b512c
 // docs: ../../docs/launcher.exe/VTABLES/0x004b512c.md
 // Provisional better-name suggestion: `CLTLoginState_ClaimCharacterNamePending`
-class CLTLoginState_State10 : public CLTLoginState {
+class CLTLoginState_State10_0x4b512c : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x004396f0 (vtable 0x004b512c slot 10 initializer)
-    CLTLoginState_State10() = default;
+    CLTLoginState_State10_0x4b512c() = default;
 
     // UNANCHORED: source-owned shared owner-state writeback helpers used by the broader state2
     // slot-5 auth-reply success path (`0x43f300`) and by the current existing-character auth

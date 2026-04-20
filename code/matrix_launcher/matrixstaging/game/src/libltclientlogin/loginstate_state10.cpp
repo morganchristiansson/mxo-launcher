@@ -87,12 +87,12 @@ static std::string DescribeOptionalState10ClaimReplyText(
 
 
 // anchor: launcher.exe vtable 0x004b512c
-const char* CLTLoginState_State10::DebugName() const {
-    return "CLTLoginState_State10";
+const char* CLTLoginState_State10_0x4b512c::DebugName() const {
+    return "CLTLoginState_State10_0x4b512c";
 }
 
 // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
-void CLTLoginState_State10::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     (void)upstreamOrArg;
     if (!g_CurrentLoginMediator) {
         return;
@@ -113,14 +113,14 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
     if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(4u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
+            "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return;
     }
     if (g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(6u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
+            "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return;
     }
@@ -134,7 +134,7 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
     g_CurrentLoginMediator->PostEvent(0x13u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> postEvent=0x13",
+        "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> postEvent=0x13",
         State10Packet0x0aFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
         std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data()));
@@ -142,7 +142,7 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
 }
 
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
-uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
+uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
         mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!g_CurrentLoginMediator || !messageRef) {
         return 0u;
@@ -178,7 +178,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     if (messageCode != 0x0bu) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected messageCode=0x{:04x} (expected 0x0b); mirrored original owner+0x80=0x12000005",
+            "CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage rejected messageCode=0x{:04x} (expected 0x0b); mirrored original owner+0x80=0x12000005",
             static_cast<unsigned>(messageCode));
         return 0u;
     }
@@ -221,7 +221,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         (void)mediator->SetCurrentState(3u);
         mediator->PostError(0x0bu);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
+            "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
             static_cast<unsigned>(mediator->worldListCountOrStatus80));
         return 1u;
     }
@@ -300,12 +300,12 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     (void)g_CurrentLoginMediator->SetCurrentState(0x0bu);
     g_CurrentLoginMediator->PostEvent(0x14u);
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful MS_ClaimCharacterNameReply -> SetCurrentState(0xb) then PostEvent(0x14)");
+        "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage successful MS_ClaimCharacterNameReply -> SetCurrentState(0xb) then PostEvent(0x14)");
     return 1u;
 }
 
 // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
-uint32_t CLTLoginState_State10::GetStateId() const {
+uint32_t CLTLoginState_State10_0x4b512c::GetStateId() const {
     return 10;
 }
 

@@ -23,7 +23,7 @@ namespace mxo {
 namespace ltlogin {
 
 class CLTLoginState;
-class CLTLoginState_State10;
+class CLTLoginState_State10_0x4b512c;
 class CLTLoginState_AuthenticatePending_0x4b5014;
 class CLTLoginState_WorldListPending_0x4b4fec;
 class CLTLoginMediator;
@@ -125,7 +125,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     friend class CLTLoginState_State6_0x4b508c;
     friend class CLTLoginState_State7;
     friend class CLTLoginState_State8_0x4b5104;
-    friend class CLTLoginState_State10;
+    friend class CLTLoginState_State10_0x4b512c;
     friend class CLTLoginState_State11_0x4b5154;
     friend class mxo::liblttcp::CAuthStartupConnection_0x4afef0;
     friend class mxo::liblttcp::CBaseMarginConnection_0x4b64a8;
@@ -218,7 +218,7 @@ public:
         //     - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (builds/sends raw auth code 0x08)
         //       -> strongest current `AS_AuthRequest` candidate
         // - slot 10 / `0x4f7890` / phase-code `10`
-        //   - current best concrete state object: `CLTLoginState_State10` / vtable `0x4b512c`
+        //   - current best concrete state object: `CLTLoginState_State10_0x4b512c` / vtable `0x4b512c`
         //   - launcher.exe:0x4401a0 = later state-10 incoming `AS_AuthReply` handler
         // - slot 14 / `0x4f78a0` / phase-code `14`
         //   - current best concrete state object: `CLTLoginState_WorldListPending_0x4b4fec` / vtable `0x4b4fec`
