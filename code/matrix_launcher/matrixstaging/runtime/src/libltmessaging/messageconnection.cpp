@@ -3310,17 +3310,39 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         envelope.packetPayloadPtr ? envelope.packetPayloadPtr[2] : 0,
         envelope.packetPayloadPtr ? envelope.packetPayloadPtr[3] : 0);
 
-    // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
-    // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
-    spdlog::debug("HandleCode2ForBootstrap: before ExtractChallengeBytes, envelope={:08x}, mbr_0x10_ptr={:08x}",
-        reinterpret_cast<uintptr_t>(&envelope),
-        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
-    auto seedBytes = envelope.ExtractChallengeBytes();
-    SetMessageCode5SeedBytes85(seedBytes);
-
+    // anchor: launcher.exe:0x442ac6-0x442ae0 -> Extract seed bytes inline to this+0x85/0x89/0x8d/0x91
+    // Original disassembly:
+    //   0x442ac6: MOV EDX,dword ptr [EDI + 0x1]  ; EDI = envelope.packetPayloadPtr
+    //   0x442acf: MOV dword ptr [ECX],EDX        ; ECX = this+0x85
+    //   0x442ad1: MOV EAX,dword ptr [EDI + 0x5]
+    //   0x442ad4: MOV dword ptr [ECX + 0x4],EAX
+    //   0x442ad7: MOV EDX,dword ptr [EDI + 0x9]
+    //   0x442ada: MOV dword ptr [ECX + 0x8],EDX
+    //   0x442add: MOV EAX,dword ptr [EDI + 0xd]
+    //   0x442ae0: MOV dword ptr [ECX + 0xc],EAX
+    // FIDELITY: No ExtractChallengeBytes() helper - all inline dword copies
+    if (envelope.packetPayloadPtr) {
+        messageCode5SeedBytes85_[0] = envelope.packetPayloadPtr[1];
+        messageCode5SeedBytes85_[1] = envelope.packetPayloadPtr[2];
+        messageCode5SeedBytes85_[2] = envelope.packetPayloadPtr[3];
+        messageCode5SeedBytes85_[3] = envelope.packetPayloadPtr[4];
+        messageCode5SeedBytes85_[4] = envelope.packetPayloadPtr[5];
+        messageCode5SeedBytes85_[5] = envelope.packetPayloadPtr[6];
+        messageCode5SeedBytes85_[6] = envelope.packetPayloadPtr[7];
+        messageCode5SeedBytes85_[7] = envelope.packetPayloadPtr[8];
+        messageCode5SeedBytes85_[8] = envelope.packetPayloadPtr[9];
+        messageCode5SeedBytes85_[9] = envelope.packetPayloadPtr[10];
+        messageCode5SeedBytes85_[10] = envelope.packetPayloadPtr[11];
+        messageCode5SeedBytes85_[11] = envelope.packetPayloadPtr[12];
+        messageCode5SeedBytes85_[12] = envelope.packetPayloadPtr[13];
+        messageCode5SeedBytes85_[13] = envelope.packetPayloadPtr[14];
+        messageCode5SeedBytes85_[14] = envelope.packetPayloadPtr[15];
+        messageCode5SeedBytes85_[15] = envelope.packetPayloadPtr[16];
+    }
     // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
     // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
     // Current: Already handled in SetMessageCode5SeedBytes85
+    EnsureStreamPacketEncryptionModuleFromSeed85();
 
     // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
     // Original flow:

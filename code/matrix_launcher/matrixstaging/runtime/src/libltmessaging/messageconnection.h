@@ -467,12 +467,6 @@ public:
     // Original at 0x442ac6-0x442ae0 extracts seed bytes via:
     //   *(dword *)(this + 0x85) = *(dword *)(local_38.mbr_0x10 + 1)
     //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
-    //   *(dword *)(this + 0x8d) = *(dword *)(local_38.mbr_0x10 + 9)
-    //   *(dword *)(this + 0x91) = *(dword *)(local_38.mbr_0x10 + 0xd)
-    // Extract 16 bytes from envelope mbr_0x10 +1/+5/+9/+0xd for connection seed fields.
-    // This is the first extraction pass - copies to connection this+0x85..+0x91.
-    std::array<uint8_t, 16> ExtractChallengeBytes() const;
-
     // anchor: launcher.exe:0x442b18 -> copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
     // Original at 0x442b18-0x442b28 copies response packet bytes via:
     //   *(dword *)(packet + 1) = *(dword *)(local_38.mbr_0x10 + 0x11)
@@ -557,19 +551,6 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     // Not used in main flow - the messageRef constructor is used instead
     (void)decryptedBytes;
     packetPayloadPtr = nullptr;
-}
-
-// anchor: launcher.exe:0x443220
-inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractChallengeBytes() const {
-    std::array<uint8_t, 16> result{};
-    // Extract 4 dwords from packetPayloadPtr at offsets +1/+5/+9/+0xd
-    if (packetPayloadPtr) {
-        std::memcpy(&result[0], packetPayloadPtr + 1, 4);   // first dword
-        std::memcpy(&result[4], packetPayloadPtr + 5, 4);  // second dword
-        std::memcpy(&result[8], packetPayloadPtr + 9, 4);  // third dword
-        std::memcpy(&result[12], packetPayloadPtr + 13, 4); // fourth dword (0xd = 13)
-    }
-    return result;
 }
 
 // anchor: launcher.exe:0x442b18 -> uses mbr_0x10 +0x11/+0x15/+0x19/+0x1d for response packet
