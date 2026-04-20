@@ -142,14 +142,10 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d1d7 / owner = this at offset 0xa4
     // anchor: launcher.exe:0x41d1dd / ConfigurePacketNameFamily in original
     // Free existing connection first (like static RE - fresh allocation every time)
-    if (authConnectionOwnedByMediator_ && authConnection_ != nullptr) {
-        delete authConnection_;
-    }
     authConnection_ = new mxo::liblttcp::CAuthStartupConnection_0x4afef0(engine_);
     if (!authConnection_) {
         return 0u;
     }
-    authConnectionOwnedByMediator_ = true;
     authConnection_->SetOwnerContext(this);
     // Configure packet naming using high-level API (ConfigurePacketNameFamily handles
     // the callback pointer internally - original used ConfigurePacketNameCallback with

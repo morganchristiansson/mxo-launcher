@@ -1509,8 +1509,6 @@ private:
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
     uint16_t lastMarginPacketOpcodeScaffold_ = 0;
     uint32_t lastMarginPacketSizeScaffold_ = 0;
-    bool authConnectionOwnedByMediator_ = false;
-    bool marginConnectionOwnedByMediator_ = false;
     bool authPeerCloseQueuedScaffold_ = false;
     bool marginPeerCloseQueuedScaffold_ = false;
 

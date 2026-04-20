@@ -218,8 +218,6 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRout
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
-      authConnectionOwnedByMediator_(false),
-      marginConnectionOwnedByMediator_(false),
       authPeerCloseQueuedScaffold_(false),
       marginPeerCloseQueuedScaffold_(false),
       authConnection_(nullptr),
@@ -288,17 +286,8 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     // inline UnregisterActiveStateSourceScaffold
     g_CurrentLoginMediator = nullptr;
 
-    if (authConnectionOwnedByMediator_) {
-        delete authConnection_;
-    }
-    if (marginConnectionOwnedByMediator_) {
-        delete marginConnection_;
-    }
-
     authConnection_ = nullptr;
     marginConnection_ = nullptr;
-    authConnectionOwnedByMediator_ = false;
-    marginConnectionOwnedByMediator_ = false;
     authPeerCloseQueuedScaffold_ = false;
     marginPeerCloseQueuedScaffold_ = false;
 
@@ -3456,20 +3445,15 @@ mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::EnsureMarginConnec
     mxo::liblttcp::CMarginConnection_0x4aff38* marginConnection =
         dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
     if (!marginConnection) {
-        if (marginConnectionOwnedByMediator_) {
-            delete marginConnection_;
-        }
         marginConnection = new mxo::liblttcp::CMarginConnection_0x4aff38(engine_);
         if (!marginConnection) {
             marginConnection_ = nullptr;
-            marginConnectionOwnedByMediator_ = false;
             return nullptr;
         }
 
         marginConnection->SetEngine(engine_);
         marginConnection->SetEngine(engine_);
         marginConnection_ = marginConnection;
-        marginConnectionOwnedByMediator_ = true;
     }
 
     marginConnection->SetEngine(engine_);
