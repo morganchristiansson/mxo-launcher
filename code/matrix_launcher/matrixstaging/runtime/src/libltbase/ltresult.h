@@ -2,9 +2,6 @@
 
 #include <cstdint>
 
-namespace mxo {
-namespace libltbase {
-
 // anchor: launcher.exe:0x417650
 // Bounded source mirror of the LTRESULT-name lookup used by `CLTTCPConnection::OnReceive`.
 // Current recovered coverage:
@@ -19,5 +16,4 @@ namespace libltbase {
 // - `LTAUTH_AUTHKEYSIGINVALID` -> `AUTH_AUTHKEYSIGINVALID`
 const char* CResultNameArrayItem_GetResultName(std::uint32_t resultCode);
 
-}  // namespace libltbase
-}  // namespace mxo
+

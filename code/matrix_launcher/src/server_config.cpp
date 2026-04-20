@@ -59,15 +59,15 @@ std::string UnquoteString(const std::string& str) {
 // Parse a single server section into a ServerConfig struct
 // The section name becomes the server name
 bool ParseServerSection(
-    mxo::libltbase::ConsoleConfigParseState& state,
+    ConsoleConfigParseState& state,
     ServerConfig& outConfig,
-    mxo::libltbase::ConsoleParseErrorSink& errors) {
+    ConsoleParseErrorSink& errors) {
     outConfig = ServerConfig();
     outConfig.name = state.configSectionName;
     
     bool hasAuthServer = false;
     
-    while (mxo::libltbase::CConsoleVar::ParseConfigFileSectionLine(state, &errors)) {
+    while (CConsoleVar::ParseConfigFileSectionLine(state, &errors)) {
         if (state.currentName.empty()) {
             continue;
         }
@@ -103,7 +103,7 @@ bool ParseServerSection(
 // and re-reading is more reliable than trying to calculate byte offsets
 std::vector<std::pair<std::string, std::string>> FindAllSections(
     FILE* file,
-    mxo::libltbase::ConsoleParseErrorSink& /*errors*/) {
+    ConsoleParseErrorSink& /*errors*/) {
     std::vector<std::pair<std::string, std::string>> sections;
     if (!file) {
         return sections;
@@ -163,11 +163,11 @@ std::vector<ServerConfig> LoadServerConfigs(const char* configPath) {
     }
     std::fclose(file);
     
-    mxo::libltbase::ConsoleConfigParseState state;
+    ConsoleConfigParseState state;
     state.configFilePath = configPath;
     state.ignoreUnknownVars = true;
     
-    mxo::libltbase::ConsoleParseErrorSink errors;
+    ConsoleParseErrorSink errors;
     
     // Open the file
     state.primaryFile = std::fopen(configPath, "rt");
@@ -185,7 +185,7 @@ std::vector<ServerConfig> LoadServerConfigs(const char* configPath) {
     std::fseek(state.primaryFile, 0, SEEK_SET);
     state.activeFile = state.primaryFile;
     
-    while (mxo::libltbase::CConsoleVar::GetNextConfigFileLine(state, lineBuffer, sizeof(lineBuffer), &errors)) {
+    while (CConsoleVar::GetNextConfigFileLine(state, lineBuffer, sizeof(lineBuffer), &errors)) {
         char* cursor = lineBuffer;
         while (*cursor && std::isspace(static_cast<unsigned char>(*cursor))) {
             ++cursor;
@@ -232,7 +232,7 @@ std::vector<ServerConfig> LoadServerConfigs(const char* configPath) {
         state.foundSectionHeader = false;
         state.reachedEndOfFile = false;
         
-        if (!mxo::libltbase::CConsoleVar::FindConfigFileSection(state, sectionName.c_str(), &errors)) {
+        if (!CConsoleVar::FindConfigFileSection(state, sectionName.c_str(), &errors)) {
             spdlog::warn("DIAGNOSTIC: Failed to find section '{}'", sectionName);
             continue;
         }
@@ -249,7 +249,7 @@ std::vector<ServerConfig> LoadServerConfigs(const char* configPath) {
         }
     }
     
-    mxo::libltbase::CConsoleVar::CloseConfigState(state);
+    CConsoleVar::CloseConfigState(state);
     return configs;
 }
 

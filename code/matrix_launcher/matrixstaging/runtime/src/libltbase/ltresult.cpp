@@ -19,8 +19,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace mxo {
-namespace libltbase {
 namespace {
 
 struct ResultFamilyRangeEntry {
@@ -148,5 +146,4 @@ const char* CResultNameArrayItem_GetResultName(std::uint32_t resultCode) {
     return resultName;
 }
 
-}  // namespace libltbase
-}  // namespace mxo
+

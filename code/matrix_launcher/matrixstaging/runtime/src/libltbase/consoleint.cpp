@@ -8,9 +8,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-namespace mxo {
-namespace libltbase {
-
 // anchor: launcher.exe:0x414e70
 CConsoleInt::CConsoleInt() = default;
 
@@ -58,5 +55,4 @@ void CConsoleInt::Dump() const {
     // Keep this as a scaffold until the replacement owns an equivalent console-log sink.
 }
 
-} // namespace libltbase
-} // namespace mxo
+

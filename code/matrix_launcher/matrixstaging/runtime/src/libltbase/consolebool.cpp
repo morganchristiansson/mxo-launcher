@@ -9,10 +9,6 @@
 #include <cstdlib>
 #include <string>
 
-namespace mxo {
-namespace libltbase {
-
-namespace {
 std::string LowercaseCopy(const char* text) {
     std::string out;
     if (!text) {
@@ -25,7 +21,6 @@ std::string LowercaseCopy(const char* text) {
     }
     return out;
 }
-} // namespace
 
 // anchor: launcher.exe:0x452990
 CConsoleBool::CConsoleBool() = default;
@@ -78,5 +73,4 @@ void CConsoleBool::Dump() const {
     // while reading the boolean byte from +0x31.
 }
 
-} // namespace libltbase
-} // namespace mxo
+

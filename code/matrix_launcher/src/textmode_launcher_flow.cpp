@@ -20,7 +20,7 @@
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
 
-extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
+extern CLauncherCommandLine g_LauncherCommandLine;
 extern void* g_pLauncherObject6304;
 extern char g_LastWorldName[256];
 

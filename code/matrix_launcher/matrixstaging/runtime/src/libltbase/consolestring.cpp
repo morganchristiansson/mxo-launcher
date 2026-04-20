@@ -6,9 +6,6 @@
 
 #include <cstdio>
 
-namespace mxo {
-namespace libltbase {
-
 // UNANCHORED: scaffold-only convenience ctor
 CConsoleString::CConsoleString() = default;
 
@@ -71,5 +68,4 @@ void CConsoleString::Dump() const {
     // using the live string buffer at +0x34.
 }
 
-} // namespace libltbase
-} // namespace mxo
+

@@ -1144,7 +1144,7 @@ static void CMessageConnection_0x4b7928_LogUnhandledOperation(void* workItem) {
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     const uint32_t workType = header ? header->workType : 0u;
     const uint32_t resultCode = header ? header->statusOrPayloadDword08 : 0u;
-    const char* resultName = mxo::libltbase::CResultNameArrayItem_GetResultName(resultCode);
+    const char* resultName = CResultNameArrayItem_GetResultName(resultCode);
     spdlog::info(
         "Got unhandled op of type {} with status {}",
         static_cast<unsigned>(workType),

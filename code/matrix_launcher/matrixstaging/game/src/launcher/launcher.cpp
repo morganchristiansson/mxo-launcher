@@ -39,7 +39,7 @@ int g_CrtArgc = 0;
 char** g_CrtArgv = NULL;
 uint32_t g_LauncherFilteredArgCount = 0;    // original: [0x4d2c5c]
 char** g_LauncherFilteredArgv = NULL;       // original: [0x4d2c60]
-mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
+CLauncherCommandLine g_LauncherCommandLine;
 CLauncher g_Launcher;
 void* g_pLauncherObject6304 = NULL;
 void* g_pILTLoginMediator_0x4af2b8Default = NULL;

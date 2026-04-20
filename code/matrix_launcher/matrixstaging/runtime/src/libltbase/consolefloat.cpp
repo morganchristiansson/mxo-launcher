@@ -7,9 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-namespace mxo {
-namespace libltbase {
-
 // anchor: launcher.exe:0x48cce0
 CConsoleFloat::CConsoleFloat() = default;
 
@@ -42,5 +39,4 @@ void CConsoleFloat::Dump() const {
     // from the float slot at +0x34.
 }
 
-} // namespace libltbase
-} // namespace mxo
+

@@ -8,9 +8,6 @@
 #include <string>
 #include <vector>
 
-namespace mxo {
-namespace libltbase {
-
 struct ConsoleParseErrorSink {
     std::vector<std::string> lines;
 };
@@ -154,5 +151,4 @@ private:
     float value_ = 0.0f;
 };
 
-} // namespace libltbase
-} // namespace mxo
+

@@ -14,9 +14,6 @@
 #include <memory>
 #include <unordered_map>
 
-namespace mxo {
-namespace libltbase {
-
 namespace {
 
 struct ConsoleRuntimeGlobals {
@@ -830,5 +827,4 @@ bool CConsoleVar::ParseCommandLineAndConfig(std::uint32_t argc, char** argv, Con
     return ParseConfigFile(runtime.configState, errors);
 }
 
-} // namespace libltbase
-} // namespace mxo
+

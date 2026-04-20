@@ -9,9 +9,6 @@
 #include <ctime>
 #include <sys/stat.h>
 
-namespace mxo {
-namespace libltbase {
-
 CLauncherCommandLine::CLauncherCommandLine() {
     Reset();
 }
@@ -576,5 +573,4 @@ bool CLauncherCommandLine::IsTmBeforeAutodetectCutoff(const std::tm* value) {
     return day < 25;
 }
 
-} // namespace libltbase
-} // namespace mxo
+

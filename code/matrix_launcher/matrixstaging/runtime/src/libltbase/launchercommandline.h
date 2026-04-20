@@ -8,9 +8,6 @@
 
 #include "consolevar.h"
 
-namespace mxo {
-namespace libltbase {
-
 class CLauncherCommandLine {
 public:
     CLauncherCommandLine();
@@ -129,5 +126,4 @@ private:
     ConsoleParseErrorSink runtimeConsoleErrors_;
 };
 
-} // namespace libltbase
-} // namespace mxo
+

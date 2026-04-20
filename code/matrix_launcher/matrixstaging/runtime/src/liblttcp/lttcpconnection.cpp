@@ -888,7 +888,7 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
                 ipv4Byte3,
                 portHostOrder);
         } else {
-            const char* resultName = libltbase::CResultNameArrayItem_GetResultName(parseResult);
+            const char* resultName = CResultNameArrayItem_GetResultName(parseResult);
             spdlog::warn(
                 "CLTTCPConnection::OnReceive(): An unrecoverable error ({}) occurred on connection to {}.{}.{}.{}:{}!  Closing connection!",
                 resultName,
