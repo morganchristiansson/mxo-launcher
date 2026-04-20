@@ -3521,7 +3521,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // anchor: launcher.exe:0x442b0f-0x442b2f -> Build response packet inline
     // Original disassembly:
     //   0x442b0f: MOV EAX,dword ptr [EBP + -0x10]  ; EAX = responseEnvelope.packetPayloadPtr
-    //   0x442b12: MOV byte ptr [EAX],0x3           ; opcode = 3
+    //   0x442b12: MOV byte ptr [EAX],0x3           ; frame byte = 3
     //   0x442b15: MOV ECX,dword ptr [EBP + -0x10]  ; ECX = responsePayload base
     //   0x442b18: ADD EDI,0x11                      ; EDI = seedEnvelope.packetPayloadPtr + 0x11
     //   0x442b1b: MOV EDX,dword ptr [EDI]          ; first dword from seed+0x11
@@ -3534,20 +3534,19 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442b2c: MOV EAX,dword ptr [EDI + 0xc]    ; fourth dword from seed+0x1d
     //   0x442b2f: MOV dword ptr [ECX + 0xc],EAX    ; copy to response+0xd
     // FIDELITY: No ExtractForResponsePacket() helper - all inline dword copies
-    // Packet structure: [opcode=0x03][0x00][0x00][16 challenge response bytes] = 19 bytes total
-    // The 2 zero bytes after opcode are the "special bytes" that were being skipped
+    // Packet structure: [frame=0x03][16 challenge response bytes] = 17 bytes (0x11) total
+    // Note: The 2-byte Protocol/Opcode field at offset 1 is NOT present in this packet type.
+    // The challenge data starts immediately at offset 1, matching the original binary.
     uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
     if (envelope.packetPayloadPtr && responsePayload) {
-        responsePayload[0] = 0x03;  // opcode
-        responsePayload[1] = 0x00;  // special byte 1
-        responsePayload[2] = 0x00;  // special byte 2
-        // Copy 16 bytes (4 dwords) from envelope.packetPayloadPtr+0x11/0x15/0x19/0x1d 
-        // to responsePayload+3/7/0xb/0xf (after opcode + 2 special bytes)
-        *reinterpret_cast<uint32_t*>(responsePayload + 3) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x11);
-        *reinterpret_cast<uint32_t*>(responsePayload + 7) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x15);
-        *reinterpret_cast<uint32_t*>(responsePayload + 11) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x19);
-        *reinterpret_cast<uint32_t*>(responsePayload + 15) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x1d);
-        responseMessageRef->GrowPayloadByteCount(19);  // 1 opcode + 2 special + 16 response bytes
+        responsePayload[0] = 0x03;  // frame byte
+        // Copy 16 bytes (4 dwords) from envelope.packetPayloadPtr+0x11/0x15/0x19/0x1d
+        // to responsePayload+1/5/9/0xd (immediately after frame byte, NO 2-byte opcode field)
+        *reinterpret_cast<uint32_t*>(responsePayload + 1) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x11);
+        *reinterpret_cast<uint32_t*>(responsePayload + 5) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x15);
+        *reinterpret_cast<uint32_t*>(responsePayload + 9) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x19);
+        *reinterpret_cast<uint32_t*>(responsePayload + 13) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x1d);
+        responseMessageRef->GrowPayloadByteCount(17);  // 1 frame + 16 response bytes = 0x11
     } else {
         spdlog::warn("HandleCode2ForBootstrap: missing envelope.packetPayloadPtr or responsePayload for response packet");
         return 0u;
