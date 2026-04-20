@@ -2882,8 +2882,8 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     SendPacketMessageRef(*builderEnvelope.messageRef08);
 
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent "
-        "payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
+        "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent CERT_ConnectRequest "
+        "opcode=0x01 payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
         "this={} ownerContext={} remoteHost='{}'",
         fmt::ptr(builderEnvelope.payloadBegin10),
         static_cast<unsigned>(builderEnvelope.reservedContentByteCount18),
