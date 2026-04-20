@@ -20,7 +20,7 @@ CLTReferenceCountedBase_0x4b42b0::CLTReferenceCountedBase_0x4b42b0(char initFlag
 }
 
 // anchor: launcher.exe:0x437900 (same ctor, different vtable progression)
-CLTReferenceCountedBase2_0x4b42b0::CLTReferenceCountedBase2_0x4b42b0(char initFlag) {
+CLTReferenceCountedBase_0x4b9fa0::CLTReferenceCountedBase_0x4b9fa0(char initFlag) {
     // Original: sets vtable to 0x4b9fa0, then 0x4bace0
     // FIDELITY: Second subobject at offset 4, initialized with flag 0
     (void)initFlag;
@@ -49,7 +49,7 @@ void CLTChildObjectBase_0x4b41e0::NotifyOwner() {
 
 CryptoInitHelper_0x4b42bc::CryptoInitHelper_0x4b42bc(uint32_t param1)
     : CLTReferenceCountedBase_0x4b42b0('\x01'),   // offset 0: subobject #1, flag 1
-      CLTReferenceCountedBase2_0x4b42b0('\x00'),  // offset 4: subobject #2, flag 0
+      CLTReferenceCountedBase_0x4b9fa0('\x00'),  // offset 4: subobject #2, flag 0
       CLTChildObjectBase_0x4b41e0(),              // offset 8: dispatch base
       mbr_0x10(param1),
       mbr_0x14(0),
@@ -64,7 +64,7 @@ CryptoInitHelper_0x4b42bc::CryptoInitHelper_0x4b42bc(uint32_t param1)
     //
     // C++ multiple inheritance gives us proper layout:
     //   [0-3]: CLTReferenceCountedBase_0x4b42b0 vtable
-    //   [4-7]: CLTReferenceCountedBase2_0x4b42b0 vtable  
+    //   [4-7]: CLTReferenceCountedBase_0x4b9fa0 vtable  
     //   [8-11]: CLTChildObjectBase_0x4b41e0 vtable pointer
     //   [12-15]: padding
     //   [16+]: CryptoInitHelper-specific fields (mbr_0x10, mbr_0x14, etc.)
@@ -91,6 +91,8 @@ CryptoInitHelper_0x4b42bc::CryptoInitHelper_0x4b42bc(uint32_t param1)
     }
 }
 
+// anchor: launcher.exe:0x41cda0 - CLTReferenceCountedBase_0x4b42b0 destructor (base class)
+// CryptoInitHelper_0x4b42bc uses inherited destructor via vtable at 0x4b42bc slot 0
 CryptoInitHelper_0x4b42bc::~CryptoInitHelper_0x4b42bc() {
     if (mbr_0x14 != 0) {
         free(reinterpret_cast<void*>(mbr_0x14));
@@ -102,20 +104,20 @@ CryptoInitHelper_0x4b42bc::~CryptoInitHelper_0x4b42bc() {
     }
 }
 
+// anchor: launcher.exe:0x468790
 void CryptoInitHelper_0x4b42bc::virt_meth_0x468790(byte param1) {
-    // anchor: launcher.exe:0x468790
     // This method calls virt_meth_0x4687a0 with adjusted this pointer
     virt_meth_0x4687a0();
 }
 
+// anchor: launcher.exe:0x4687a0
 void CryptoInitHelper_0x4b42bc::virt_meth_0x4687a0() {
-    // anchor: launcher.exe:0x4687a0
     // Implementation would go here
     // For now, this is a stub
 }
 
+// anchor: launcher.exe:0x468dc0
 void CryptoInitHelper_0x4b42bc::InitializeCryptoState(uint32_t param1, void** param2) {
-    // anchor: launcher.exe:0x468dc0
     // Implementation would go here
     // For now, this is a stub
     if (param2) {

@@ -29,12 +29,12 @@ public:
 
 // Second reference-counted subobject at offset 4
 // anchor: launcher.exe:0x4b9fa0 / 0x4bace0 vtables at offset 4
-// This is the same class as CLTReferenceCountedBase_0x4b42b0 but with different vtables
-// during construction. We use a distinct type for C++ multiple inheritance fidelity.
-class CLTReferenceCountedBase2_0x4b42b0 {
+// Same class type as CLTReferenceCountedBase_0x4b42b0 but installed at different offset
+// with different vtable progression. Distinct C++ type for multiple inheritance layout.
+class CLTReferenceCountedBase_0x4b9fa0 {
 public:
-    CLTReferenceCountedBase2_0x4b42b0(char initFlag);
-    virtual ~CLTReferenceCountedBase2_0x4b42b0() = default;
+    CLTReferenceCountedBase_0x4b9fa0(char initFlag);
+    virtual ~CLTReferenceCountedBase_0x4b9fa0() = default;
 };
 
 // Child object base class for owner dispatch
@@ -78,12 +78,12 @@ public:
 //   offset 0x28: mbr_0x28 (param_1 copy)
 //
 // C++ IMPLEMENTATION: Using multiple inheritance to match offsets:
-//   - CLTReferenceCountedBase_0x4b42b0 at offset 0 (primary base)
-//   - CLTReferenceCountedBase2_0x4b42b0 at offset 4 (second subobject)
-//   - CLTChildObjectBase_0x4b41e0 at offset 8 (third base)
+//   - CLTReferenceCountedBase_0x4b42b0 at offset 0 (primary base, vtable 0x4b42b0)
+//   - CLTReferenceCountedBase_0x4b9fa0 at offset 4 (second subobject, vtable 0x4b9fa0)
+//   - CLTChildObjectBase_0x4b41e0 at offset 8 (third base, vtable 0x4b41e0)
 class CryptoInitHelper_0x4b42bc 
     : public CLTReferenceCountedBase_0x4b42b0   // offset 0
-    , public CLTReferenceCountedBase2_0x4b42b0 // offset 4
+    , public CLTReferenceCountedBase_0x4b9fa0   // offset 4
     , public CLTChildObjectBase_0x4b41e0 {      // offset 8
 public:
     CryptoInitHelper_0x4b42bc(uint32_t param1);
