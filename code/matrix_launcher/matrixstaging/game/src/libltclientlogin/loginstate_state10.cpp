@@ -147,8 +147,6 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     if (!g_CurrentLoginMediator || !messageRef) {
         return 0u;
     }
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-
     // anchor: launcher.exe:0x4401a0
     // Original at 0x4401aa: CALL 0x41bc20 (CMessageConnectionMessageRef_DecodeMessageCode)
     // returns u16 opcode directly. At 0x4401b3: CMP AX,0xb; JNZ reject_path.
@@ -218,11 +216,11 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
 
     if (parsed.status >= 1u) {
         // Error path: SetCurrentState(3), PostError(0xb) — matches 0x4402cd-0x4402e2
-        (void)mediator->SetCurrentState(3u);
-        mediator->PostError(0x0bu);
+        (void)g_CurrentLoginMediator->SetCurrentState(3u);
+        g_CurrentLoginMediator->PostError(0x0bu);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
-            static_cast<unsigned>(mediator->worldListCountOrStatus80));
+            static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80));
         return 1u;
     }
 

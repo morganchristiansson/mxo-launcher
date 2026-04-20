@@ -15,7 +15,6 @@ void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginStat
     if (!g_CurrentLoginMediator) {
         return;
     }
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
 
     // Current evidence-backed narrow scaffold for helper/state 14:
     // - verify auth-side connectivity first
@@ -24,18 +23,18 @@ void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginStat
     // - post event `0x1b`
     // Keep this intentionally limited to the outgoing half already described in the vtable docs;
     // the broader `0x36` reply handling remains owned by AuthMessageDispatch().
-    if (mediator->authConnectionFlag2c_ == 0u) {
+    if (g_CurrentLoginMediator->authConnectionFlag2c_ == 0u) {
         spdlog::info(
             "CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue blocked on owner+0x2c==0 currentState={}",
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return;
     }
 
-    mxo::liblttcp::CMessageConnection_0x4b7928* connection = mediator->authConnection_;
+    mxo::liblttcp::CMessageConnection_0x4b7928* connection = g_CurrentLoginMediator->authConnection_;
     if (connection == nullptr) {
         spdlog::info(
             "CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue missing auth connection object currentState={}",
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return;
     }
 
@@ -54,14 +53,14 @@ void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginStat
         packet.bytes.data(),
         static_cast<uint32_t>(packet.bytes.size()),
         nullptr);
-    mediator->PostEvent(0x1bu);
+    g_CurrentLoginMediator->PostEvent(0x1bu);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue built raw-0x35 packet headerLen={} payloadLen={} byteCount={} currentState={} -> sendResult=0x{:08x} then posts event=0x1b",
         packet.headerBytes.size(),
         packet.payloadBytes.size(),
         packet.bytes.size(),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(sendResult));
     return;
 }

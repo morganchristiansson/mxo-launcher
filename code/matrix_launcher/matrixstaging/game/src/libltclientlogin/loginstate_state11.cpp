@@ -61,7 +61,6 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     if (!g_CurrentLoginMediator) {
         return;
     }
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
 
     // Faithfulness correction:
     // - `0x43c020` belongs to `CLTLoginState_State11_0x4b5154` slot 3, so the packet build/send shape
@@ -91,14 +90,14 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     //   and then stalls before any incoming `MS_LoadCharacterReply`
     std::array<uint32_t, 17> sourceDwords134{};
     std::copy(
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.begin(),
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.end(),
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.begin(),
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.end(),
         sourceDwords134.begin());
     std::copy(
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.begin(),
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.end(),
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.begin(),
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.end(),
         sourceDwords134.begin() + 8);
-    sourceDwords134[16] = mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.bodyWord6c;
+    sourceDwords134[16] = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.bodyWord6c;
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     State11Packet0x4dBuilder packetBuilder;
@@ -124,15 +123,15 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     packetBuilder.SetFixedDword(0x41, sourceDwords134[16]);
 
     packetBuilder.SetRealFirstName(
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data());
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data());
     packetBuilder.SetRealLastName(
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data());
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data());
     packetBuilder.SetBackground(
-        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data());
-    packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data());
+    packetBuilder.SetGameSessionId(g_CurrentLoginMediator->GetGameSessionId());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
-    mediator->PostEvent(0x15u);
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    g_CurrentLoginMediator->PostEvent(0x15u);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
@@ -145,17 +144,17 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
         sourceDwords134[3],
         sourceDwords134[4],
         sourceDwords134[16],
-        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data()),
-        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data()),
-        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data()),
-        mediator->GetGameSessionId() ? mediator->GetGameSessionId() : "<empty>",
+        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data()),
+        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data()),
+        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data()),
+        g_CurrentLoginMediator->GetGameSessionId() ? g_CurrentLoginMediator->GetGameSessionId() : "<empty>",
         sendResult);
     spdlog::info(
         "CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(mediator->MarginPacketReceiveCountScaffold()),
-        static_cast<unsigned>(mediator->MarginPacketFilteredBeforeSlot6CountScaffold()),
-        static_cast<unsigned>(mediator->MarginPacketSlot6DispatchCountScaffold()));
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(g_CurrentLoginMediator->MarginPacketReceiveCountScaffold()),
+        static_cast<unsigned>(g_CurrentLoginMediator->MarginPacketFilteredBeforeSlot6CountScaffold()),
+        static_cast<unsigned>(g_CurrentLoginMediator->MarginPacketSlot6DispatchCountScaffold()));
     return;
 }
 
@@ -165,25 +164,23 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
     if (!g_CurrentLoginMediator) {
         return 0u;
     }
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-
     auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     // anchor: launcher.exe:0x43ae50
     LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
     if (!loadCharacterReplyEnvelope.valid) {
-        mediator->worldListCountOrStatus80 = 0x12000005u;
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage rejected message ref; mirrored original owner+0x80=0x12000005 and returned false-like");
         return 0u;
     }
 
-    auto& ownerState = mediator->postAuthMarginLoadingState_0xf14;
-    mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
+    auto& ownerState = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14;
+    g_CurrentLoginMediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
-        mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
-        (void)mediator->SetCurrentState(3u);
-        mediator->PostError(12u);
+        g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
+        (void)g_CurrentLoginMediator->SetCurrentState(3u);
+        g_CurrentLoginMediator->PostError(12u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
             static_cast<unsigned>(loadCharacterReplyEnvelope.status),
@@ -425,12 +422,12 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
 
     const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
     if (completed) {
-        if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(mediator->LoginHelperStateByIdScaffold(9u))) {
+        if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
             // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
             // Current source-owned mirror keeps that on the concrete state9 object.
             nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
         }
-        const uint32_t slot3Result = mediator->SetCurrentState(9u);
+        const uint32_t slot3Result = g_CurrentLoginMediator->SetCurrentState(9u);
         spdlog::info(
             "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
             loadCharacterReplyEnvelope.handoffWord09,
@@ -440,7 +437,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
         // - helper9 slot3 (`0x439780`) immediately consumes that handoff word during `0x41b450`
         // - it then calls owner `0x41de40`
         // - later state9 slot6 raw `0x11` success switches to helper12 and posts event `0x18`
-        mediator->PostEvent(0x16u);
+        g_CurrentLoginMediator->PostEvent(0x16u);
 
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} name='{}' -> currentState=helper9 event=0x16",
@@ -451,7 +448,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             replySectionsSeen_,
             replySectionsExpected_,
             firstFragment ? 1u : 0u,
-            ownerState.characterNameBufferF1c[0] ? ownerState.characterNameBufferF1c : "<empty>");
+            g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c[0] ? g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c : "<empty>");
         replySectionsSeen_ = 0;
         replySectionsExpected_ = 0;
     } else {
@@ -466,7 +463,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             replySectionsExpected_,
             loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
             firstFragment ? 1u : 0u,
-            ownerState.characterNameBufferF1c[0] ? ownerState.characterNameBufferF1c : "<empty>");
+            g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c[0] ? g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c : "<empty>");
     }
     return 1u;
 }
