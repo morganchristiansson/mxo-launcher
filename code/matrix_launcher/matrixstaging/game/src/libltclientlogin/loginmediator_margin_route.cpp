@@ -185,7 +185,8 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     const std::string marginHost = ResolvedMarginHostName();
     connection->remoteEndpoint_ = marginEndpoint_;
 
-    const uint32_t result = connection->EnsureConnected();
+    // Call Connect via vtable+0x1c (same as BeginAuthConnection)
+    const uint32_t result = connection->Connect(marginEndpoint_);
     spdlog::info(
         "CLTLoginMediator::BeginMarginConnection resolvedHost='{}' routeHostText='{}' selector=0x{:02x} beginCount={} selectedIpv4=0x{:08x} port={} ensureConnectedResult=0x{:08x}",
         marginHost.empty() ? std::string("<empty>") : marginHost,
