@@ -15,6 +15,7 @@
 #include "launcher_network_object_abi.h"
 #include "launcher_replacement_support.h"
 #include "server_config.h"
+#include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
 #include "../matrixstaging/game/src/launcher/launcher.h"
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
@@ -66,6 +67,29 @@ void LoadServerConfigurations() {
     }
 
     SetServerConfigs(std::move(configs));
+}
+
+// Auto-select server by name from command-line -server flag
+bool SelectServerByName(const char* serverName) {
+    if (!serverName || !serverName[0]) {
+        return false;
+    }
+
+    const auto& configs = GetAllServerConfigs();
+    for (size_t i = 0; i < configs.size(); ++i) {
+        const ServerConfig& config = configs[i];
+        if (_stricmp(config.name.c_str(), serverName) == 0) {
+            SetSelectedServerConfig(&config);
+            WriteMatrixConsoleFormattedLine(
+                "Using server: %s (%s)",
+                config.name.c_str(),
+                config.authServerDnsName.c_str());
+            return true;
+        }
+    }
+
+    spdlog::warn("DIAGNOSTIC: server '{}' not found in servers.cfg", serverName);
+    return false;
 }
 
 // Interactive server selection menu
@@ -884,11 +908,26 @@ character_selection_menu:
 //   recovered launcher-owned startup coordination and anchored method bodies.
 
 bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
-    // Load and select server first (before credentials)
+    // Load server configurations first
     LoadServerConfigurations();
-    if (!SelectServerInteractive()) {
-        spdlog::error("ERROR: server selection failed");
-        return false;
+
+    // Check for -server command-line flag
+    const char* serverFromCommandLine = g_LauncherCommandLine.LauncherServer();
+    if (serverFromCommandLine[0] != '\0') {
+        spdlog::info("DIAGNOSTIC: auto-selecting server from -server flag: '{}'", serverFromCommandLine);
+        if (!SelectServerByName(serverFromCommandLine)) {
+            spdlog::error("ERROR: server '{}' not found in servers.cfg", serverFromCommandLine);
+            WriteMatrixConsoleFormattedLine(
+                "Server '{}' not found in servers.cfg",
+                serverFromCommandLine);
+            return false;
+        }
+    } else {
+        // Interactive server selection menu
+        if (!SelectServerInteractive()) {
+            spdlog::error("ERROR: server selection failed");
+            return false;
+        }
     }
 
     // Apply selected server config to mediator globals

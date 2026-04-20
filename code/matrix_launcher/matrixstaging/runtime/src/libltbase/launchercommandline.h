@@ -42,6 +42,8 @@ public:
     void SetLauncherCharacter(const char* value);
     const char* LauncherSession() const;
     void SetLauncherSession(const char* value);
+    const char* LauncherServer() const;
+    void SetLauncherServer(const char* value);
 
     bool SwitchClone() const;
     bool SwitchSilent() const;
@@ -73,6 +75,7 @@ private:
         kCharacter = 3,
         kQlVersion = 4,
         kSession = 5,
+        kServer = 6,
     };
 
     static char* DuplicateArgString(const char* value);
@@ -101,6 +104,7 @@ private:
     char authPassword_[256] = {};
     char launcherCharacter_[256] = {};
     char launcherSession_[256] = {};
+    char launcherServer_[256] = {};
 
     bool switchClone_ = false;
     bool switchSilent_ = false;     // observed -silent presence; 0x409950 shows no extra state write here

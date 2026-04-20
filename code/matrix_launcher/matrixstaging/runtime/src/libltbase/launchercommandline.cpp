@@ -89,6 +89,7 @@ void CLauncherCommandLine::Reset() {
     std::memset(authPassword_, 0, sizeof(authPassword_));
     std::memset(launcherCharacter_, 0, sizeof(launcherCharacter_));
     std::memset(launcherSession_, 0, sizeof(launcherSession_));
+    std::memset(launcherServer_, 0, sizeof(launcherServer_));
 
     switchClone_ = false;
     switchSilent_ = false;
@@ -152,9 +153,18 @@ const char* CLauncherCommandLine::LauncherSession() const {
     return launcherSession_;
 }
 
+const char* CLauncherCommandLine::LauncherServer() const {
+    return launcherServer_;
+}
+
 // UNANCHORED: replacement-only CLI mirror of launcher UI session prefill.
 void CLauncherCommandLine::SetLauncherSession(const char* value) {
     CopyIntoFixedBuffer(launcherSession_, sizeof(launcherSession_), value ? value : "");
+}
+
+// UNANCHORED: replacement-only CLI mirror of launcher UI server prefill.
+void CLauncherCommandLine::SetLauncherServer(const char* value) {
+    CopyIntoFixedBuffer(launcherServer_, sizeof(launcherServer_), value ? value : "");
 }
 
 bool CLauncherCommandLine::SwitchClone() const {
@@ -356,6 +366,9 @@ CLauncherCommandLine::PendingValueTarget CLauncherCommandLine::PendingTargetForS
     if (::lstrcmpiA(value, "-qlsession") == 0 || ::lstrcmpiA(value, "-session") == 0) {
         return PendingValueTarget::kSession;
     }
+    if (::lstrcmpiA(value, "-server") == 0) {
+        return PendingValueTarget::kServer;
+    }
     if (::lstrcmpiA(value, "-qlver") == 0) {
         return PendingValueTarget::kQlVersion;
     }
@@ -422,6 +435,8 @@ bool CLauncherCommandLine::ConsumeValueSwitch(PendingValueTarget target, const c
             return CopyIntoFixedBuffer(launcherCharacter_, sizeof(launcherCharacter_), value);
         case PendingValueTarget::kSession:
             return CopyIntoFixedBuffer(launcherSession_, sizeof(launcherSession_), value);
+        case PendingValueTarget::kServer:
+            return CopyIntoFixedBuffer(launcherServer_, sizeof(launcherServer_), value);
         case PendingValueTarget::kQlVersion:
             return true;
         case PendingValueTarget::kNone:

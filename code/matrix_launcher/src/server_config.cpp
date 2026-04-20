@@ -288,6 +288,21 @@ const std::vector<ServerConfig>& GetAllServerConfigs() {
     return g_ServerConfigs;
 }
 
+bool SelectServerConfigByName(const char* name) {
+    if (!name || !name[0]) {
+        return false;
+    }
+
+    for (auto& config : g_ServerConfigs) {
+        if (_stricmp(config.name.c_str(), name) == 0) {
+            g_SelectedServerConfig = &config;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void ApplySelectedServerConfigToMediator() {
     if (!g_SelectedServerConfig) {
         spdlog::warn("ApplySelectedServerConfigToMediator: no server config selected");

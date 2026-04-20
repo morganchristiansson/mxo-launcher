@@ -41,3 +41,7 @@ void SetServerConfigs(std::vector<ServerConfig>&& configs);
 
 // Get all server configs (for testing)
 const std::vector<ServerConfig>& GetAllServerConfigs();
+
+// Select a server config by name (case-insensitive)
+// Returns true if found and selected, false otherwise
+bool SelectServerConfigByName(const char* name);
