@@ -585,79 +585,15 @@ public:
 
     Packet_CertConnectRequest_0x4b6524() {
         // anchor: launcher.exe:0x441f30 - constructor setup
-        // Compiler sets vtable to 0x004b6524 automatically via C++ vptr
-        nopatchLauncherVersionValue04 = 0;
-        messageRef08 = nullptr;
-        ownerReadyFlag0c = 0;
-        payloadBegin10 = nullptr;
-        // Base class fields through worldId24 are zero-initialized
+        // C++ compiler automatically sets vptr to Packet_CertConnectRequest_0x4b6524 vtable
+        // Base class Packet_0x4af2a4 constructor runs first:
+        //   - Creates a fresh messageRef via CMessageConnectionMessage_CreateRef
+        //   - Sets nopatchLauncherVersionValue04 = messageStorage->PayloadBase()
+        //   - Sets payloadBegin10 = nopatchLauncherVersionValue04
+        // Derived fields are zero-initialized:
         reservationHeader14 = nullptr;
         reservedContentByteCount18 = 0u;
         reservedPadding1a = 0u;
-    }
-
-    // Initialize the builder with a message reference
-    // anchor: launcher.exe:0x441f3e - constructor call and field setup
-    void InitializeWithMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef, uint16_t initialPayloadByteCount) {
-        messageRef08 = &messageRef;
-        if (messageRef.messageStorage0c) {
-            payloadBegin10 = messageRef.messageStorage0c->PayloadBase();
-        }
-
-        // Reset payload to initial size (3 bytes for opcode + 2-byte field)
-        if (messageRef.messageStorage0c) {
-            messageRef.messageStorage0c->ResetPayloadByteCount(initialPayloadByteCount);
-        }
-    }
-
-    // Set up the CERT_ConnectRequest packet header
-    // anchor: launcher.exe:0x441f64, 0x441f6a - opcode and field setup
-    void SetupCertConnectRequestHeader() {
-        uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
-        if (packetPayload) {
-            packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
-            *reinterpret_cast<uint16_t*>(packetPayload + 1) = 0u;  // Field value
-        }
-    }
-
-    // Reserve space for the bootstrap reply copy
-    // anchor: launcher.exe:0x441f73 - LocalPacketBuilder_ReserveLengthPrefixedTail call
-    bool ReserveBootstrapReplySpace(CMessageConnectionMessageRef_0x4ba23c& messageRef,
-                                    uint16_t replyByteCount) {
-        uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
-        if (!messageRef.messageStorage0c || !packetPayload) {
-            return false;
-        }
-
-        const uint16_t currentPayloadByteCount = messageRef.messageStorage0c->PayloadByteCount();
-        reservationHeader14 = packetPayload + currentPayloadByteCount;
-
-        const uint16_t requestedGrowth = static_cast<uint16_t>(replyByteCount + sizeof(uint16_t));
-        const uint16_t newPayloadByteCount =
-            messageRef.messageStorage0c->GrowPayloadByteCount(requestedGrowth);
-
-        if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
-            return false;
-        }
-
-        // Write the length prefix
-        reservationHeader14[0] = static_cast<uint8_t>(replyByteCount & 0xffu);
-        reservationHeader14[1] = static_cast<uint8_t>((replyByteCount >> 8) & 0xffu);
-
-        reservedContentByteCount18 = replyByteCount;
-        return true;
-    }
-
-    // Copy bootstrap reply data into the reserved space
-    // anchor: launcher.exe:0x441f8b-0x441f97 - memcpy loop
-    bool CopyBootstrapReplyData(const uint8_t* sourceData, uint16_t byteCount) {
-        if (!reservationHeader14 || byteCount != reservedContentByteCount18) {
-            return false;
-        }
-
-        uint8_t* destination = reservationHeader14 + sizeof(uint16_t);  // Skip length prefix
-        std::copy(sourceData, sourceData + byteCount, destination);
-        return true;
     }
 
     // Virtual method overrides matching vtable 0x4b6524
@@ -750,20 +686,6 @@ public:
 
     // anchor: launcher.exe:0x481760 / vtable slot 4 (inherited)
     // GetPayloadBase() inherited from base, returns payloadBegin10
-
-    // Get the envelope for sending (source helper for ABI compatibility)
-    CMessageConnectionPacketBuilderEnvelope GetEnvelope() const {
-        CMessageConnectionPacketBuilderEnvelope envelope;
-        envelope.vtable00 = const_cast<void**>(reinterpret_cast<const void**>(0x004b6524));
-        envelope.payloadBase04 = static_cast<uint8_t*>(payloadBegin10);
-        envelope.messageRef08 = messageRef08;
-        return envelope;
-    }
-
-    // Check if the builder is valid for sending
-    bool IsValidForSend() const {
-        return payloadBegin10 != nullptr && messageRef08 != nullptr;
-    }
 };
 
 // Note: Modern C++ adds vptr (4 bytes) but original MSVC2003 binary has no leading vptr.
