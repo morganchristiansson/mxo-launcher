@@ -425,7 +425,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
 
     const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
     if (completed) {
-        if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(mediator->LoginHelperStateByIdScaffold(9u))) {
+        if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(mediator->LoginHelperStateByIdScaffold(9u))) {
             // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
             // Current source-owned mirror keeps that on the concrete state9 object.
             nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);

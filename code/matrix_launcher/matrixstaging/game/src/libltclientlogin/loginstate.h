@@ -345,10 +345,10 @@ public:
 // Provisional better-name suggestion: `CLTLoginState_LoadCharacterFollowupPending`
 // Focused source home for the active late-login body:
 // - `loginstate_state9.cpp`
-class CLTLoginState_State9 : public CLTLoginState {
+class CLTLoginState_State9_0x4b517c : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x00439750 (vtable 0x004b517c slot 10 initializer)
-    CLTLoginState_State9() = default;
+    CLTLoginState_State9_0x4b517c() = default;
 
 private:
     // `0x00439780` consumes a local byte/word payload from `this+4/+6`.

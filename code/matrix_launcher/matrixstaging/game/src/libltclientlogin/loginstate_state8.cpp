@@ -824,7 +824,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         }
         LogState8PersistenceFamilySnapshot(ownerState, "completed", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, true);
 
-        if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
+        if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
             nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
         }
         const uint32_t slot3Result = g_CurrentLoginMediator->SetCurrentState(9u);
