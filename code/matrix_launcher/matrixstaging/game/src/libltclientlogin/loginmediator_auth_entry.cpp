@@ -166,21 +166,9 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d1ee / byte ptr [ESI + 0x2c] = 0
     authConnectionFlag2c_ = 0u;
 
-    // Inline: refresh address list and get next IPv4 - anchor: launcher.exe:0x41d1f2
+    // Inline: get next IPv4 - anchor: launcher.exe:0x41d1f2
     // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
-    // First refresh the address list if empty - original directly uses global without cache
-    if (authAddressList4c_.Empty()) {
-        if (g_qsAuthServerDNSName != nullptr && g_qsAuthServerDNSName[0] != '\0') {
-            uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
-            if (ignoreHostsFileForAuth_) {
-                flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
-            }
-            (void)authAddressList4c_.Reinit(g_qsAuthServerDNSName, flags);
-        } else {
-            authAddressList4c_.Reset();
-        }
-    }
-    // Get next IPv4
+    // Original does NOT reinitialize - assumes list already populated from Initialize
     const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
     if (nextIpv4 != 0u) {
         authEndpoint_.ipv4NetworkOrder = nextIpv4;
@@ -204,8 +192,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: 0x41d22f / MOV EAX, dword ptr [ECX] - get vtable
     // anchor: 0x41d231 / PUSH EDX - endpoint
     // anchor: 0x41d232 / CALL dword ptr [EAX+0x1c] - EnsureConnected
-    connection->remoteEndpoint_ = authEndpoint_;
-    connection->SetRemoteHostName(g_qsAuthServerDNSName);
+    // Original only sets endpoint and calls EnsureConnected - no SetRemoteHostName
 
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",

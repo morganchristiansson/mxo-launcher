@@ -181,10 +181,8 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     ++marginBeginCount24_;
     marginSelectedIpv4_7c_ = 0u;
 
+    // Original does NOT call SetRemoteHostName - only sets endpoint
     const std::string marginHost = ResolvedMarginHostName();
-    if (!marginHost.empty()) {
-        connection->SetRemoteHostName(marginHost.c_str());
-    }
     connection->remoteEndpoint_ = marginEndpoint_;
 
     const uint32_t result = connection->EnsureConnected();
