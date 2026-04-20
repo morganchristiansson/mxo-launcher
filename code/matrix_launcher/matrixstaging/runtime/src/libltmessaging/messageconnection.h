@@ -546,6 +546,47 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
 
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");
 
+// anchor: launcher.exe:0x4b6560 -> Packet_CertChallengeResponse_0x4b6560
+// FIDELITY: Separate class for response envelope (vtable 0x4b6560)
+// The original manually switches vtable from base PacketBuilder (0x4af2a4) to this (0x4b6560)
+// at offset 0x442afd after default construction.
+// This class is used specifically for building the CERT challenge response packet (opcode 0x03).
+// The vtable at 0x4b6560 is a copy of MarginConnectionChallengeParsedResult_0x4b654c vtable
+// but used in a different context for response packet building.
+class Packet_CertChallengeResponse_0x4b6560 : public ltlogin::PacketBuilder_0x4af2a4 {
+public:
+    // FIDELITY: Default constructor mirrors original at 0x439840
+    // Creates new message ref, sets up payload base at +0xc offset
+    // anchor: launcher.exe:0x439840 - PacketBuilder_CertChallengeResponse_0x4b6538_DefaultCtor
+    Packet_CertChallengeResponse_0x4b6560();
+    
+    ~Packet_CertChallengeResponse_0x4b6560() override = default;
+};
+
+// Size matches base PacketBuilder (0x26 = 38 bytes)
+static_assert(sizeof(Packet_CertChallengeResponse_0x4b6560) == sizeof(ltlogin::PacketBuilder_0x4af2a4),
+              "Packet_CertChallengeResponse_0x4b6560 size mismatch");
+
+inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6560() {
+    // FIDELITY: Mirror original default ctor at 0x439840
+    // The original sets base vtable (0x4af2a4), creates message ref, then later
+    // manually overwrites with 0x4b6560 at 0x442afd.
+    // We directly initialize with the correct vtable concept.
+    // anchor: launcher.exe:0x439840-0x439893: Default ctor creates message ref, sets field_0x4
+    
+    CMessageConnectionMessageRef_0x4ba23c* newMessageRef = new CMessageConnectionMessageRef_0x4ba23c();
+    if (newMessageRef) {
+        newMessageRef->AddRef();
+        newMessageRef->ResetForPacketBuilder(false, 0);
+        messageRef08 = newMessageRef;
+        if (newMessageRef->messageStorage0c) {
+            uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBase();
+            nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
+            payloadBegin10 = payloadBase + 0xc;
+        }
+    }
+}
+
 } // namespace mxo::liblttcp
 
 // CertConnectRequestPacketBuilder_0x4b6524 - CERT_ConnectRequest packet builder (opcode 0x01)

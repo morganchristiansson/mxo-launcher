@@ -3458,27 +3458,25 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
     // Original flow:
     // 1. CLTLoginMediatorPacketBuilderEnvelope_Initialize(&local_24)
-    // 2. Set opcode 0x11
-    // 3. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-    // 4. Send via connection vtable+0x24
+    // 2. Manually set vtable to 0x4b6560 at 0x442afd
+    // 3. Set opcode 0x11
+    // 4. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+    // 5. Send via connection vtable+0x24
 
     // FIDELITY: Build response packet inline to match launcher.exe:0x442ab9-0x442b03
     // The original at 0x442ab9 creates a response envelope on the stack and populates it directly
+    // FIDELITY: Use Packet_CertChallengeResponse_0x4b6560 (vtable 0x4b6560) for response envelope
+    // The original manually switches vtable from base (0x4af2a4) to 0x4b6560 at 0x442afd
 
-    // Create response envelope (default constructor as per original)
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
-    // Original at 0x442af4 sets: responseEnvelope.mbr_0x10 = responseEnvelope.mbr_0x4
-    // In original, mbr_0x10 is a pointer field (not a 16-byte buffer as in our C++ class)
-    // The original copies the message ref pointer from mbr_0x8 to mbr_0x10, then later
-    // accesses packet payload through that pointer. Our C++ class can't replicate this
-    // exactly because mbr_0x10 is a buffer. We use the message ref from builder00 instead.
-    // FIDELITY: In our C++ version, the builder00 already has an initialized messageRef
-    // from default construction, so we use it directly
+    Packet_CertChallengeResponse_0x4b6560 responseEnvelope;
+    // anchor: launcher.exe:0x442afd: Original manually sets field_0x4 = 0x4b6560 (vtable)
+    // C++ handles this through the class vtable automatically
+    // anchor: launcher.exe:0x442af4: responseEnvelope.mbr_0x10 = responseEnvelope.mbr_0x4
+    // Our C++ class uses payloadBegin10 from base PacketBuilder
 
-    // The original at 0x442b00 sets opcode 3:
-    //   *(undefined1 *)responseEnvelope.mbr_0x10 = 3;
-    // Get the message ref from response envelope (stored at mbr_0x8) and set up the packet
-    CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = static_cast<CMessageConnectionMessageRef_0x4ba23c*>(responseEnvelope.messageRef08);
+    // anchor: launcher.exe:0x442b00: Get message ref from response envelope (mbr_0x8)
+    // and packet payload base (mbr_0x4/mbr_0x10) for building response
+    CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = responseEnvelope.messageRef08;
     if (!responseMessageRef) {
         // Should not happen - envelope has default-constructed message ref
         spdlog::warn("HandleCode2ForBootstrap: responseEnvelope has no messageRef");
