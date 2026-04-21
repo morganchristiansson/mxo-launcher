@@ -111,10 +111,14 @@ public:
             messageRef08->AddRef();
             messageRef08->ResetForPacketBuilder(false, 0);
             if (messageRef08->messageStorage0c) {
+                // FIDELITY: Original at 0x439894 does:
+                //   MOV ECX, dword ptr [EAX + 0xc]  ; Load messageStorage0c pointer from messageRef
+                //   ADD ECX, 0xc                    ; Add 0xc to get to payload
+                //   MOV [ESI + 0x4], ECX            ; Store at this+0x4
+                // PayloadBase() returns payloadBytesPtr0c + 0xc, which matches the original calculation.
                 uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
-                // Original sets field_0x4 = payloadBase + 0xc
-                nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
-                payloadBegin10 = payloadBase + 0xc;
+                nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase);
+                payloadBegin10 = payloadBase;
             }
         }
     }

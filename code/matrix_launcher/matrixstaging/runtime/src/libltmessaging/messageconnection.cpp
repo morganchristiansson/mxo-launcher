@@ -140,17 +140,10 @@ uint32_t CMessageConnectionMessageStorage_0x4ba208::Release() {
     return static_cast<uint32_t>(current);
 }
 
-CMessageConnectionMessageStorage_0x4ba208::~CMessageConnectionMessageStorage_0x4ba208() {
-    // Clean up dynamically allocated payload buffer
-    delete[] payloadBytesPtr0c;
-    payloadBytesPtr0c = nullptr;
-}
-
 void CMessageConnectionMessageStorage_0x4ba208::FinalRelease() {
     // anchor: launcher.exe:0x455ad0 / vtable `0x004ba208 +0x0c`
     // The original heap object returns to a pool here. This internal mirror is stack/inline owned,
     // so the final-release path is intentionally non-deleting.
-    // Note: payload buffer is now heap-allocated and cleaned up in destructor
 }
 
 // anchor: launcher.exe:0x42f880 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x10`
@@ -172,30 +165,23 @@ void CMessageConnectionMessageStorage_0x4ba208::ResetForPacketBuilder() {
     reservedBytes08 = kBuilderReservedBytes08;
     payloadLengthHigh0a = 0u;
     payloadLengthLow0b = 0u;
-    // FIDELITY: Allocate payload buffer separately to match original layout
-    if (!payloadBytesPtr0c) {
-        payloadBytesPtr0c = new uint8_t[kMaxPayloadByteCount]();
-    } else {
-        std::fill(payloadBytesPtr0c, payloadBytesPtr0c + kMaxPayloadByteCount, 0u);
-    }
+    // FIDELITY: Zero the inline payload array at offset 0xc
+    std::fill(payloadBytes0c.begin(), payloadBytes0c.end(), 0u);
 }
 
 void CMessageConnectionMessageStorage_0x4ba208::ResetPayloadByteCount(uint16_t payloadByteCount) {
     const uint16_t oldByteCount = PayloadByteCount();
     const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
-    // FIDELITY: Use payloadBytesPtr0c instead of inline array
-    if (payloadBytesPtr0c) {
-        if (clampedByteCount < oldByteCount) {
-            std::fill(
-                payloadBytesPtr0c + clampedByteCount,
-                payloadBytesPtr0c + oldByteCount,
-                0u);
-        } else if (clampedByteCount > oldByteCount) {
-            std::fill(
-                payloadBytesPtr0c + oldByteCount,
-                payloadBytesPtr0c + clampedByteCount,
-                0u);
-        }
+    if (clampedByteCount < oldByteCount) {
+        std::fill(
+            payloadBytes0c.begin() + clampedByteCount,
+            payloadBytes0c.begin() + oldByteCount,
+            0u);
+    } else if (clampedByteCount > oldByteCount) {
+        std::fill(
+            payloadBytes0c.begin() + oldByteCount,
+            payloadBytes0c.begin() + clampedByteCount,
+            0u);
     }
     SetPayloadByteCountRaw(clampedByteCount);
 }
@@ -241,15 +227,15 @@ uint16_t CMessageConnectionMessageStorage_0x4ba208::RemainingAppendableByteCount
 }
 
 uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBase() {
-    // FIDELITY: Original DefaultCtor at 0x439894 does:
-    //   MOV ECX, dword ptr [EAX + 0xc]  ; Load pointer from offset 0xc
-    //   ADD ECX, 0xc                    ; Add 0xc
-    // So PayloadBase() returns payloadBytesPtr0c + 0xc to match original behavior
-    return payloadBytesPtr0c ? payloadBytesPtr0c + 0xc : nullptr;
+    // FIDELITY: Original DefaultCtor at 0x439840 computes:
+    //   nopatchLauncherVersionValue04 = *(messageRef08 + 0xc) + 0xc
+    // = messageStorage0c + 0xc = &payloadBytes0c[0]
+    // Inline array starts at offset 0xc in this struct.
+    return payloadBytes0c.data();
 }
 
 const uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBase() const {
-    return payloadBytesPtr0c ? payloadBytesPtr0c + 0xc : nullptr;
+    return payloadBytes0c.data();
 }
 
 // anchor: launcher.exe:0x42f850 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x04`
