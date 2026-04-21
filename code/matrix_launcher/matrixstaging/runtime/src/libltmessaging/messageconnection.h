@@ -582,10 +582,10 @@ namespace mxo::liblttcp {
 
 class Packet_CertConnectRequest_0x4b6524 : public ltlogin::Packet_0x4af2a4 {
 public:
-    // Additional fields for Packet_CertConnectRequest_0x4b6524 (follow base class fields)
-    uint8_t* reservationHeader14 = nullptr;   // +0x14 (after base's worldId24 at +0x24, but MSVC2003 layout differs)
-    uint16_t reservedContentByteCount18 = 0u; // +0x18
-    uint16_t reservedPadding1a = 0u;          // +0x1a
+    // FIDELITY: No additional fields at +0x14/+0x18 - use base class fields:
+    // - debugString14 at +0x14 is repurposed as reservationHeader14 (uint8_t* instead of const char*)
+    // - payloadSize18 at +0x18 is repurposed as reservedContentByteCount18
+    // This matches original binary layout where these offsets store the reservation state.
 
     Packet_CertConnectRequest_0x4b6524() {
         // anchor: launcher.exe:0x441f30 - constructor setup
@@ -594,10 +594,9 @@ public:
         //   - Creates a fresh messageRef via CMessageConnectionMessage_CreateRef
         //   - Sets nopatchLauncherVersionValue04 = messageStorage->PayloadBase()
         //   - Sets payloadBegin10 = nopatchLauncherVersionValue04
-        // Derived fields are zero-initialized:
-        reservationHeader14 = nullptr;
-        reservedContentByteCount18 = 0u;
-        reservedPadding1a = 0u;
+        // Reservation fields are zero-initialized via base class:
+        debugString14 = nullptr;  // Acts as reservationHeader14
+        payloadSize18 = 0u;       // Acts as reservedContentByteCount18
     }
 
     // Virtual method overrides matching vtable 0x4b6524
@@ -612,7 +611,9 @@ public:
     // Original at 0x4425f0: void function, outputs "Certificate:(Array of size X)" or "Certificate:[byte0,byte1,...]"
     // param_2 == 2: array size format; param_2 == 3: byte array format
     void DebugString(int formatType = 2) override {
-        if (!reservationHeader14) {
+        // Cast debugString14 (const char*) to uint8_t* for byte array access
+        uint8_t* reservationHeader = reinterpret_cast<uint8_t*>(const_cast<char*>(debugString14));
+        if (!reservationHeader) {
             spdlog::debug("CertConnectRequestPacketBuilder: Certificate reservation not initialized");
             return;
         }
@@ -620,16 +621,16 @@ public:
         if (formatType == 2) {
             // Array size format: "Certificate:(Array of size X)"
             spdlog::debug("CertConnectRequestPacketBuilder: Certificate:(Array of size 0x{:04x})",
-                         static_cast<unsigned>(reservedContentByteCount18));
+                         static_cast<unsigned>(payloadSize18));
         } else if (formatType == 3) {
             // Byte array format: "Certificate:[byte0,byte1,...,]"
-            if (reservationHeader14 && reservedContentByteCount18 > 0) {
+            if (payloadSize18 > 0) {
                 std::string byteStr;
-                for (uint16_t i = 0; i < reservedContentByteCount18 && i < 32; ++i) {
+                for (uint16_t i = 0; i < payloadSize18 && i < 32; ++i) {
                     if (i > 0) byteStr += ",";
-                    byteStr += fmt::format("0x{:02x}", reservationHeader14[i]);
+                    byteStr += fmt::format("0x{:02x}", reservationHeader[i]);
                 }
-                if (reservedContentByteCount18 > 32) byteStr += ",...";
+                if (payloadSize18 > 32) byteStr += ",...";
                 spdlog::debug("CertConnectRequestPacketBuilder: Certificate:[{}]", byteStr);
             } else {
                 spdlog::debug("CertConnectRequestPacketBuilder: Certificate:[]");
@@ -684,19 +685,20 @@ public:
             packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
             *reinterpret_cast<uint16_t*>(packetPayload + 1) = 0u;  // Zero field
         }
-        reservationHeader14 = nullptr;
-        reservedContentByteCount18 = 0u;
+        // Clear reservation fields (stored in base class debugString14/payloadSize18)
+        debugString14 = nullptr;
+        payloadSize18 = 0u;
     }
 
     // anchor: launcher.exe:0x481760 / vtable slot 4 (inherited)
     // GetPayloadBase() inherited from base, returns payloadAlias10
 };
 
-// Note: Modern C++ adds vptr (4 bytes) but original MSVC2003 binary has no leading vptr.
-// With vptr on i686: sizeof = 4 (vptr) + base fields (0x28) + derived fields (0x8) + padding = 48 (0x30)
-// Original binary layout: base(0x14) + derived(0x8) = 0x1c (28 bytes) without vptr
-static_assert(sizeof(Packet_CertConnectRequest_0x4b6524) == 0x30,
-              "Packet_CertConnectRequest_0x4b6524 size mismatch (expected 0x30 with vptr)");
+// Note: Modern C++ adds vptr (4 bytes). Packet_CertConnectRequest_0x4b6524 has no additional
+// fields - it repurposes base class debugString14/payloadSize18 for reservation state.
+// Size: 4 (vptr) + base fields (0x24) = 0x28 (40 bytes) on i686.
+static_assert(sizeof(Packet_CertConnectRequest_0x4b6524) == 0x28,
+              "Packet_CertConnectRequest_0x4b6524 size mismatch (expected 0x28 with vptr)");
 
 class CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:

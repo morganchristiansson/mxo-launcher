@@ -91,13 +91,16 @@ public:
     virtual void* GetPayloadBase() { return payloadAlias10; }
 
     // anchor: launcher.exe:0x43a230 - LocalPacketBuilder_ReserveLengthPrefixedTail
-    // Non-virtual helper used by 3 packet builder subclasses:
+    // Virtual helper used by packet builder subclasses:
     // - CMarginConnection_SendStoredBootstrapReplyCopy98 (0x441f7d)
     // - CLTLoginMediatorPacket0x0a_SetCharacterName (0x43aaae)
     // - AuthBootstrap680_HandleInboundAuthMessage (0x448418)
+    // Must be virtual because derived classes have different fields at +0x14/+0x18:
+    // - Packet_0x4af2a4: debugString14 (+0x14), payloadSize18 (+0x18)
+    // - Packet_CertConnectRequest_0x4b6524: reservationHeader14 (+0x14), reservedContentByteCount18 (+0x18)
     // Reserves space for a length-prefixed tail, updates bytes[1-2] with offset to header.
     // Returns content byte count (may be clamped to available space).
-    uint16_t ReserveLengthPrefixedTail(uint16_t contentByteCount);
+    virtual uint16_t ReserveLengthPrefixedTail(uint16_t contentByteCount);
 
     // anchor: launcher.exe:0x439840 - Packet_0x4af2a4_DefaultCtor
     // Default constructor - creates message ref, sets up payload base at +0xc offset

@@ -2868,9 +2868,9 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
 
     // anchor: launcher.exe:0x441f8b-0x441f97 - copy 0x136 bytes from bootstrapReplyCopy98_
     // Original uses REP MOVSD (0x4d dwords) + MOVSW (1 word) = 0x136 bytes
-    // Reservation header is at builderEnvelope.reservationHeader14 (set by helper)
-    // Copy destination is after the 2-byte length prefix: reservationHeader + 2
-    uint8_t* copyDest = builderEnvelope.reservationHeader14 + 2;
+    // Base class ReserveLengthPrefixedTail sets debugString14 to point AFTER length prefix
+    // (at reservationHeader + 2), which is exactly where we want to copy the data.
+    uint8_t* copyDest = reinterpret_cast<uint8_t*>(const_cast<char*>(builderEnvelope.debugString14));
     const uint8_t* bootstrapReplySrc = bootstrapReplyCopy98_.data();
     for (int copyLoopCounter = 0x4d; copyLoopCounter != 0; --copyLoopCounter) {
         *reinterpret_cast<uint32_t*>(copyDest) = *reinterpret_cast<const uint32_t*>(bootstrapReplySrc);
@@ -2889,7 +2889,7 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
         "opcode=0x01 payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
         "this={} ownerContext={} remoteHost='{}'",
         builderEnvelope.payloadPtr04,
-        static_cast<unsigned>(builderEnvelope.reservedContentByteCount18),
+        static_cast<unsigned>(builderEnvelope.payloadSize18),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
