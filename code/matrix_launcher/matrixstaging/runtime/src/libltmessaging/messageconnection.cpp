@@ -2862,24 +2862,15 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
 
     // anchor: launcher.exe:0x441f73 - reserve length-prefixed tail for bootstrap reply copy
     // Original: LocalPacketBuilder_ReserveLengthPrefixedTail(this, 0x136)
-    // This helper is used by 3 packet builder subclasses, grows by (param_1 + 2) internally
-    // After GrowPayloadByteCount(3), reservation header goes at byte 3 (right after fixed header)
-    uint8_t* reservationHeader = packetPayloadPtr + 3u;
-    // Grow by (contentBytes + 2) for length prefix - matches original helper behavior
-    builderEnvelope.messageRef08->messageStorage0c->GrowPayloadByteCount(kReplyCopyByteCount + 2u);
-    // Write the length prefix (little-endian) at reservation header
-    reservationHeader[0] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
-    reservationHeader[1] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
-    // FIDELITY: Update bytes [1-2] with offset to reservation header (3)
-    // Original at 0x43a290: SUB EDI, EAX (reservationHeader - payloadBase)
-    // Original at 0x43a2aa: MOV word ptr [ECX+0x1], DI
-    *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = 3u;  // offset = 3
-    builderEnvelope.reservationHeader14 = reservationHeader;
-    builderEnvelope.reservedContentByteCount18 = kReplyCopyByteCount;
+    // This non-virtual helper on Packet_0x4af2a4 is used by 3 packet builder subclasses.
+    // It updates bytes [1-2] with offset, sets heapString14/payloadLength14 fields.
+    builderEnvelope.ReserveLengthPrefixedTail(kReplyCopyByteCount);
 
     // anchor: launcher.exe:0x441f8b-0x441f97 - copy 0x136 bytes from bootstrapReplyCopy98_
     // Original uses REP MOVSD (0x4d dwords) + MOVSW (1 word) = 0x136 bytes
-    uint8_t* copyDest = reservationHeader + sizeof(uint16_t);
+    // Reservation header is at builderEnvelope.reservationHeader14 (set by helper)
+    // Copy destination is after the 2-byte length prefix: reservationHeader + 2
+    uint8_t* copyDest = builderEnvelope.reservationHeader14 + 2;
     const uint8_t* bootstrapReplySrc = bootstrapReplyCopy98_.data();
     for (int copyLoopCounter = 0x4d; copyLoopCounter != 0; --copyLoopCounter) {
         *reinterpret_cast<uint32_t*>(copyDest) = *reinterpret_cast<const uint32_t*>(bootstrapReplySrc);
@@ -3935,3 +3926,64 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
 }
 
 }  // namespace mxo::liblttcp
+
+// ============================================================
+// Packet_0x4af2a4 family (base packet builder)
+// Implementation outside namespace since Packet_0x4af2a4 is in mxo::ltlogin
+// ============================================================
+
+// anchor: launcher.exe:0x43a230 - LocalPacketBuilder_ReserveLengthPrefixedTail
+// Non-virtual helper used by packet builder subclasses to reserve length-prefixed tails.
+// Assembly flow:
+//   0x43a288: CALL vtable slot 0x10 (GetPacketPayloadBase @ 0x481760) to get payload base
+//   0x43a290: SUB EDI, EAX - compute offset = reservationHeader - payloadBase
+//   0x43a2a4: MOV word ptr [EAX], BX - write content length at reservation header
+//   0x43a2aa: MOV word ptr [ECX+0x1], DI - write offset to bytes [1-2] of packet
+//   0x43a2b5: LEA EAX,[EDX+EAX*0x1+0x2] - compute end pointer for heapString14
+uint16_t mxo::ltlogin::Packet_0x4af2a4::ReserveLengthPrefixedTail(uint16_t contentByteCount) {
+    // FIDELITY: Variable names synced with Ghidra:0x43a230
+    // No null checks in original - straight dereference like launcher.exe
+    
+    // Original at 0x43a23e-0x43a241: load messageStorage from messageRef08->messageStorage0c
+    auto* messageStorage = messageRef08->messageStorage0c;
+    
+    // Clamp to available space in message storage
+    // Original at 0x43a257-0x43a267: contentByteCount = min(contentByteCount, 0xffc - payloadSize)
+    constexpr uint16_t kMaxPayloadSize = 0xffcu;
+    const uint16_t availableSpace = kMaxPayloadSize - messageStorage->PayloadByteCount();
+    if (contentByteCount > availableSpace) {
+        contentByteCount = availableSpace;
+    }
+
+    // Get current payload position for reservation header
+    // Original at 0x43a26c-0x43a285: calculates reservationHeader from messageStorage fields
+    auto* payloadBase = reinterpret_cast<uint8_t*>(this->payloadAlias10);
+    auto* reservationHeader = payloadBase + messageStorage->PayloadByteCount();
+
+    // Grow payload by (content + 2 bytes for length prefix)
+    // Original at 0x43a288: CALL vtable slot 0x10 (GetPacketPayloadBase @ 0x481760)
+    // Original at 0x43a298-0x43a29e: push (contentByteCount + 2), push 0, call Grow
+    messageStorage->GrowPayloadByteCount(contentByteCount + 2u);
+
+    // Write content length at reservation header (little-endian)
+    // Original at 0x43a2a4: MOV word ptr [EAX], BX
+    reservationHeader[0] = static_cast<uint8_t>(contentByteCount & 0xffu);
+    reservationHeader[1] = static_cast<uint8_t>((contentByteCount >> 8) & 0xffu);
+
+    // FIDELITY: Update bytes [1-2] of packet with offset to reservation header
+    // Original at 0x43a290: SUB EDI, EAX (reservationHeader - payloadBase)
+    // Original at 0x43a2aa: MOV word ptr [ECX+0x1], DI
+    auto* packetPayloadPtr = reinterpret_cast<uint8_t*>(payloadPtr04);
+    *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = static_cast<uint16_t>(reservationHeader - packetPayloadPtr);
+
+    // Update heapString14 (debugString14) to point after reserved section
+    // Original at 0x43a2b5: LEA EAX,[EDX+EAX*0x1+0x2] = payloadBase + offset + 2 = reservationHeader + 2
+    debugString14 = reinterpret_cast<const char*>(reservationHeader + 2 + contentByteCount);
+
+    // Update payloadLength14 (payloadSize18) to content byte count
+    // Original at 0x43a2c0: MOV word ptr [ESI+0x18], BX
+    payloadSize18 = contentByteCount;
+
+    // FIDELITY: Single return at end of function
+    return contentByteCount;
+}
