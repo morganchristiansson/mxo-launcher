@@ -3976,9 +3976,11 @@ uint16_t mxo::ltlogin::Packet_0x4af2a4::ReserveLengthPrefixedTail(uint16_t conte
     auto* packetPayloadPtr = reinterpret_cast<uint8_t*>(payloadPtr04);
     *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = static_cast<uint16_t>(reservationHeader - packetPayloadPtr);
 
-    // Update heapString14 (debugString14) to point after reserved section
-    // Original at 0x43a2b5: LEA EAX,[EDX+EAX*0x1+0x2] = payloadBase + offset + 2 = reservationHeader + 2
-    debugString14 = reinterpret_cast<const char*>(reservationHeader + 2 + contentByteCount);
+    // Update heapString14 (debugString14) to point to START of content (after length prefix)
+    // Original at 0x43a2b5: LEA EAX,[EDX+EAX*0x1+0x2] where EDX=offset, EAX=payloadBase
+    // Result: heapString14 = payloadBase + offset + 2 = reservationHeader + 2
+    // This is the START of the content area (after the 2-byte length prefix)
+    debugString14 = reinterpret_cast<const char*>(reservationHeader + 2);
 
     // Update payloadLength14 (payloadSize18) to content byte count
     // Original at 0x43a2c0: MOV word ptr [ESI+0x18], BX
