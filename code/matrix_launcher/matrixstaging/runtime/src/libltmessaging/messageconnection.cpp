@@ -2852,9 +2852,9 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     builderEnvelope.messageRef08->GrowPayloadByteCount(3);
 
     // anchor: launcher.exe:0x441f64, 0x441f6a - write CERT_ConnectRequest opcode (0x01) and zero word
-    // FIDELITY: Original assembly at 0x441f43 reads from offset 4 (nopatchLauncherVersionValue04),
-    // NOT offset 16 (payloadBegin10). The DefaultCtor only writes to offset 4.
-    uint8_t* packetPayloadPtr = reinterpret_cast<uint8_t*>(builderEnvelope.nopatchLauncherVersionValue04);
+    // FIDELITY: Original assembly at 0x441f43 reads from offset 4 (payloadPtr04),
+    // NOT offset 16 (payloadAlias10). The DefaultCtor only writes to offset 4.
+    uint8_t* packetPayloadPtr = reinterpret_cast<uint8_t*>(builderEnvelope.payloadPtr04);
     packetPayloadPtr[0] = 0x01u;  // CERT_ConnectRequest opcode
     *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = 0u;
 
@@ -2891,7 +2891,7 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
         "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent CERT_ConnectRequest "
         "opcode=0x01 payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
         "this={} ownerContext={} remoteHost='{}'",
-        builderEnvelope.nopatchLauncherVersionValue04,
+        builderEnvelope.payloadPtr04,
         static_cast<unsigned>(builderEnvelope.reservedContentByteCount18),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),

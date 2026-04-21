@@ -56,7 +56,7 @@ public:
         // Initialize message ref for packet building
         messageRef08 = &messageRef_;
         messageRef_.ResetForPacketBuilder(/*headerless=*/false);
-        payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
+        payloadAlias10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
     }
 
     ~PacketBuilderEnvelopeBase() override = default;
@@ -64,8 +64,8 @@ public:
     PacketBuilderEnvelopeBase(const PacketBuilderEnvelopeBase&) = delete;
     PacketBuilderEnvelopeBase& operator=(const PacketBuilderEnvelopeBase&) = delete;
 
-    uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadBegin10); }
-    const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadBegin10); }
+    uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadAlias10); }
+    const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
 
     uint32_t PayloadByteCount() const {
         return MessageStorage() ? MessageStorage()->PayloadByteCount() : 0u;
@@ -77,7 +77,7 @@ public:
     // Returns envelope struct for send path compatibility.
     // anchor: launcher.exe:0x439840 / envelope fields
     ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& Envelope() {
-        envelope_.payloadBase04 = static_cast<uint8_t*>(payloadBegin10);
+        envelope_.payloadBase04 = static_cast<uint8_t*>(payloadAlias10);
         envelope_.messageRef08 = messageRef08;
         return envelope_;
     }
@@ -91,7 +91,7 @@ protected:
     uint32_t StubReturn0() override { return 0; }
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
-    void* GetPayloadBase() override { return payloadBegin10; }
+    void* GetPayloadBase() override { return payloadAlias10; }
 
     ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* MessageStorage() {
         return messageRef_.messageStorage0c;
@@ -106,9 +106,9 @@ protected:
         if (!messageStorage) {
             return;
         }
-        statusByte1a = 0u;
+        packetType1a = 0u;
         messageStorage->ResetPayloadByteCount(static_cast<uint16_t>(fixedByteCount));
-        payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
+        payloadAlias10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
     }
 
     void ClearReservation(
@@ -120,7 +120,7 @@ protected:
 
     void WritePayloadByte(size_t offset, uint8_t value) {
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
         if (!messageStorage || !packetPayload || offset >= messageStorage->PayloadByteCount()) {
             return;
         }
@@ -129,7 +129,7 @@ protected:
 
     void WritePayloadU16LE(size_t offset, uint16_t value) {
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
         const uint16_t payloadByteCount =
             messageStorage ? messageStorage->PayloadByteCount() : 0u;
         if (!packetPayload || offset + 1u >= payloadByteCount) {
@@ -141,7 +141,7 @@ protected:
 
     void WritePayloadU32LE(size_t offset, uint32_t value) {
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
         const uint16_t payloadByteCount =
             messageStorage ? messageStorage->PayloadByteCount() : 0u;
         if (!packetPayload || offset + 3u >= payloadByteCount) {
@@ -164,7 +164,7 @@ protected:
 
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
         const uint8_t* const payloadBase = PayloadBase();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
         if (!messageStorage || !payloadBase || !packetPayload || !text) {
             return 0u;
         }
@@ -190,7 +190,7 @@ protected:
             return 0u;
         }
 
-        uint8_t* const reservationHeader = static_cast<uint8_t*>(payloadBegin10) + currentPayloadByteCount;
+        uint8_t* const reservationHeader = static_cast<uint8_t*>(payloadAlias10) + currentPayloadByteCount;
         if (!reservationHeader || reservationHeader < packetPayload) {
             return 0u;
         }

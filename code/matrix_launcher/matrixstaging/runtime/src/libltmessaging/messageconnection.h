@@ -418,12 +418,12 @@ public:
     void DebugString(int formatType = 2) override {
         if (formatType == 2) {
             spdlog::debug("CLTLoginMediatorPacketBuilderEnvelope: SessionKey:(Array of size 0x10) Secret:(Array of size 0x10)");
-        } else if (formatType == 3 && payloadBegin10) {
+        } else if (formatType == 3 && payloadAlias10) {
             std::string sessionKeyBytes, secretBytes;
             for (int i = 0; i < 16; ++i) {
                 if (i > 0) { sessionKeyBytes += ","; secretBytes += ","; }
-                sessionKeyBytes += fmt::format("0x{:02x}", static_cast<uint8_t*>(payloadBegin10)[i + 1]);
-                secretBytes += fmt::format("0x{:02x}", static_cast<uint8_t*>(payloadBegin10)[i + 0x11]);
+                sessionKeyBytes += fmt::format("0x{:02x}", static_cast<uint8_t*>(payloadAlias10)[i + 1]);
+                secretBytes += fmt::format("0x{:02x}", static_cast<uint8_t*>(payloadAlias10)[i + 0x11]);
             }
             spdlog::debug("CLTLoginMediatorPacketBuilderEnvelope: SessionKey:[{}] Secret:[{}]",
                          sessionKeyBytes, secretBytes);
@@ -439,7 +439,7 @@ public:
     void InitializePayloadSize() override {
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(0x21);
-            packetPayloadPtr = static_cast<uint8_t*>(payloadBegin10);
+            packetPayloadPtr = static_cast<uint8_t*>(payloadAlias10);
             if (packetPayloadPtr) {
                 *packetPayloadPtr = 0x00;  // Opcode byte
             }
@@ -498,17 +498,17 @@ inline Packet_CertChallenge_0x4b6538::Packet_CertChallenge_0x4b6538(
     messageRef08 = messageRef;
     
     if (messageRef && messageRef->messageStorage0c) {
-        const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
+        const uint8_t* payload = messageRef->messageStorage0c->payloadBytes0c.data();
         // Simple offset: packetPayloadPtr points to payload base
         // For full fidelity, would use lookup table per original decompile
-        nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payload);
+        payloadPtr04 = reinterpret_cast<uint32_t>(payload);
         packetPayloadPtr = const_cast<uint8_t*>(payload);
     } else {
-        nopatchLauncherVersionValue04 = 0;
+        payloadPtr04 = 0;
         packetPayloadPtr = nullptr;
     }
     
-    ownerReadyFlag0c = flag;
+    createRefParam0c = flag;
 }
 
 // anchor: launcher.exe:0x443aa0 -> PacketBuilder_CertChallengeResponse_Dtor (shared dtor)
@@ -556,9 +556,9 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
         newMessageRef->ResetForPacketBuilder(false, 0);
         messageRef08 = newMessageRef;
         if (newMessageRef->messageStorage0c) {
-            uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBase();
-            nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
-            payloadBegin10 = payloadBase + 0xc;
+            uint8_t* payloadBase = newMessageRef->messageStorage0c->payloadBytes0c.data();
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
+            payloadAlias10 = payloadBase;
         }
     }
 }
@@ -575,7 +575,7 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
 // - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
 // - Slot 2 (+0x08): 0x4425f0 - DebugString (OVERRIDDEN - "Certificate:..." output)
 // - Slot 3 (+0x0c): 0x4418a0 - InitializePayloadSize (OVERRIDDEN - packet 0x01 setup)
-// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
+// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited, returns payloadAlias10)
 // Include PacketBuilder base class for inheritance (after CMessageConnectionMessageRef is defined)
 
 namespace mxo::liblttcp {
@@ -643,10 +643,10 @@ public:
     // Original flow:
     // - reads descriptor byte at [messageRef->messageStorage0c + 0xd]
     // - computes payload size = lookup[high_nibble] + lookup[low_nibble] + 0x12
-    // - sets nopatchLauncherVersionValue04 = messageStorage + 0xc + payloadSize (END pointer)
+    // - sets payloadPtr04 = messageStorage + 0xc + payloadSize (END pointer)
     // - calls SetPayloadByteCount(messageRef08, 0) to zero messageRef length
     // - calls messageStorage->GrowPayloadByteCount(payloadSize) to grow storage
-    // - sets payloadBegin10 = nopatchLauncherVersionValue04 (END pointer)
+    // - sets payloadAlias10 = payloadPtr04 (END pointer)
     // - calls messageRef08->GrowPayloadByteCount(3) to grow messageRef by 3
     // - writes opcode 0x01 (CERT_ConnectRequest) and zeros word at payload+1
     // - clears reservation fields +0x14/+0x18
@@ -663,8 +663,8 @@ public:
         uint32_t offset2 = ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
         uint32_t payloadSize = offset1 + offset2 + 0x12;
 
-        // Set nopatchLauncherVersionValue04 to END of payload (storage base + 0xc + size)
-        nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(storageBase + 0xc) + payloadSize;
+        // Set payloadPtr04 to END of payload (storage base + 0xc + size)
+        payloadPtr04 = reinterpret_cast<uint32_t>(storageBase + 0xc) + payloadSize;
 
         // Zero the messageRef payload length via SetPayloadByteCount
         messageRef08->SetPayloadByteCount(0);
@@ -672,14 +672,14 @@ public:
         // Grow messageStorage by payloadSize (from 0 to payloadSize)
         msgStorage->GrowPayloadByteCount(static_cast<uint16_t>(payloadSize));
 
-        // Set payloadBegin10 to END pointer (same as nopatchLauncherVersionValue04)
-        payloadBegin10 = reinterpret_cast<void*>(nopatchLauncherVersionValue04);
+        // Set payloadAlias10 to END pointer (same as payloadPtr04)
+        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
 
         // Grow messageRef by 3 bytes (opcode + 2-byte field)
         messageRef08->GrowPayloadByteCount(3);
 
         // Write opcode and zero word to payload
-        uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        uint8_t* packetPayload = static_cast<uint8_t*>(payloadAlias10);
         if (packetPayload) {
             packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
             *reinterpret_cast<uint16_t*>(packetPayload + 1) = 0u;  // Zero field
@@ -689,7 +689,7 @@ public:
     }
 
     // anchor: launcher.exe:0x481760 / vtable slot 4 (inherited)
-    // GetPayloadBase() inherited from base, returns payloadBegin10
+    // GetPayloadBase() inherited from base, returns payloadAlias10
 };
 
 // Note: Modern C++ adds vptr (4 bytes) but original MSVC2003 binary has no leading vptr.

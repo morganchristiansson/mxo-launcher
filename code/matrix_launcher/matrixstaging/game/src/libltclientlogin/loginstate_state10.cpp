@@ -276,12 +276,12 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Original: PUSH &mediator->createCharacterData108; MOV ECX,pNewSlotRecord;
     // CALL 0x43aa80 (SetCharacterName). This copies the character name into the slot
     // record's payload buffer via ReserveLengthPrefixedString + WriteReservedCString.
-    // Current code approximates this by setting the heapString14 pointer directly.
+    // Current code approximates this by setting the debugString14 pointer directly.
     // TODO: Once slot records are heap-allocated with payload buffers, replace with
     // a proper SetCharacterName call.
     SlotRecordState_0x4b5328& appendedSlotRecord =
         g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
-    appendedSlotRecord.heapString14 =
+    appendedSlotRecord.debugString14 =
         g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
 
     // anchor: launcher.exe:0x440288-0x4402ab

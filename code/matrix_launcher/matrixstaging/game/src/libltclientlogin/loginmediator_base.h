@@ -55,22 +55,23 @@ class Packet_0x4af2a4 {
 public:
     // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
     // +0x00: vtable pointer (C++ implicit)
-    uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04: payload base pointer (set to messageStorage->payloadBytes0c + 0xc)
+    uint32_t payloadPtr04 = 0;           // +0x04: payload base pointer (was: nopatchLauncherVersionValue04)
     ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
-    uint32_t ownerReadyFlag0c = 0;                  // +0x0c
+    uint32_t createRefParam0c = 0;        // +0x0c: param to CreateRef (was: ownerReadyFlag0c)
 
     // Payload pointers (set by derived classes):
-    void* payloadBegin10 = nullptr;               // +0x10: alias of nopatchLauncherVersionValue04 in some contexts
-    const char* heapString14 = nullptr;           // +0x14: heap-allocated string pointer (debug/cert info)
-    uint16_t payloadLength18 = 0;                 // +0x18: payload length in bytes
-    uint8_t statusByte1a = 0;                     // +0x1a: status/packet type byte
-    uint8_t padding1b = 0;                        // +0x1b: alignment padding
+    void* payloadAlias10 = nullptr;       // +0x10: alias of payloadPtr04 in some contexts (was: payloadBegin10)
+    const char* debugString14 = nullptr;  // +0x14: heap-allocated string pointer (was: heapString14)
+    uint16_t payloadSize18 = 0;           // +0x18: payload length in bytes (was: payloadLength18)
+    uint8_t packetType1a = 0;             // +0x1a: status/packet type byte (was: statusByte1a)
+    uint8_t padding1b = 0;                // +0x1b: alignment padding
 
     // Character slot fields (used by derived slot record):
-    uint32_t characterIdLow1c = 0;                 // +0x1c
-    uint32_t characterIdHigh20 = 0;                // +0x20
-    uint16_t worldId24 = 0;                       // +0x24
+    uint32_t characterIdLow1c = 0;         // +0x1c
+    uint32_t characterIdHigh20 = 0;      // +0x20
+    uint16_t worldId24 = 0;              // +0x24
 
+public:
     // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
     // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
     virtual ~Packet_0x4af2a4() = default;
@@ -86,8 +87,8 @@ public:
     // Initialize payload size from message ref, calls helper at 0x41bb30
     virtual void InitializePayloadSize() {}
     // anchor: launcher.exe:0x481760 / vtable +0x10
-    // Returns payload base pointer (payloadBegin10 field)
-    virtual void* GetPayloadBase() { return payloadBegin10; }
+    // Returns payload base pointer (payloadAlias10 field)
+    virtual void* GetPayloadBase() { return payloadAlias10; }
 
     // anchor: launcher.exe:0x439840 - Packet_0x4af2a4_DefaultCtor
     // Default constructor - creates message ref, sets up payload base at +0xc offset
@@ -111,14 +112,13 @@ public:
             messageRef08->AddRef();
             messageRef08->ResetForPacketBuilder(false, 0);
             if (messageRef08->messageStorage0c) {
-                // FIDELITY: Original at 0x439894 does:
-                //   MOV ECX, dword ptr [EAX + 0xc]  ; Load messageStorage0c pointer from messageRef
-                //   ADD ECX, 0xc                    ; Add 0xc to get to payload
-                //   MOV [ESI + 0x4], ECX            ; Store at this+0x4
-                // PayloadBase() returns payloadBytesPtr0c + 0xc, which matches the original calculation.
-                uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
-                nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase);
-                payloadBegin10 = payloadBase;
+                // FIDELITY: Original at 0x439840 computes:
+                //   payloadPtr04 = *(messageRef08 + 0xc) + 0xc
+                // Where *(messageRef08 + 0xc) is messageStorage0c.
+                // So payloadPtr04 = messageStorage0c + 0xc = &payloadBytes0c[0]
+                uint8_t* payloadBase = messageRef08->messageStorage0c->payloadBytes0c.data();
+                payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
+                payloadAlias10 = payloadBase;
             }
         }
     }
@@ -144,13 +144,13 @@ public:
     // PacketBuilder layout at +0x00 (composition - Ghidra shows as cls_0x4af2a4 member):
     // Note: Removed explicit vtable00 field - C++ vptr is implicit with virtual methods
     // This is a key step towards C++ inheritance from Packet_0x4af2a4
-    uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04 (vptr is at +0x00, implicit)
+    uint32_t payloadPtr04 = 0;                                 // +0x04 (was: nopatchLauncherVersionValue04)
     liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
-    uint32_t ownerReadyFlag0c = 0;                             // +0x0c
-    void* payloadBegin10 = nullptr;                            // +0x10
-    const char* heapString14 = nullptr;                        // +0x14
-    uint16_t padding16 = 0;                                    // +0x16
-    uint8_t statusByte18 = 0;                                  // +0x18: status/packet type byte
+    uint32_t createRefParam0c = 0;                             // +0x0c (was: ownerReadyFlag0c)
+    void* payloadAlias10 = nullptr;                            // +0x10 (was: payloadBegin10)
+    const char* debugString14 = nullptr;                       // +0x14 (was: heapString14)
+    uint16_t payloadSize16 = 0;                                // +0x16 (was: padding16)
+    uint8_t packetType18 = 0;                                  // +0x18: status/packet type byte (was: statusByte18)
     uint8_t padding19 = 0;                                     // +0x19: alignment padding
     // ... rest of PacketBuilder fields through +0x31
     // Note: Packet_0x4af2a4 has characterIdLow1c/worldId24 at +0x1c/+0x24,
@@ -169,7 +169,7 @@ public:
     uint32_t StubReturn0() { return 0; }
     const char* DebugString() const { return nullptr; }
     void InitializePayloadSize() {}
-    void* GetPayloadBase() { return payloadBegin10; }
+    void* GetPayloadBase() { return payloadAlias10; }
 };
 
 // Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
@@ -192,8 +192,8 @@ struct Arg6CurrentSlotRecord44ObjectSketch {
     uint8_t flag0c;
     uint8_t padding0d[3];
     SlotRecordState_0x4b5328* payload10;  // points to current slot record
-    const char* heapString14;
-    uint16_t heapStringLen18;
+    const char* debugString14;  // Character name string (was: heapString14)
+    uint16_t debugStringLen18;  // Length of character name (was: heapStringLen18)
     uint8_t padding1a[2];
 };
 
@@ -203,8 +203,8 @@ struct Arg6CurrentSlotRecord44ObjectSketch {
 // - status3a at +0x18 (client accesses as payload+0x0b)
 // - worldId3c at +0x24 (client accesses as payload+0x0c)
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
-static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapString14) == 0x14);
-static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapStringLen18) == 0x18);
+static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, debugString14) == 0x14);
+static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, debugStringLen18) == 0x18);
 static_assert(sizeof(Arg6CurrentSlotRecord44ObjectSketch) == 0x1c);
 
 struct RouteDescriptor30SmallStringLikeSketch {

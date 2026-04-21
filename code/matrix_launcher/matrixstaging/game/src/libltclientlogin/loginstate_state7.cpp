@@ -99,7 +99,7 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
-        currentSlotRecord && currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
+        currentSlotRecord && currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
         sendResult);
     return;
 }

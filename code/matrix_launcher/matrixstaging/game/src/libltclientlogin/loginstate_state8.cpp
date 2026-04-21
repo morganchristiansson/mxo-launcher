@@ -420,12 +420,12 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
 
         const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
         if (currentSlotRecord != nullptr) {
-            if (currentSlotRecord->heapString14) {
+            if (currentSlotRecord->debugString14) {
                 const size_t copyCount = std::min(
-                    std::strlen(currentSlotRecord->heapString14),
+                    std::strlen(currentSlotRecord->debugString14),
                     sizeof(ownerState.characterNameBufferF1c) - 1u);
                 std::copy_n(
-                    currentSlotRecord->heapString14,
+                    currentSlotRecord->debugString14,
                     copyCount,
                     ownerState.characterNameBufferF1c);
                 ownerState.characterNameBufferF1c[copyCount] = '\0';

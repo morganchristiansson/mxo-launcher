@@ -707,7 +707,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
         fmt::ptr(&arg6SelectionDescriptor40_),
         matchMode,
         static_cast<unsigned>(currentSlotIndex),
-        currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
+        currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
         fmt::ptr(arg6SelectionDescriptor40_.vtable),
         static_cast<unsigned>(currentSlotRecord->characterIdLow32),
         static_cast<unsigned>(currentSlotRecord->characterIdHigh36));
@@ -739,19 +739,19 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
     arg6CurrentSlotRecord44_.vtable = Arg6CurrentSlotRecord44Vtable();
     arg6CurrentSlotRecord44_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
     arg6CurrentSlotRecord44_.flag0c = 1u;
-    arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->heapString14;
+    arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->debugString14;
 
     if (!arg6CurrentSlotRecord44NameOwned_.empty()) {
-        arg6CurrentSlotRecord44_.heapString14 = arg6CurrentSlotRecord44NameOwned_.c_str();
+        arg6CurrentSlotRecord44_.debugString14 = arg6CurrentSlotRecord44NameOwned_.c_str();
         const size_t nameLength = arg6CurrentSlotRecord44NameOwned_.size();
-        arg6CurrentSlotRecord44_.heapStringLen18 =
+        arg6CurrentSlotRecord44_.debugStringLen18 =
             static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
     }
 
     spdlog::info(
         "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
         fmt::ptr(&arg6CurrentSlotRecord44_),
-        arg6CurrentSlotRecord44_.heapString14 ? arg6CurrentSlotRecord44_.heapString14 : "<empty>",
+        arg6CurrentSlotRecord44_.debugString14 ? arg6CurrentSlotRecord44_.debugString14 : "<empty>",
         static_cast<unsigned>(currentSlotRecord->characterIdLow32),
         static_cast<unsigned>(currentSlotRecord->characterIdHigh36),
         static_cast<unsigned>(currentSlotRecord->status3a),
@@ -772,8 +772,8 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     const char* worldOrSelectionName = Arg6MappedSelectionName();
     const char* source = "arg6-selection";
 
-    if (slotRecord && slotRecord->heapString14) {
-        worldOrSelectionName = slotRecord->heapString14;
+    if (slotRecord && slotRecord->debugString14) {
+        worldOrSelectionName = slotRecord->debugString14;
         source = "slotRecord+0x14";
     } else if (ownerState.characterNameBufferF1c[0]) {
         worldOrSelectionName = ownerState.characterNameBufferF1c;
@@ -790,8 +790,8 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
         "CLTLoginMediator::GetWorldOrSelectionName(+0x48) -> '{}' [source={} currentSlot='{}' profile='{}' mappedSelection='{}']",
         NonEmptyTextOrPlaceholder(worldOrSelectionName),
         source,
-        (slotRecord && slotRecord->heapString14)
-            ? slotRecord->heapString14
+        (slotRecord && slotRecord->debugString14)
+            ? slotRecord->debugString14
             : "<empty>",
         NonEmptyTextOrPlaceholder(Arg6ProfileName()),
         NonEmptyTextOrPlaceholder(Arg6MappedSelectionName()));
@@ -1316,7 +1316,7 @@ const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const
     const char* source =
         !stateAllowsRead ? "state-gated-zero" :
         !indexInRange ? "index>=100" :
-        (selectionName ? "owner+0x688[index].heapString14" : "owner+0x688[index]=<null>");
+        (selectionName ? "owner+0x688[index].debugString14" : "owner+0x688[index]=<null>");
     spdlog::info(
         "CLTLoginMediator::MapSelectionName(+0xdc selectionHighByte={}) -> '{}' [stateCode={} source={}]",
         static_cast<unsigned>(selectionHighByte),
@@ -1432,7 +1432,7 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 
     const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
     const uint8_t oldCount = selectionRouteState684_.slotRecordCount00_;
-    const std::string removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].heapString14 ? selectionRouteState684_.slotRecordTable04_[slotIndex].heapString14 : "";
+    const std::string removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].debugString14 ? selectionRouteState684_.slotRecordTable04_[slotIndex].debugString14 : "";
 
     // anchor: launcher.exe:0x41ec00
     // Original order:
@@ -3310,7 +3310,7 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
 
     SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
     slotRecord = {};
-    slotRecord.heapString14 = character.handle.text.c_str();
+    slotRecord.debugString14 = character.handle.text.c_str();
     slotRecord.characterIdLow32 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
     slotRecord.characterIdHigh36 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
     slotRecord.status3a = normalizedStatus;
@@ -3344,12 +3344,12 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
     const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (currentSlotRecord != nullptr) {
         if (postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00[0] == '\0' &&
-            currentSlotRecord->heapString14) {
+            currentSlotRecord->debugString14) {
             const size_t copyCount = std::min(
-                std::strlen(currentSlotRecord->heapString14),
+                std::strlen(currentSlotRecord->debugString14),
                 postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.size() - 1);
             std::copy_n(
-                currentSlotRecord->heapString14,
+                currentSlotRecord->debugString14,
                 copyCount,
                 postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.begin());
             postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00[copyCount] = '\0';
@@ -3399,7 +3399,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
 
         const SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const RouteHostStringTripleState& route = selectionRouteState684_.routeHostStringTriples194_[i];
-        const char* characterName = slotRecord.heapString14 ? slotRecord.heapString14 : "";
+        const char* characterName = slotRecord.debugString14 ? slotRecord.debugString14 : "";
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";
         std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);
         ++persistedCount;

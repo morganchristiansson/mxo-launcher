@@ -244,7 +244,7 @@ const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotInde
     if (!record) {
         return nullptr;
     }
-    return record->heapString14;
+    return record->debugString14;
 }
 
 // anchor: launcher.exe:0x41b260

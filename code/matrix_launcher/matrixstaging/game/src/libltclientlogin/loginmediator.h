@@ -707,14 +707,14 @@ public:
         // anchor: launcher.exe:0x439a70 / vtable +0x0c
         void InitializePayloadSize() override {}
         // anchor: launcher.exe:0x481760 / vtable +0x10
-        void* GetPayloadBase() override { return payloadBegin10; }
+        void* GetPayloadBase() override { return payloadAlias10; }
         // Additional slots from WorldDescriptorState vtable:
         // anchor: launcher.exe:0x43c350 / vtable +0x18
         void* VtableSlot18() { return nullptr; }
         // anchor: launcher.exe:0x439b50 / vtable +0x1c
         void VtableSlot1c() {}
         // anchor: launcher.exe:0x481760 / vtable +0x20
-        void* VtableSlot20() { return payloadBegin10; }
+        void* VtableSlot20() { return payloadAlias10; }
     };
 
     CLTLoginMediator();
