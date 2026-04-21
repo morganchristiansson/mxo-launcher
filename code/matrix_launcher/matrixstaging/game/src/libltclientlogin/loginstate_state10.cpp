@@ -191,7 +191,8 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Current approach: extract payload bytes + use a POD scaffold parser. This produces
     // the same field values (offsets +3=status, +7=charIdLow, +0xb=charIdHigh match) but
     // doesn't mirror the original's parse-object lifetime or virtual dispatch.
-    const uint8_t* payloadBytes = messageRef->messageStorage0c->payloadBytes0c.data();
+    // FIDELITY: Use PayloadBase() which returns payloadBytesPtr0c + 0xc to match original
+    const uint8_t* payloadBytes = messageRef->messageStorage0c->PayloadBase();
     const uint16_t payloadByteCount = messageRef->PayloadByteCount();
 
     // Inline recovery of MS_ClaimCharacterNameReply parsing and slot record allocation:

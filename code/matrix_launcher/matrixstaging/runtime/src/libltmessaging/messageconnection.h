@@ -181,8 +181,15 @@ public:
     uint16_t reservedBytes08 = kBuilderReservedBytes08;
     uint8_t payloadLengthHigh0a = 0;
     uint8_t payloadLengthLow0b = 0;
-    std::array<uint8_t, 0x1000> payloadBytes0c{};
+    // FIDELITY: Original binary has a POINTER at offset 0xc, not inline array.
+    // The DefaultCtor at 0x439894 does: MOV ECX, dword ptr [EAX + 0xc] (dereferences the pointer)
+    // C++ originally had: std::array<uint8_t, 0x1000> payloadBytes0c{};
+    // Fixed to match original layout - pointer to separately allocated payload buffer.
+    uint8_t* payloadBytesPtr0c = nullptr;  // Points to 0x1000 byte buffer allocated separately
 
+    // Virtual destructor to ensure proper cleanup of dynamically allocated payload buffer
+    ~CMessageConnectionMessageStorage_0x4ba208() override;
+    
     uint32_t AddRef() override;
     uint32_t Release() override;
     // anchor: launcher.exe:0x455ad0 / vtable `0x004ba208 +0x0c`
