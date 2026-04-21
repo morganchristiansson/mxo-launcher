@@ -2856,18 +2856,24 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     // NOT offset 16 (payloadAlias10). The DefaultCtor only writes to offset 4.
     uint8_t* packetPayloadPtr = reinterpret_cast<uint8_t*>(builderEnvelope.payloadPtr04);
     packetPayloadPtr[0] = 0x01u;  // CERT_ConnectRequest opcode
+    // FIDELITY: Bytes [1-2] initially zero, updated to offset (3) after reservation by
+    // LocalPacketBuilder_ReserveLengthPrefixedTail @ 0x43a2aa: MOV word ptr [ECX+0x1], DI
     *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = 0u;
 
     // anchor: launcher.exe:0x441f73 - reserve length-prefixed tail for bootstrap reply copy
     // Original: LocalPacketBuilder_ReserveLengthPrefixedTail(this, 0x136)
     // This helper is used by 3 packet builder subclasses, grows by (param_1 + 2) internally
-    // After GrowPayloadByteCount(3), payloadBegin10 points to byte 3, reservation goes at byte 3+3=6
+    // After GrowPayloadByteCount(3), reservation header goes at byte 3 (right after fixed header)
     uint8_t* reservationHeader = packetPayloadPtr + 3u;
     // Grow by (contentBytes + 2) for length prefix - matches original helper behavior
     builderEnvelope.messageRef08->messageStorage0c->GrowPayloadByteCount(kReplyCopyByteCount + 2u);
-    // Write the length prefix (little-endian)
+    // Write the length prefix (little-endian) at reservation header
     reservationHeader[0] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
     reservationHeader[1] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
+    // FIDELITY: Update bytes [1-2] with offset to reservation header (3)
+    // Original at 0x43a290: SUB EDI, EAX (reservationHeader - payloadBase)
+    // Original at 0x43a2aa: MOV word ptr [ECX+0x1], DI
+    *reinterpret_cast<uint16_t*>(packetPayloadPtr + 1) = 3u;  // offset = 3
     builderEnvelope.reservationHeader14 = reservationHeader;
     builderEnvelope.reservedContentByteCount18 = kReplyCopyByteCount;
 
