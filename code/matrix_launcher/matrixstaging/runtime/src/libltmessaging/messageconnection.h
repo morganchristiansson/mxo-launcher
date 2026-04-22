@@ -1481,15 +1481,31 @@ static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, 
 class CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c {
 public:
     // anchor family: launcher.exe:0x45de10 / 0x45d000 / data type `cls_0x4ba50c`
-    uint32_t vftptr_0x0 = 0u;
-    uint32_t allocatorState_0x04 = 0u;
-    uint32_t digitCapacityWords_0x08 = 0u;
-    void* digitPointer_0x0c = nullptr;
-    uint32_t bigIntFlags_0x10 = 0u;
+    // vtable is compiler-managed in the reimplementation; original vftable at 0x004ba50c
+    virtual ~CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
 
-    // FIDELITY: Original meth_0x45de10 performs deep copy of digit array.
-    // We must NOT do shallow struct copy (which would leave dangling pointers).
+    // anchor: launcher.exe:0x45d000 / default ctor
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+
+    // anchor: launcher.exe:0x45d090 / copy ctor
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& other);
+
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& operator=(
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& other);
+
+    // Move ctor/assignment (transfer digit ownership)
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(
+        CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&& other) noexcept;
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& operator=(
+        CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&& other) noexcept;
+
+    // Reimplementation helper: construct from CryptoPP::Integer (no original anchor)
+    explicit CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(const CryptoPP::Integer& value);
+
+    // anchor: launcher.exe:0x45de10 / DeepCopyFrom
     void DeepCopyFrom(const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& source);
+
+    // anchor: launcher.exe:0x45d000 tail / Release digits
     void ReleaseDigits();
 
     // anchor: launcher.exe:0x45a440
@@ -1518,6 +1534,11 @@ public:
         bits += (cap - 1u) * 32u;
         return bits;
     }
+
+    uint32_t allocatorState_0x04 = 0u;
+    uint32_t digitCapacityWords_0x08 = 0u;
+    void* digitPointer_0x0c = nullptr;
+    uint32_t bigIntFlags_0x10 = 0u;
 
 };
 static_assert(sizeof(CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
