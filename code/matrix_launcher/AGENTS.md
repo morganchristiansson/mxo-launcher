@@ -2,16 +2,16 @@
 
 ## Rule 1: Fidelity to static-RE of launcher.exe
 
-- Implementations must be faithful to static-RE of launcher.exe
-- Use Ghidra for static-RE
-- Anchor code to static-RE with comments like `// anchor: launcher.exe:0x41f390 / vtable +0x58`
-- VTables are documented in ../../docs/launcher.exe/VTABLES/0x*.md
-- Decompile and xrefs nearby anchored methods to discover static-RE faithful implementations
+- Implementations must be faithful to ghidra static-RE of launcher.exe
 - Classes and methods should map directly to orignal launcher.exe vtable and implementation
-- Fields and methods should be ordered by VTable slot from launcher.exe
+- Respect method boundaries in static-RE. Do not inline or split methods if split does not exist in static-RE.
 - Follow method boundaries - don't create helpers when there weren't any in static-RE.
+- Anchor code to static-RE with comments like `// anchor: launcher.exe:0x41f390 / vtable +0x58`
+- Decompile and xrefs nearby anchored methods to discover static-RE faithful implementations
+- methods and fields and should be ordered by VTable offsets from launcher.exe
 - All fidelity improvements that don't require further exploration or static-RE investigation are in scope
 - When discovering new VTables on the active path, exploring, documenting and implementing them as C++ classes is a big improvement to fidelity.
+- VTables are documented in ../../docs/launcher.exe/VTABLES/0x*.md
 
 ## Rule 2: Keep launcher working
 
