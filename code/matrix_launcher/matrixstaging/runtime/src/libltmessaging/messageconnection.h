@@ -1470,32 +1470,32 @@ public:
 
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
 
-class CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c {
+class CBootstrapBigInt_0x4ba50c {
 public:
     // anchor family: launcher.exe:0x45de10 / 0x45d000 / data type `cls_0x4ba50c`
     // vtable is compiler-managed in the reimplementation; original vftable at 0x004ba50c
-    virtual ~CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+    virtual ~CBootstrapBigInt_0x4ba50c();
 
     // anchor: launcher.exe:0x45d000 / default ctor
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+    CBootstrapBigInt_0x4ba50c();
 
     // anchor: launcher.exe:0x45d090 / copy ctor
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& other);
+    CBootstrapBigInt_0x4ba50c(const CBootstrapBigInt_0x4ba50c& other);
 
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& operator=(
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& other);
+    CBootstrapBigInt_0x4ba50c& operator=(
+        const CBootstrapBigInt_0x4ba50c& other);
 
     // Move ctor/assignment (transfer digit ownership)
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(
-        CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&& other) noexcept;
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& operator=(
-        CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&& other) noexcept;
+    CBootstrapBigInt_0x4ba50c(
+        CBootstrapBigInt_0x4ba50c&& other) noexcept;
+    CBootstrapBigInt_0x4ba50c& operator=(
+        CBootstrapBigInt_0x4ba50c&& other) noexcept;
 
     // Reimplementation helper: construct from CryptoPP::Integer (no original anchor)
-    explicit CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(const CryptoPP::Integer& value);
+    explicit CBootstrapBigInt_0x4ba50c(const CryptoPP::Integer& value);
 
     // anchor: launcher.exe:0x45de10 / DeepCopyFrom
-    void DeepCopyFrom(const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& source);
+    void DeepCopyFrom(const CBootstrapBigInt_0x4ba50c& source);
 
     // anchor: launcher.exe:0x45d000 tail / Release digits
     void ReleaseDigits();
@@ -1563,7 +1563,7 @@ public:
     uint32_t bigIntFlags_0x10 = 0u;
 
 };
-static_assert(sizeof(CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
+static_assert(sizeof(CBootstrapBigInt_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
 
 // anchor: launcher.exe vtable 0x4b42b0 / CLTReferenceCountedBase_0x4b42b0
 // Base class with 3 vtable slots:
@@ -1581,21 +1581,21 @@ class CMarginConnectionBootstrapPrepState_0x4b659c {
 public:
     // anchor: launcher.exe:0x465d70
     void InitializeFromBootstrapBlocks(
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3);
+        const CBootstrapBigInt_0x4ba50c* param_1,
+        const CBootstrapBigInt_0x4ba50c* param_2,
+        const CBootstrapBigInt_0x4ba50c* param_3);
 
     uint32_t vftptr_0x0 = 0u;
     uint32_t field_0x4 = 0u;
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x8{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x1c{};
+    CBootstrapBigInt_0x4ba50c field_0x8{};
+    CBootstrapBigInt_0x4ba50c field_0x1c{};
     std::array<uint8_t, 0x0c> gap_0x30{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x3c{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x50{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x64{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c mbr_0x78{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c mbr_0x8c{};
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c mbr_0xa0{};
+    CBootstrapBigInt_0x4ba50c field_0x3c{};
+    CBootstrapBigInt_0x4ba50c field_0x50{};
+    CBootstrapBigInt_0x4ba50c field_0x64{};
+    CBootstrapBigInt_0x4ba50c mbr_0x78{};
+    CBootstrapBigInt_0x4ba50c mbr_0x8c{};
+    CBootstrapBigInt_0x4ba50c mbr_0xa0{};
     uint32_t field_0xb4 = 0u;
     uint32_t field_0xb8 = 0u;
     std::array<uint8_t, 0x08> gap_0xbc{};
@@ -1628,9 +1628,9 @@ public:
     //   +0x20: virt_meth_0x4383d0
     //   +0x24: ImportThunk_48bc34
     CMarginConnectionAuthBootstrapCrypto_0x4b6778(
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+        const CBootstrapBigInt_0x4ba50c* param_1,
+        const CBootstrapBigInt_0x4ba50c* param_2,
+        const CBootstrapBigInt_0x4ba50c* param_3,
         int param_4);
     // anchor: launcher.exe:0x443390
     virtual ~CMarginConnectionAuthBootstrapCrypto_0x4b6778();
@@ -1695,9 +1695,9 @@ class CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
     : public CMarginConnectionAuthBootstrapCrypto_0x4b6778 {
 public:
     CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
-        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+        const CBootstrapBigInt_0x4ba50c* param_1,
+        const CBootstrapBigInt_0x4ba50c* param_2,
+        const CBootstrapBigInt_0x4ba50c* param_3,
         int param_4);
     ~CMarginConnectionAuthBootstrapDecryptor_0x4b69b4() override = default;
 

@@ -2381,7 +2381,7 @@ static uint32_t RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(size_t re
 }
 
 static CryptoPP::Integer CMarginConnectionBootstrapPrepBigIntObjectToInteger(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& object) {
+    const CBootstrapBigInt_0x4ba50c& object) {
     const auto* digits = static_cast<const uint32_t*>(object.digitPointer_0x0c);
     if (!digits || object.digitCapacityWords_0x08 == 0u) {
         return CryptoPP::Integer::Zero();
@@ -2415,12 +2415,12 @@ static CryptoPP::Integer CMarginConnectionBootstrapPrepBigIntObjectToInteger(
 }  // namespace
 
 // anchor: launcher.exe:0x45d000 tail / dtor
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::~CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c() {
+CBootstrapBigInt_0x4ba50c::~CBootstrapBigInt_0x4ba50c() {
     ReleaseDigits();
 }
 
 // anchor: launcher.exe:0x45d000 / default ctor
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c() {
+CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c() {
     allocatorState_0x04 = 0u;
     digitCapacityWords_0x08 = 2u;
     digitPointer_0x0c = new uint32_t[2]();
@@ -2428,8 +2428,8 @@ CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstra
 }
 
 // anchor: launcher.exe:0x45d090 / copy ctor
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& other) {
+CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
+    const CBootstrapBigInt_0x4ba50c& other) {
     allocatorState_0x04 = other.allocatorState_0x04;
     bigIntFlags_0x10 = other.bigIntFlags_0x10;
     const uint32_t cap = other.digitCapacityWords_0x08;
@@ -2441,17 +2441,17 @@ CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstra
     }
 }
 
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::operator=(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& other) {
+CBootstrapBigInt_0x4ba50c&
+CBootstrapBigInt_0x4ba50c::operator=(
+    const CBootstrapBigInt_0x4ba50c& other) {
     if (this != &other) {
         DeepCopyFrom(other);
     }
     return *this;
 }
 
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&& other) noexcept {
+CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
+    CBootstrapBigInt_0x4ba50c&& other) noexcept {
     allocatorState_0x04 = other.allocatorState_0x04;
     digitCapacityWords_0x08 = other.digitCapacityWords_0x08;
     digitPointer_0x0c = other.digitPointer_0x0c;
@@ -2460,9 +2460,9 @@ CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstra
     other.digitCapacityWords_0x08 = 0u;
 }
 
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::operator=(
-    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c&& other) noexcept {
+CBootstrapBigInt_0x4ba50c&
+CBootstrapBigInt_0x4ba50c::operator=(
+    CBootstrapBigInt_0x4ba50c&& other) noexcept {
     if (this != &other) {
         ReleaseDigits();
         allocatorState_0x04 = other.allocatorState_0x04;
@@ -2476,8 +2476,8 @@ CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::operator=(
 }
 
 // anchor: launcher.exe:0x45de10 / DeepCopyFrom
-void CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::DeepCopyFrom(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& source) {
+void CBootstrapBigInt_0x4ba50c::DeepCopyFrom(
+    const CBootstrapBigInt_0x4ba50c& source) {
     if (this == &source) {
         return;
     }
@@ -2494,14 +2494,14 @@ void CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::DeepCopyFrom(
 }
 
 // anchor: launcher.exe:0x45d000 tail / Release digits
-void CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::ReleaseDigits() {
+void CBootstrapBigInt_0x4ba50c::ReleaseDigits() {
     delete[] static_cast<uint32_t*>(digitPointer_0x0c);
     digitPointer_0x0c = nullptr;
     digitCapacityWords_0x08 = 0u;
 }
 
 // Reimplementation helper: construct from CryptoPP::Integer (no original anchor)
-CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(
+CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
     const CryptoPP::Integer& value) {
     const size_t encodedByteCount = static_cast<size_t>(value.MinEncodedSize());
     std::vector<uint8_t> encodedBytes(std::max<size_t>(encodedByteCount, 1u), 0u);
@@ -2527,32 +2527,32 @@ CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c::CMarginConnectionBootstra
 
 // anchor: launcher.exe:0x465d70
 void CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3) {
+    const CBootstrapBigInt_0x4ba50c* param_1,
+    const CBootstrapBigInt_0x4ba50c* param_2,
+    const CBootstrapBigInt_0x4ba50c* param_3) {
     field_0xb4 = 0x004b630cu;
     field_0xb8 = 0x004af294u;
 
     if (param_1) {
         field_0x8 = *param_1;
     } else {
-        field_0x8 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+        field_0x8 = CBootstrapBigInt_0x4ba50c();
     }
     if (param_2) {
         field_0x1c = *param_2;
     } else {
-        field_0x1c = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+        field_0x1c = CBootstrapBigInt_0x4ba50c();
     }
     if (param_3) {
         field_0x3c = *param_3;
     } else {
-        field_0x3c = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+        field_0x3c = CBootstrapBigInt_0x4ba50c();
     }
-    field_0x50 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
-    field_0x64 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
-    mbr_0x78 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
-    mbr_0x8c = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
-    mbr_0xa0 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c();
+    field_0x50 = CBootstrapBigInt_0x4ba50c();
+    field_0x64 = CBootstrapBigInt_0x4ba50c();
+    mbr_0x78 = CBootstrapBigInt_0x4ba50c();
+    mbr_0x8c = CBootstrapBigInt_0x4ba50c();
+    mbr_0xa0 = CBootstrapBigInt_0x4ba50c();
 
     if (!param_1 || !param_2 || !param_3) {
         return;
@@ -2574,7 +2574,7 @@ void CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks
 
         // ROUND-TRIP TEST: verify BigInt -> Integer -> BigInt produces identical digits
         {
-            CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c roundTripObj(modulus);
+            CBootstrapBigInt_0x4ba50c roundTripObj(modulus);
             const uint32_t cap = field_0x8.digitCapacityWords_0x08;
             const uint32_t rtCap = roundTripObj.digitCapacityWords_0x08;
             const auto* origDigits = static_cast<const uint32_t*>(field_0x8.digitPointer_0x0c);
@@ -2652,11 +2652,11 @@ void CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks
         spdlog::debug("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: RSA key initialized, deriving CRT params");
 
         // anchor: launcher.exe:0x465d70 -> CRT derivation (no exception handling in original, we match)
-        field_0x50 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(privateKey.GetPrime1());
-        field_0x64 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(privateKey.GetPrime2());
-        mbr_0x78 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(privateKey.GetModPrime1PrivateExponent());
-        mbr_0x8c = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(privateKey.GetModPrime2PrivateExponent());
-        mbr_0xa0 = CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c(privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
+        field_0x50 = CBootstrapBigInt_0x4ba50c(privateKey.GetPrime1());
+        field_0x64 = CBootstrapBigInt_0x4ba50c(privateKey.GetPrime2());
+        mbr_0x78 = CBootstrapBigInt_0x4ba50c(privateKey.GetModPrime1PrivateExponent());
+        mbr_0x8c = CBootstrapBigInt_0x4ba50c(privateKey.GetModPrime2PrivateExponent());
+        mbr_0xa0 = CBootstrapBigInt_0x4ba50c(privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
     } catch (const CryptoPP::Exception& exception) {
         spdlog::warn(
             "CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks CryptoPP key reconstruction failed: {}",
@@ -2674,9 +2674,9 @@ namespace { static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptCha
 
 // anchor: launcher.exe:0x443220 / constructor reached from `0x443340`
 CMarginConnectionAuthBootstrapCrypto_0x4b6778::CMarginConnectionAuthBootstrapCrypto_0x4b6778(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+    const CBootstrapBigInt_0x4ba50c* param_1,
+    const CBootstrapBigInt_0x4ba50c* param_2,
+    const CBootstrapBigInt_0x4ba50c* param_3,
     int param_4) {
     // C++ vtable auto-generated, no raw vtable pointers needed
     // Original set: mbr_0x4 = 0x004b6b10, mbr_0xd4 = 0x004b6300, mbr_0xd8 = 0x004b3e18, mbr_0xdc = 0x004b67a0
@@ -2699,9 +2699,9 @@ CMarginConnectionAuthBootstrapCrypto_0x4b6778::~CMarginConnectionAuthBootstrapCr
 
 // anchor: launcher.exe:0x442b70 / cls_0x4b69b4 constructor
 CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
-    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+    const CBootstrapBigInt_0x4ba50c* param_1,
+    const CBootstrapBigInt_0x4ba50c* param_2,
+    const CBootstrapBigInt_0x4ba50c* param_3,
     int param_4)
     : CMarginConnectionAuthBootstrapCrypto_0x4b6778(param_1, param_2, param_3, param_4) {
 }
@@ -2861,11 +2861,11 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     const void* blockC4,
     const void* blockD8) {
     const auto* param_1 =
-        static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockB0);
+        static_cast<const CBootstrapBigInt_0x4ba50c*>(blockB0);
     const auto* param_2 =
-        static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockC4);
+        static_cast<const CBootstrapBigInt_0x4ba50c*>(blockC4);
     const auto* param_3 =
-        static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockD8);
+        static_cast<const CBootstrapBigInt_0x4ba50c*>(blockD8);
 
     connection_.bootstrapPrepStateA0_.reset(new (std::nothrow)
         CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(param_1, param_2, param_3, 1));
