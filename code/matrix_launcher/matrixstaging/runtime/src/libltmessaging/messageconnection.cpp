@@ -2496,7 +2496,7 @@ static bool BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
 }  // namespace
 
 // anchor: launcher.exe:0x465d70
-void CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks(
+void CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks(
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3) {
@@ -2526,11 +2526,11 @@ void CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBoot
             CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0x1c);
         const CryptoPP::Integer privateExponent =
             CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0x3c);
-        spdlog::debug("CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks: modulus bits={} exp bits={} priv bits={}",
+        spdlog::debug("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: modulus bits={} exp bits={} priv bits={}",
             modulus.BitCount(), publicExponent.BitCount(), privateExponent.BitCount());
 
         if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
-            spdlog::warn("CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks: zero BigInt detected, skipping CRT derivation");
+            spdlog::warn("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: zero BigInt detected, skipping CRT derivation");
             return;
         }
 
@@ -2552,16 +2552,16 @@ void CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBoot
             // Force using no validation by accessing the key through different API
             keyOk = true;
         } catch (const CryptoPP::Exception& ex) {
-            spdlog::warn("CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks: SetModulus failed: {}", ex.what());
+            spdlog::warn("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: SetModulus failed: {}", ex.what());
         }
 
         if (!keyOk) {
-            spdlog::warn("CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks: RSA key invalid, but continuing anyway per original (no exception handling)");
+            spdlog::warn("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: RSA key invalid, but continuing anyway per original (no exception handling)");
             // Per original: no exception handling, continue without CRT params
             return;
         }
 
-        spdlog::debug("CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks: RSA key initialized, deriving CRT params");
+        spdlog::debug("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: RSA key initialized, deriving CRT params");
 
         // anchor: launcher.exe:0x465d70 -> CRT derivation (no exception handling in original, we match)
         BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
@@ -2586,7 +2586,7 @@ void CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBoot
             privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
     } catch (const CryptoPP::Exception& exception) {
         spdlog::warn(
-            "CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c::InitializeFromBootstrapBlocks CryptoPP key reconstruction failed: {}",
+            "CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks CryptoPP key reconstruction failed: {}",
             exception.what());
     }
 }
