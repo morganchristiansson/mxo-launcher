@@ -2935,24 +2935,8 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
 }
 
-// anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
-uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes(
-    const std::array<uint8_t, 16>& /*challengeBytes*/) {
-    // anchor: launcher.exe:0x4429b0 - This function is no longer used.
-    // The response is now built inline in HandleCode2ForBootstrap to match
-    // launcher.exe:0x442ab9-0x442b30 exactly.
-    // This function remains for potential future use but currently returns 0
-    // since HandleCode2ForBootstrap builds and sends the response directly.
-    spdlog::warn("SendCertChallengeResponseFromChallengeBytes called but response is built inline in HandleCode2ForBootstrap");
-    return 0u;
-}
-
 // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
 void CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed85() {
-    if (!hasMessageCode5SeedBytes85_) {
-        return;
-    }
-
     const bool needsInitialInstall = (streamPacketEncryptionModule9c_ == nullptr);
     if (needsInitialInstall) {
         streamPacketEncryptionModule9c_ =
@@ -2988,17 +2972,7 @@ void CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed8
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
 }
 
-// anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-void CBaseMarginConnection_0x4b64a8::SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value) {
-    messageCode5SeedBytes85_ = value;
-    hasMessageCode5SeedBytes85_ = true;
-    EnsureStreamPacketEncryptionModuleFromSeed85();
-}
 
-// anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-const uint8_t* CBaseMarginConnection_0x4b64a8::MessageCode5SeedBytes85Pointer() const {
-    return hasMessageCode5SeedBytes85_ ? messageCode5SeedBytes85_.data() : nullptr;
-}
 
 // Fidelity helper: invoke message ref vtable+0x08 completion callback if present.
 // anchor: launcher.exe:0x442d65 / call dword ptr [EDX + 0x8]
@@ -3070,46 +3044,46 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
             return false;
         }
 
-        // Note: CRT fields (p, q, dP, dQ, qInv) are not used in current implementation
-        // Original at 0x468130 uses custom big integer operations, not CRT optimization
-
-        // Fidelity: Use Set* methods like InitializeFromBootstrapBlocks instead of throwing Initialize()
-        CryptoPP::RSA::PrivateKey privateKey;
-        privateKey.SetModulus(modulus);
-        privateKey.SetPublicExponent(publicExponent);
-        privateKey.SetPrivateExponent(privateExponent);
-
-        // RSA decrypt the challenge blob using OAEP-SHA1
-        // FIDELITY: Server uses RSAES_OAEP_SHA_Encryptor (MarginSocket.cpp).
-        // Original launcher at 0x468130 performs equivalent OAEP unpadding via
-        // custom BigInt operations; we use CryptoPP's standard decryptor.
+        // FIDELITY: Original at 0x468130 uses raw BigInt modular exponentiation
+        // (a_exp_b_mod_c family) with no CRT optimization visible. The server uses
+        // RSAES_OAEP_SHA_Encryptor (MarginSocket.cpp), so after raw RSA we must
+        // unpad OAEP-SHA1 ourselves. CryptoPP's RSA::PrivateKey rejects our bare
+        // (n,e,d) key because it cannot derive CRT parameters for validation, so
+        // we use Integer arithmetic directly then apply OAEP unpadding.
         std::vector<uint8_t> decryptedBytes;
 
         try {
-            CryptoPP::RSA::PrivateKey privateKey;
-            privateKey.SetModulus(modulus);
-            privateKey.SetPublicExponent(publicExponent);
-            privateKey.SetPrivateExponent(privateExponent);
+            CryptoPP::Integer ciphertextInteger(
+                static_cast<const uint8_t*>(encryptedBytes), encryptedByteCount);
+            CryptoPP::Integer plaintextInteger = a_exp_b_mod_c(
+                ciphertextInteger, privateExponent, modulus);
 
-            CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
-            CryptoPP::AutoSeededRandomPool rng;
+            const size_t modulusByteCount = modulus.ByteCount();
+            std::vector<uint8_t> paddedPlaintext(modulusByteCount);
+            plaintextInteger.Encode(paddedPlaintext.data(), paddedPlaintext.size());
 
-            std::string recovered;
-            CryptoPP::StringSource(
-                static_cast<const uint8_t*>(encryptedBytes),
-                encryptedByteCount,
-                true,
-                new CryptoPP::PK_DecryptorFilter(rng, decryptor,
-                    new CryptoPP::StringSink(recovered)));
+            // OAEP-SHA1 unpadding to match server-side RSAES_OAEP_SHA_Encryptor
+            CryptoPP::OAEP<CryptoPP::SHA1> oaep;
+            std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
+            CryptoPP::DecodingResult result = oaep.Unpad(
+                paddedPlaintext.data(), paddedPlaintext.size(),
+                unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
 
-            decryptedBytes.assign(recovered.begin(), recovered.end());
+            if (!result.isValidCoding) {
+                spdlog::warn(
+                    "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: OAEP unpadding failed");
+                return false;
+            }
+
+            decryptedBytes.assign(
+                unpaddedBuffer.begin(), unpaddedBuffer.begin() + result.messageLength);
 
             spdlog::debug(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: OAEP RSA decrypted bytes={}",
-                decryptedBytes.size());
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: raw RSA + OAEP unpad ok, modulusBytes={} payloadBytes={}",
+                modulusByteCount, decryptedBytes.size());
         } catch (const CryptoPP::Exception& ex) {
             spdlog::warn(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: RSA OAEP decryption failed: {}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: RSA raw decrypt failed: {}",
                 ex.what());
             return false;
         }
@@ -3224,9 +3198,7 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
 //   Original creates local_8 (cls_0x4489d0), decrypts into its storage, grows payload.
 // - Source does not construct cls_0x4b6538 envelope object (vtable 0x4b6538 at 0x443220).
 //   Original constructs envelope wrapping message ref with flag '\x01', extracts bytes from mbr_0x10.
-// - Source uses SetMessageCode5SeedBytes85 helper instead of direct field writes to +0x85, 0x89, 0x8d, 0x91.
-// - Source delegates to SendCertChallengeResponseFromChallengeBytes helper.
-//   Original does inline packet builder construction and sends via vtable+0x24 directly.
+// - Source builds response packet inline matching launcher.exe:0x442ab9-0x442b30.
 // - Source lacks MessageBox error handling and vtable+0xc close call on decrypt failure.
 //   Original shows MessageBox("Failed to decrypt challenge blob from server!") then closes.
 // - FIDELITY: Removed infidel mediator continuation fallback on decrypt failure - matches original return 0.
@@ -3677,8 +3649,6 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     }
     // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
     // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
-    // FIDELITY: Must set hasMessageCode5SeedBytes85_ before calling EnsureStreamPacketEncryptionModuleFromSeed85
-    hasMessageCode5SeedBytes85_ = true;
     EnsureStreamPacketEncryptionModuleFromSeed85();
 
     // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
@@ -3918,7 +3888,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         if (parsedCode5) {
             // anchor: launcher.exe:0x442d42..0x442d5e / direct write to this+0x85..0x91
             // Original writes directly from parse result buffer+1,+5,+9,+d to this+0x85,0x89,0x8d,0x91
-            SetMessageCode5SeedBytes85(code5Message.seedBytes0c);
+            // FIDELITY: No SetMessageCode5SeedBytes85 helper exists in static-RE.
+            messageCode5SeedBytes85_ = code5Message.seedBytes0c;
+            EnsureStreamPacketEncryptionModuleFromSeed85();
             spdlog::info(
                 "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={}",
                 static_cast<unsigned>(rawCode),

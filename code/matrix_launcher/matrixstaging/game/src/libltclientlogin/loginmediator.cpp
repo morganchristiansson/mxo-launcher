@@ -1246,7 +1246,8 @@ RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11Stri
 // anchor: launcher.exe:0x41b4f0 +0xd4
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_)) {
-        if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85Pointer()) {
+        const uint8_t* seedPointer = marginConnection->messageCode5SeedBytes85_.data();
+        if (seedPointer) {
             const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(seedPointer);
             spdlog::info(
                 "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=connection+0x85 mirror connection={} seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}]]",
@@ -2893,32 +2894,17 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     marginBootstrapState.marginTwofishKeyBytes.begin(),
                     liveSeedBytes85.size(),
                     liveSeedBytes85.begin());
-                marginConnection->SetMessageCode5SeedBytes85(liveSeedBytes85);
+                marginConnection->messageCode5SeedBytes85_ = liveSeedBytes85;
                 spdlog::info(
                     "DIAGNOSTIC: mirrored launcher-owned CERT_Challenge Twofish key into live margin connection +0x85..+0x94 early because the active replacement path has not yet naturally hit the decoded code-5 writeback seam connection={}",
                     fmt::ptr(marginConnection));
             }
 
             uint32_t sendResult = 0u;
-            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
-                marginConnection != nullptr &&
-                marginBootstrapState.marginTwofishKeyBytes.size() == 16u &&
-                marginBootstrapState.certChallengeBytes.size() == 16u) {
-                std::array<uint8_t, 16> challengeBytes = {};
-                std::copy_n(
-                    marginBootstrapState.certChallengeBytes.begin(),
-                    challengeBytes.size(),
-                    challengeBytes.begin());
-                sendResult = marginConnection->SendCertChallengeResponseFromChallengeBytes(
-                    challengeBytes);
-                if (sendResult != 0u) {
-                    spdlog::info(
-                        "DIAGNOSTIC: launcher-owned margin mirrored original 0x4429b0 send seam by routing CERT_ChallengeResponse through CMarginConnection_0x4aff38 packet-builder/message-ref send connection={}",
-                        fmt::ptr(marginConnection));
-                }
-            }
-
-            if (sendResult == 0u) {
+            // FIDELITY: Original sends CERT_ChallengeResponse inline from
+            // HandleCode2ForBootstrap (0x4429b0). No SendCertChallengeResponseFromChallengeBytes
+            // helper exists in static-RE; use fallback packet builder.
+            {
                 mxo::auth::FramedPacket response;
                 if (!mxo::auth::BuildMarginCertChallengeResponsePacket(
                         marginBootstrapState.certChallengeBytes,

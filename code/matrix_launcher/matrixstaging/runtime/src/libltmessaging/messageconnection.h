@@ -1365,17 +1365,6 @@ public:
     // Source-owned mirror of the later raw type-1 send that now keeps the nearer original local
     // builder shape explicit too.
     void SendStoredBootstrapReplyCopy98();
-    // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
-    // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send.
-    uint32_t SendCertChallengeResponseFromChallengeBytes(
-        const std::array<uint8_t, 16>& challengeBytes);
-    // anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-    // Narrow source-owned mirror of the consumed decoded-code-2/5 seed-byte writeback.
-    void SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value);
-    // anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-    // Source-owned raw-pointer readback of the same recovered seed-byte block.
-    const uint8_t* MessageCode5SeedBytes85Pointer() const;
-
     // anchor: launcher.exe:0x442d00
     // Intermediate base dispatch router shared by the auth and margin startup leaf families.
     // Current source now keeps the nearer helper-wrapper step explicit too:
@@ -1400,6 +1389,11 @@ public:
         const uint8_t* packetBytes,
         size_t packetSize);
 
+    // anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
+    // Recovered original field at connection+0x85. Kept public because original
+    // consumers (e.g., login mediator +0xd4 callback) access it directly.
+    std::array<uint8_t, 16> messageCode5SeedBytes85_{};
+
 protected:
     // anchor: launcher.exe:0x442d00 -> vtable `+0x2c`
     // The recovered intermediate-base table still owns the `+0x2c(messageRef)` row. Keep the
@@ -1420,8 +1414,6 @@ private:
     bool hasBootstrapReplyCopy98_ = false;
     std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
     std::unique_ptr<CMarginConnectionAuthBootstrapCrypto_0x4b6778> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here, and the first later original consumer is `0x4429b0 -> +0x1c / 0x437810`
-    bool hasMessageCode5SeedBytes85_ = false;
-    std::array<uint8_t, 16> messageCode5SeedBytes85_{};
     std::unique_ptr<CStreamPacketEncryptionModule_0x4b8704> streamPacketEncryptionModule9c_;
 };
 
