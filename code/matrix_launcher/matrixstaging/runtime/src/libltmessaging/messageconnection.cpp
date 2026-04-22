@@ -3062,11 +3062,13 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
             std::vector<uint8_t> paddedPlaintext(modulusByteCount);
             plaintextInteger.Encode(paddedPlaintext.data(), paddedPlaintext.size());
 
-            // OAEP-SHA1 unpadding to match server-side RSAES_OAEP_SHA_Encryptor
+            // OAEP-SHA1 unpadding to match server-side RSAES_OAEP_SHA_Encryptor.
+            // FIDELITY: OAEP_Base::Unpad expects paddedLength in BITS (divides by 8
+            // internally), not bytes. Pass modulusByteCount * 8.
             CryptoPP::OAEP<CryptoPP::SHA1> oaep;
             std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
             CryptoPP::DecodingResult result = oaep.Unpad(
-                paddedPlaintext.data(), paddedPlaintext.size(),
+                paddedPlaintext.data(), modulusByteCount * 8,
                 unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
 
             if (!result.isValidCoding) {
