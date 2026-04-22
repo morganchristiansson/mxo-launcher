@@ -2697,12 +2697,17 @@ CMarginConnectionAuthBootstrapCrypto_0x4b6778::~CMarginConnectionAuthBootstrapCr
     // C++ destructor handles cleanup
 }
 
-// anchor: launcher.exe:0x468130 / vtable+0x24 -> actual RSA decryption
-// FIDELITY NOTE: Original uses cryptoContext for BigInt memory allocation and custom arithmetic.
-// The cryptoContext provides allocator functions at vtable+0xc (0x468050) for BigInt operations.
-// We use CryptoPP which handles memory internally, so cryptoContext is not strictly needed,
-// but we pass it through for API compatibility with the original vtable signature.
-bool CMarginConnectionAuthBootstrapCrypto_0x4b6778::PerformRSADecryption(
+// anchor: launcher.exe:0x442b70 / cls_0x4b69b4 constructor
+CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+    int param_4)
+    : CMarginConnectionAuthBootstrapCrypto_0x4b6778(param_1, param_2, param_3, param_4) {
+}
+
+// anchor: launcher.exe:0x468130 / vtable+0x24 in cls_0x4b69b4
+bool CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
     const void* encryptedBytes,
     size_t encryptedByteCount,
     void* outputBuffer) {
@@ -2842,7 +2847,7 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
         static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockD8);
 
     connection_.bootstrapPrepStateA0_.reset(new (std::nothrow)
-        CMarginConnectionAuthBootstrapCrypto_0x4b6778(param_1, param_2, param_3, 1));
+        CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(param_1, param_2, param_3, 1));
     if (!connection_.bootstrapPrepStateA0_) {
         spdlog::warn(
             "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={} remoteHost='{}'",

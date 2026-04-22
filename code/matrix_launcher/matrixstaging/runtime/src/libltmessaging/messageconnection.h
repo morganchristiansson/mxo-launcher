@@ -1618,12 +1618,13 @@ public:
         uint16_t expectedOutputSize,
         void* encryptedChallengeData);
 
-    // anchor: launcher.exe:0x468130 / vtable+0x24 -> actual RSA decryption
-    // FIDELITY: Perform RSA decryption using proper CryptoPP with OAEP padding
-    bool PerformRSADecryption(
+    // anchor: launcher.exe:0x468130 / vtable+0x24 in cls_0x4b69b4
+    // Pure virtual in base class vtable 0x4b6778 (slot +0x24 = purecall).
+    // Implemented by derived class cls_0x4b69b4 (vtable 0x4b69b4 / 0x4b6ae0).
+    virtual bool PerformRSADecryption(
         const void* encryptedBytes,
         size_t encryptedByteCount,
-        void* outputBuffer);
+        void* outputBuffer) = 0;
 
     // Later original use of the stored connection `+0xa0` object starts at
     // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
@@ -1645,6 +1646,31 @@ public:
 };
 
 static_assert(sizeof(CMarginConnectionAuthBootstrapCrypto_0x4b6778) >= 0xe0, "bootstrap prep state +0xa0 object size mismatch");
+
+// anchor: launcher.exe: cls_0x4b69b4 / vtable 0x4b69b4 (subobject) and 0x4b6ae0 (complete object)
+// Derived class that implements the pure virtual PerformRSADecryption from the base.
+// Original constructor at 0x442b70; object is constructed at connection+0xa0 via 0x443220.
+// The derived vtable adds:
+//   +0x24: PerformRSADecryption (0x468130)
+//   +0x34: MaxUnpaddedLength (0x464b80)
+//   +0x38: OAEP_Pad (0x467640)
+//   +0x3c: OAEP_Unpad (0x467740)
+class CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
+    : public CMarginConnectionAuthBootstrapCrypto_0x4b6778 {
+public:
+    CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+        int param_4);
+    ~CMarginConnectionAuthBootstrapDecryptor_0x4b69b4() override = default;
+
+    // anchor: launcher.exe:0x468130 / vtable+0x24
+    bool PerformRSADecryption(
+        const void* encryptedBytes,
+        size_t encryptedByteCount,
+        void* outputBuffer) override;
+};
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
 public:
