@@ -3053,27 +3053,39 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
         std::vector<uint8_t> decryptedBytes;
 
         try {
+            // FIDELITY: Original BigInt stores digits in little-endian word order with
+            // little-endian bytes within each word. CryptoPP::Integer(byte*,size) expects
+            // big-endian. Reverse the encrypted bytes to match original LE interpretation.
+            std::vector<uint8_t> reversedEncrypted(
+                static_cast<const uint8_t*>(encryptedBytes),
+                static_cast<const uint8_t*>(encryptedBytes) + encryptedByteCount);
+            std::reverse(reversedEncrypted.begin(), reversedEncrypted.end());
+
             CryptoPP::Integer ciphertextInteger(
-                static_cast<const uint8_t*>(encryptedBytes), encryptedByteCount);
+                reversedEncrypted.data(), reversedEncrypted.size());
             CryptoPP::Integer plaintextInteger = a_exp_b_mod_c(
                 ciphertextInteger, privateExponent, modulus);
 
             const size_t modulusByteCount = modulus.ByteCount();
-            std::vector<uint8_t> paddedPlaintext(modulusByteCount);
-            plaintextInteger.Encode(paddedPlaintext.data(), paddedPlaintext.size());
+            std::vector<uint8_t> paddedPlaintextLE(modulusByteCount);
+            plaintextInteger.Encode(paddedPlaintextLE.data(), paddedPlaintextLE.size());
+            // Encode produces big-endian; reverse to get little-endian matching original
+            std::reverse(paddedPlaintextLE.begin(), paddedPlaintextLE.end());
 
             // DIAGNOSTIC: Log raw decrypted bytes before any unpadding
             std::string hexPadded;
             for (size_t i = 0; i < std::min(modulusByteCount, size_t{32}); ++i) {
-                hexPadded += fmt::format("{:02x}", paddedPlaintext[i]);
+                hexPadded += fmt::format("{:02x}", paddedPlaintextLE[i]);
             }
-            spdlog::info("RSA raw decrypt: modulusBytes={} first32hex={}", modulusByteCount, hexPadded);
+            spdlog::info("RSA raw decrypt LE: modulusBytes={} first32hex={}", modulusByteCount, hexPadded);
 
-            // Try OAEP-SHA1 unpadding with normal byte order
+            // OAEP-SHA1 unpadding on little-endian bytes
             CryptoPP::OAEP<CryptoPP::SHA1> oaep;
             std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
+            // OAEP unpad expects big-endian input, so reverse again for OAEP
+            std::vector<uint8_t> paddedPlaintextBE(paddedPlaintextLE.rbegin(), paddedPlaintextLE.rend());
             CryptoPP::DecodingResult result = oaep.Unpad(
-                paddedPlaintext.data(), modulusByteCount * 8,
+                paddedPlaintextBE.data(), modulusByteCount * 8,
                 unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
 
             if (result.isValidCoding) {
@@ -3081,42 +3093,8 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
                     unpaddedBuffer.begin(), unpaddedBuffer.begin() + result.messageLength);
                 spdlog::info("OAEP unpad OK: payloadBytes={}", decryptedBytes.size());
             } else {
-                // Try reversed byte order (original stores LE internally)
-                std::vector<uint8_t> reversedPadded(paddedPlaintext.rbegin(), paddedPlaintext.rend());
-                CryptoPP::DecodingResult revResult = oaep.Unpad(
-                    reversedPadded.data(), modulusByteCount * 8,
-                    unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
-                if (revResult.isValidCoding) {
-                    decryptedBytes.assign(
-                        unpaddedBuffer.begin(), unpaddedBuffer.begin() + revResult.messageLength);
-                    spdlog::info("OAEP unpad OK (reversed): payloadBytes={}", decryptedBytes.size());
-                } else {
-                    // Try PKCS#1 v1.5 style: look for 0x00 0x02 ... 0x00 pattern
-                    size_t payloadOffset = 0;
-                    for (size_t i = 2; i < modulusByteCount; ++i) {
-                        if (paddedPlaintext[i - 1] == 0x00 && paddedPlaintext[i - 2] != 0x00) {
-                            payloadOffset = i;
-                            break;
-                        }
-                    }
-                    if (payloadOffset > 0 && payloadOffset < modulusByteCount) {
-                        decryptedBytes.assign(
-                            paddedPlaintext.begin() + payloadOffset,
-                            paddedPlaintext.end());
-                        spdlog::info("PKCS#1 v1.5 extract: payloadOffset={} payloadBytes={}", payloadOffset, decryptedBytes.size());
-                    } else {
-                        // Last resort: assume payload is last 33 bytes (server sends 00+key+challenge)
-                        if (modulusByteCount >= 33) {
-                            decryptedBytes.assign(
-                                paddedPlaintext.end() - 33,
-                                paddedPlaintext.end());
-                            spdlog::info("Last-resort tail-33 extract: payloadBytes={}", decryptedBytes.size());
-                        } else {
-                            spdlog::warn("All unpadding methods failed");
-                            return false;
-                        }
-                    }
-                }
+                spdlog::warn("OAEP unpad failed on LE-decrypted RSA output");
+                return false;
             }
         } catch (const CryptoPP::Exception& ex) {
             spdlog::warn(
