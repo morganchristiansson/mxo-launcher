@@ -3659,10 +3659,6 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
-    const bool marginOwnerPath =
-        mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnection(this, mediator);
-
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
     bool hadValidMessageCode = false;
@@ -3675,79 +3671,53 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    const std::string remoteHostForLog =
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName();
     // anchor: launcher.exe:0x442d30 / decode result object pointer stored at EBP-0x14 for code2/4
     // Original: Completion callback is stored in the parse result object returned by OnMessageCodeX.
     // The parse result buffer is stack-allocated and contains: [callback, parsed data].
     // Our scaffolds don't track the callback directly - they just do payload resolution.
     void* code2CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 2u) {
-        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2Message = {};
-        const bool parsedCode2 =
+        // anchor: launcher.exe:0x442d8d -> 0x441a30 / OnMessageCode2
+        // Original: CBaseMarginConnection_OnMessageCode2 parses and returns a parse result buffer.
+        // The parse result buffer contains: [callback at +0, parsed challenge data at +4].
+        // Then HandleCode2ForBootstrap is called with the parse result.
+        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2ParseResultBuffer;
+        const bool hasCode2ParseResult =
             CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
                 copiedMessageRef,
-                &code2Message,
+                &code2ParseResultBuffer,
                 /*parseIncomingMessage=*/true);
         const uint8_t* const logicalPayloadBytes =
-            parsedCode2 ? code2Message.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
+            hasCode2ParseResult ? code2ParseResultBuffer.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
         const size_t logicalPayloadByteCount =
-            parsedCode2 ? code2Message.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
+            hasCode2ParseResult ? code2ParseResultBuffer.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
         const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
         uint32_t handledCode2 = 0u;
-        if (marginOwnerPath) {
-            // anchor: launcher.exe:0x442d9e -> 0x4429b0
-            // Original: CBaseMarginConnection_OnMessageCode2(code2ParseResult, messageRef, '\x01')
-            // then calls HandleCode2ForBootstrap with the parsed result
-            CBaseMarginConnection_0x4b64a8_Code2MessageScaffold parsedResult;
-            if (CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
-                    copiedMessageRef, &parsedResult, /*parseIncomingMessage=*/true)) {
-                handledCode2 = HandleCode2ForBootstrap(&parsedResult);
-
-                // FIDELITY: HandleCode2ForBootstrap handles the low-level decryption and response sending
-                // (matching original vtable+0x1c and vtable+0x24 calls), but the mediator needs to update
-                // bootstrap state for the next expected packet. The infidel method was handling this state
-                // management, so we call it to maintain the bootstrap flow.
-                if (handledCode2 != 0u && mediator) {
-                    // Call infidel method for state management (it will detect our response was already sent)
-                    const uint32_t infidelHandled = mediator->ContinueMarginBootstrapHandshake(
-                        logicalPayloadBytes,
-                        logicalPayloadByteCount,
-                        /*transportEncrypted=*/false);
-
-                    spdlog::info(
-                        "CBaseMarginConnection_0x4b64a8::DispatchMessage fidelity decryption+send succeeded, infidel state management result={} this={} ownerContext={}",
-                        static_cast<unsigned>(infidelHandled),
-                        fmt::ptr(this),
-                        fmt::ptr(OwnerContext()));
-                }
-            } else {
-                spdlog::warn(
-                    "CBaseMarginConnection_0x4b64a8::DispatchMessage: failed to parse code2 message for bootstrap");
-            }
+        if (hasCode2ParseResult) {
+            // anchor: launcher.exe:0x442d9e -> 0x4429b0 / HandleCode2ForBootstrap
+            handledCode2 = HandleCode2ForBootstrap(&code2ParseResultBuffer);
         }
         spdlog::info(
-            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} marginOwnerPath={} handledCode2={} this={} ownerContext={} currentState={} remoteHost='{}'",
+            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} handledCode2={} this={} ownerContext={} currentState={}",
             static_cast<unsigned>(rawCode),
-            parsedCode2 && code2Message.parsedPayload00.headerless08 ? 1u : 0u,
-            parsedCode2 && code2Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
-            parsedCode2 ? 1u : 0u,
+            hasCode2ParseResult && code2ParseResultBuffer.parsedPayload00.headerless08 ? 1u : 0u,
+            hasCode2ParseResult && code2ParseResultBuffer.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
+            hasCode2ParseResult ? 1u : 0u,
             static_cast<unsigned>(logicalPayloadByteCount),
-            marginOwnerPath ? 1u : 0u,
             static_cast<unsigned>(handledCode2),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator ? mediator->currentState_ : nullptr),
-            remoteHostForLog);
+            fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
         // anchor: launcher.exe:0x442da6-0x442dac - callback only fires if OnMessageCode2 result non-null
         // In original: extracts callback from parse-result object (at EBP-0x14 + 0), calls vtable+0x8
         // The parse result buffer contains callback at offset 0. Here we simulate the callback-fire
         // based on having gotten to this point - the original checks for non-null parse result object.
         // Note: In original, callback comes from the OnMessageCode2 return value's vtable structure.
-        // We simulate: callback fires if OnMessageCode2 returned a valid result object (parsedCode2).
-        if (parsedCode2) {
-            // Simulated parse-result callback: original extracts from code4And5ParseResult[0]
-            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code2CompletionCallbackSlot);
+        // We simulate: callback fires if OnMessageCode2 returned a valid result object (hasCode2ParseResult).
+        if (hasCode2ParseResult) {
+            // Simulated parse-result callback: original extracts from code2ParseResultBuffer[0]
+            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
+                &copiedMessageRef, &code2CompletionCallbackSlot);
         }
         return 1u;
     }
@@ -3755,43 +3725,44 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
     // anchor: launcher.exe:0x442d38 - similar to code2, parse result stored at EBP-0x14 with callback at +0
     void* code4CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 4u) {
-        CBaseMarginConnection_0x4b64a8_Code4MessageScaffold code4Message = {};
-        const bool parsedCode4 =
+        // anchor: launcher.exe:0x442d72 -> 0x441bc0 / OnMessageCode4
+        // Original: CBaseMarginConnection_OnMessageCode4 parses and returns a parse result buffer.
+        // The parse result buffer contains: [callback at +0, parsed data at +4].
+        CBaseMarginConnection_0x4b64a8_Code4MessageScaffold code4ParseResultBuffer;
+        const bool hasCode4ParseResult =
             CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
                 copiedMessageRef,
-                &code4Message,
+                &code4ParseResultBuffer,
                 /*parseIncomingMessage=*/true);
         const uint8_t* const logicalPayloadBytes =
-            parsedCode4 ? code4Message.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
+            hasCode4ParseResult ? code4ParseResultBuffer.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
         const size_t logicalPayloadByteCount =
-            parsedCode4 ? code4Message.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
+            hasCode4ParseResult ? code4ParseResultBuffer.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
         const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
         uint32_t handledCode4 = 0u;
-        if (marginOwnerPath) {
+        if (hasCode4ParseResult) {
             // anchor: launcher.exe:0x442d83 -> 0x441850
             handledCode4 = HandleCode4ForBootstrap(
                 logicalPayloadBytes,
                 logicalPayloadByteCount);
         }
         spdlog::info(
-            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code4 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode4={} logicalPayloadBytes={} status=0x{:08x} marginOwnerPath={} handledCode4={} connectionByte84={} this={} ownerContext={} currentState={} remoteHost='{}'",
+            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code4 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode4={} logicalPayloadBytes={} status=0x{:08x} handledCode4={} connectionByte84={} this={} ownerContext={} currentState={}",
             static_cast<unsigned>(rawCode),
-            parsedCode4 && code4Message.parsedPayload00.headerless08 ? 1u : 0u,
-            parsedCode4 && code4Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
-            parsedCode4 ? 1u : 0u,
+            hasCode4ParseResult && code4ParseResultBuffer.parsedPayload00.headerless08 ? 1u : 0u,
+            hasCode4ParseResult && code4ParseResultBuffer.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
+            hasCode4ParseResult ? 1u : 0u,
             static_cast<unsigned>(logicalPayloadByteCount),
-            static_cast<unsigned>(parsedCode4 ? code4Message.statusOrPayload0c : 0u),
-            marginOwnerPath ? 1u : 0u,
+            static_cast<unsigned>(hasCode4ParseResult ? code4ParseResultBuffer.statusOrPayload0c : 0u),
             static_cast<unsigned>(handledCode4),
             MessageCode4SuccessFlag84() ? 1u : 0u,
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator ? mediator->currentState_ : nullptr),
-            remoteHostForLog);
+            fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
         // anchor: 0x442da6-0x442dac - callback only fires if OnMessageCode4 result non-null
         // In original: extracts callback from parse-result (EBP-0x14 + 0), calls vtable+0x8
         // Here we simulate: callback fires if parsing/result object was non-null
-        if (parsedCode4) {
+        if (hasCode4ParseResult) {
             CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code4CompletionCallbackSlot);
         }
         return 1u;
@@ -3816,7 +3787,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
             // Original writes directly from parse result buffer+1,+5,+9,+d to this+0x85,0x89,0x8d,0x91
             SetMessageCode5SeedBytes85(code5Message.seedBytes0c);
             spdlog::info(
-                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
+                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={}",
                 static_cast<unsigned>(rawCode),
                 code5Message.parsedPayload00.headerless08 ? 1u : 0u,
                 code5Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : 0u,
@@ -3828,23 +3799,21 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
                     (static_cast<uint32_t>(code5Message.seedBytes0c[3]) << 24u)),
                 fmt::ptr(this),
                 fmt::ptr(OwnerContext()),
-                fmt::ptr(mediator ? mediator->currentState_ : nullptr),
-                remoteHostForLog);
+                fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
             // Original callback for code5: after writing bytes, checks callback from parse result
             // at [EBP-0xc], calls vtable+0x8 if non-null, THEN returns (callbackResult << 8) | 1
             // Our callback simulation fires after write, before return.
             CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code5CompletionCallbackSlot);
         } else {
             spdlog::warn(
-                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={} remoteHost='{}'",
+                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={}",
                 static_cast<unsigned>(rawCode),
                 usedHeaderlessLocatorDecode ? 1u : 0u,
                 usedHeaderlessLocatorDecode ? 1u : 0u,
                 static_cast<unsigned>(logicalPayloadByteCount),
                 fmt::ptr(this),
                 fmt::ptr(OwnerContext()),
-                fmt::ptr(mediator ? mediator->currentState_ : nullptr),
-                remoteHostForLog);
+                fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
         }
         // anchor: 0x442d59-0x442d65 - callback only fires if OnMessageCode5 result non-null
         // Note: In original, the callback check and invocation happens BEFORE return for code5.
