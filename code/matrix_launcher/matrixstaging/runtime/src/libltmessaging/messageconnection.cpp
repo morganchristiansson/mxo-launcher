@@ -3006,35 +3006,37 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
         privateKey.SetPublicExponent(publicExponent);
         privateKey.SetPrivateExponent(privateExponent);
 
-        // RSA decrypt the challenge blob using raw RSA (no padding)
-        // anchor: launcher.exe:0x468130 -> virt_meth_0x468130 performs raw RSA operations
-        // Original uses custom big integer operations, not standard OAEP padding
-        // FIDELITY: Remove infidel OAEP approach and use raw RSA like original
+        // RSA decrypt the challenge blob using OAEP-SHA1
+        // FIDELITY: Server uses RSAES_OAEP_SHA_Encryptor (MarginSocket.cpp).
+        // Original launcher at 0x468130 performs equivalent OAEP unpadding via
+        // custom BigInt operations; we use CryptoPP's standard decryptor.
         std::vector<uint8_t> decryptedBytes;
 
         try {
-            // Convert ciphertext to CryptoPP integer
-            CryptoPP::Integer ciphertext(
+            CryptoPP::RSA::PrivateKey privateKey;
+            privateKey.SetModulus(modulus);
+            privateKey.SetPublicExponent(publicExponent);
+            privateKey.SetPrivateExponent(privateExponent);
+
+            CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
+            CryptoPP::AutoSeededRandomPool rng;
+
+            std::string recovered;
+            CryptoPP::StringSource(
                 static_cast<const uint8_t*>(encryptedBytes),
-                encryptedByteCount);
+                encryptedByteCount,
+                true,
+                new CryptoPP::PK_DecryptorFilter(rng, decryptor,
+                    new CryptoPP::StringSink(recovered)));
 
-            // Perform raw RSA decryption: m = c^d mod n
-            // This matches the original's big integer operations at 0x468130
-            CryptoPP::Integer plaintext = ciphertext;
-            plaintext ^= privateExponent;
-            plaintext %= modulus;
-
-            // Convert plaintext to bytes
-            size_t encodedSize = plaintext.MinEncodedSize();
-            decryptedBytes.resize(encodedSize);
-            plaintext.Encode(decryptedBytes.data(), encodedSize);
+            decryptedBytes.assign(recovered.begin(), recovered.end());
 
             spdlog::debug(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: raw RSA decrypted bytes={}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: OAEP RSA decrypted bytes={}",
                 decryptedBytes.size());
         } catch (const CryptoPP::Exception& ex) {
             spdlog::warn(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: RSA decryption failed: {}",
+                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: RSA OAEP decryption failed: {}",
                 ex.what());
             return false;
         }
