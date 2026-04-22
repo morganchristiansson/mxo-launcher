@@ -3238,7 +3238,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // FIDELITY: Comprehensive logging for HandleCode2ForBootstrap (launcher.exe:0x4429b0)
     spdlog::info("HandleCode2ForBootstrap: BEGIN this={} parsedMessageResult={}",
         fmt::ptr(this), fmt::ptr(parsedMessageResult));
-    
+
     // Log encrypted payload info from parsed message
     // FIDELITY: direct field access to debugString14 (+0x14) and payloadSize18 (+0x18)
     const uint8_t* encPayload = reinterpret_cast<const uint8_t*>(parsedMessageResult->debugString14);
@@ -3250,7 +3250,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             encPayload[8], encPayload[9], encPayload[10], encPayload[11],
             encPayload[12], encPayload[13], encPayload[14], encPayload[15]);
     }
-    
+
     // Log encrypted blob fields (stored in inherited debugString14 / payloadSize18)
     spdlog::debug("HandleCode2ForBootstrap: encryptedBlobPtr={} encryptedBlobSize={}",
         fmt::ptr(parsedMessageResult->debugString14),
@@ -3381,7 +3381,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     const bool decryptSuccess = decryptedByteCount != 0;
 
     // FIDELITY: Log the decrypt result structure
-    spdlog::info("HandleCode2ForBootstrap: decrypt result success={} byteCount={}", 
+    spdlog::info("HandleCode2ForBootstrap: decrypt result success={} byteCount={}",
         decryptSuccess ? 1 : 0, decryptedByteCount);
     if (decryptSuccess && decryptedByteCount > 0) {
         spdlog::debug("HandleCode2ForBootstrap: decrypt output [0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
@@ -3487,7 +3487,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             envelope.packetPayloadPtr[8], envelope.packetPayloadPtr[9], envelope.packetPayloadPtr[10], envelope.packetPayloadPtr[11],
             envelope.packetPayloadPtr[12], envelope.packetPayloadPtr[13], envelope.packetPayloadPtr[14], envelope.packetPayloadPtr[15],
             envelope.packetPayloadPtr[16], envelope.packetPayloadPtr[17], envelope.packetPayloadPtr[18], envelope.packetPayloadPtr[19]);
-            
+
         messageCode5SeedBytes85_[0] = envelope.packetPayloadPtr[1];
         messageCode5SeedBytes85_[1] = envelope.packetPayloadPtr[2];
         messageCode5SeedBytes85_[2] = envelope.packetPayloadPtr[3];
@@ -3504,14 +3504,14 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         messageCode5SeedBytes85_[13] = envelope.packetPayloadPtr[14];
         messageCode5SeedBytes85_[14] = envelope.packetPayloadPtr[15];
         messageCode5SeedBytes85_[15] = envelope.packetPayloadPtr[16];
-        
+
         // FIDELITY: Log extracted seed bytes (will be used for this+0x85, 0x89, 0x8d, 0x91)
         spdlog::info("HandleCode2ForBootstrap: extracted seed bytes for this+0x85 [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
             messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
             messageCode5SeedBytes85_[8], messageCode5SeedBytes85_[9], messageCode5SeedBytes85_[10], messageCode5SeedBytes85_[11],
             messageCode5SeedBytes85_[12], messageCode5SeedBytes85_[13], messageCode5SeedBytes85_[14], messageCode5SeedBytes85_[15]);
-            
+
         // Log as DWORDs to match how they get written to connection fields
         const uint32_t seedDword0 = *reinterpret_cast<const uint32_t*>(&messageCode5SeedBytes85_[0]);
         const uint32_t seedDword1 = *reinterpret_cast<const uint32_t*>(&messageCode5SeedBytes85_[4]);
@@ -3588,8 +3588,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
     // FIDELITY: Log response packet details before sending (already have responsePayload from above)
     const size_t responsePayloadSize = responseMessageRef->messageStorage0c->PayloadByteCount();
-    
-    spdlog::info("HandleCode2ForBootstrap: RESPONSE PACKET opcode=0x{:02x} size={} bytes", 
+
+    spdlog::info("HandleCode2ForBootstrap: RESPONSE PACKET opcode=0x{:02x} size={} bytes",
         responsePayload ? responsePayload[0] : 0, responsePayloadSize);
     if (responsePayload && responsePayloadSize >= 17) {
         spdlog::info("HandleCode2ForBootstrap: response payload [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
@@ -3597,14 +3597,14 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             responsePayload[4], responsePayload[5], responsePayload[6], responsePayload[7],
             responsePayload[8], responsePayload[9], responsePayload[10], responsePayload[11],
             responsePayload[12], responsePayload[13], responsePayload[14], responsePayload[15]);
-            
+
         // Verify response bytes match expected challenge
-        const bool responseMatchesChallenge = 
+        const bool responseMatchesChallenge =
             (responsePayload[1] == messageCode5SeedBytes85_[0]) &&
             (responsePayload[2] == messageCode5SeedBytes85_[1]) &&
             (responsePayload[3] == messageCode5SeedBytes85_[2]) &&
             (responsePayload[4] == messageCode5SeedBytes85_[3]);
-        spdlog::info("HandleCode2ForBootstrap: response byte[1-4] match seed byte[0-3]: {}", 
+        spdlog::info("HandleCode2ForBootstrap: response byte[1-4] match seed byte[0-3]: {}",
             responseMatchesChallenge ? "YES" : "NO");
     }
 
@@ -3872,13 +3872,6 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
     return 0u;
 }
 
-}  // namespace mxo::liblttcp
-
-// ============================================================
-// Packet_0x4af2a4 family (base packet builder)
-// Implementation outside namespace since Packet_0x4af2a4 is in mxo::ltlogin
-// ============================================================
-
 // anchor: launcher.exe:0x43a230 - LocalPacketBuilder_ReserveLengthPrefixedTail
 // Non-virtual helper used by packet builder subclasses to reserve length-prefixed tails.
 // Assembly flow:
@@ -3887,13 +3880,13 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
 //   0x43a2a4: MOV word ptr [EAX], BX - write content length at reservation header
 //   0x43a2aa: MOV word ptr [ECX+0x1], DI - write offset to bytes [1-2] of packet
 //   0x43a2b5: LEA EAX,[EDX+EAX*0x1+0x2] - compute end pointer for heapString14
-uint16_t mxo::ltlogin::Packet_0x4af2a4::ReserveLengthPrefixedTail(uint16_t contentByteCount) {
+uint16_t Packet_0x4af2a4::ReserveLengthPrefixedTail(uint16_t contentByteCount) {
     // FIDELITY: Variable names synced with Ghidra:0x43a230
     // No null checks in original - straight dereference like launcher.exe
-    
+
     // Original at 0x43a23e-0x43a241: load messageStorage from messageRef08->messageStorage0c
     auto* messageStorage = messageRef08->messageStorage0c;
-    
+
     // Clamp to available space in message storage
     // Original at 0x43a257-0x43a267: contentByteCount = min(contentByteCount, 0xffc - payloadSize)
     constexpr uint16_t kMaxPayloadSize = 0xffcu;
@@ -3936,3 +3929,5 @@ uint16_t mxo::ltlogin::Packet_0x4af2a4::ReserveLengthPrefixedTail(uint16_t conte
     // FIDELITY: Single return at end of function
     return contentByteCount;
 }
+
+}  // namespace mxo::liblttcp

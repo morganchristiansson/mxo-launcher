@@ -283,13 +283,14 @@ uint32_t CLTLoginMediator::SetCurrentState(uint32_t helperStateId) {
         return 0u;
     }
 
+    spdlog::info(
+        "CLTLoginMediator::SetCurrentState {} -> {}",
+        oldState->GetStateId(), helperStateId);
+
     // Original: this->currentState10 = newState
     currentState_ = newState;
     // Original: new helper vtable+0x08(oldState) slot3
     newState->Slot3_BeginOrContinue(oldState);
-    spdlog::info(
-        "CLTLoginMediator::SetCurrentState {} -> {}",
-        oldState->GetStateId(), helperStateId);
     return 0u;
 }
 

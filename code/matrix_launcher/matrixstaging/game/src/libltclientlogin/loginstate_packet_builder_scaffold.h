@@ -6,7 +6,6 @@
 #include <cstdint>
 
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
-#include "loginmediator_base.h"  // Packet_0x4af2a4
 
 namespace mxo::ltlogin {
 
@@ -85,7 +84,7 @@ struct State6ChallengeResponsePayload {
 
 // anchor: launcher.exe:0x43fd20 / packet 0x08 challenge response builder for state6
 // Margin opcode 0x08 = MS_ConnectChallengeResponse (reply to opcode 0x07)
-class Packet_MsConnectChallengeResponse_0x4b5378 : public Packet_0x4af2a4 {
+class Packet_MsConnectChallengeResponse_0x4b5378 : public mxo::liblttcp::Packet_0x4af2a4 {
  public:
   // anchor: launcher.exe:0x43fd20..0x43fd70
   // Original implementation pattern:
@@ -172,7 +171,7 @@ namespace mxo::ltlogin {
 // anchor: launcher.exe:0x43ac10
 //
 // Margin opcode 0x0f = MS_LoadCharacterRequest (used by state8)
-class Packet_MsLoadCharacterRequest_0x4b5418 : public Packet_0x4af2a4 {
+class Packet_MsLoadCharacterRequest_0x4b5418 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
 
     // anchor: launcher.exe:0x43ac10 = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
@@ -191,20 +190,20 @@ public:
         // Note: In C++ the vtable pointer is implicit, set by the constructor.
         // The original at 0x43ac14 calls Packet_0x4af2a4 ctor, then overwrites vtable.
         // With C++ inheritance, the vtable is already correct for Packet_MsLoadCharacterRequest_0x4b5418.
-        
+
         // Step 3: Clear flag
         createRefParam0c = 0u;
-        
+
         // Step 4: Cache payload base
         payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
-        
+
         // Step 5: Grow payload to 0xbb bytes
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->GrowPayloadByteCount(0xbb);
             payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
             payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
         }
-        
+
         // Step 6-8: Initialize fixed payload structure
         uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
         if (payload) {
@@ -215,11 +214,11 @@ public:
             // Clear GameSessionID offset at +0xb9
             *reinterpret_cast<uint16_t*>(payload + 0xb9) = 0u;
         }
-        
+
         // Step 9: Clear string/length fields
         debugString14 = nullptr;
         payloadSize18 = 0u;
-        
+
     }
 
     // Note: Original code accesses payloadAlias10 field directly.
@@ -274,7 +273,7 @@ struct State7Packet0x0dFixedPayload {
 // Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
 //
 // Margin opcode 0x0d = MS_DeleteCharacterRequest (used by state7 for character selection probe)
-class Packet_MsDeleteCharacterRequest_0x4b53f0 : public Packet_0x4af2a4 {
+class Packet_MsDeleteCharacterRequest_0x4b53f0 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a9a0
     void ResetAndInitialize() {
@@ -286,7 +285,7 @@ public:
                 messageRef08->ResetForPacketBuilder(false, 0);
             }
         }
-        
+
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(
                 State7Packet0x0dFixedPayload::kFixedByteCount);
@@ -329,7 +328,7 @@ struct State10Packet0x0aFixedPayload {
 // Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
 //
 // Margin opcode 0x0a = MS_ClaimCharacterNameRequest (used by state10)
-class Packet_MsClaimCharacterNameRequest_0x4b53b4 : public Packet_0x4af2a4 {
+class Packet_MsClaimCharacterNameRequest_0x4b53b4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a1f0
     void ResetAndInitialize() {
@@ -340,7 +339,7 @@ public:
                 messageRef08->ResetForPacketBuilder(false, 0);
             }
         }
-        
+
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(
                 State10Packet0x0aFixedPayload::kFixedByteCount);
@@ -371,7 +370,7 @@ static_assert(offsetof(Packet_MsClaimCharacterNameRequest_0x4b53b4, reservation1
 // Object layout: inherits Packet_0x4af2a4 at +0x00, then 4 reservation scaffolds at +0x28/+0x30/+0x38/+0x40
 //
 // Margin opcode 0x0c (0x4d) = MS_CreateCharacterRequest (used by state11)
-class Packet_MsCreateCharacterRequest_0x4b53c8 : public Packet_0x4af2a4 {
+class Packet_MsCreateCharacterRequest_0x4b53c8 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a470
     void ResetAndInitialize() {
@@ -382,7 +381,7 @@ public:
                 messageRef08->ResetForPacketBuilder(false, 0);
             }
         }
-        
+
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(
                 State11Packet0x4dFixedPayload::kFixedByteCount);
@@ -465,7 +464,7 @@ struct State6Packet0x06FixedPayload {
 // anchor: launcher.exe:0x43b8f0 = ResetAndInitialize
 //
 // Margin opcode 0x06 = MS_ConnectRequest (used by state6)
-class Packet_MsConnectRequest_0x4b5364 : public Packet_0x4af2a4 {
+class Packet_MsConnectRequest_0x4b5364 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43b8f0
     void ResetAndInitialize() {
@@ -476,7 +475,7 @@ public:
                 messageRef08->ResetForPacketBuilder(false, 0);
             }
         }
-        
+
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(
                 State6Packet0x06FixedPayload::kFixedByteCount);
@@ -506,6 +505,6 @@ public:
     const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
 };
 
-static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
+static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
 
 }  // namespace mxo::ltlogin

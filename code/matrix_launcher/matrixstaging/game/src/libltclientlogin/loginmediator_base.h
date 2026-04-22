@@ -21,110 +21,6 @@ class CMessageConnectionMessageRef_0x4ba23c;
 // Type definitions used in pure virtual methods
 struct Arg6SelectionConfig;
 
-// anchor: launcher.exe:0x004af2a4 / vtable
-// anchor: launcher.exe:0x439840 / ctor
-// Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef
-// for internal message storage. This is the shared base pattern used by
-// CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
-// Note: Ghidra decompiler shows this as a component within SlotRecord_0x4b5328.
-// VTable methods (inherited by derived classes):
-// - +0x00: dtor / release retained outer message-ref (0x00443aa0)
-// - +0x04: stub returns 0 (0x00437b50)
-// - +0x08: append debug string (builder-specific)
-// - +0x0c: reset/init helper (builder-specific)
-// - +0x10: return builder +0x10 packet-payload base (0x00481760)
-class Packet_0x4af2a4 {
-public:
-    // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
-    // +0x00: vtable pointer (C++ implicit)
-    uint32_t payloadPtr04 = 0;           // +0x04: payload base pointer (was: nopatchLauncherVersionValue04)
-    ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
-    uint8_t createRefParam0c = 0;         // +0x0c: param to CreateRef (was: ownerReadyFlag0c)
-    uint8_t padding0d_0f[3] = {0, 0, 0};  // +0x0d .. +0x0f
-
-    // Payload pointers (set by derived classes):
-    void* payloadAlias10 = nullptr;       // +0x10: alias of payloadPtr04 in some contexts (was: payloadBegin10)
-    const char* debugString14 = nullptr;  // +0x14: heap-allocated string pointer (was: heapString14)
-    uint16_t payloadSize18 = 0;           // +0x18: payload length in bytes (was: payloadLength18)
-    uint8_t packetType1a = 0;             // +0x1a: status/packet type byte (was: statusByte1a)
-    uint8_t padding1b = 0;                // +0x1b: alignment padding
-
-    // Character slot fields (used by derived slot record):
-    uint32_t characterIdLow1c = 0;         // +0x1c
-    uint32_t characterIdHigh20 = 0;      // +0x20
-    uint16_t worldId24 = 0;              // +0x24
-
-public:
-    // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
-    // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
-    virtual ~Packet_0x4af2a4() {
-        // anchor: launcher.exe:0x443aa0
-        // Original destructor releases the retained outer message-ref via vtable+8,
-        // then optionally deletes the object itself (based on the flag in param_1).
-        if (messageRef08) {
-            messageRef08->Release();
-        }
-    }
-    // anchor: launcher.exe:0x437b50 / vtable +0x04
-    // Stub method returning 0 - inherited by all derived builders
-    virtual uint32_t StubReturn0() { return 0; }
-    // anchor: launcher.exe:0x4af2ac / vtable +0x08
-    // Debug string method - builder-specific (e.g., "Certificate:..." output)
-    // formatType: 2 = array size format, 3 = byte array format
-    // Note: Original at 0x4425f0 returns void, not const char*
-    virtual void DebugString(int /*formatType*/ = 2) {}
-    // anchor: launcher.exe:0x41baf0 / vtable +0x0c
-    // Initialize payload size from message ref, calls helper at 0x41bb30
-    virtual void InitializePayloadSize() {}
-    // anchor: launcher.exe:0x481760 / vtable +0x10
-    // Returns payload base pointer (payloadAlias10 field)
-    virtual void* GetPayloadBase() { return payloadAlias10; }
-
-    // anchor: launcher.exe:0x43a230 - LocalPacketBuilder_ReserveLengthPrefixedTail
-    // Virtual helper used by packet builder subclasses:
-    // - CMarginConnection_SendStoredBootstrapReplyCopy98 (0x441f7d)
-    // - CLTLoginMediatorPacket0x0a_SetCharacterName (0x43aaae)
-    // - AuthBootstrap680_HandleInboundAuthMessage (0x448418)
-    // Must be virtual because derived classes have different fields at +0x14/+0x18:
-    // - Packet_0x4af2a4: debugString14 (+0x14), payloadSize18 (+0x18)
-    // - Packet_CertConnectRequest_0x4b6524: reservationHeader14 (+0x14), reservedContentByteCount18 (+0x18)
-    // Reserves space for a length-prefixed tail, updates bytes[1-2] with offset to header.
-    // Returns content byte count (may be clamped to available space).
-    virtual uint16_t ReserveLengthPrefixedTail(uint16_t contentByteCount);
-
-    // anchor: launcher.exe:0x439840 - Packet_0x4af2a4_DefaultCtor
-    // Default constructor - creates message ref, sets up payload base at +0xc offset
-    // 
-    // DECOMPILER ARTIFACT NOTE (Ghidra 0x439840):
-    // The decompiler incorrectly shows:
-    //   messageRefHelper_local.messageRef00 = (CMessageConnectionMessageRef_0x4ba23c *)this;
-    // before calling CMessageConnectionMessage_CreateRef(&messageRefHelper_local, 0).
-    // Actual behavior: messageRefHelper_local is an uninitialized 4-byte stack local.
-    // CMessageConnectionMessage_CreateRef creates a NEW message ref and stores it in
-    // messageRefHelper_local.messageRef00, then the AddRef/Release dance updates this->messageRef08.
-    Packet_0x4af2a4() {
-        // Create message ref as per original 0x439840
-        // Note: Uses CMessageConnectionMessage_CreateRef helper which:
-        // 1. Calls CMessageConnectionMessage_Create() to allocate new ref
-        // 2. Sets messageContext14 = 0
-        // 3. Stores in helper->messageRef00
-        // 4. Calls AddRef on the new ref
-        messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
-        if (messageRef08) {
-            messageRef08->AddRef();
-            messageRef08->ResetForPacketBuilder(false, 0);
-            if (messageRef08->messageStorage0c) {
-                // FIDELITY: Original at 0x439840 computes:
-                //   payloadPtr04 = *(messageRef08 + 0xc) + 0xc
-                // Where *(messageRef08 + 0xc) is messageStorage0c.
-                // So payloadPtr04 = messageStorage0c + 0xc = &payloadBytes0c[0]
-                uint8_t* payloadBase = messageRef08->messageStorage0c->payloadBytes0c.data();
-                payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
-                payloadAlias10 = payloadBase;
-            }
-        }
-    }
-};
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
@@ -185,7 +81,7 @@ public:
 // - mbr_0x8: source CMessageConnectionMessageRef* (set from workItem param)
 // - mbr_0xc: opcode flag byte (0x01 = success, 0x00 = pending)
 // - mbr_0x10: computed payload pointer (inherited from Packet_0x4af2a4 as payloadAlias10)
-class Packet_MarginConnectReplyView_0x4b5378 : public Packet_0x4af2a4 {
+class Packet_MarginConnectReplyView_0x4b5378 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // +0x0c: flag (reuses createRefParam0c from parent)
     // virtual methods inherited from Packet_0x4af2a4
