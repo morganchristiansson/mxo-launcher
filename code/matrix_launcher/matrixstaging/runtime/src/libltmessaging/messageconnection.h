@@ -16,6 +16,24 @@ namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 // Forward declare crypto helper
 class CryptoInitHelper_0x4b42bc;
 
+// anchor: launcher.exe:0x004cb4d4
+// Static lookup table for message offset calculations.
+// Used by headerless message path to compute payload offset from descriptor byte.
+// The descriptor byte at [messageRef + 0xc + 0xd] is split into two 3-bit indices:
+// - high nibble: (descriptor >> 4) & 7
+// - low nibble: descriptor & 7
+// Payload size = lookup[high] + lookup[low] + 0x12
+inline const uint32_t g_MessageOffsetLookupTable[8] = {
+    0x00000011u,  // index 0
+    0x00000004u,  // index 1
+    0x00000010u,  // index 2
+    0x0000000bu,  // index 3
+    0x00000010u,  // index 4
+    0x00000011u,  // index 5
+    0x00000010u,  // index 6
+    0x004AC434u,  // index 7 (pointer? unused in practice)
+};
+
 
 
 
@@ -660,8 +678,8 @@ public:
         uint8_t* storageBase = reinterpret_cast<uint8_t*>(msgStorage);
         uint8_t descriptor = *(storageBase + 0xc + 0xd);
 
-        uint32_t offset1 = ltlogin::g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
-        uint32_t offset2 = ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
+        uint32_t offset1 = g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
+        uint32_t offset2 = g_MessageOffsetLookupTable[descriptor & 7];
         uint32_t payloadSize = offset1 + offset2 + 0x12;
 
         // Set payloadPtr04 to END of payload (storage base + 0xc + size)

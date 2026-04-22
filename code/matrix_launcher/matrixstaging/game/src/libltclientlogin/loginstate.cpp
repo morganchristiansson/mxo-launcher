@@ -3,6 +3,7 @@
 #include "loginmediator.h"
 #include "loginstate_packet_builder_scaffold.h"
 #include "../../../../src/diagnostics.h"
+#include "../../../../matrixstaging/runtime/src/libltmessaging/messageconnection.h"
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
