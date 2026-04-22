@@ -2,6 +2,9 @@
 
 ## Rule 1: Fidelity to static-RE of launcher.exe
 
+- Ghidra first:
+  - Rename methods, variables, fields from default ghidra names to improve readability.
+  - Work with user to improve incorrect types.
 - Implementations must be faithful to ghidra static-RE of launcher.exe
 - Classes and methods should map directly to orignal launcher.exe vtable and implementation
 - Respect method boundaries in static-RE. Do not inline or split methods if split does not exist in static-RE.

@@ -8,6 +8,8 @@
 #include "variablelengthprefixedtcpstreamparser.h"
 #include "spdlog/spdlog.h"
 
+#include <integer.h>
+
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -2454,12 +2456,24 @@ static CryptoPP::Integer CMarginConnectionBootstrapPrepBigIntObjectToInteger(
         --usedWordCount;
     }
 
-    CryptoPP::Integer value = CryptoPP::Integer::Zero();
-    for (size_t i = usedWordCount; i != 0u; --i) {
-        value <<= 32u;
-        value += digits[i - 1u];
+    if (usedWordCount == 0u) {
+        return CryptoPP::Integer::Zero();
     }
-    return value;
+
+    // FIDELITY: Original stores digits in little-endian word order with little-endian
+    // bytes within each word. byte 0 = LSB, byte (usedWordCount*4 - 1) = MSB.
+    // CryptoPP::Integer(byte*, size) expects big-endian bytes.
+    std::vector<uint8_t> bigEndianBytes(usedWordCount * 4u);
+    for (size_t wordIdx = 0; wordIdx < usedWordCount; ++wordIdx) {
+        const uint32_t word = digits[wordIdx];
+        const size_t destBase = (usedWordCount - 1u - wordIdx) * 4u;
+        bigEndianBytes[destBase + 0] = static_cast<uint8_t>(word >> 24);
+        bigEndianBytes[destBase + 1] = static_cast<uint8_t>(word >> 16);
+        bigEndianBytes[destBase + 2] = static_cast<uint8_t>(word >> 8);
+        bigEndianBytes[destBase + 3] = static_cast<uint8_t>(word);
+    }
+
+    return CryptoPP::Integer(bigEndianBytes.data(), bigEndianBytes.size());
 }
 
 static bool BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
@@ -2532,6 +2546,58 @@ void CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks
         if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
             spdlog::warn("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: zero BigInt detected, skipping CRT derivation");
             return;
+        }
+
+        // ROUND-TRIP TEST: verify BigInt -> Integer -> BigInt produces identical digits
+        {
+            std::vector<uint32_t> roundTripDigits;
+            CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c roundTripObj;
+            BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(&roundTripObj, &roundTripDigits, modulus);
+            const uint32_t cap = field_0x8.digitCapacityWords_0x08;
+            const uint32_t rtCap = roundTripObj.digitCapacityWords_0x08;
+            const auto* origDigits = static_cast<const uint32_t*>(field_0x8.digitPointer_0x0c);
+            const auto* rtDigits = static_cast<const uint32_t*>(roundTripObj.digitPointer_0x0c);
+            bool roundTripOk = (cap == rtCap);
+            uint32_t mismatchCount = 0;
+            if (roundTripOk && origDigits && rtDigits) {
+                for (uint32_t i = 0; i < cap; ++i) {
+                    if (origDigits[i] != rtDigits[i]) {
+                        roundTripOk = false;
+                        if (mismatchCount < 8) {
+                            spdlog::warn("Round-trip mismatch at word {}: orig=0x{:08x} rt=0x{:08x}", i, origDigits[i], rtDigits[i]);
+                        }
+                        ++mismatchCount;
+                    }
+                }
+            }
+            if (!roundTripOk) {
+                spdlog::error("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: ROUND-TRIP FAILED cap={} rtCap={} mismatches={}", cap, rtCap, mismatchCount);
+            } else {
+                spdlog::debug("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: round-trip OK");
+            }
+        }
+
+        // KEY VALIDATION TEST: verify m == (m^e)^d mod n for random m
+        {
+            CryptoPP::AutoSeededRandomPool rng;
+            const size_t testByteCount = modulus.ByteCount();
+            std::vector<uint8_t> testM(testByteCount);
+            rng.GenerateBlock(testM.data(), testM.size());
+            // Ensure m < n by masking the high byte
+            if (testByteCount > 0) {
+                testM[0] &= 0x7f;
+            }
+            CryptoPP::Integer m(testM.data(), testM.size());
+            if (m >= modulus) {
+                m = modulus - 1;
+            }
+            const CryptoPP::Integer c = a_exp_b_mod_c(m, publicExponent, modulus);
+            const CryptoPP::Integer m2 = a_exp_b_mod_c(c, privateExponent, modulus);
+            if (m != m2) {
+                spdlog::error("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: KEY VALIDATION FAILED m != m2. Key reconstruction is wrong.");
+            } else {
+                spdlog::debug("CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks: key validation passed");
+            }
         }
 
         // Fidelity: Original computes CRT parameters using BigInt methods, not CryptoPP::RSA::PrivateKey
@@ -2727,7 +2793,7 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     // anchor: launcher.exe:0x43783e-0x437853: Call vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
     spdlog::debug("DecryptChallenge: calling PerformRSADecryption(vtable+0x24)");
     const bool decryptSuccess = PerformRSADecryption(
-        encryptedChallengeData,
+        reinterpret_cast<const void*>(keySizeBytes),
         expectedOutputSize,
         outputBuffer);
 
@@ -2783,14 +2849,14 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored connection+0xa0 prep object size=0x{:02x} modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapCrypto_0x4b6778)),
-        static_cast<unsigned>(prepState->field_0xc.field_0x8.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.field_0x1c.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.field_0x3c.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.field_0x50.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.field_0x64.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.mbr_0x78.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.mbr_0x8c.mbr_0x8),
-        static_cast<unsigned>(prepState->field_0xc.mbr_0xa0.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.field_0x8.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.field_0x1c.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.field_0x3c.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.field_0x50.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.field_0x64.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.mbr_0x78.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.mbr_0x8c.digitCapacityWords_0x08),
+        static_cast<unsigned>(prepState->field_0xc.mbr_0xa0.digitCapacityWords_0x08),
         fmt::ptr(&connection_),
         fmt::ptr(connection_.OwnerContext()),
         connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
@@ -2991,9 +3057,9 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
             // Debug: log the raw BigInt digit counts to understand what's in the fields
             spdlog::warn(
                 "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: raw BigInt caps field_0x8={} field_0x1c={} field_0x3c={}",
-                static_cast<unsigned>(prepState->field_0xc.field_0x8.mbr_0x8),
-                static_cast<unsigned>(prepState->field_0xc.field_0x1c.mbr_0x8),
-                static_cast<unsigned>(prepState->field_0xc.field_0x3c.mbr_0x8));
+                static_cast<unsigned>(prepState->field_0xc.field_0x8.digitCapacityWords_0x08),
+                static_cast<unsigned>(prepState->field_0xc.field_0x1c.digitCapacityWords_0x08),
+                static_cast<unsigned>(prepState->field_0xc.field_0x3c.digitCapacityWords_0x08));
             return false;
         }
 
@@ -3439,7 +3505,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         const uint8_t payloadLengthHigh = localMessageRef.messageStorage0c->payloadLengthHigh0a;
         const uint8_t payloadLengthLow = localMessageRef.messageStorage0c->payloadLengthLow0b;
         const uint16_t payloadOffset = ((payloadLengthHigh & 0x7f) << 8) | payloadLengthLow;
-        localBufferPtr = localMessageRef.messageStorage0c->PayloadBase() + payloadOffset + 0xc;
+        localBufferPtr = localMessageRef.messageStorage0c->PayloadBase() + payloadOffset;
     }
 
     // anchor: launcher.exe:0x442a5a-0x442a6d: 5 stack params pushed (plus ECX=this)
@@ -3459,8 +3525,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // Original: iVar3 = DecryptChallenge(...); if (*(int *)(iVar3 + 4) == 0) -> error path
     // The decrypt returns a pointer to result structure where offset +4 is the byte count
     // Our implementation writes directly to decryptOutput: [0]=success, [4]=byteCount
-    const bool decryptSuccess = decryptOutput[0] != 0;
     const uint32_t decryptedByteCount = *reinterpret_cast<const uint32_t*>(decryptOutput.data() + 4);
+    const bool decryptSuccess = decryptedByteCount != 0;
 
     // FIDELITY: Log the decrypt result structure
     spdlog::info("HandleCode2ForBootstrap: decrypt result success={} byteCount={}", 
