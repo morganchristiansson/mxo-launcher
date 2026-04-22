@@ -1500,6 +1500,35 @@ public:
     // anchor: launcher.exe:0x45d000 tail / Release digits
     void ReleaseDigits();
 
+    // anchor: launcher.exe:0x45a400
+    // Returns the logical byte count of the BigInt value (not capacity)
+    // Original iterates digit words from the top down; uses FUN_004531b0 to count
+    // significant bytes in the highest non-zero word.
+    uint32_t GetByteCount() const {
+        const auto* digits = static_cast<const uint32_t*>(digitPointer_0x0c);
+        uint32_t cap = digitCapacityWords_0x08;
+        if (cap == 0u || !digits) {
+            return 0u;
+        }
+        // Find highest non-zero word from capacity down
+        while (cap != 0u && digits[cap - 1u] == 0u) {
+            --cap;
+        }
+        if (cap == 0u) {
+            return 0u;
+        }
+        // Count bytes in highest non-zero word (FUN_004531b0 logic)
+        uint32_t word = digits[cap - 1u];
+        uint32_t bytes = 4u;
+        if ((word & 0xFF000000u) == 0u) { bytes--; }
+        if ((word & 0x00FF0000u) == 0u) { bytes--; }
+        if ((word & 0x0000FF00u) == 0u) { bytes--; }
+        if ((word & 0x000000FFu) == 0u) { bytes--; }
+        // Add 4 bytes for each fully-used word below the highest
+        bytes += (cap - 1u) * 4u;
+        return bytes;
+    }
+
     // anchor: launcher.exe:0x45a440
     // Returns the actual bit count of the BigInt value (not capacity)
     uint32_t GetBitCount() const {
@@ -1619,12 +1648,18 @@ public:
         void* encryptedChallengeData);
 
     // anchor: launcher.exe:0x468130 / vtable+0x24 in cls_0x4b69b4
-    // Pure virtual in base class vtable 0x4b6778 (slot +0x24 = purecall).
-    // Implemented by derived class cls_0x4b69b4 (vtable 0x4b69b4 / 0x4b6ae0).
-    virtual bool PerformRSADecryption(
-        const void* encryptedBytes,
-        size_t encryptedByteCount,
-        void* outputBuffer) = 0;
+    // Original signature (RET 0x10, 4 stack args + ECX=this):
+    //   void* __thiscall PerformRSADecryption(void* outputBuffer, void* cryptoContext,
+    //                                         uint32_t encryptedBlobPtr, void* localBufferPtr)
+    // Note: Ghidra names the 3rd param 'keySizeBytes' and 4th 'encryptedChallengeData',
+    // but assembly shows encryptedBlobPtr is used as a byte buffer for BigInt import
+    // and localBufferPtr is passed to the output-formatter vtable+0x0c call.
+    // Returns outputBuffer pointer in EAX.
+    virtual void* PerformRSADecryption(
+        void* outputBuffer,
+        const void* cryptoContext,
+        uint32_t encryptedBlobPtr,
+        void* localBufferPtr) = 0;
 
     // Later original use of the stored connection `+0xa0` object starts at
     // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
@@ -1666,10 +1701,11 @@ public:
     ~CMarginConnectionAuthBootstrapDecryptor_0x4b69b4() override = default;
 
     // anchor: launcher.exe:0x468130 / vtable+0x24
-    bool PerformRSADecryption(
-        const void* encryptedBytes,
-        size_t encryptedByteCount,
-        void* outputBuffer) override;
+    void* PerformRSADecryption(
+        void* outputBuffer,
+        const void* cryptoContext,
+        uint32_t encryptedBlobPtr,
+        void* localBufferPtr) override;
 };
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {

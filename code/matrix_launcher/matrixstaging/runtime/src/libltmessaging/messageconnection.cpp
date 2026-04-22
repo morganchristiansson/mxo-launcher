@@ -2707,35 +2707,50 @@ CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::CMarginConnectionAuthBootstrap
 }
 
 // anchor: launcher.exe:0x468130 / vtable+0x24 in cls_0x4b69b4
-bool CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
-    const void* encryptedBytes,
-    size_t encryptedByteCount,
-    void* outputBuffer) {
-    // FIDELITY: Detailed logging for decryption diagnostics
-    spdlog::debug("PerformRSADecryption: BEGIN encryptedByteCount={} this={}",
-        encryptedByteCount, fmt::ptr(this));
-    
-    // Log the first 16 bytes of encrypted input (the challenge blob)
-    const auto* encBytes = static_cast<const uint8_t*>(encryptedBytes);
-    spdlog::debug("PerformRSADecryption: encrypted input [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        encBytes[0], encBytes[1], encBytes[2], encBytes[3],
-        encBytes[4], encBytes[5], encBytes[6], encBytes[7],
-        encBytes[8], encBytes[9], encBytes[10], encBytes[11],
-        encBytes[12], encBytes[13], encBytes[14], encBytes[15]);
+// Original: void* __thiscall PerformRSADecryption(void* outputBuffer, void* cryptoContext,
+//                                                   uint32_t encryptedBlobPtr, void* localBufferPtr)
+// RET 0x10 confirms 4 stack parameters (plus ECX=this).
+//
+// Assembly summary:
+//   1. Get modulus bit count from this+8 embedded cls_0x4b6ad4 object via vtable[0]/vtable[1].
+//   2. Allocate exportBuffer of (bitCount+6)>>3 bytes via AllocateTrackedMemoryBySize (0x41d2e0).
+//   3. Import encrypted blob into a local BigInt at [EBP-0x40] via ConstructFromByteReader (0x461ee0).
+//   4. Call modular-exponentiation vtable+0x0c on the modulus BigInt -> result into [EBP-0x2c].
+//   5. If result byte count > modulus byte count, DeepCopyFrom singleton zero BigInt.
+//   6. Export result bytes to exportBuffer via ExportBytesToBuffer (0x460980).
+//   7. Call output-formatter vtable+0x0c with (outputBuffer, exportBuffer, bitCount-1, localBufferPtr).
+//   8. ZeroAndFreeTrackedMemory (0x41c750) on exportBuffer; release local BigInt digit arrays.
+//
+// NOTE: cls_0x4b630c (now MSVC_EH_StackUnwindGuard_0x4b630c) is a compiler-generated MSVC EH
+// helper. The original writes its vtable to stack locals before ctor calls; we rely on C++ RAII.
+void* CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
+    void* outputBuffer,
+    const void* cryptoContext,
+    uint32_t encryptedBlobPtr,
+    void* localBufferPtr) {
+    // FIDELITY: Log entry with all original parameters
+    spdlog::debug(
+        "PerformRSADecryption(vtable+0x24): BEGIN this={} outputBuffer={} cryptoContext={} "
+        "encryptedBlobPtr={} localBufferPtr={}",
+        fmt::ptr(this), fmt::ptr(outputBuffer), fmt::ptr(cryptoContext),
+        encryptedBlobPtr, fmt::ptr(localBufferPtr));
 
-    // Use the static helper for actual decryption
+    // Use the static helper for actual decryption (CryptoPP reimplementation of steps 1-7)
     std::array<uint8_t, 16> decryptedChallengeBytes{};
     std::vector<uint8_t> fullDecryptedBytes;
     const bool decryptSuccess = CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
         this,
-        encryptedBytes,
-        encryptedByteCount,
+        reinterpret_cast<const void*>(encryptedBlobPtr),
+        0,  // encryptedByteCount not used by static helper (derives from prep state)
         &decryptedChallengeBytes,
         &fullDecryptedBytes);
 
     if (!decryptSuccess) {
         spdlog::warn("PerformRSADecryption: FAILED - static helper returned false");
-        return false;
+        auto* outBytes = static_cast<uint8_t*>(outputBuffer);
+        outBytes[0] = 0;  // failure flag
+        *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
+        return outputBuffer;
     }
 
     // Write result to output buffer matching original format:
@@ -2756,7 +2771,7 @@ bool CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
         outBytes[12], outBytes[13], outBytes[14], outBytes[15],
         outBytes[16], outBytes[17], outBytes[18], outBytes[19],
         outBytes[20], outBytes[21], outBytes[22], outBytes[23]);
-    
+
     // Log the 16 extracted challenge bytes that will become seed
     spdlog::info("PerformRSADecryption: extracted challenge bytes (seed source) [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
         decryptedChallengeBytes[0], decryptedChallengeBytes[1], decryptedChallengeBytes[2], decryptedChallengeBytes[3],
@@ -2764,24 +2779,36 @@ bool CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
         decryptedChallengeBytes[8], decryptedChallengeBytes[9], decryptedChallengeBytes[10], decryptedChallengeBytes[11],
         decryptedChallengeBytes[12], decryptedChallengeBytes[13], decryptedChallengeBytes[14], decryptedChallengeBytes[15]);
 
-    return true;
+    return outputBuffer;
 }
 
 // anchor: launcher.exe:0x437810 / vtable +0x1c
-// FIDELITY: Validates payload size (0x437816-0x437824) then calls vtable+0x24 (0x468130) for RSA decrypt
-// CRYPTO CONTEXT NOTE: The cryptoContext parameter is passed by the original at 0x442a64 but
-// the original's PerformRSADecryption (0x468130) only uses it for BigInt memory allocation
-// through vtable+0xc (0x468050). Since we use CryptoPP which handles memory internally,
-// we accept the parameter for API compatibility but don't use it directly.
+// Original signature (RET 0x14, 5 stack args + ECX=this):
+//   byte* __thiscall DecryptChallenge(byte* outputBuffer, void* cryptoContext,
+//                                     uint keySizeBytes, ushort expectedOutputSize,
+//                                     byte* encryptedChallengeData)
+// Note: Despite Ghidra naming param3 'keySizeBytes' and param5 'encryptedChallengeData',
+// the caller at 0x442a5a passes encryptedBlobPtr as param3 and localBufferPtr as param5.
+// DecryptChallenge forwards (outputBuffer, cryptoContext, encryptedBlobPtr, localBufferPtr)
+// to vtable+0x24 PerformRSADecryption (0x468130).
+//
+// Assembly flow:
+//   0x437816-0x437824: Get expected size from bootstrap state BigInt via vtable[1].
+//   0x437827-0x43783b: If expectedOutputSize != actual, zero output[0] and output[4..7], return.
+//   0x43783e-0x437853: Call vtable+0x24 PerformRSADecryption with 4 args.
+//   0x437855-0x43785d: Return outputBuffer (EAX).
 void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     void* outputBuffer,
     const void* cryptoContext,
-    uint32_t keySizeBytes,
+    uint32_t encryptedBlobPtr,
     uint16_t expectedOutputSize,
-    void* encryptedChallengeData) {
-    
-    spdlog::debug("DecryptChallenge(vtable+0x1c): BEGIN keySizeBytes={} expectedOutputSize={} cryptoContext={}",
-        keySizeBytes, expectedOutputSize, fmt::ptr(cryptoContext));
+    void* localBufferPtr) {
+
+    spdlog::debug(
+        "DecryptChallenge(vtable+0x1c): BEGIN outputBuffer={} cryptoContext={} "
+        "encryptedBlobPtr={} expectedOutputSize={} localBufferPtr={}",
+        fmt::ptr(outputBuffer), fmt::ptr(cryptoContext),
+        encryptedBlobPtr, expectedOutputSize, fmt::ptr(localBufferPtr));
 
     // anchor: launcher.exe:0x437816-0x437824: Get expected size from bootstrap state BigInt
     // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
@@ -2794,7 +2821,7 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     // anchor: launcher.exe:0x437827-0x43783b: Size mismatch check - early return with zeroed output
     // Original: if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
     if (expectedOutputSize != expectedPayloadSize) {
-        spdlog::warn("DecryptChallenge: SIZE MISMATCH expected={} actual={} - returning zeroed output", 
+        spdlog::warn("DecryptChallenge: SIZE MISMATCH expected={} actual={} - returning zeroed output",
             expectedPayloadSize, expectedOutputSize);
         auto* outBytes = static_cast<uint8_t*>(outputBuffer);
         outBytes[0] = 0;
@@ -2802,21 +2829,15 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
         return outputBuffer;
     }
 
-    // anchor: launcher.exe:0x43783e-0x437853: Call vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
+    // anchor: launcher.exe:0x43783e-0x437853: Call vtable+0x24 (0x468130) for actual RSA decrypt
+    // Original pushes: outputBuffer, cryptoContext, encryptedBlobPtr, localBufferPtr
     spdlog::debug("DecryptChallenge: calling PerformRSADecryption(vtable+0x24)");
-    const bool decryptSuccess = PerformRSADecryption(
-        reinterpret_cast<const void*>(keySizeBytes),
-        expectedOutputSize,
-        outputBuffer);
+    PerformRSADecryption(outputBuffer, cryptoContext, encryptedBlobPtr, localBufferPtr);
 
-    if (!decryptSuccess) {
-        spdlog::warn("DecryptChallenge: PerformRSADecryption returned false");
-    } else {
-        // Log the result structure that will be checked by caller at offset +4
-        const auto* outBytes = static_cast<const uint8_t*>(outputBuffer);
-        spdlog::debug("DecryptChallenge: SUCCESS result[0]=0x{:02x} result[4]=0x{:08x}",
-            outBytes[0], *reinterpret_cast<const uint32_t*>(outBytes + 4));
-    }
+    // Log the result structure that will be checked by caller at offset +4
+    const auto* outBytes = static_cast<const uint8_t*>(outputBuffer);
+    spdlog::debug("DecryptChallenge: result[0]=0x{:02x} result[4]=0x{:08x}",
+        outBytes[0], *reinterpret_cast<const uint32_t*>(outBytes + 4));
 
     return outputBuffer;
 }
@@ -3486,14 +3507,11 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
     // anchor: launcher.exe:0x442a33 -> DecryptChallenge with &DAT_004f7bf4 crypto context
     // Original passes 5 explicit params (plus implicit this):
-    //   param 1: &decryptOutputBuffer
-    //   param 2: &g_CryptoInitHelper_0x4f7bf4
-    //   param 3: parsedMessageResult->mbr_0x14 (blob pointer)
-    //   param 4: parsedMessageResult->mbr_0x18 (blob size word)
-    //   param 5: messageBuffer->payloadBytes0c + payloadLength (local buffer)
-    // Our signature has 6 explicit params; we map the blob to params 5/6
-    // (our encryptedChallengeData / payloadSize) and pass local buffer ptr
-    // through param 3 (uint32_t slot) to match original call shape.
+    //   param 1 (EBP+0x08): &decryptOutputBuffer
+    //   param 2 (EBP+0x0c): &g_CryptoInitHelper_0x4f7bf4
+    //   param 3 (EBP+0x10): parsedMessageResult->mbr_0x14 (encrypted blob ptr)
+    //   param 4 (EBP+0x14): parsedMessageResult->mbr_0x18 (encrypted blob size word)
+    //   param 5 (EBP+0x18): localBufferPtr
     std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer]
 
     void* cryptoContext = &g_CryptoInitHelper_0x4f7bf4;
