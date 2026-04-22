@@ -1517,7 +1517,7 @@ public:
         if (cap == 0u) {
             return 0u;
         }
-        // Count bytes in highest non-zero word (FUN_004531b0 logic)
+        // Count bytes in highest non-zero word (GetSignificantByteCountInWord logic)
         uint32_t word = digits[cap - 1u];
         uint32_t bytes = 4u;
         if ((word & 0xFF000000u) == 0u) { bytes--; }
@@ -1529,8 +1529,9 @@ public:
         return bytes;
     }
 
-    // anchor: launcher.exe:0x45a440
+    // anchor: launcher.exe:0x45a440 / GetBitCount
     // Returns the actual bit count of the BigInt value (not capacity)
+    // Original uses GetHighestSetBitPosition (FUN_004531e0) for the top word.
     uint32_t GetBitCount() const {
         const auto* digits = static_cast<const uint32_t*>(digitPointer_0x0c);
         uint32_t cap = digitCapacityWords_0x08;
