@@ -3647,82 +3647,46 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode4ForBootstrap(
 
 // anchor: launcher.exe:0x442d00
 uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
-    if (!messageRef) {
-        return 0u;
-    }
+    // anchor: launcher.exe:0x442d00
+    // Original: decode message code and route by value 2/4/5 to internal handlers
+    // Any other code falls through with false-ish return for owner continuation
+    uint16_t decodedMessageCode = CMessageConnectionMessageRef_DecodeMessageCode(
+        static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef));
+    const uint32_t messageCodeValue = static_cast<uint32_t>(decodedMessageCode);
 
+    // Variables needed for code4/5 handling
     auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef);
-    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef.messageStorage0c;
-    if (!messageStorage) {
-        return 0u;
-    }
-
-    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
-    const size_t payloadByteCount = messageStorage->PayloadByteCount();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return 0u;
-    }
-
-    uint16_t decodedMessageCode = 0u;
+    const CMessageConnectionMessageStorage_0x4ba208* messageStorage = copiedMessageRef.messageStorage0c;
+    const uint8_t* payloadBytes = messageStorage ? messageStorage->PayloadBase() : nullptr;
+    const size_t payloadByteCount = messageStorage ? messageStorage->PayloadByteCount() : 0u;
     bool usedHeaderlessLocatorDecode = false;
-    bool hadValidMessageCode = false;
-    (void)CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
-        copiedMessageRef,
-        &decodedMessageCode,
-        &usedHeaderlessLocatorDecode,
-        &hadValidMessageCode);
-    if (!hadValidMessageCode) {
-        return 0u;
-    }
 
-    // anchor: launcher.exe:0x442d30 / decode result object pointer stored at EBP-0x14 for code2/4
-    // Original: Completion callback is stored in the parse result object returned by OnMessageCodeX.
-    // The parse result buffer is stack-allocated and contains: [callback, parsed data].
-    // Our scaffolds don't track the callback directly - they just do payload resolution.
-    void* code2CompletionCallbackSlot = nullptr;
-    if (decodedMessageCode == 2u) {
-        // anchor: launcher.exe:0x442d8d -> 0x441a30 / OnMessageCode2
-        // Original: CBaseMarginConnection_OnMessageCode2 parses and returns a parse result buffer.
-        // The parse result buffer contains: [callback at +0, parsed challenge data at +4].
-        // Then HandleCode2ForBootstrap is called with the parse result.
+    // anchor: launcher.exe:0x442d30 / code2 handling begins at 0x442d2e
+    if (messageCodeValue == 2u) {
+        // anchor: launcher.exe:0x442d8d -> 0x441a30 / OnMessageCode2(&code2ParseResult, messageRef, '\x01')
+        // FIDELITY: Original flow - parse result passed as first param receives vtable setup
         CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2ParseResultBuffer;
-        const bool hasCode2ParseResult =
-            OnMessageCode2(
-                copiedMessageRef,
-                &code2ParseResultBuffer);
-        const uint8_t* const logicalPayloadBytes =
-            hasCode2ParseResult ? code2ParseResultBuffer.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
-        const size_t logicalPayloadByteCount =
-            hasCode2ParseResult ? code2ParseResultBuffer.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
-        const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
-        uint32_t handledCode2 = 0u;
-        if (hasCode2ParseResult) {
-            // anchor: launcher.exe:0x442d9e -> 0x4429b0 / HandleCode2ForBootstrap
-            handledCode2 = HandleCode2ForBootstrap(&code2ParseResultBuffer);
-        }
-        spdlog::info(
-            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} handledCode2={} this={} ownerContext={} currentState={}",
-            static_cast<unsigned>(rawCode),
-            hasCode2ParseResult && code2ParseResultBuffer.parsedPayload00.headerless08 ? 1u : 0u,
-            hasCode2ParseResult && code2ParseResultBuffer.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
-            hasCode2ParseResult ? 1u : 0u,
-            static_cast<unsigned>(logicalPayloadByteCount),
-            static_cast<unsigned>(handledCode2),
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
-        // anchor: launcher.exe:0x442da6-0x442dac - callback only fires if OnMessageCode2 result non-null
-        // In original: extracts callback from parse-result object (at EBP-0x14 + 0), calls vtable+0x8
-        // The parse result buffer contains callback at offset 0. Here we simulate the callback-fire
-        // based on having gotten to this point - the original checks for non-null parse result object.
-        // Note: In original, callback comes from the OnMessageCode2 return value's vtable structure.
-        // We simulate: callback fires if OnMessageCode2 returned a valid result object (hasCode2ParseResult).
-        if (hasCode2ParseResult) {
-            // Simulated parse-result callback: original extracts from code2ParseResultBuffer[0]
+        // anchor: launcher.exe:0x442d8d
+        // Original calls: OnMessageCode2(&parseResultBuffer, messageRef, '\x01')
+        OnMessageCode2(
+            copiedMessageRef,
+            &code2ParseResultBuffer);
+        // anchor: launcher.exe:0x442d9e -> 0x4429b0 / HandleCode2ForBootstrap
+        // Original returns: callback bytes pointer for post-handler callback extraction
+        const uint32_t handledCode2 = HandleCode2ForBootstrap(&code2ParseResultBuffer);
+        void* parseResultBuffer = &code2ParseResultBuffer;
+        // anchor: launcher.exe:0x442da6-0x442dac
+        // Original checks: if (parseResultBuffer != nullptr) call callback from vtable+0x8
+        void* callbackResultBytes = nullptr;
+        if (parseResultBuffer != nullptr) {
+            // Simulated callback extraction from parse result buffer at vtable+0x8
+            // Original: callback = *(code**)(*(int*)parseResultBuffer + 8); callback();
             CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
-                &copiedMessageRef, &code2CompletionCallbackSlot);
+                static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef),
+                &callbackResultBytes);
         }
-        return 1u;
+        // anchor: launcher.exe:0x442daf / return (callbackResult << 8) | 1
+        return (reinterpret_cast<uint32_t>(callbackResultBytes) >> 8) | 1u;
     }
 
     // anchor: launcher.exe:0x442d38 - similar to code2, parse result stored at EBP-0x14 with callback at +0
