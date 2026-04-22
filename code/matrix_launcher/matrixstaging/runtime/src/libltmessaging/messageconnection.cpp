@@ -2405,18 +2405,18 @@ static uint32_t RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(size_t re
 static void ResetCMarginConnectionBootstrapPrepBigIntObject(
     CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits,
-    uint32_t mbr_0x4 = 0u,
-    uint32_t mbr_0x10 = 0u) {
+    uint32_t allocatorState_0x04 = 0u,
+    uint32_t bigIntFlags_0x10 = 0u) {
     if (!outObject || !ownedDigits) {
         return;
     }
 
     ownedDigits->assign(2u, 0u);
     outObject->vftptr_0x0 = 0x004ba50cu;
-    outObject->mbr_0x4 = mbr_0x4;
-    outObject->mbr_0x8 = 2u;
-    outObject->mbr_0xc = ownedDigits->data();
-    outObject->mbr_0x10 = mbr_0x10;
+    outObject->allocatorState_0x04 = allocatorState_0x04;
+    outObject->digitCapacityWords_0x08 = 2u;
+    outObject->digitPointer_0x0c = ownedDigits->data();
+    outObject->bigIntFlags_0x10 = bigIntFlags_0x10;
 }
 
 static bool CopyCMarginConnectionBootstrapPrepBigIntObject(
@@ -2427,29 +2427,29 @@ static bool CopyCMarginConnectionBootstrapPrepBigIntObject(
         return false;
     }
 
-    const uint32_t wordCapacity = sourceObject->mbr_0x8;
-    const auto* sourceDigits = static_cast<const uint32_t*>(sourceObject->mbr_0xc);
+    const uint32_t wordCapacity = sourceObject->digitCapacityWords_0x08;
+    const auto* sourceDigits = static_cast<const uint32_t*>(sourceObject->digitPointer_0x0c);
     ownedDigits->assign(static_cast<size_t>(std::max<uint32_t>(wordCapacity, 2u)), 0u);
     if (wordCapacity != 0u && sourceDigits != nullptr) {
         std::copy_n(sourceDigits, wordCapacity, ownedDigits->data());
     }
 
     outObject->vftptr_0x0 = sourceObject->vftptr_0x0 != 0u ? sourceObject->vftptr_0x0 : 0x004ba50cu;
-    outObject->mbr_0x4 = sourceObject->mbr_0x4;
-    outObject->mbr_0x8 = static_cast<uint32_t>(ownedDigits->size());
-    outObject->mbr_0xc = ownedDigits->data();
-    outObject->mbr_0x10 = sourceObject->mbr_0x10;
+    outObject->allocatorState_0x04 = sourceObject->allocatorState_0x04;
+    outObject->digitCapacityWords_0x08 = static_cast<uint32_t>(ownedDigits->size());
+    outObject->digitPointer_0x0c = ownedDigits->data();
+    outObject->bigIntFlags_0x10 = sourceObject->bigIntFlags_0x10;
     return true;
 }
 
 static CryptoPP::Integer CMarginConnectionBootstrapPrepBigIntObjectToInteger(
     const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& object) {
-    const auto* digits = static_cast<const uint32_t*>(object.mbr_0xc);
-    if (!digits || object.mbr_0x8 == 0u) {
+    const auto* digits = static_cast<const uint32_t*>(object.digitPointer_0x0c);
+    if (!digits || object.digitCapacityWords_0x08 == 0u) {
         return CryptoPP::Integer::Zero();
     }
 
-    size_t usedWordCount = object.mbr_0x8;
+    size_t usedWordCount = object.digitCapacityWords_0x08;
     while (usedWordCount != 0u && digits[usedWordCount - 1u] == 0u) {
         --usedWordCount;
     }
@@ -2486,10 +2486,10 @@ static bool BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
     }
 
     outObject->vftptr_0x0 = 0x004ba50cu;
-    outObject->mbr_0x4 = 0u;
-    outObject->mbr_0x8 = roundedWordCapacity;
-    outObject->mbr_0xc = ownedDigits->empty() ? nullptr : ownedDigits->data();
-    outObject->mbr_0x10 = 0u;
+    outObject->allocatorState_0x04 = 0u;
+    outObject->digitCapacityWords_0x08 = roundedWordCapacity;
+    outObject->digitPointer_0x0c = ownedDigits->empty() ? nullptr : ownedDigits->data();
+    outObject->bigIntFlags_0x10 = 0u;
     return true;
 }
 

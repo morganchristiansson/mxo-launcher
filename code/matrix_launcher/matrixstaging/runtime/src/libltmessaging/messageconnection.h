@@ -1482,16 +1482,21 @@ class CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c {
 public:
     // anchor family: launcher.exe:0x45de10 / 0x45d000 / data type `cls_0x4ba50c`
     uint32_t vftptr_0x0 = 0u;
-    uint32_t mbr_0x4 = 0u;
-    uint32_t mbr_0x8 = 0u;  // capacity in 32-bit words
-    void* mbr_0xc = nullptr;
-    uint32_t mbr_0x10 = 0u;
+    uint32_t allocatorState_0x04 = 0u;
+    uint32_t digitCapacityWords_0x08 = 0u;
+    void* digitPointer_0x0c = nullptr;
+    uint32_t bigIntFlags_0x10 = 0u;
+
+    // FIDELITY: Original meth_0x45de10 performs deep copy of digit array.
+    // We must NOT do shallow struct copy (which would leave dangling pointers).
+    void DeepCopyFrom(const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& source);
+    void ReleaseDigits();
 
     // anchor: launcher.exe:0x45a440
     // Returns the actual bit count of the BigInt value (not capacity)
     uint32_t GetBitCount() const {
-        const auto* digits = static_cast<const uint32_t*>(mbr_0xc);
-        uint32_t cap = mbr_0x8;
+        const auto* digits = static_cast<const uint32_t*>(digitPointer_0x0c);
+        uint32_t cap = digitCapacityWords_0x08;
         if (cap == 0u || !digits) {
             return 0u;
         }
