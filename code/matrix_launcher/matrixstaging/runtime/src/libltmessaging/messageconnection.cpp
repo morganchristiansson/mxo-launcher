@@ -3176,22 +3176,22 @@ Packet_MarginChallenge_0x4b654c::Packet_MarginChallenge_0x4b654c(
         messageRef08->AddRef();
     }
 
-    // Compute payloadPtr04 (+0x04) based on headerless flag
+    // Compute payloadPtr04 (+0x04) based on messageRef headerless flag
     // anchor: launcher.exe:0x441a30
-    if (!isHeaderless) {
-        // Non-headerless: payloadPtr04 = messageStorage0c + 0xc = payloadBase
-        if (messageRef08 && messageRef08->messageStorage0c) {
+    // FIDELITY: Original checks messageRef->headerless10, NOT isHeaderless param
+    if (messageRef08 && messageRef08->messageStorage0c) {
+        if (messageRef08->headerless10 == 0) {
+            // Non-headerless: payloadPtr04 = payloadBytes0c
             payloadPtr04 = reinterpret_cast<uint32_t>(
                 messageRef08->messageStorage0c->payloadBytes0c.data());
-        }
-    } else {
-        // Headerless: payloadPtr04 = messageStorage0c + lookup[high] + lookup[low] + 0x1e
-        if (messageRef08 && messageRef08->messageStorage0c) {
-            uint8_t* storageBase = reinterpret_cast<uint8_t*>(messageRef08->messageStorage0c);
-            uint8_t descriptor = storageBase[0xd];
+        } else {
+            // Headerless: payloadPtr04 = payloadBytes0c + lookup[high] + lookup[low] + 0x12
+            uint8_t* payloadBase = messageRef08->messageStorage0c->payloadBytes0c.data();
+            uint8_t descriptor = payloadBase[1];
             uint32_t offset = g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
                               g_MessageOffsetLookupTable[descriptor & 7];
-            payloadPtr04 = reinterpret_cast<uint32_t>(storageBase) + offset + 0x1e;
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase) + offset + 0x12;
+            messageRef08->headerless10 = 1;
         }
     }
 
