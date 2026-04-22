@@ -1538,38 +1538,6 @@ static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
     return true;
 }
 
-static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2(
-    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
-    CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
-    bool parseIncomingMessage = true) {
-    if (outCode2Message) {
-        *outCode2Message = {};
-    }
-    if (!parseIncomingMessage || !outCode2Message ||
-        !CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
-            messageRef,
-            &outCode2Message->parsedPayload00)) {
-        return false;
-    }
-
-    const auto& parsedPayload = outCode2Message->parsedPayload00;
-    if (parsedPayload.logicalPayloadByteCount04 < 1u ||
-        parsedPayload.logicalPayloadBytes00[0] != 2u) {
-        return false;
-    }
-
-    // FIDELITY: Set message context fields from message storage
-    // These correspond to param_1+0x14 and param_1+0x18 in the original
-    if (messageRef.messageStorage0c) {
-        // TODO: Add proper message context fields to CMessageConnectionMessageStorage_0x4ba208
-        // For now, use dummy values
-        outCode2Message->messageContext14 = 0u;
-        outCode2Message->messageContextWord18 = 0u;
-    }
-
-    return true;
-}
-
 static bool CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     CBaseMarginConnection_0x4b64a8_Code4MessageScaffold* outCode4Message,
@@ -3188,6 +3156,42 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
 // - Source lacks MessageBox error handling and vtable+0xc close call on decrypt failure.
 //   Original shows MessageBox("Failed to decrypt challenge blob from server!") then closes.
 // - FIDELITY: Removed infidel mediator continuation fallback on decrypt failure - matches original return 0.
+
+// anchor: launcher.exe:0x441a30
+// Virtual method: decoded-code-2 message parser
+// Base implementation that parses the incoming message payload
+bool CBaseMarginConnection_0x4b64a8::OnMessageCode2(
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
+    CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
+    bool parseIncomingMessage) {
+    if (outCode2Message) {
+        *outCode2Message = {};
+    }
+    if (!parseIncomingMessage || !outCode2Message ||
+        !CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
+            messageRef,
+            &outCode2Message->parsedPayload00)) {
+        return false;
+    }
+
+    const auto& parsedPayload = outCode2Message->parsedPayload00;
+    if (parsedPayload.logicalPayloadByteCount04 < 1u ||
+        parsedPayload.logicalPayloadBytes00[0] != 2u) {
+        return false;
+    }
+
+    // FIDELITY: Set message context fields from message storage
+    // These correspond to param_1+0x14 and param_1+0x18 in the original
+    if (messageRef.messageStorage0c) {
+        // TODO: Add proper message context fields to CMessageConnectionMessageStorage_0x4ba208
+        // For now, use dummy values
+        outCode2Message->messageContext14 = 0u;
+        outCode2Message->messageContextWord18 = 0u;
+    }
+
+    return true;
+}
+
 // anchor: launcher.exe:0x4429b0 -> 0x442b6f
 // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
 //                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
@@ -3683,7 +3687,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         // Then HandleCode2ForBootstrap is called with the parse result.
         CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2ParseResultBuffer;
         const bool hasCode2ParseResult =
-            CBaseMarginConnection_0x4b64a8_OnMessageCode2(
+            OnMessageCode2(
                 copiedMessageRef,
                 &code2ParseResultBuffer);
         const uint8_t* const logicalPayloadBytes =

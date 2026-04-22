@@ -1383,6 +1383,14 @@ public:
     //   later connection/owner continuations
     virtual uint32_t DispatchMessage(void* messageRef);
 
+    // anchor: launcher.exe:0x441a30
+    // Source-owned virtual override point for decoded-code-2 message parse.
+    // Current source mirrors the base implementation; leaf classes may override.
+    virtual bool OnMessageCode2(
+        const CMessageConnectionMessageRef_0x4ba23c& messageRef,
+        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
+        bool parseIncomingMessage = true);
+
     // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_0x4b64a8_HandleCode2CertChallengeAndSendResponse)
     // Original signature: void __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse(void *this, int param_1)
     //   param_1 = parsed message result object with message context at +0x14 (dword) and +0x18 (word)
