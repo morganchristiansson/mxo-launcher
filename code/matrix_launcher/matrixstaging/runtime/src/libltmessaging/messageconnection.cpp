@@ -1538,10 +1538,10 @@ static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
     return true;
 }
 
-static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
+static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
-    bool parseIncomingMessage) {
+    bool parseIncomingMessage = true) {
     if (outCode2Message) {
         *outCode2Message = {};
     }
@@ -3683,10 +3683,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         // Then HandleCode2ForBootstrap is called with the parse result.
         CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2ParseResultBuffer;
         const bool hasCode2ParseResult =
-            CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
+            CBaseMarginConnection_0x4b64a8_OnMessageCode2(
                 copiedMessageRef,
-                &code2ParseResultBuffer,
-                /*parseIncomingMessage=*/true);
+                &code2ParseResultBuffer);
         const uint8_t* const logicalPayloadBytes =
             hasCode2ParseResult ? code2ParseResultBuffer.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
         const size_t logicalPayloadByteCount =
