@@ -3201,6 +3201,27 @@ Packet_MarginChallenge_0x4b654c::Packet_MarginChallenge_0x4b654c(
 
     // Extract encrypted blob info (mirrors original meth_0x4416d0)
     ExtractEncryptedBlobFromPayload(isHeaderless);
+
+    // anchor: launcher.exe:0x441a30 tail
+    // Original tail writes differ by headerless flag:
+    if (!isHeaderless) {
+        // Non-headerless: write opcode 0x02 and zero word to payloadAlias10
+        if (payloadAlias10) {
+            uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+            payload[0] = 0x02u;
+            *reinterpret_cast<uint16_t*>(payload + 1) = 0u;
+        }
+        // Zero debugString14 / payloadSize18 (original field_0x14 / field_0x18)
+        debugString14 = nullptr;
+        payloadSize18 = 0u;
+    } else {
+        // Headerless: set incoming messageRef headerless flag
+        // anchor: launcher.exe:0x441a30: *(undefined1 *)(messageRef + 4) = 1;
+        // messageRef is int* in decompile, +4 = offset 0x10 = headerless10
+        if (messageRef08) {
+            messageRef08->headerless10 = 1u;
+        }
+    }
 }
 
 // anchor: launcher.exe:0x4416d0 / MarginConnectionChallengeParsedResult_0x4b654c::meth_0x4416d0
@@ -3371,21 +3392,6 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // the received packet data. We copy from parsedMessageResult->GetEncryptedPayload() 
     // into localMessageRef's payload buffer to match behavior.
 
-    // Get encrypted blob fields from parsed result (inherited debugString14 / payloadSize18)
-    const uint8_t* encryptedBlobPtr = parsedMessageResult->GetEncryptedPayload();
-    const uint16_t encryptedBlobSize = parsedMessageResult->GetEncryptedPayloadSize();
-
-    // FIDELITY: Copy encrypted challenge from parsed result into local message ref's payload
-    // This matches the original where local message ref already has the packet data from pool
-    const uint8_t* sourceEncryptedPayload = parsedMessageResult->GetEncryptedPayload();
-    const size_t sourceEncryptedPayloadSize = parsedMessageResult->GetEncryptedPayloadSize();
-    
-    if (!sourceEncryptedPayload || sourceEncryptedPayloadSize == 0) {
-        spdlog::warn(
-            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: no encrypted payload in parsed message");
-        return 0u;
-    }
-
     // anchor: launcher.exe:0x442a26-0x442a56: Build encrypted payload pointer
     // Original loads from messageStorage0c (local message ref at [EBP-0x4] + 0xc):
     //   0x442a26: MOV EAX, [ECX+0xc]  ; get messageStorage0c
@@ -3396,55 +3402,51 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442a54: OR EBX, EDI         ; EBX = ((high & 0x7f) << 8) | low
     //   0x442a56: LEA EAX, [EBX+EAX+0xc]  ; &payloadBytes0c + length + 0xc
     //
-    // For fresh message (payloadLength=0), this gives &payloadBytes0c[0xc]
-    // We copy the encrypted challenge data to this location before calling DecryptChallenge.
-    
-    uint8_t* encryptedPayload = nullptr;
-    size_t encryptedPayloadSize = 96;  // RSA challenge is 96 bytes
-    
-    if (localMessageRef.messageStorage0c) {
-        // Calculate target offset matching original formula
-        const uint8_t payloadLengthHigh = localMessageRef.messageStorage0c->payloadLengthHigh0a;
-        const uint8_t payloadLengthLow = localMessageRef.messageStorage0c->payloadLengthLow0b;
-        const uint16_t payloadOffset = ((payloadLengthHigh & 0x7f) << 8) | payloadLengthLow;
-        
-        // Target is payloadBytes0c + payloadOffset + 0xc
-        encryptedPayload = localMessageRef.messageStorage0c->PayloadBase() + payloadOffset + 0xc;
-        
-        // Copy encrypted challenge data from parsed result to local message buffer
-        const size_t bytesToCopy = std::min(sourceEncryptedPayloadSize, encryptedPayloadSize);
-        std::copy(sourceEncryptedPayload, sourceEncryptedPayload + bytesToCopy, encryptedPayload);
-        
-        spdlog::debug(
-            "HandleCode2ForBootstrap: payloadOffset={}, encryptedPayload={:08x}, copied {} bytes",
-            payloadOffset, reinterpret_cast<uintptr_t>(encryptedPayload), bytesToCopy);
-    }
+    // For fresh message (payloadLength=0), this gives &payloadBytes0c[0xc].
+    // The original does NOT copy encrypted data into localMessageRef; it passes
+    // the blob pointer directly from parsedMessageResult->mbr_0x14 / mbr_0x18.
 
-    if (!encryptedPayload) {
+    // Get encrypted blob pointer and size directly from parsed result.
+    // These map to original mbr_0x14 (blob pointer) and mbr_0x18 (blob size).
+    const uint8_t* encryptedBlobPtr = parsedMessageResult->GetEncryptedPayload();
+    const uint16_t encryptedBlobSize = parsedMessageResult->GetEncryptedPayloadSize();
+
+    if (!encryptedBlobPtr || encryptedBlobSize == 0) {
         spdlog::warn(
-            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: failed to setup encrypted payload");
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: no encrypted payload in parsed message");
         return 0u;
     }
 
-    const void* ciphertextPtr = encryptedPayload;
-    const size_t ciphertextSize = encryptedPayloadSize;
-
     // anchor: launcher.exe:0x442a33 -> DecryptChallenge with &DAT_004f7bf4 crypto context
-    // Original passes: (local_10, &DAT_004f7bf4, local_c, messageContextWord, encryptedPayload)
-    // Where &DAT_004f7bf4 is the global CryptoInitHelper_0x4b42bc with vtables 0x4b695c/0x4b68a8/0x4b41e0
-    std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer (96 bytes)]
+    // Original passes 5 explicit params (plus implicit this):
+    //   param 1: &decryptOutputBuffer
+    //   param 2: &g_CryptoInitHelper_0x4f7bf4
+    //   param 3: parsedMessageResult->mbr_0x14 (blob pointer)
+    //   param 4: parsedMessageResult->mbr_0x18 (blob size word)
+    //   param 5: messageBuffer->payloadBytes0c + payloadLength (local buffer)
+    // Our signature has 6 explicit params; we map the blob to params 5/6
+    // (our encryptedChallengeData / payloadSize) and pass local buffer ptr
+    // through param 3 (uint32_t slot) to match original call shape.
+    std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer]
 
-    // Get crypto context pointer - matching original global at 0x004f7bf4
-    // anchor: &DAT_004f7bf4 - the crypto context with vtables 0x4b695c/0x4b68a8/0x4b41e0
     void* cryptoContext = &g_CryptoInitHelper_0x4f7bf4;
+
+    // Compute local buffer pointer matching original formula
+    uint8_t* localBufferPtr = nullptr;
+    if (localMessageRef.messageStorage0c) {
+        const uint8_t payloadLengthHigh = localMessageRef.messageStorage0c->payloadLengthHigh0a;
+        const uint8_t payloadLengthLow = localMessageRef.messageStorage0c->payloadLengthLow0b;
+        const uint16_t payloadOffset = ((payloadLengthHigh & 0x7f) << 8) | payloadLengthLow;
+        localBufferPtr = localMessageRef.messageStorage0c->PayloadBase() + payloadOffset + 0xc;
+    }
 
     bootstrapPrepStateA0_->DecryptChallenge(
         decryptOutput.data(),
-        cryptoContext,  // anchor: &DAT_004f7bf4
-        reinterpret_cast<uint32_t>(encryptedBlobPtr),
-        encryptedBlobSize,
-        ciphertextPtr,
-        ciphertextSize);
+        cryptoContext,
+        reinterpret_cast<uint32_t>(localBufferPtr),   // param 3: local buffer ptr (original shape)
+        encryptedBlobSize,                             // param 4: blob size (original shape)
+        encryptedBlobPtr,                              // param 5: actual ciphertext
+        encryptedBlobSize);                            // param 6: actual ciphertext size
 
     // anchor: launcher.exe:0x442a3d-0x442a44: Check decrypt result at *(int*)(iVar3 + 4)
     // Original: iVar3 = DecryptChallenge(...); if (*(int *)(iVar3 + 4) == 0) -> error path

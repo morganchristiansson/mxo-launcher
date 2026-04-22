@@ -57,7 +57,8 @@ public:
     // +0x00: vtable pointer (C++ implicit)
     uint32_t payloadPtr04 = 0;           // +0x04: payload base pointer (was: nopatchLauncherVersionValue04)
     ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
-    uint32_t createRefParam0c = 0;        // +0x0c: param to CreateRef (was: ownerReadyFlag0c)
+    uint8_t createRefParam0c = 0;         // +0x0c: param to CreateRef (was: ownerReadyFlag0c)
+    uint8_t padding0d_0f[3] = {0, 0, 0};  // +0x0d .. +0x0f
 
     // Payload pointers (set by derived classes):
     void* payloadAlias10 = nullptr;       // +0x10: alias of payloadPtr04 in some contexts (was: payloadBegin10)
