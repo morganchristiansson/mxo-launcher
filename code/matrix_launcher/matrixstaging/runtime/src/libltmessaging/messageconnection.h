@@ -19,7 +19,7 @@ class CryptoInitHelper_0x4b42bc;
 // anchor: launcher.exe:0x004cb4d4
 // Static lookup table for message offset calculations.
 // Used by headerless message path to compute payload offset from descriptor byte.
-// The descriptor byte at [messageRef + 0xc + 0xd] is split into two 3-bit indices:
+// The descriptor byte at [messageStorage0c + 0xd] (= payloadBytes0c + 1) is split into two 3-bit indices:
 // - high nibble: (descriptor >> 4) & 7
 // - low nibble: descriptor & 7
 // Payload size = lookup[high] + lookup[low] + 0x12
@@ -676,7 +676,7 @@ public:
 
         auto* msgStorage = messageRef08->messageStorage0c;
         uint8_t* storageBase = reinterpret_cast<uint8_t*>(msgStorage);
-        uint8_t descriptor = *(storageBase + 0xc + 0xd);
+        uint8_t descriptor = *(storageBase + 0xd);
 
         uint32_t offset1 = g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
         uint32_t offset2 = g_MessageOffsetLookupTable[descriptor & 7];
@@ -1323,13 +1323,8 @@ public:
     // Extracts encrypted blob pointer and size from the payload based on headerless flag.
     void ExtractEncryptedBlobFromPayload(bool isHeaderless);
 
-    // Convenience accessors for the encrypted blob data stored in repurposed base fields.
-    const uint8_t* GetEncryptedPayload() const {
-        return reinterpret_cast<const uint8_t*>(debugString14);
-    }
-    uint16_t GetEncryptedPayloadSize() const {
-        return payloadSize18;
-    }
+    // FIDELITY: Original accesses debugString14 (+0x14) and payloadSize18 (+0x18)
+    // directly as encryptedBlobPtr and encryptedBlobSize; no accessor methods exist.
 };
 
 struct CBaseMarginConnection_0x4b64a8_Code4MessageScaffold {
@@ -1582,7 +1577,8 @@ public:
 
     // anchor: launcher.exe:0x437810 / vtable +0x1c
     // DecryptChallenge: Validation wrapper that checks payload size then calls vtable+0x24 decrypt.
-    // Original Ghidra: undefined1* __thiscall DecryptChallenge(byte* outputBuffer, void* cryptoContext, uint keySizeBytes, uint expectedOutputSize, byte* encryptedChallengeData)
+    // Original: byte* __thiscall DecryptChallenge(byte* outputBuffer, void* cryptoContext, uint keySizeBytes, ushort expectedOutputSize, byte* encryptedChallengeData)
+    // RET 0x14 confirms 5 stack parameters (plus ECX=this).
     // Returns output buffer with {success, byteCount} at +0x04.
     // FIDELITY: Entry point called from CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse (0x4429b0).
     virtual void* DecryptChallenge(
@@ -1590,8 +1586,7 @@ public:
         const void* cryptoContext,
         uint32_t keySizeBytes,
         uint16_t expectedOutputSize,
-        const void* encryptedChallengeData,
-        size_t payloadSize);
+        void* encryptedChallengeData);
 
     // anchor: launcher.exe:0x468130 / vtable+0x24 -> actual RSA decryption
     // FIDELITY: Perform RSA decryption using proper CryptoPP with OAEP padding

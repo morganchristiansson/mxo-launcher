@@ -2700,25 +2700,24 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     const void* cryptoContext,
     uint32_t keySizeBytes,
     uint16_t expectedOutputSize,
-    const void* encryptedChallengeData,
-    size_t payloadSize) {
+    void* encryptedChallengeData) {
     
-    spdlog::debug("DecryptChallenge(vtable+0x1c): BEGIN payloadSize={} keySizeBytes={} expectedOutputSize={} cryptoContext={}",
-        payloadSize, keySizeBytes, expectedOutputSize, fmt::ptr(cryptoContext));
+    spdlog::debug("DecryptChallenge(vtable+0x1c): BEGIN keySizeBytes={} expectedOutputSize={} cryptoContext={}",
+        keySizeBytes, expectedOutputSize, fmt::ptr(cryptoContext));
 
     // anchor: launcher.exe:0x437816-0x437824: Get expected size from bootstrap state BigInt
     // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
     const uint32_t modulusBitCount = field_0xc.field_0x8.GetBitCount();
     const uint32_t expectedPayloadSize = (modulusBitCount + 7) / 8;  // bits to bytes
 
-    spdlog::debug("DecryptChallenge: modulusBitCount={} expectedPayloadSize={} actualPayloadSize={}",
-        modulusBitCount, expectedPayloadSize, payloadSize);
+    spdlog::debug("DecryptChallenge: modulusBitCount={} expectedPayloadSize={} expectedOutputSize={}",
+        modulusBitCount, expectedPayloadSize, expectedOutputSize);
 
     // anchor: launcher.exe:0x437827-0x43783b: Size mismatch check - early return with zeroed output
     // Original: if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
-    if (payloadSize != expectedPayloadSize) {
+    if (expectedOutputSize != expectedPayloadSize) {
         spdlog::warn("DecryptChallenge: SIZE MISMATCH expected={} actual={} - returning zeroed output", 
-            expectedPayloadSize, payloadSize);
+            expectedPayloadSize, expectedOutputSize);
         auto* outBytes = static_cast<uint8_t*>(outputBuffer);
         outBytes[0] = 0;
         *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
@@ -2729,7 +2728,7 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
     spdlog::debug("DecryptChallenge: calling PerformRSADecryption(vtable+0x24)");
     const bool decryptSuccess = PerformRSADecryption(
         encryptedChallengeData,
-        payloadSize,
+        expectedOutputSize,
         outputBuffer);
 
     if (!decryptSuccess) {
@@ -3189,9 +3188,9 @@ Packet_MarginChallenge_0x4b654c::Packet_MarginChallenge_0x4b654c(
         // Headerless: payloadPtr04 = messageStorage0c + lookup[high] + lookup[low] + 0x1e
         if (messageRef08 && messageRef08->messageStorage0c) {
             uint8_t* storageBase = reinterpret_cast<uint8_t*>(messageRef08->messageStorage0c);
-            uint8_t descriptor = storageBase[0xc + 0xd];
-            uint32_t offset = ltlogin::g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
-                              ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
+            uint8_t descriptor = storageBase[0xd];
+            uint32_t offset = g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
+                              g_MessageOffsetLookupTable[descriptor & 7];
             payloadPtr04 = reinterpret_cast<uint32_t>(storageBase) + offset + 0x1e;
         }
     }
@@ -3272,9 +3271,9 @@ void Packet_MarginChallenge_0x4b654c::InitializePayloadSize() {
     }
     auto* msgStorage = messageRef08->messageStorage0c;
     uint8_t* storageBase = reinterpret_cast<uint8_t*>(msgStorage);
-    uint8_t descriptor = storageBase[0xc + 0xd];
-    uint32_t offset1 = ltlogin::g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
-    uint32_t offset2 = ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
+    uint8_t descriptor = storageBase[0xd];
+    uint32_t offset1 = g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
+    uint32_t offset2 = g_MessageOffsetLookupTable[descriptor & 7];
     uint32_t payloadSize = offset1 + offset2 + 0x12;
 
     // Set payloadPtr04 to END of payload
@@ -3318,8 +3317,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         fmt::ptr(this), fmt::ptr(parsedMessageResult));
     
     // Log encrypted payload info from parsed message
-    const uint8_t* encPayload = parsedMessageResult->GetEncryptedPayload();
-    const size_t encSize = parsedMessageResult->GetEncryptedPayloadSize();
+    // FIDELITY: direct field access to debugString14 (+0x14) and payloadSize18 (+0x18)
+    const uint8_t* encPayload = reinterpret_cast<const uint8_t*>(parsedMessageResult->debugString14);
+    const uint16_t encSize = parsedMessageResult->payloadSize18;
     if (encPayload && encSize >= 16) {
         spdlog::info("HandleCode2ForBootstrap: encrypted payload size={} bytes [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             encSize, encPayload[0], encPayload[1], encPayload[2], encPayload[3],
@@ -3330,8 +3330,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     
     // Log encrypted blob fields (stored in inherited debugString14 / payloadSize18)
     spdlog::debug("HandleCode2ForBootstrap: encryptedBlobPtr={} encryptedBlobSize={}",
-        fmt::ptr(parsedMessageResult->GetEncryptedPayload()),
-        parsedMessageResult->GetEncryptedPayloadSize());
+        fmt::ptr(parsedMessageResult->debugString14),
+        parsedMessageResult->payloadSize18);
 
     // anchor: launcher.exe:0x4429b9-0x442a17: Static crypto context initialization (inline)
     // Original: if ((_g_CryptoInitializedFlag_0x4f7c20 & 1) == 0) { ...init... }
@@ -3389,8 +3389,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   - param_5: encrypted challenge blob pointer from local message storage calculation
     //
     // FIDELITY NOTE: Original uses message pool where local message ref already contains
-    // the received packet data. We copy from parsedMessageResult->GetEncryptedPayload() 
-    // into localMessageRef's payload buffer to match behavior.
+    // the received packet data. Direct field access to debugString14 / payloadSize18.
 
     // anchor: launcher.exe:0x442a26-0x442a56: Build encrypted payload pointer
     // Original loads from messageStorage0c (local message ref at [EBP-0x4] + 0xc):
@@ -3408,8 +3407,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
     // Get encrypted blob pointer and size directly from parsed result.
     // These map to original mbr_0x14 (blob pointer) and mbr_0x18 (blob size).
-    const uint8_t* encryptedBlobPtr = parsedMessageResult->GetEncryptedPayload();
-    const uint16_t encryptedBlobSize = parsedMessageResult->GetEncryptedPayloadSize();
+    // FIDELITY: no accessor methods exist in static-RE; direct field access only.
+    const uint8_t* encryptedBlobPtr = reinterpret_cast<const uint8_t*>(parsedMessageResult->debugString14);
+    const uint16_t encryptedBlobSize = parsedMessageResult->payloadSize18;
 
     if (!encryptedBlobPtr || encryptedBlobSize == 0) {
         spdlog::warn(
@@ -3440,13 +3440,18 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         localBufferPtr = localMessageRef.messageStorage0c->PayloadBase() + payloadOffset + 0xc;
     }
 
+    // anchor: launcher.exe:0x442a5a-0x442a6d: 5 stack params pushed (plus ECX=this)
+    //   param 1 (EBP+0x08): &decryptOutputBuffer
+    //   param 2 (EBP+0x0c): &g_CryptoInitHelper_0x4f7bf4
+    //   param 3 (EBP+0x10): parsedMessageResult->mbr_0x14 (encrypted blob ptr)
+    //   param 4 (EBP+0x14): parsedMessageResult->mbr_0x18 (encrypted blob size word)
+    //   param 5 (EBP+0x18): localBufferPtr
     bootstrapPrepStateA0_->DecryptChallenge(
         decryptOutput.data(),
         cryptoContext,
-        reinterpret_cast<uint32_t>(localBufferPtr),   // param 3: local buffer ptr (original shape)
-        encryptedBlobSize,                             // param 4: blob size (original shape)
-        encryptedBlobPtr,                              // param 5: actual ciphertext
-        encryptedBlobSize);                            // param 6: actual ciphertext size
+        reinterpret_cast<uint32_t>(encryptedBlobPtr), // param 3: encrypted blob ptr (mbr_0x14)
+        encryptedBlobSize,                             // param 4: encrypted blob size (mbr_0x18)
+        localBufferPtr);                               // param 5: local buffer ptr
 
     // anchor: launcher.exe:0x442a3d-0x442a44: Check decrypt result at *(int*)(iVar3 + 4)
     // Original: iVar3 = DecryptChallenge(...); if (*(int *)(iVar3 + 4) == 0) -> error path
