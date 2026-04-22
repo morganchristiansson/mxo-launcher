@@ -3157,52 +3157,137 @@ static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
 //   Original shows MessageBox("Failed to decrypt challenge blob from server!") then closes.
 // - FIDELITY: Removed infidel mediator continuation fallback on decrypt failure - matches original return 0.
 
-// anchor: launcher.exe:0x441a30
-// Virtual method: decoded-code-2 message parser
-// Base implementation that parses the incoming message payload
-bool CBaseMarginConnection_0x4b64a8::OnMessageCode2(
-    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
-    CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
-    bool parseIncomingMessage) {
-    if (outCode2Message) {
-        *outCode2Message = {};
+// ============================================================
+// Packet_MarginChallenge_0x4b654c implementation
+// ============================================================
+// anchor: launcher.exe:0x441a30 / CBaseMarginConnection_OnMessageCode2
+// Original manually sets Packet_0x4af2a4 vtable, stores messageRef with AddRef,
+// computes payloadPtr04, then switches to 0x4b654c vtable and calls meth_0x4416d0.
+// We model this as a constructor on the Packet_MarginChallenge_0x4b654c class.
+Packet_MarginChallenge_0x4b654c::Packet_MarginChallenge_0x4b654c(
+    CMessageConnectionMessageRef_0x4ba23c* messageRef,
+    bool isHeaderless) {
+    // Release base-allocated message ref (from Packet_0x4af2a4 default ctor) and replace
+    // with the provided external ref, matching original manual field init.
+    if (messageRef08) {
+        messageRef08->Release();
     }
-    if (!parseIncomingMessage || !outCode2Message ||
-        !CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
-            messageRef,
-            &outCode2Message->parsedPayload00)) {
-        return false;
-    }
-
-    const auto& parsedPayload = outCode2Message->parsedPayload00;
-    if (parsedPayload.logicalPayloadByteCount04 < 1u ||
-        parsedPayload.logicalPayloadBytes00[0] != 2u) {
-        return false;
+    messageRef08 = messageRef;
+    if (messageRef08) {
+        messageRef08->AddRef();
     }
 
-    // FIDELITY: Set message context fields from message storage
-    // These correspond to param_1+0x14 and param_1+0x18 in the original
-    if (messageRef.messageStorage0c) {
-        // TODO: Add proper message context fields to CMessageConnectionMessageStorage_0x4ba208
-        // For now, use dummy values
-        outCode2Message->messageContext14 = 0u;
-        outCode2Message->messageContextWord18 = 0u;
+    // Compute payloadPtr04 (+0x04) based on headerless flag
+    // anchor: launcher.exe:0x441a30
+    if (!isHeaderless) {
+        // Non-headerless: payloadPtr04 = messageStorage0c + 0xc = payloadBase
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            payloadPtr04 = reinterpret_cast<uint32_t>(
+                messageRef08->messageStorage0c->payloadBytes0c.data());
+        }
+    } else {
+        // Headerless: payloadPtr04 = messageStorage0c + lookup[high] + lookup[low] + 0x1e
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            uint8_t* storageBase = reinterpret_cast<uint8_t*>(messageRef08->messageStorage0c);
+            uint8_t descriptor = storageBase[0xc + 0xd];
+            uint32_t offset = ltlogin::g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
+                              ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
+            payloadPtr04 = reinterpret_cast<uint32_t>(storageBase) + offset + 0x1e;
+        }
     }
 
-    return true;
+    // Set createRefParam0c (+0x0c) to isHeaderless flag
+    createRefParam0c = isHeaderless ? 1u : 0u;
+
+    // Extract encrypted blob info (mirrors original meth_0x4416d0)
+    ExtractEncryptedBlobFromPayload(isHeaderless);
+}
+
+// anchor: launcher.exe:0x4416d0 / MarginConnectionChallengeParsedResult_0x4b654c::meth_0x4416d0
+void Packet_MarginChallenge_0x4b654c::ExtractEncryptedBlobFromPayload(bool isHeaderless) {
+    uint8_t* payloadPtr = reinterpret_cast<uint8_t*>(payloadPtr04);
+    payloadAlias10 = payloadPtr;
+    if (!isHeaderless) {
+        // Non-headerless: grow messageRef payload by 3 bytes
+        if (messageRef08) {
+            messageRef08->GrowPayloadByteCount(3);
+        }
+        return;
+    }
+    // Headerless: read word at payloadPtr04 + 1 as offset to length-prefixed blob
+    if (payloadPtr) {
+        uint16_t offsetWord = *reinterpret_cast<uint16_t*>(payloadPtr + 1);
+        if (offsetWord != 0) {
+            payloadSize18 = *reinterpret_cast<uint16_t*>(payloadPtr + offsetWord);
+            debugString14 = reinterpret_cast<const char*>(payloadPtr + offsetWord + 2);
+            return;
+        }
+    }
+    payloadSize18 = 0;
+    debugString14 = nullptr;
+}
+
+// anchor: launcher.exe:0x442790 / vtable slot 2
+void Packet_MarginChallenge_0x4b654c::DebugString(int formatType) {
+    const uint8_t* blobBytes = reinterpret_cast<const uint8_t*>(debugString14);
+    uint16_t blobSize = payloadSize18;
+    if (formatType == 2) {
+        spdlog::debug("Packet_MarginChallenge_0x4b654c: EncryptedBlob:(Array of size 0x{:04x})", blobSize);
+    } else if (formatType == 3 && blobBytes && blobSize > 0) {
+        std::string byteStr;
+        for (uint16_t i = 0; i < blobSize && i < 64; ++i) {
+            if (i > 0) byteStr += ",";
+            byteStr += fmt::format("0x{:02x}", blobBytes[i]);
+        }
+        if (blobSize > 64) byteStr += ",...";
+        spdlog::debug("Packet_MarginChallenge_0x4b654c: EncryptedBlob:[{}]", byteStr);
+    }
+}
+
+// anchor: launcher.exe:0x441ad0 / vtable slot 3
+void Packet_MarginChallenge_0x4b654c::InitializePayloadSize() {
+    if (!messageRef08 || !messageRef08->messageStorage0c) {
+        return;
+    }
+    auto* msgStorage = messageRef08->messageStorage0c;
+    uint8_t* storageBase = reinterpret_cast<uint8_t*>(msgStorage);
+    uint8_t descriptor = storageBase[0xc + 0xd];
+    uint32_t offset1 = ltlogin::g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
+    uint32_t offset2 = ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
+    uint32_t payloadSize = offset1 + offset2 + 0x12;
+
+    // Set payloadPtr04 to END of payload
+    payloadPtr04 = reinterpret_cast<uint32_t>(storageBase + 0xc) + payloadSize;
+
+    // Zero messageRef payload length
+    messageRef08->SetPayloadByteCount(0);
+
+    // Grow messageStorage by payloadSize
+    msgStorage->GrowPayloadByteCount(static_cast<uint16_t>(payloadSize));
+
+    // Set payloadAlias10 to END pointer
+    payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+
+    // Grow messageRef by 3
+    messageRef08->GrowPayloadByteCount(3);
+
+    // Write opcode 0x02 and zero word
+    uint8_t* packetPayload = static_cast<uint8_t*>(payloadAlias10);
+    if (packetPayload) {
+        packetPayload[0] = 0x02u;
+        *reinterpret_cast<uint16_t*>(packetPayload + 1) = 0u;
+    }
+
+    // Clear blob fields
+    debugString14 = nullptr;
+    payloadSize18 = 0u;
 }
 
 // anchor: launcher.exe:0x4429b0 -> 0x442b6f
 // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
-//                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
-// FIDELITY: Now accepts parsed message result object matching Ghidra decompile
-// FIDELITY TODOs:
-// 1. Implement cls_0x4b6538 envelope class for proper byte extraction
-// 2. Add MessageBox error handling on decryption failure
-// 3. Call connection vtable+0xc to close on failure
-// 4. Inline packet builder construction and send via vtable+0x24
+//                     (CBaseMarginConnection_0x4b64a8 *this, Packet_MarginChallenge_0x4b654c *parsedMessageResult)
 uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
-    CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult) {
+    Packet_MarginChallenge_0x4b654c* parsedMessageResult) {
     if (!parsedMessageResult) {
         return 0u;
     }
@@ -3222,9 +3307,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             encPayload[12], encPayload[13], encPayload[14], encPayload[15]);
     }
     
-    // Log message context fields
-    spdlog::debug("HandleCode2ForBootstrap: messageContext=0x{:08x} messageContextWord=0x{:04x}",
-        parsedMessageResult->messageContext14, parsedMessageResult->messageContextWord18);
+    // Log encrypted blob fields (stored in inherited debugString14 / payloadSize18)
+    spdlog::debug("HandleCode2ForBootstrap: encryptedBlobPtr={} encryptedBlobSize={}",
+        fmt::ptr(parsedMessageResult->GetEncryptedPayload()),
+        parsedMessageResult->GetEncryptedPayloadSize());
 
     // anchor: launcher.exe:0x4429b9-0x442a17: Static crypto context initialization (inline)
     // Original: if ((_g_CryptoInitializedFlag_0x4f7c20 & 1) == 0) { ...init... }
@@ -3285,9 +3371,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // the received packet data. We copy from parsedMessageResult->GetEncryptedPayload() 
     // into localMessageRef's payload buffer to match behavior.
 
-    // Get message context fields from parsed result
-    const uint32_t messageContext = parsedMessageResult->messageContext14;
-    const uint16_t messageContextWord = parsedMessageResult->messageContextWord18;
+    // Get encrypted blob fields from parsed result (inherited debugString14 / payloadSize18)
+    const uint8_t* encryptedBlobPtr = parsedMessageResult->GetEncryptedPayload();
+    const uint16_t encryptedBlobSize = parsedMessageResult->GetEncryptedPayloadSize();
 
     // FIDELITY: Copy encrypted challenge from parsed result into local message ref's payload
     // This matches the original where local message ref already has the packet data from pool
@@ -3355,8 +3441,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     bootstrapPrepStateA0_->DecryptChallenge(
         decryptOutput.data(),
         cryptoContext,  // anchor: &DAT_004f7bf4
-        messageContext,
-        messageContextWord,
+        reinterpret_cast<uint32_t>(encryptedBlobPtr),
+        encryptedBlobSize,
         ciphertextPtr,
         ciphertextSize);
 
@@ -3663,16 +3749,13 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
 
     // anchor: launcher.exe:0x442d30 / code2 handling begins at 0x442d2e
     if (messageCodeValue == 2u) {
-        // anchor: launcher.exe:0x442d8d -> 0x441a30 / OnMessageCode2(&code2ParseResult, messageRef, '\x01')
-        // FIDELITY: Original flow - parse result passed as first param receives vtable setup
-        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2ParseResultBuffer;
-        // anchor: launcher.exe:0x442d8d
-        // Original calls: OnMessageCode2(&parseResultBuffer, messageRef, '\x01')
-        OnMessageCode2(
-            copiedMessageRef,
-            &code2ParseResultBuffer);
+        // anchor: launcher.exe:0x442d8d -> 0x441a30
+        // FIDELITY: Original constructs Packet_MarginChallenge_0x4b654c on stack with
+        // messageRef and isHeaderless=1, then passes it to HandleCode2ForBootstrap.
+        Packet_MarginChallenge_0x4b654c code2ParseResultBuffer(
+            const_cast<CMessageConnectionMessageRef_0x4ba23c*>(&copiedMessageRef),
+            /*isHeaderless=*/true);
         // anchor: launcher.exe:0x442d9e -> 0x4429b0 / HandleCode2ForBootstrap
-        // Original returns: callback bytes pointer for post-handler callback extraction
         const uint32_t handledCode2 = HandleCode2ForBootstrap(&code2ParseResultBuffer);
         void* parseResultBuffer = &code2ParseResultBuffer;
         // anchor: launcher.exe:0x442da6-0x442dac

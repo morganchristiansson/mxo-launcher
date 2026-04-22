@@ -788,49 +788,8 @@ public:
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
-// ============================================================
-// Challenge Result Structure - cls_0x4b654c
-// ============================================================
-// anchor: launcher.exe:0x4b654c
-// Original structure used in CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
-// to store parsed challenge result information. This corresponds to the 'local_38' variable
-// in the Ghidra decompilation at 0x4429b0.
-//
-// Memory layout (28 bytes total):
-// +0x00: uint32_t mbr_0x00  - Unknown field 0
-// +0x04: uint32_t mbr_0x04  - Unknown field 1
-// +0x08: uint32_t mbr_0x08  - Unknown field 2
-// +0x0c: uint32_t mbr_0x0c  - Unknown field 3
-// +0x10: uint32_t mbr_0x10  - Unknown field 4
-// +0x14: uint32_t mbr_0x14  - Message context (passed to DecryptChallenge)
-// +0x18: uint32_t mbr_0x18  - Field 18 (passed to DecryptChallenge)
-
-class MarginConnectionChallengeParsedResult_0x4b654c {
-public:
-    uint32_t mbr_0x00 = 0;        // +0x00 - unknown field 0
-    uint32_t mbr_0x04 = 0;        // +0x04 - unknown field 1
-    uint32_t mbr_0x08 = 0;        // +0x08 - unknown field 2
-    uint32_t mbr_0x0c = 0;        // +0x0c - unknown field 3
-    uint32_t mbr_0x10 = 0;        // +0x10 - unknown field 4
-    uint32_t mbr_0x14 = 0;        // +0x14 - message context for decryption
-    uint32_t mbr_0x18 = 0;        // +0x18 - field18 parameter for decryption
-
-    // anchor: launcher.exe:0x4429b0 (implicit default constructor)
-    // Default constructor - all fields initialized to zero
-    MarginConnectionChallengeParsedResult_0x4b654c() = default;
-
-    // anchor: launcher.exe:0x4429b0 (constructor with context/field18)
-    // Constructor used in challenge processing to set up context parameters
-    // Corresponds to the initialization of local_38 in the original code
-    explicit MarginConnectionChallengeParsedResult_0x4b654c(uint32_t context, uint32_t field18)
-        : mbr_0x14(context), mbr_0x18(field18) {
-        // Other fields remain zero-initialized
-    }
-};
-
-// Static assertion to ensure correct size matches original structure
-static_assert(sizeof(MarginConnectionChallengeParsedResult_0x4b654c) == 0x1C,
-              "MarginConnectionChallengeParsedResult_0x4b654c size mismatch");
+// Forward declaration: Packet_MarginChallenge_0x4b654c is defined later near
+// CBaseMarginConnection_0x4b64a8 (see below).
 
 // ============================================================
 // Message Reference Helper - cls_0x4489d0
@@ -1307,21 +1266,51 @@ struct CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold {
     bool usedHeaderlessLocatorDecode09 = false;
 };
 
-struct CBaseMarginConnection_0x4b64a8_Code2MessageScaffold {
-    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
+// ============================================================
+// Packet_MarginChallenge_0x4b654c - Code-2 challenge packet builder
+// ============================================================
+// anchor: launcher.exe vtable `0x004b654c`
+// Proper packet builder subclass of Packet_0x4af2a4 used for code-2 (challenge) message
+// handling.  VTable at 0x4b654c has 5 slots inheriting from Packet_0x4af2a4 (0x4af2a4):
+// - Slot 0 (+0x00): 0x443aa0 - destructor (inherited)
+// - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited)
+// - Slot 2 (+0x08): 0x442790 - DebugString (OVERRIDDEN - "EncryptedBlob:...")
+// - Slot 3 (+0x0c): 0x441ad0 - InitializePayloadSize (OVERRIDDEN - opcode 0x02)
+// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
+//
+// Field layout reuses inherited Packet_0x4af2a4 fields:
+// - debugString14 (+0x14) stores the encrypted blob pointer
+// - payloadSize18 (+0x18) stores the encrypted blob size
+class Packet_MarginChallenge_0x4b654c : public ltlogin::Packet_0x4af2a4 {
+public:
+    // anchor: launcher.exe:0x441a30 / CBaseMarginConnection_OnMessageCode2
+    // Constructor that initializes from an existing message ref, mirroring original manual
+    // vtable+field init.  Releases the base-allocated message ref and replaces it with the
+    // provided external ref (with AddRef).
+    Packet_MarginChallenge_0x4b654c(
+        CMessageConnectionMessageRef_0x4ba23c* messageRef,
+        bool isHeaderless);
 
-    // FIDELITY: Add fields matching cls_0x4b654c for bootstrap handling
-    uint32_t messageContext14 = 0u;     // from param_1+0x14
-    uint16_t messageContextWord18 = 0u; // from param_1+0x18
+    ~Packet_MarginChallenge_0x4b654c() override = default;
 
+    // anchor: launcher.exe:0x442790 / vtable slot 2 (OVERRIDDEN)
+    // DebugString - outputs "EncryptedBlob:(Array of size X)" or "EncryptedBlob:[...]"
+    void DebugString(int formatType = 2) override;
+
+    // anchor: launcher.exe:0x441ad0 / vtable slot 3 (OVERRIDDEN)
+    // InitializePayloadSize - setup for opcode 0x02 packet
+    void InitializePayloadSize() override;
+
+    // anchor: launcher.exe:0x4416d0 / MarginConnectionChallengeParsedResult_0x4b654c::meth_0x4416d0
+    // Extracts encrypted blob pointer and size from the payload based on headerless flag.
+    void ExtractEncryptedBlobFromPayload(bool isHeaderless);
+
+    // Convenience accessors for the encrypted blob data stored in repurposed base fields.
     const uint8_t* GetEncryptedPayload() const {
-        if (parsedPayload00.logicalPayloadByteCount04 <= 1u) return nullptr;
-        return parsedPayload00.logicalPayloadBytes00 + 1u;  // Skip opcode
+        return reinterpret_cast<const uint8_t*>(debugString14);
     }
-
-    size_t GetEncryptedPayloadSize() const {
-        if (parsedPayload00.logicalPayloadByteCount04 <= 1u) return 0u;
-        return parsedPayload00.logicalPayloadByteCount04 - 1u;  // Skip opcode
+    uint16_t GetEncryptedPayloadSize() const {
+        return payloadSize18;
     }
 };
 
@@ -1383,35 +1372,14 @@ public:
     //   later connection/owner continuations
     virtual uint32_t DispatchMessage(void* messageRef);
 
-    // anchor: launcher.exe:0x441a30
-    // Source-owned virtual override point for decoded-code-2 message parse.
-    // Current source mirrors the base implementation; leaf classes may override.
-    virtual bool OnMessageCode2(
-        const CMessageConnectionMessageRef_0x4ba23c& messageRef,
-        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
-        bool parseIncomingMessage = true);
-
     // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_0x4b64a8_HandleCode2CertChallengeAndSendResponse)
-    // Original signature: void __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse(void *this, int param_1)
-    //   param_1 = parsed message result object with message context at +0x14 (dword) and +0x18 (word)
-    // Original: Decrypts challenge via prep object vtable+0x1c (0x437810 -> 0x468130),
-    //   extracts 16 bytes via cls_0x4b6538 envelope, writes to this+0x85..0x91,
-    //   ensures stream encryption module, sends response packet opcode 0x11 via vtable+0x24.
-    // SOURCE DIVERGENCE: Current source takes raw bytes instead of message object,
-    // anchor: launcher.exe:0x4429b0 -> 0x442b6f
-    // Handle decoded code 2: decrypt challenge blob, extract seed/response bytes, send response.
-    // FIDELITY: Now accepts parsed message result object matching Ghidra decompile.
     // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
-    //                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
-    // FIDELITY: Implementation now closely matches Ghidra decompile:
-    // - Accepts parsed message result object (cls_0x4b654c*)
-    // - Constructs envelope with proper message ref and flag: cls_0x4b6538(&localMessageRef, 0x01)
-    // - Extracts bytes via envelope methods (two different offset patterns)
-    // - Calls connection vtable+0xc Close() on decryption failure
-    // - Uses helper method for packet construction/send (minor divergence from inline original)
-    // Overall fidelity: HIGH - all major behaviors match original decompile
+    //                     (CBaseMarginConnection_0x4b64a8 *this, Packet_MarginChallenge_0x4b654c *parsedMessageResult)
+    // Handle decoded code 2: decrypt challenge blob, extract seed/response bytes, send response.
+    // The parsedMessageResult object is a Packet_MarginChallenge_0x4b654c (vtable 0x4b654c)
+    // constructed by its constructor (mirroring original OnMessageCode2 at 0x441a30).
     uint32_t HandleCode2ForBootstrap(
-        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult);
+        Packet_MarginChallenge_0x4b654c* parsedMessageResult);
 
     // Handle decoded code 4: set success flag, synthesize local completion work item, continue bootstrap.
     // anchor: launcher.exe:0x441850 - takes 2 params (this, parsed message object)
