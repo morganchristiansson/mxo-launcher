@@ -2711,6 +2711,10 @@ CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::CMarginConnectionAuthBootstrap
 //   5. If result byte count > modulus byte count, DeepCopyFrom singleton zero BigInt.
 //   6. Export result bytes to exportBuffer via ExportBytesToBuffer (0x460980).
 //   7. Call output-formatter vtable+0x0c with (outputBuffer, exportBuffer, bitCount-1, localBufferPtr).
+//      NOTE (verified by static-RE): the target object is a singleton zero BigInt
+//      (GetSingletonZeroBigInt). ExportToSink on a zero BigInt exports 0 bytes;
+//      the extra params are ignored. This call is a no-op. See Ghidra comment at
+//      launcher.exe:0x468241 and bookmark "RENOTE/NOOP formatter call".
 //   8. ZeroAndFreeTrackedMemory (0x41c750) on exportBuffer; release local BigInt digit arrays.
 //
 // NOTE: cls_0x4b630c (now MSVC_EH_StackUnwindGuard_0x4b630c) is a compiler-generated MSVC EH
