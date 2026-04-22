@@ -1517,7 +1517,7 @@ public:
 };
 static_assert(sizeof(CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
 
-class CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70 {
+class CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c {
 public:
     // anchor: launcher.exe:0x465d70
     void InitializeFromBootstrapBlocks(
@@ -1541,17 +1541,17 @@ public:
     std::array<uint8_t, 0x08> gap_0xbc{};
 };
 
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x8) == 0x08);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x1c) == 0x1c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x3c) == 0x3c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x50) == 0x50);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x64) == 0x64);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, mbr_0x78) == 0x78);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, mbr_0x8c) == 0x8c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, mbr_0xa0) == 0xa0);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0xb4) == 0xb4);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0xb8) == 0xb8);
-static_assert(sizeof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70) == 0xc4, "bootstrap prep state subobject +0x0c size mismatch");
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0x8) == 0x08);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0x1c) == 0x1c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0x3c) == 0x3c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0x50) == 0x50);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0x64) == 0x64);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, mbr_0x78) == 0x78);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, mbr_0x8c) == 0x8c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, mbr_0xa0) == 0xa0);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0xb4) == 0xb4);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c, field_0xb8) == 0xb8);
+static_assert(sizeof(CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c) == 0xc4, "bootstrap prep state subobject +0x0c size mismatch");
 
 class CMarginConnectionAuthBootstrapCrypto_0x4b6778 {
 public:
@@ -1602,7 +1602,7 @@ public:
 
     // C++ vtable replaces raw uint32_t vtable pointers
     // Note: Original object size was 0xe0, but with C++ vtable we'll have different alignment
-    CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70 field_0xc{};
+    CMarginConnectionBootstrapPrepStateSubobject0c_0x4b659c field_0xc{};
     uint32_t mbr_0xd0 = 0u;  // was field_0xd0 - inner vtable pointer
     uint32_t mbr_0xd4 = 0u;  // was field_0xd4 - vtable pointer for component
     uint32_t mbr_0xd8 = 0u;  // was cls_0x4b3e18 - vtable pointer for component
