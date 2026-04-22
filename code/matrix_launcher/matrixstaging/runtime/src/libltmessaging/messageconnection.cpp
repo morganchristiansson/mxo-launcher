@@ -2664,14 +2664,6 @@ void CMarginConnectionBootstrapPrepState_0x4b659c::InitializeFromBootstrapBlocks
     }
 }
 
-// Forward declare the static helper (defined later in anonymous namespace around line 2696)
-namespace { static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
-    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* prepState,
-    const void* encryptedBytes,
-    size_t encryptedByteCount,
-    std::array<uint8_t, 16>* outDecryptedChallengeBytes,
-    std::vector<uint8_t>* outFullDecryptedBytes = nullptr); }
-
 // anchor: launcher.exe:0x443220 / constructor reached from `0x443340`
 CMarginConnectionAuthBootstrapCrypto_0x4b6778::CMarginConnectionAuthBootstrapCrypto_0x4b6778(
     const CBootstrapBigInt_0x4ba50c* param_1,
@@ -2735,49 +2727,95 @@ void* CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
         fmt::ptr(this), fmt::ptr(outputBuffer), fmt::ptr(cryptoContext),
         encryptedBlobPtr, fmt::ptr(localBufferPtr));
 
-    // Use the static helper for actual decryption (CryptoPP reimplementation of steps 1-7)
+    // FIDELITY: Inlined from original 0x468130 — this method performs raw BigInt
+    // modular exponentiation then OAEP-SHA1 unpadding, matching the original asm.
     std::array<uint8_t, 16> decryptedChallengeBytes{};
     std::vector<uint8_t> fullDecryptedBytes;
-    const bool decryptSuccess = CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
-        this,
-        reinterpret_cast<const void*>(encryptedBlobPtr),
-        0,  // encryptedByteCount not used by static helper (derives from prep state)
-        &decryptedChallengeBytes,
-        &fullDecryptedBytes);
+    bool decryptSuccess = false;
 
-    if (!decryptSuccess) {
-        spdlog::warn("PerformRSADecryption: FAILED - static helper returned false");
+    try {
+        const CryptoPP::Integer modulus =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0xc.field_0x8);
+        const CryptoPP::Integer publicExponent =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0xc.field_0x1c);
+        const CryptoPP::Integer privateExponent =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0xc.field_0x3c);
+
+        spdlog::debug(
+            "PerformRSADecryption: modulus bits={} exponent bits={} d bits={}",
+            modulus.BitCount(), publicExponent.BitCount(), privateExponent.BitCount());
+
+        if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
+            spdlog::warn(
+                "PerformRSADecryption: zero BigInt component modulus={} exponent={} privateExp={}",
+                modulus.IsZero(), publicExponent.IsZero(), privateExponent.IsZero());
+            spdlog::warn(
+                "PerformRSADecryption: raw BigInt caps field_0x8={} field_0x1c={} field_0x3c={}",
+                field_0xc.field_0x8.digitCapacityWords_0x08,
+                field_0xc.field_0x1c.digitCapacityWords_0x08,
+                field_0xc.field_0x3c.digitCapacityWords_0x08);
+        } else {
+            // FIDELITY: Original BigInt stores digits in little-endian word order.
+            // CryptoPP::Integer(byte*,size) expects big-endian, so reverse first.
+            const auto* encBytes = static_cast<const uint8_t*>(
+                reinterpret_cast<const void*>(encryptedBlobPtr));
+            std::vector<uint8_t> reversedEncrypted(encBytes, encBytes + field_0xc.field_0x8.GetByteCount());
+            std::reverse(reversedEncrypted.begin(), reversedEncrypted.end());
+
+            CryptoPP::Integer ciphertextInteger(reversedEncrypted.data(), reversedEncrypted.size());
+            CryptoPP::Integer plaintextInteger = a_exp_b_mod_c(
+                ciphertextInteger, privateExponent, modulus);
+
+            const size_t modulusByteCount = modulus.ByteCount();
+            std::vector<uint8_t> paddedPlaintextLE(modulusByteCount);
+            plaintextInteger.Encode(paddedPlaintextLE.data(), paddedPlaintextLE.size());
+            std::reverse(paddedPlaintextLE.begin(), paddedPlaintextLE.end());
+
+            // OAEP-SHA1 unpadding
+            CryptoPP::OAEP<CryptoPP::SHA1> oaep;
+            std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
+            std::vector<uint8_t> paddedPlaintextBE(
+                paddedPlaintextLE.rbegin(), paddedPlaintextLE.rend());
+            CryptoPP::DecodingResult result = oaep.Unpad(
+                paddedPlaintextBE.data(), modulusByteCount * 8,
+                unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
+
+            if (result.isValidCoding) {
+                fullDecryptedBytes.assign(
+                    unpaddedBuffer.begin(), unpaddedBuffer.begin() + result.messageLength);
+                decryptSuccess = true;
+                spdlog::info("PerformRSADecryption: OAEP unpad OK payloadBytes={}", fullDecryptedBytes.size());
+            } else {
+                spdlog::warn("PerformRSADecryption: OAEP unpad failed");
+            }
+        }
+    } catch (const CryptoPP::Exception& ex) {
+        spdlog::warn("PerformRSADecryption: RSA raw decrypt failed: {}", ex.what());
+    }
+
+    if (!decryptSuccess || fullDecryptedBytes.size() < 0x11u) {
+        spdlog::warn("PerformRSADecryption: FAILED decryptSuccess={} bytes={}",
+            decryptSuccess, fullDecryptedBytes.size());
         auto* outBytes = static_cast<uint8_t*>(outputBuffer);
-        outBytes[0] = 0;  // failure flag
+        outBytes[0] = 0;
         *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
         return outputBuffer;
     }
 
-    // Write result to output buffer matching original format:
-    // [0] = success flag, [4-7] = byte count, [8+] = decrypted bytes
-    auto* outBytes = static_cast<uint8_t*>(outputBuffer);
-    outBytes[0] = 1;  // success flag
-    *reinterpret_cast<uint32_t*>(outBytes + 4) = static_cast<uint32_t>(fullDecryptedBytes.size());
+    // Extract 16 challenge bytes at offsets 1-16 (matching launcher.exe:0x442ac6)
+    for (size_t i = 0; i < 16; ++i) {
+        decryptedChallengeBytes[i] = fullDecryptedBytes[i + 1];
+    }
 
-    // Copy full decrypted bytes after the header
+    // Write result to output buffer: [0]=success, [4..7]=byteCount, [8+]=decrypted bytes
+    auto* outBytes = static_cast<uint8_t*>(outputBuffer);
+    outBytes[0] = 1;
+    *reinterpret_cast<uint32_t*>(outBytes + 4) = static_cast<uint32_t>(fullDecryptedBytes.size());
     const size_t bytesToCopy = std::min(fullDecryptedBytes.size(), size_t{96});
     std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.begin() + bytesToCopy, outBytes + 8);
 
-    // FIDELITY: Log the complete output buffer structure
     spdlog::debug("PerformRSADecryption: SUCCESS output[0]=0x{:02x} output[4]=0x{:08x} bytesCopied={}",
         outBytes[0], *reinterpret_cast<uint32_t*>(outBytes + 4), bytesToCopy);
-    spdlog::debug("PerformRSADecryption: output decrypted bytes [8-23]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        outBytes[8], outBytes[9], outBytes[10], outBytes[11],
-        outBytes[12], outBytes[13], outBytes[14], outBytes[15],
-        outBytes[16], outBytes[17], outBytes[18], outBytes[19],
-        outBytes[20], outBytes[21], outBytes[22], outBytes[23]);
-
-    // Log the 16 extracted challenge bytes that will become seed
-    spdlog::info("PerformRSADecryption: extracted challenge bytes (seed source) [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        decryptedChallengeBytes[0], decryptedChallengeBytes[1], decryptedChallengeBytes[2], decryptedChallengeBytes[3],
-        decryptedChallengeBytes[4], decryptedChallengeBytes[5], decryptedChallengeBytes[6], decryptedChallengeBytes[7],
-        decryptedChallengeBytes[8], decryptedChallengeBytes[9], decryptedChallengeBytes[10], decryptedChallengeBytes[11],
-        decryptedChallengeBytes[12], decryptedChallengeBytes[13], decryptedChallengeBytes[14], decryptedChallengeBytes[15]);
 
     return outputBuffer;
 }
@@ -2846,15 +2884,6 @@ void* CMarginConnectionAuthBootstrapCrypto_0x4b6778::DecryptChallenge(
 // State5 only constructs/stores this object. The first later original consumer is
 // `0x4429b0`, which loads connection `+0xa0` and calls prep-object vtable
 // `+0x1c / 0x437810 (DecryptChallenge)`.
-
-namespace {
-// Forward declare the static helper (defined later in this anonymous namespace)
-static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
-    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* prepState,
-    const void* encryptedBytes,
-    size_t encryptedByteCount,
-    std::array<uint8_t, 16>* outDecryptedChallengeBytes);
-}  // anonymous namespace
 
 void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0(
     const void* blockB0,
@@ -3027,177 +3056,6 @@ static void CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
     // Note: In original, this is (**(code **)(*callback + 8))(); call vtable+0x8
     // The callback signals back to the connection completion chain (connection+0x94 vtable+0x08)
 }
-
-namespace {
-
-// anchor: launcher.exe:0x465d70 / decrypt helper reached from 0x437810 -> 0x468130
-// RSA private key decryption using the bootstrap state (modulus, exponent, private exponent)
-// The decrypted output format: 16 bytes at offset 1,5,9,13 are used as seed bytes
-static bool CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge(
-    const CMarginConnectionAuthBootstrapCrypto_0x4b6778* prepState,
-    const void* encryptedBytes,
-    size_t encryptedByteCount,
-    std::array<uint8_t, 16>* outDecryptedChallengeBytes,
-    std::vector<uint8_t>* outFullDecryptedBytes) {
-    if (!prepState || !encryptedBytes || encryptedByteCount == 0u || !outDecryptedChallengeBytes) {
-        return false;
-    }
-
-    // Build RSA private key from the bootstrap state BigInts
-    try {
-        const CryptoPP::Integer modulus =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x8);
-        const CryptoPP::Integer publicExponent =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x1c);
-        const CryptoPP::Integer privateExponent =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x3c);
-
-        spdlog::debug("CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: modulus bits={} exponent bits={} d bits={}",
-            modulus.BitCount(), publicExponent.BitCount(), privateExponent.BitCount());
-
-        if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
-            spdlog::warn(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: zero BigInt component modulus={} exponent={} privateExp={}",
-                modulus.IsZero() ? "zero" : "non-zero",
-                publicExponent.IsZero() ? "zero" : "non_zero",
-                privateExponent.IsZero() ? "zero" : "non_zero");
-            // Debug: log the raw BigInt digit counts to understand what's in the fields
-            spdlog::warn(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: raw BigInt caps field_0x8={} field_0x1c={} field_0x3c={}",
-                static_cast<unsigned>(prepState->field_0xc.field_0x8.digitCapacityWords_0x08),
-                static_cast<unsigned>(prepState->field_0xc.field_0x1c.digitCapacityWords_0x08),
-                static_cast<unsigned>(prepState->field_0xc.field_0x3c.digitCapacityWords_0x08));
-            return false;
-        }
-
-        // FIDELITY: Original at 0x468130 uses raw BigInt modular exponentiation
-        // (a_exp_b_mod_c family) with no CRT optimization visible. The server uses
-        // RSAES_OAEP_SHA_Encryptor (MarginSocket.cpp), so after raw RSA we must
-        // unpad OAEP-SHA1 ourselves. CryptoPP's RSA::PrivateKey rejects our bare
-        // (n,e,d) key because it cannot derive CRT parameters for validation, so
-        // we use Integer arithmetic directly then apply OAEP unpadding.
-        std::vector<uint8_t> decryptedBytes;
-
-        try {
-            // FIDELITY: Original BigInt stores digits in little-endian word order with
-            // little-endian bytes within each word. CryptoPP::Integer(byte*,size) expects
-            // big-endian. Reverse the encrypted bytes to match original LE interpretation.
-            std::vector<uint8_t> reversedEncrypted(
-                static_cast<const uint8_t*>(encryptedBytes),
-                static_cast<const uint8_t*>(encryptedBytes) + encryptedByteCount);
-            std::reverse(reversedEncrypted.begin(), reversedEncrypted.end());
-
-            CryptoPP::Integer ciphertextInteger(
-                reversedEncrypted.data(), reversedEncrypted.size());
-            CryptoPP::Integer plaintextInteger = a_exp_b_mod_c(
-                ciphertextInteger, privateExponent, modulus);
-
-            const size_t modulusByteCount = modulus.ByteCount();
-            std::vector<uint8_t> paddedPlaintextLE(modulusByteCount);
-            plaintextInteger.Encode(paddedPlaintextLE.data(), paddedPlaintextLE.size());
-            // Encode produces big-endian; reverse to get little-endian matching original
-            std::reverse(paddedPlaintextLE.begin(), paddedPlaintextLE.end());
-
-            // DIAGNOSTIC: Log raw decrypted bytes before any unpadding
-            std::string hexPadded;
-            for (size_t i = 0; i < std::min(modulusByteCount, size_t{32}); ++i) {
-                hexPadded += fmt::format("{:02x}", paddedPlaintextLE[i]);
-            }
-            spdlog::info("RSA raw decrypt LE: modulusBytes={} first32hex={}", modulusByteCount, hexPadded);
-
-            // OAEP-SHA1 unpadding on little-endian bytes
-            CryptoPP::OAEP<CryptoPP::SHA1> oaep;
-            std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
-            // OAEP unpad expects big-endian input, so reverse again for OAEP
-            std::vector<uint8_t> paddedPlaintextBE(paddedPlaintextLE.rbegin(), paddedPlaintextLE.rend());
-            CryptoPP::DecodingResult result = oaep.Unpad(
-                paddedPlaintextBE.data(), modulusByteCount * 8,
-                unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
-
-            if (result.isValidCoding) {
-                decryptedBytes.assign(
-                    unpaddedBuffer.begin(), unpaddedBuffer.begin() + result.messageLength);
-                spdlog::info("OAEP unpad OK: payloadBytes={}", decryptedBytes.size());
-            } else {
-                spdlog::warn("OAEP unpad failed on LE-decrypted RSA output");
-                return false;
-            }
-        } catch (const CryptoPP::Exception& ex) {
-            spdlog::warn(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: RSA raw decrypt failed: {}",
-                ex.what());
-            return false;
-        }
-
-        // FIDELITY: Extract 16 bytes from offsets 1-16 (matching launcher.exe:0x442ac6-0x442ae0)
-        // The original extracts bytes at positions [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
-        // These form 4 DWORDs at offsets +1, +5, +9, +13 which are copied to this+0x85, 0x89, 0x8d, 0x91
-        if (decryptedBytes.size() < 0x11u) {  // Need at least 17 bytes (offset 0-16)
-            spdlog::warn(
-                "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge: decrypted too short {} < 17",
-                decryptedBytes.size());
-            return false;
-        }
-
-        // Return full decrypted buffer if requested
-        if (outFullDecryptedBytes) {
-            *outFullDecryptedBytes = decryptedBytes;
-        }
-
-        // FIDELITY VERIFICATION: Log the full decrypted buffer to verify extraction offsets
-        spdlog::debug("DecryptChallenge: full decrypted buffer [0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            decryptedBytes[0], decryptedBytes[1], decryptedBytes[2], decryptedBytes[3],
-            decryptedBytes[4], decryptedBytes[5], decryptedBytes[6], decryptedBytes[7],
-            decryptedBytes[8], decryptedBytes[9], decryptedBytes[10], decryptedBytes[11],
-            decryptedBytes[12], decryptedBytes[13], decryptedBytes[14], decryptedBytes[15],
-            decryptedBytes[16], decryptedBytes[17], decryptedBytes[18], decryptedBytes[19],
-            decryptedBytes[20], decryptedBytes[21], decryptedBytes[22], decryptedBytes[23],
-            decryptedBytes[24], decryptedBytes[25], decryptedBytes[26], decryptedBytes[27],
-            decryptedBytes[28], decryptedBytes[29], decryptedBytes[30], decryptedBytes[31]);
-
-        // FIDELITY: Extract bytes at offsets 1-16 (NOT 0-15) - this matches original
-        // The original at 0x442ac6 reads from EDI+1, EDI+5, EDI+9, EDI+0xd
-        // where EDI points to the decrypted buffer
-        (*outDecryptedChallengeBytes)[0] = decryptedBytes[1];
-        (*outDecryptedChallengeBytes)[1] = decryptedBytes[2];
-        (*outDecryptedChallengeBytes)[2] = decryptedBytes[3];
-        (*outDecryptedChallengeBytes)[3] = decryptedBytes[4];
-        (*outDecryptedChallengeBytes)[4] = decryptedBytes[5];
-        (*outDecryptedChallengeBytes)[5] = decryptedBytes[6];
-        (*outDecryptedChallengeBytes)[6] = decryptedBytes[7];
-        (*outDecryptedChallengeBytes)[7] = decryptedBytes[8];
-        (*outDecryptedChallengeBytes)[8] = decryptedBytes[9];
-        (*outDecryptedChallengeBytes)[9] = decryptedBytes[10];
-        (*outDecryptedChallengeBytes)[10] = decryptedBytes[11];
-        (*outDecryptedChallengeBytes)[11] = decryptedBytes[12];
-        (*outDecryptedChallengeBytes)[12] = decryptedBytes[13];
-        (*outDecryptedChallengeBytes)[13] = decryptedBytes[14];
-        (*outDecryptedChallengeBytes)[14] = decryptedBytes[15];
-        (*outDecryptedChallengeBytes)[15] = decryptedBytes[16];
-
-        // FIDELITY: Log as DWORDs to match how original uses them
-        const uint32_t dword0 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[0]);
-        const uint32_t dword1 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[4]);
-        const uint32_t dword2 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[8]);
-        const uint32_t dword3 = *reinterpret_cast<const uint32_t*>(&(*outDecryptedChallengeBytes)[12]);
-        
-        spdlog::info(
-            "DecryptChallenge: extracted challenge bytes as DWORDs: 0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}",
-            dword0, dword1, dword2, dword3);
-        spdlog::info(
-            "DecryptChallenge: these DWORDs go to connection+0x85=0x{:08x}, +0x89=0x{:08x}, +0x8d=0x{:08x}, +0x91=0x{:08x}",
-            dword0, dword1, dword2, dword3);
-
-        return true;
-    } catch (const CryptoPP::Exception& ex) {
-        spdlog::warn(
-            "CMarginConnectionAuthBootstrapCrypto_0x4b6778_DecryptChallenge CryptoPP exception: {}",
-            ex.what());
-        return false;
-    }
-}
-
-}  // namespace
 
 // anchor: launcher.exe:0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
 // Original signature: void __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse(void *this, int param_1)
