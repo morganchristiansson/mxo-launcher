@@ -3602,7 +3602,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     }
     // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
     // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
-    // Current: Already handled in SetMessageCode5SeedBytes85
+    // FIDELITY: Must set hasMessageCode5SeedBytes85_ before calling EnsureStreamPacketEncryptionModuleFromSeed85
+    hasMessageCode5SeedBytes85_ = true;
     EnsureStreamPacketEncryptionModuleFromSeed85();
 
     // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
