@@ -121,34 +121,35 @@ static const char* ResolveClientMetricFilenameById(uint16_t metricId) {
 }
 
 static ParsedState6Opcode9ReplyScaffold ParseState6Opcode9ReplyScaffold(
-    const std::vector<uint8_t>& bytes) {
+    const uint8_t* bytes,
+    const uint16_t byteCount) {
     ParsedState6Opcode9ReplyScaffold out = {};
-    if (bytes.size() < 0x0f || bytes[0] != 0x09u) {
+    if (!bytes || byteCount < 0x0f || bytes[0] != 0x09u) {
         return out;
     }
 
     out.valid = true;
-    out.status01 = ReadU32LE(bytes.data() + 0x01u);
-    out.goHereAddr05 = ReadU32LE(bytes.data() + 0x05u);
-    out.udpSessionSecret09 = ReadU32LE(bytes.data() + 0x09u);
-    out.metricIdsOffset0d = ReadU16LE(bytes.data() + 0x0du);
+    out.status01 = ReadU32LE(bytes + 0x01u);
+    out.goHereAddr05 = ReadU32LE(bytes + 0x05u);
+    out.udpSessionSecret09 = ReadU32LE(bytes + 0x09u);
+    out.metricIdsOffset0d = ReadU16LE(bytes + 0x0du);
 
     if (out.metricIdsOffset0d != 0u) {
         const size_t metricHeaderOffset = static_cast<size_t>(out.metricIdsOffset0d);
-        if (metricHeaderOffset + 2u <= bytes.size()) {
-            out.metricIdCount = ReadU16LE(bytes.data() + metricHeaderOffset);
+        if (metricHeaderOffset + 2u <= byteCount) {
+            out.metricIdCount = ReadU16LE(bytes + metricHeaderOffset);
             const size_t metricBodyOffset = metricHeaderOffset + 2u;
             const size_t metricBodyBytes = static_cast<size_t>(out.metricIdCount) * sizeof(uint16_t);
-            if (metricBodyOffset + metricBodyBytes > bytes.size()) {
-                out.metricIdCount = static_cast<uint16_t>((bytes.size() - metricBodyOffset) / sizeof(uint16_t));
+            if (metricBodyOffset + metricBodyBytes > byteCount) {
+                out.metricIdCount = static_cast<uint16_t>((byteCount - metricBodyOffset) / sizeof(uint16_t));
             }
             out.metricIds.reserve(out.metricIdCount);
             for (uint16_t i = 0; i < out.metricIdCount; ++i) {
                 const size_t metricOffset = metricBodyOffset + static_cast<size_t>(i) * sizeof(uint16_t);
-                if (metricOffset + sizeof(uint16_t) > bytes.size()) {
+                if (metricOffset + sizeof(uint16_t) > byteCount) {
                     break;
                 }
-                out.metricIds.push_back(ReadU16LE(bytes.data() + metricOffset));
+                out.metricIds.push_back(ReadU16LE(bytes + metricOffset));
             }
         }
     }
@@ -237,14 +238,21 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
 uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    (void)workItem;
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage entered this={} stagedMarginBytes={} currentState={}",
+        "DIAGNOSTIC: CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage entered this={} currentState={}",
         fmt::ptr(this),
-        g_CurrentLoginMediator ? g_CurrentLoginMediator->StagedIncomingMarginPacketBytes().size() : 0u,
         (g_CurrentLoginMediator && g_CurrentLoginMediator->currentState_) ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     if (!g_CurrentLoginMediator) {
         return 0u;
+    }
+
+    // Static-RE fidelity: the original at 0x440793 calls DecodeMessageCode (0x41bc20)
+    // which returns the message opcode in AX. Then 0x44079b CMP AX,0x7
+    // dispatches opcode-7 to one path, others to another. Use the same decode approach
+    // as state10: CMessageConnection_0x4b7928_DecodeMessageCode to get opcode.
+    uint16_t messageCode = 0;
+    if (!CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
+        // Decode failed - original sees opcode 0, dispatches to reject path
     }
 
     // Positive `owner +0xf18` writer result:
@@ -269,23 +277,29 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     // - importantly, the immediate helper-state switch target is **not** derived from that dword:
     //   `0x440acc..0x440ae0` reloads state6 `this`, reads the cached upstream object at `this+4`,
     //   and calls its vtable `+0x18` to choose the next helper state
-    const std::vector<uint8_t>& stagedMarginBytes = g_CurrentLoginMediator->StagedIncomingMarginPacketBytes();
-    if (stagedMarginBytes.empty()) {
+
+    // Get payload directly from message ref (matching state10 pattern at 0x4401c0)
+    const uint8_t* payloadBytes = workItem->messageStorage0c->PayloadBase();
+    const uint16_t payloadByteCount = workItem->PayloadByteCount();
+    if (!payloadBytes || payloadByteCount == 0u) {
+        spdlog::info(
+            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected empty payload");
         return 0u;
     }
 
-    if (stagedMarginBytes[0] == 0x07u) {
+    if (messageCode == 0x07u) {
         spdlog::info(
             "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage observed opcode-0x07; client.dll/module-path-derived branch is still not source-owned");
         return 0u;
     }
 
-    const ParsedState6Opcode9ReplyScaffold parsed = ParseState6Opcode9ReplyScaffold(stagedMarginBytes);
+    // Opcode 0x09 = MS_ConnectChallengeResponse or similar margin reply
+    const ParsedState6Opcode9ReplyScaffold parsed = ParseState6Opcode9ReplyScaffold(payloadBytes, payloadByteCount);
     if (!parsed.valid) {
         spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; state6 slot6 currently source-owns only opcode-0x09",
-            static_cast<unsigned>(stagedMarginBytes.size()),
-            stagedMarginBytes.empty() ? 0u : static_cast<unsigned>(stagedMarginBytes[0]));
+            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected payloadCode=0x{:02x} payloadBytes={}; state6 slot6 currently source-owns only opcode-0x09",
+            static_cast<unsigned>(messageCode),
+            static_cast<unsigned>(payloadByteCount));
         return 0u;
     }
 
