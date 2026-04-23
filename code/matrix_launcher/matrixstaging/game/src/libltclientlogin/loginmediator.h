@@ -717,38 +717,6 @@ public:
         void* VtableSlot20() { return payloadAlias10; }
     };
 
-    // ============================================================================
-    // Margin message reply view class (opcode-7/9 handler helpers)
-    // ============================================================================
-
-    // anchor: launcher.exe:0x4b5378 / vtable
-    // Used in state6 slot6 for margin reply handling - creates a view into decoded
-    // margin message. Inherits from Packet_0x4af2a4, then retables to own vtable in ctor.
-    // This is used when we receive:
-    // - opcode 0x07 = MS_ConnectChallenge (server challenge)
-    // - opcode 0x09 = ConnectChallengeResponse (success reply)
-    //
-    // MBR layout (from decompiler):
-    // - mbr_0x4: payload compute base
-    // - mbr_0x8: source CMessageConnectionMessageRef* (set from param_1)
-    // - mbr_0xc: param_2 (opcode or flag byte)
-    // - mbr_0x10: computed payload pointer
-    class Packet_MarginConnectReplyView_0x4b5378 : public Packet_0x4af2a4 {
-    public:
-        // +0x0c: opcode param (0x01 = success, 0x00 = pending)
-        uint8_t opcodeFlag0c = 0;
-
-        // Virtual method implementations (inherited from Packet_0x4af2a4 pattern):
-        // slot0: dtor (inherits)
-        // slot1: stub returns this
-        // slot2: debug (0x43ded0)
-        void DebugString(int /*formatType*/ = 2) override {}
-        // slot3: reset (0x439a70)
-        void InitializePayloadSize() override {}
-        // slot4: payload base (0x481760)
-        void* GetPayloadBase() override { return payloadAlias10; }
-    };
-
     CLTLoginMediator();
     ~CLTLoginMediator();
 

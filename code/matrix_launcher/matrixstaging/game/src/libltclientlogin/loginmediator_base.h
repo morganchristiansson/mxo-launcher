@@ -167,6 +167,24 @@ public:
     void* GetPayloadBase() { return payloadAlias10; }
 };
 
+// anchor: launcher.exe:0x4b5378 / vtable
+// Margin message reply view class - used in state6 slot6 for margin reply handling.
+// Creates a view into decoded margin message. Inherits from Packet_0x4af2a4.
+// Used when receiving:
+// - opcode 0x07 = MS_ConnectChallenge
+// - opcode 0x09 = ConnectChallengeResponse
+//
+// MBR layout (from decompiler):
+// - mbr_0x8: source CMessageConnectionMessageRef* (set from workItem param)
+// - mbr_0xc: opcode flag byte (0x01 = success, 0x00 = pending)
+// - mbr_0x10: computed payload pointer (inherited from Packet_0x4af2a4 as payloadAlias10)
+class Packet_MarginConnectReplyView_0x4b5378 : public Packet_0x4af2a4 {
+public:
+    // +0x0c: flag (reuses createRefParam0c from parent)
+    // virtual methods inherited from Packet_0x4af2a4
+};
+
+
 // Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
 // Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under
 // `0x004b01c8`:
