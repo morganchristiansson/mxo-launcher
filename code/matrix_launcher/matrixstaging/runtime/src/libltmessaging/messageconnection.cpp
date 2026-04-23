@@ -2759,29 +2759,25 @@ void* CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
                 field_0xc.field_0x1c.digitCapacityWords_0x08,
                 field_0xc.field_0x3c.digitCapacityWords_0x08);
         } else {
-            // FIDELITY: Original BigInt stores digits in little-endian word order.
-            // CryptoPP::Integer(byte*,size) expects big-endian, so reverse first.
+            // FIDELITY: The encrypted blob from the server is big-endian.
+            // CryptoPP::Integer(byte*,size) expects big-endian — pass directly.
             const auto* encBytes = static_cast<const uint8_t*>(
                 reinterpret_cast<const void*>(encryptedBlobPtr));
-            std::vector<uint8_t> reversedEncrypted(encBytes, encBytes + field_0xc.field_0x8.GetByteCount());
-            std::reverse(reversedEncrypted.begin(), reversedEncrypted.end());
+            const size_t modulusByteCount = modulus.ByteCount();
 
-            CryptoPP::Integer ciphertextInteger(reversedEncrypted.data(), reversedEncrypted.size());
+            CryptoPP::Integer ciphertextInteger(encBytes, modulusByteCount);
             CryptoPP::Integer plaintextInteger = a_exp_b_mod_c(
                 ciphertextInteger, privateExponent, modulus);
 
-            const size_t modulusByteCount = modulus.ByteCount();
-            std::vector<uint8_t> paddedPlaintextLE(modulusByteCount);
-            plaintextInteger.Encode(paddedPlaintextLE.data(), paddedPlaintextLE.size());
-            std::reverse(paddedPlaintextLE.begin(), paddedPlaintextLE.end());
+            // Export decrypted plaintext in big-endian (standard OAEP format)
+            std::vector<uint8_t> paddedPlaintext(modulusByteCount);
+            plaintextInteger.Encode(paddedPlaintext.data(), paddedPlaintext.size());
 
-            // OAEP-SHA1 unpadding
+            // OAEP-SHA1 unpadding on big-endian bytes
             CryptoPP::OAEP<CryptoPP::SHA1> oaep;
             std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
-            std::vector<uint8_t> paddedPlaintextBE(
-                paddedPlaintextLE.rbegin(), paddedPlaintextLE.rend());
             CryptoPP::DecodingResult result = oaep.Unpad(
-                paddedPlaintextBE.data(), modulusByteCount * 8,
+                paddedPlaintext.data(), modulusByteCount * 8,
                 unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
 
             if (result.isValidCoding) {
