@@ -307,8 +307,10 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
         // Store for use in challenge-response construction
         g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
         g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
-        // Original: sends margin packet then PostEvent(0x11)
-        // For now, just return success and let caller flow handle the send+event
+
+        // Original: builds and sends challenge-response packet (opcode 0x09) then PostEvent(0x11)
+        // Post event to trigger challenge-response packet construction and send
+        g_CurrentLoginMediator->PostEvent(0x11u);
         return 1u;
     }
 
