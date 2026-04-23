@@ -216,56 +216,8 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     return connection->Connect(authEndpoint_);
 }
 
-// UNANCHORED: source-owned early-auth helper that stages state1 then dispatches slot 3.
-uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
-    CLTLoginState* const state1 = LoginHelperStateByIdScaffold(1u);
-    if (state1 == nullptr) {
-        spdlog::warn(
-            "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold missing registered state1 scaffold currentState={}",
-            currentState_ ? currentState_->DebugName() : "<null>");
-        return 0u;
-    }
 
-    // Inline reset - original resets address list directly
-    authAddressList4c_.Reset();
-    authConnectAttemptCount28_ = 0;
 
-    CLTLoginState* const upstreamState = currentState_;
-    spdlog::info(
-        "ROUTE CHECKPOINT: early-auth entering state1 auth-connect upstreamState={} currentStateBeforeSwitch={} resetAuthRetryState=1 attemptCount28={} candidateCount={}",
-        upstreamState ? upstreamState->DebugName() : "<null>",
-        currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(authConnectAttemptCount28_),
-        static_cast<unsigned>(authAddressList4c_.Count()));
-    const uint32_t result = SetCurrentState(1u);
-    spdlog::info(
-        "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold upstreamState={} currentState={} -> result=0x{:08x}",
-        upstreamState ? upstreamState->DebugName() : "<null>",
-        currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(result));
-    return result;
-}
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
-    CLTLoginState* const state4 = LoginHelperStateByIdScaffold(4u);
-    if (state4 == nullptr) {
-        spdlog::warn(
-            "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold missing registered state4 scaffold currentState={}",
-            currentState_ ? currentState_->DebugName() : "<null>");
-        return 0u;
-    }
-
-    CLTLoginState* const upstreamState = currentState_;
-    const uint32_t result = SetCurrentState(4u);
-    const std::string marginHost = ResolvedMarginHostName();
-    spdlog::info(
-        "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold upstreamState={} currentState={} marginHost='{}' -> result=0x{:08x}",
-        upstreamState ? upstreamState->DebugName() : "<null>",
-        currentState_ ? currentState_->DebugName() : "<null>",
-        marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
-        static_cast<unsigned>(result));
-    return result;
-}
 
 }  // namespace mxo::ltlogin
