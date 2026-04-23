@@ -203,7 +203,8 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // - payload `+0x0a/+0x0e` = fixed dwords `0x11186887` / `0x7460a4b0`
     // - payload `+0x12..+0x21` = packed-GOB LTGUID from `0x438e60` fallback family
     // - payload `+0x22` = owner current helper phase byte
-    State6Packet0x06Builder_0x4b5364 packetBuilder;
+    // anchor: launcher.exe:0x43b8f0 = cls_0x4b5364::ResetAndInitialize
+    cls_0x4b5364 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
@@ -214,12 +215,23 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint8_t currentHelperPhaseByte = static_cast<uint8_t>(
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode() : 0u);
 
-    packetBuilder.SetLauncherVersion(launcherVersion);
-    packetBuilder.SetClientVersion(clientVersion);
-    packetBuilder.SetGobFileGuid(gobFileGuidWords);
-    packetBuilder.SetCurrentHelperPhaseByte(currentHelperPhaseByte);
+    // Write fields directly to payload (static-RE faithful)
+    uint8_t* payload = packetBuilder.PayloadBase();
+    if (payload) {
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kLauncherVersionOffset) = launcherVersion;
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kClientVersionOffset) = clientVersion;
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0) = gobFileGuidWords[0];
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4) = gobFileGuidWords[1];
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8) = gobFileGuidWords[2];
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc) = gobFileGuidWords[3];
+        payload[State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset] = currentHelperPhaseByte;
+    }
 
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    // Build envelope for send
+    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+    envelope.payloadBase04 = payload;
+    envelope.messageRef08 = packetBuilder.messageRef08;
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x11u);
     spdlog::info(
         "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",

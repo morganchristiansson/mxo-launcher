@@ -5,6 +5,10 @@
 #include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
 
+// anchor: launcher.exe:0x43bd20 = CLTLoginState_State8_Slot3_BeginOrContinue
+// Static-RE faithful implementation using cls_0x4b5418 (vtable 0x4b5418).
+// Note: Original does NOT use a separate State8* wrapper class - uses cls_0x4b5418 directly.
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -236,38 +240,88 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
-    State8StructuredMarginPacket_0x4af2a4 packetBuilder;
+    
+    // anchor: launcher.exe:0x43bd6a = construct cls_0x4b5418 on stack
+    // anchor: launcher.exe:0x43ac10 = ResetAndInitialize
+    cls_0x4b5418 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
-    packetBuilder.SetFixedDword(0x01, currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u);
-    packetBuilder.SetFixedDword(0x05, currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u);
+    // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload
+    uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    if (payload) {
+        *reinterpret_cast<uint32_t*>(payload + 0x01) = currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u;
+        *reinterpret_cast<uint32_t*>(payload + 0x05) = currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u;
+    }
 
+    // anchor: launcher.exe:0x43bd84-0x43bdfa = write selection blocks directly to payload
     // Keep block write order aligned with the original `0x43bd20` disassembly, not numeric order.
-    // Newer client-side layout aliasing helps interpret the later blocks too:
-    // - `cf0` = il.cfg
-    // - `d00` = hl.cfg
-    // - `d10` = an.cfg
-    // - `d20` = rl.cfg
-    // - `d30` = cl.cfg
-    // - `d40` = pi.cfg
-    // - `d50` = ai.cfg
-    // - `d60` = shared cs/bl temporary slot on the proven client path
-    // - `d70` = cui.cfg
-    packetBuilder.SetSelectionBlock(0x09, g_CurrentLoginMediator->SelectionContextBlockCd0());
-    packetBuilder.SetSelectionBlock(0x19, g_CurrentLoginMediator->SelectionContextBlockCe0());
-    packetBuilder.SetSelectionBlock(0x29, g_CurrentLoginMediator->SelectionContextBlockCf0());
-    packetBuilder.SetSelectionBlock(0x79, g_CurrentLoginMediator->SelectionContextBlockD40());
-    packetBuilder.SetSelectionBlock(0x89, g_CurrentLoginMediator->SelectionContextBlockD50());
-    packetBuilder.SetSelectionBlock(0x99, g_CurrentLoginMediator->SelectionContextBlockD60());
-    packetBuilder.SetSelectionBlock(0xa9, g_CurrentLoginMediator->SelectionContextBlockD70());
-    packetBuilder.SetSelectionBlock(0x39, g_CurrentLoginMediator->SelectionContextBlockD00());
-    packetBuilder.SetSelectionBlock(0x49, g_CurrentLoginMediator->SelectionContextBlockD10());
-    packetBuilder.SetSelectionBlock(0x59, g_CurrentLoginMediator->SelectionContextBlockD20());
-    packetBuilder.SetSelectionBlock(0x69, g_CurrentLoginMediator->SelectionContextBlockD30());
+    if (payload) {
+        // cf0 = il.cfg, d00 = hl.cfg, d10 = an.cfg, d20 = rl.cfg, d30 = cl.cfg,
+        // d40 = pi.cfg, d50 = ai.cfg, d60 = cs/bl, d70 = cui.cfg
+        auto WriteBlock = [payload](size_t offset, const std::array<uint32_t, 4>& block) {
+            *reinterpret_cast<uint32_t*>(payload + offset + 0x0) = block[0];
+            *reinterpret_cast<uint32_t*>(payload + offset + 0x4) = block[1];
+            *reinterpret_cast<uint32_t*>(payload + offset + 0x8) = block[2];
+            *reinterpret_cast<uint32_t*>(payload + offset + 0xc) = block[3];
+        };
+        WriteBlock(0x09, g_CurrentLoginMediator->SelectionContextBlockCd0());
+        WriteBlock(0x19, g_CurrentLoginMediator->SelectionContextBlockCe0());
+        WriteBlock(0x29, g_CurrentLoginMediator->SelectionContextBlockCf0());
+        WriteBlock(0x79, g_CurrentLoginMediator->SelectionContextBlockD40());
+        WriteBlock(0x89, g_CurrentLoginMediator->SelectionContextBlockD50());
+        WriteBlock(0x99, g_CurrentLoginMediator->SelectionContextBlockD60());
+        WriteBlock(0xa9, g_CurrentLoginMediator->SelectionContextBlockD70());
+        WriteBlock(0x39, g_CurrentLoginMediator->SelectionContextBlockD00());
+        WriteBlock(0x49, g_CurrentLoginMediator->SelectionContextBlockD10());
+        WriteBlock(0x59, g_CurrentLoginMediator->SelectionContextBlockD20());
+        WriteBlock(0x69, g_CurrentLoginMediator->SelectionContextBlockD30());
+    }
 
-    packetBuilder.SetGameSessionId(g_CurrentLoginMediator->GetGameSessionId());
+    // anchor: launcher.exe:0x43ada0 = SetGameSessionId (mediator helper)
+    // Note: Original 0x43ada0 is a CLTLoginMediator method that operates on mediator fields.
+    // For source fidelity, we implement the reservation logic inline here.
+    // The mediator caches the write pointer in its own fields (not packet builder fields).
+    const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
+    if (gameSessionId) {
+        // Compute string length including NUL
+        size_t textLen = 0;
+        const char* p = gameSessionId;
+        while (*p++) ++textLen;
+        ++textLen;
 
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+
+                if (newSize == currentSize + growth && payload) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+
+                    // Write payload-relative offset to fixed field at +0xb9
+                    *reinterpret_cast<uint16_t*>(payload + 0xb9) = currentSize;
+
+                    if (textLen > 1u) {
+                        std::copy_n(gameSessionId, textLen - 1u, lengthPrefix + 2u);
+                    }
+                    if (textLen > 0u) {
+                        lengthPrefix[2u + textLen - 1u] = '\0';
+                    }
+                }
+            }
+        }
+    }
+
+    // anchor: launcher.exe:0x439840 = envelope field access pattern
+    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+    envelope.payloadBase04 = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    envelope.messageRef08 = packetBuilder.messageRef08;
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x09u);
 
     spdlog::debug(
@@ -296,12 +350,13 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD50())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD60())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD70()));
-    const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
+    // gameSessionId already declared above in SetGameSessionId block
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
-        State8StructuredMarginPacketFixedPayload::kFixedByteCount,
-        packetBuilder.PayloadByteCount(),
+        0xbbu,
+        packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
+            ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
         nonZeroSnapshotBlockCount,

@@ -125,18 +125,65 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
         return;
     }
 
-    State10Packet0x0aBuilder_0x4b53b4 packetBuilder;
+    // anchor: launcher.exe:0x43a1f0 = cls_0x4b53b4::ResetAndInitialize
+    cls_0x4b53b4 packetBuilder;
     packetBuilder.ResetAndInitialize();
-    packetBuilder.SetCharacterName(
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data());
 
-    (void)g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
+    // Implement reservation inline for source fidelity
+    const char* characterName = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
+    uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    if (payload && characterName && packetBuilder.reservation14_.reservedContentByteCount04 == 0u) {
+        size_t textLen = 0;
+        const char* p = characterName;
+        while (*p++) ++textLen;
+        ++textLen;
+
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+
+                if (newSize == currentSize + growth) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+
+                    const uint16_t offset = currentSize;
+                    *reinterpret_cast<uint16_t*>(payload + State10Packet0x0aFixedPayload::kCharacterNameOffset) = offset;
+
+                    if (textLen > 1u) {
+                        std::copy_n(characterName, textLen - 1u, lengthPrefix + 2u);
+                    }
+                    if (textLen > 0u) {
+                        lengthPrefix[2u + textLen - 1u] = '\0';
+                    }
+
+                    packetBuilder.reservation14_.writePointer00 = lengthPrefix + 2u;
+                    packetBuilder.reservation14_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
+                }
+            }
+        }
+    }
+
+    // Build envelope for send
+    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+    envelope.payloadBase04 = payload;
+    envelope.messageRef08 = packetBuilder.messageRef08;
+    (void)g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x13u);
+
+    const uint16_t totalBytes = packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
+        ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u;
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> postEvent=0x13",
         State10Packet0x0aFixedPayload::kFixedByteCount,
-        packetBuilder.PayloadByteCount(),
+        totalBytes,
         std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data()));
     return;
 }

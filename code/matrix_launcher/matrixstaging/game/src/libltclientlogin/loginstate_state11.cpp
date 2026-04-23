@@ -100,44 +100,158 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     sourceDwords134[16] = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.bodyWord6c;
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
-    State11Packet0x4dBuilder packetBuilder;
+    // anchor: launcher.exe:0x43a470 = cls_0x4b53c8::ResetAndInitialize
+    cls_0x4b53c8 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     // Keep write order aligned with the original disassembly of `0x43c020`.
-    packetBuilder.SetFixedDword(0x01, sourceDwords134[0]);
-    packetBuilder.SetFixedDword(0x05, sourceDwords134[1]);
-    packetBuilder.SetFixedDword(0x09, sourceDwords134[2]);
-    packetBuilder.SetFixedDword(0x0d, sourceDwords134[3]);
-    packetBuilder.SetFixedDword(0x11, sourceDwords134[4]);
-    packetBuilder.SetFixedDword(0x15, sourceDwords134[5]);
-    packetBuilder.SetFixedDword(0x19, sourceDwords134[6]);
-    packetBuilder.SetFixedDword(0x1d, sourceDwords134[7]);
-    packetBuilder.SetFixedDword(0x35, sourceDwords134[13]);
-    packetBuilder.SetFixedDword(0x25, sourceDwords134[9]);
-    packetBuilder.SetFixedDword(0x3d, sourceDwords134[15]);
-    packetBuilder.SetFixedDword(0x2d, sourceDwords134[11]);
-    packetBuilder.SetFixedDword(0x21, sourceDwords134[8]);
-    packetBuilder.SetFixedDword(0x39, sourceDwords134[14]);
-    packetBuilder.SetFixedDword(0x31, sourceDwords134[12]);
-    packetBuilder.SetFixedDword(0x29, sourceDwords134[10]);
-    packetBuilder.SetFixedDword(0x41, sourceDwords134[16]);
+    // Write fixed dwords directly to payload
+    uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    if (payload) {
+        *reinterpret_cast<uint32_t*>(payload + 0x01) = sourceDwords134[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x05) = sourceDwords134[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x09) = sourceDwords134[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x0d) = sourceDwords134[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x11) = sourceDwords134[4];
+        *reinterpret_cast<uint32_t*>(payload + 0x15) = sourceDwords134[5];
+        *reinterpret_cast<uint32_t*>(payload + 0x19) = sourceDwords134[6];
+        *reinterpret_cast<uint32_t*>(payload + 0x1d) = sourceDwords134[7];
+        *reinterpret_cast<uint32_t*>(payload + 0x35) = sourceDwords134[13];
+        *reinterpret_cast<uint32_t*>(payload + 0x25) = sourceDwords134[9];
+        *reinterpret_cast<uint32_t*>(payload + 0x3d) = sourceDwords134[15];
+        *reinterpret_cast<uint32_t*>(payload + 0x2d) = sourceDwords134[11];
+        *reinterpret_cast<uint32_t*>(payload + 0x21) = sourceDwords134[8];
+        *reinterpret_cast<uint32_t*>(payload + 0x39) = sourceDwords134[14];
+        *reinterpret_cast<uint32_t*>(payload + 0x31) = sourceDwords134[12];
+        *reinterpret_cast<uint32_t*>(payload + 0x29) = sourceDwords134[10];
+        *reinterpret_cast<uint32_t*>(payload + 0x41) = sourceDwords134[16];
+    }
 
-    packetBuilder.SetRealFirstName(
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data());
-    packetBuilder.SetRealLastName(
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data());
-    packetBuilder.SetBackground(
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data());
-    packetBuilder.SetGameSessionId(g_CurrentLoginMediator->GetGameSessionId());
+    // SetRealFirstName - anchor: launcher.exe:0x43a640
+    const char* realFirstName = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data();
+    if (payload && realFirstName && packetBuilder.realFirstName14_.reservedContentByteCount04 == 0u) {
+        size_t textLen = 0;
+        const char* p = realFirstName;
+        while (*p++) ++textLen;
+        ++textLen;
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+                if (newSize == currentSize + growth) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kRealFirstNameOffset) = currentSize;
+                    if (textLen > 1u) std::copy_n(realFirstName, textLen - 1u, lengthPrefix + 2u);
+                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
+                    packetBuilder.realFirstName14_.writePointer00 = lengthPrefix + 2u;
+                    packetBuilder.realFirstName14_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
+                }
+            }
+        }
+    }
 
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    // SetRealLastName - anchor: launcher.exe:0x43a740
+    const char* realLastName = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data();
+    if (payload && realLastName && packetBuilder.realLastName1c_.reservedContentByteCount04 == 0u) {
+        size_t textLen = 0;
+        const char* p = realLastName;
+        while (*p++) ++textLen;
+        ++textLen;
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+                if (newSize == currentSize + growth) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kRealLastNameOffset) = currentSize;
+                    if (textLen > 1u) std::copy_n(realLastName, textLen - 1u, lengthPrefix + 2u);
+                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
+                    packetBuilder.realLastName1c_.writePointer00 = lengthPrefix + 2u;
+                    packetBuilder.realLastName1c_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
+                }
+            }
+        }
+    }
+
+    // SetBackground - anchor: launcher.exe:0x43a840
+    const char* background = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data();
+    if (payload && background && packetBuilder.background24_.reservedContentByteCount04 == 0u) {
+        size_t textLen = 0;
+        const char* p = background;
+        while (*p++) ++textLen;
+        ++textLen;
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+                if (newSize == currentSize + growth) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kBackgroundOffset) = currentSize;
+                    if (textLen > 1u) std::copy_n(background, textLen - 1u, lengthPrefix + 2u);
+                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
+                    packetBuilder.background24_.writePointer00 = lengthPrefix + 2u;
+                    packetBuilder.background24_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
+                }
+            }
+        }
+    }
+
+    // SetGameSessionId - anchor: launcher.exe:0x43a940
+    const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
+    if (payload && gameSessionId && packetBuilder.gameSessionId2c_.reservedContentByteCount04 == 0u) {
+        size_t textLen = 0;
+        const char* p = gameSessionId;
+        while (*p++) ++textLen;
+        ++textLen;
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+                if (newSize == currentSize + growth) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kGameSessionIdOffset) = currentSize;
+                    if (textLen > 1u) std::copy_n(gameSessionId, textLen - 1u, lengthPrefix + 2u);
+                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
+                    packetBuilder.gameSessionId2c_.writePointer00 = lengthPrefix + 2u;
+                    packetBuilder.gameSessionId2c_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
+                }
+            }
+        }
+    }
+
+    // Build envelope for send
+    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+    envelope.payloadBase04 = payload;
+    envelope.messageRef08 = packetBuilder.messageRef08;
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x15u);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
         State11Packet0x4dFixedPayload::kPayloadTag0c,
         State11Packet0x4dFixedPayload::kFixedByteCount,
-        packetBuilder.PayloadByteCount(),
+        packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
+            ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u,
         sourceDwords134[0],
         sourceDwords134[1],
         sourceDwords134[2],

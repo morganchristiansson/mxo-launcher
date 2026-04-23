@@ -82,20 +82,73 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
     const char* sourceBlock94String60Begin = g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
 
-    State7Packet0x0dBuilder packetBuilder;
+    // anchor: launcher.exe:0x43a9a0 = cls_0x4b53f0::ResetAndInitialize
+    cls_0x4b53f0 packetBuilder;
     packetBuilder.ResetAndInitialize();
-    packetBuilder.SetCharacterName(sourceBlock94String60Begin);
-    packetBuilder.SetCharacterIdPair(
-        currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
-        currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u);
 
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
+    // Implement reservation inline for source fidelity
+    uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    if (payload && sourceBlock94String60Begin && packetBuilder.reservation14_.reservedContentByteCount04 == 0u) {
+        // Compute string length
+        size_t textLen = 0;
+        const char* p = sourceBlock94String60Begin;
+        while (*p++) ++textLen;
+        ++textLen;  // Include NUL
+
+        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
+            auto* storage = packetBuilder.messageRef08->messageStorage0c;
+            const uint16_t currentSize = storage->PayloadByteCount();
+            const uint16_t remaining = storage->RemainingAppendableByteCount();
+
+            if (remaining >= 2u + textLen) {
+                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
+                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
+
+                if (newSize == currentSize + growth) {
+                    uint8_t* lengthPrefix = payload + currentSize;
+                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
+                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
+
+                    const uint16_t offset = currentSize;
+                    *reinterpret_cast<uint16_t*>(payload + State7Packet0x0dFixedPayload::kCharacterNameOffset) = offset;
+
+                    if (textLen > 1u) {
+                        std::copy_n(sourceBlock94String60Begin, textLen - 1u, lengthPrefix + 2u);
+                    }
+                    if (textLen > 0u) {
+                        lengthPrefix[2u + textLen - 1u] = '\0';
+                    }
+
+                    packetBuilder.reservation14_.writePointer00 = lengthPrefix + 2u;
+                    packetBuilder.reservation14_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
+                }
+            }
+        }
+    }
+
+    // Write character ID pair directly to payload
+    if (payload) {
+        *reinterpret_cast<uint32_t*>(payload + State7Packet0x0dFixedPayload::kCharacterIdLowOffset) =
+            currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u;
+        *reinterpret_cast<uint32_t*>(payload + State7Packet0x0dFixedPayload::kCharacterIdHighOffset) =
+            currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u;
+    }
+
+    // Build envelope for send
+    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+    envelope.payloadBase04 = payload;
+    envelope.messageRef08 = packetBuilder.messageRef08;
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x07u);
+
+    const uint16_t totalBytes = packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
+        ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u;
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
         State7Packet0x0dFixedPayload::kFixedByteCount,
-        packetBuilder.PayloadByteCount(),
+        totalBytes,
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,

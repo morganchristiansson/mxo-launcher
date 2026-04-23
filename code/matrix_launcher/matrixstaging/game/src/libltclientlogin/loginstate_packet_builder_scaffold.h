@@ -45,188 +45,122 @@ static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, gameSessionId2c) == 
 
 }  // namespace ltlogin
 
-// Packet builder envelope base - static-RE faithful implementation.
-// Inherits from Packet_0x4af2a4 and adds send-payload helpers.
-// anchor: launcher.exe:0x439840
+// =============================================================================
+// cls_0x4b5418 - Packet 0x0f (MS_LoadCharacterRequest) builder
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b5418 (5 slots, 20 bytes)
+// anchor: launcher.exe:0x43ac10 = cls_0x4b5418::ResetAndInitialize
+// anchor: launcher.exe:0x43acf0 = CLTLoginMediator::ReserveGameSessionId (mediator helper)
+// anchor: launcher.exe:0x43ada0 = CLTLoginMediator::SetGameSessionId (mediator helper)
+//
+// VTable layout at 0x4b5418 (5 slots):
+// - Slot 0 (+0x00): 0x443aa0 - destructor (inherited from Packet_0x4af2a4)
+// - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
+// - Slot 2 (+0x08): 0x4425f0 - DebugString (inherited or packet-specific)
+// - Slot 3 (+0x0c): 0x43ac10 - ResetAndInitialize (OVERRIDDEN - packet 0x0f setup)
+// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
+//
+// Object layout: inherits Packet_0x4af2a4 base at +0x00, size = 0x28 bytes
+// Note: The original 0x43acf0/0x43ada0 helpers operate on CLTLoginMediator fields,
+// NOT on the packet builder. The mediator has its own caching fields for the
+// GameSessionID reservation write pointer and length.
+//
+// Usage pattern from 0x43bd20 (State8 slot3):
+//   1. Stack-allocate cls_0x4b5418
+//   2. Call 0x43ac10 = ResetAndInitialize
+//   3. Write fixed dwords at payload +0x01 and +0x05 (character ID pair)
+//   4. Write selection blocks at payload +0x09, +0x19, +0x29, etc.
+//   5. Call mediator's SetGameSessionId helper (operates on mediator fields)
+//   6. Send through 0x41af70 = CLTLoginMediator_SendCurrentMarginPacket
+// =============================================================================
+
 namespace mxo::ltlogin {
 
-class PacketBuilderEnvelopeBase : public Packet_0x4af2a4 {
+// Static-RE faithful implementation of packet 0x0f builder.
+// anchor: launcher.exe:0x43ac10
+class cls_0x4b5418 : public Packet_0x4af2a4 {
 public:
-    PacketBuilderEnvelopeBase() {
-        // Initialize message ref for packet building
-        messageRef08 = &messageRef_;
-        messageRef_.ResetForPacketBuilder(/*headerless=*/false);
-        payloadAlias10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
+
+    // anchor: launcher.exe:0x43ac10 = cls_0x4b5418::ResetAndInitialize
+    // Original implementation:
+    //   1. Calls Packet_0x4af2a4 default ctor (sets vtable to 0x4af2a4, creates message ref)
+    //   2. Overwrites vtable to 0x4b5418
+    //   3. Sets createRefParam0c = 0
+    //   4. Sets payloadBegin10 = nopatchLauncherVersionValue04 (payload base)
+    //   5. Calls messageStorage->GrowPayloadByteCount(0xbb)
+    //   6. Writes opcode 0x0f to payload[0]
+    //   7. Clears payload[1-4] and payload[5-8] (character ID dwords)
+    //   8. Clears payload[0xb9-0xba] (GameSessionID offset)
+    //   9. Clears heapString14 and payloadLength14
+    void ResetAndInitialize() {
+        // Step 1-2: Base ctor already called if constructed on stack
+        // Note: In C++ the vtable pointer is implicit, set by the constructor.
+        // The original at 0x43ac14 calls Packet_0x4af2a4 ctor, then overwrites vtable.
+        // With C++ inheritance, the vtable is already correct for cls_0x4b5418.
+        
+        // Step 3: Clear flag
+        createRefParam0c = 0u;
+        
+        // Step 4: Cache payload base
+        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+        
+        // Step 5: Grow payload to 0xbb bytes
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->GrowPayloadByteCount(0xbb);
+            payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+        }
+        
+        // Step 6-8: Initialize fixed payload structure
+        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        if (payload) {
+            payload[0] = 0x0fu;  // Opcode
+            // Clear character ID dwords at +0x01 and +0x05
+            *reinterpret_cast<uint32_t*>(payload + 0x01) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + 0x05) = 0u;
+            // Clear GameSessionID offset at +0xb9
+            *reinterpret_cast<uint16_t*>(payload + 0xb9) = 0u;
+        }
+        
+        // Step 9: Clear string/length fields
+        debugString14 = nullptr;
+        payloadSize18 = 0u;
+        
     }
 
-    ~PacketBuilderEnvelopeBase() override = default;
+    // Note: Original code accesses payloadAlias10 field directly.
 
-    PacketBuilderEnvelopeBase(const PacketBuilderEnvelopeBase&) = delete;
-    PacketBuilderEnvelopeBase& operator=(const PacketBuilderEnvelopeBase&) = delete;
+    // Friend declarations for mediator helper access
+    friend class CLTLoginMediator;
 
-    uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadAlias10); }
-    const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
-
-    uint32_t PayloadByteCount() const {
-        return MessageStorage() ? MessageStorage()->PayloadByteCount() : 0u;
-    }
-
-    ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& MessageRef() { return messageRef_; }
-    const ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& MessageRef() const { return messageRef_; }
-
-    // Returns envelope struct for send path compatibility.
-    // anchor: launcher.exe:0x439840 / envelope fields
-    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& Envelope() {
-        envelope_.payloadBase04 = static_cast<uint8_t*>(payloadAlias10);
-        envelope_.messageRef08 = messageRef08;
-        return envelope_;
-    }
-
-    const ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& Envelope() const {
-        return envelope_;
-    }
-
-protected:
-    // Implement pure virtual methods from Packet_0x4af2a4
-    uint32_t StubReturn0() override { return 0; }
+public:
+    // Override virtual methods to match 5-slot vtable
+    ~cls_0x4b5418() override = default;
+    uint32_t StubReturn0() override { return 0u; }
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
     void* GetPayloadBase() override { return payloadAlias10; }
-
-    ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* MessageStorage() {
-        return messageRef_.messageStorage0c;
-    }
-
-    const ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* MessageStorage() const {
-        return messageRef_.messageStorage0c;
-    }
-
-    void ResetPacketPayloadBuilderScaffold(size_t fixedByteCount) {
-        ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        if (!messageStorage) {
-            return;
-        }
-        packetType1a = 0u;
-        messageStorage->ResetPayloadByteCount(static_cast<uint16_t>(fixedByteCount));
-        payloadAlias10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
-    }
-
-    void ClearReservation(
-        ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold& reservation) {
-        reservation.writePointer00 = nullptr;
-        reservation.reservedContentByteCount04 = 0u;
-        reservation.reservedPadding06 = 0u;
-    }
-
-    void WritePayloadByte(size_t offset, uint8_t value) {
-        ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
-        if (!messageStorage || !packetPayload || offset >= messageStorage->PayloadByteCount()) {
-            return;
-        }
-        packetPayload[offset] = value;
-    }
-
-    void WritePayloadU16LE(size_t offset, uint16_t value) {
-        ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
-        const uint16_t payloadByteCount =
-            messageStorage ? messageStorage->PayloadByteCount() : 0u;
-        if (!packetPayload || offset + 1u >= payloadByteCount) {
-            return;
-        }
-        packetPayload[offset] = static_cast<uint8_t>(value & 0xffu);
-        packetPayload[offset + 1u] = static_cast<uint8_t>((value >> 8) & 0xffu);
-    }
-
-    void WritePayloadU32LE(size_t offset, uint32_t value) {
-        ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
-        const uint16_t payloadByteCount =
-            messageStorage ? messageStorage->PayloadByteCount() : 0u;
-        if (!packetPayload || offset + 3u >= payloadByteCount) {
-            return;
-        }
-        packetPayload[offset] = static_cast<uint8_t>(value & 0xffu);
-        packetPayload[offset + 1u] = static_cast<uint8_t>((value >> 8) & 0xffu);
-        packetPayload[offset + 2u] = static_cast<uint8_t>((value >> 16) & 0xffu);
-        packetPayload[offset + 3u] = static_cast<uint8_t>((value >> 24) & 0xffu);
-    }
-
-    uint16_t ReserveLengthPrefixedString(
-        size_t offsetField,
-        const char* text,
-        size_t bound,
-        ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold* reservation) {
-        if (reservation) {
-            ClearReservation(*reservation);
-        }
-
-        ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
-        const uint8_t* const payloadBase = PayloadBase();
-        uint8_t* const packetPayload = static_cast<uint8_t*>(payloadAlias10);
-        if (!messageStorage || !payloadBase || !packetPayload || !text) {
-            return 0u;
-        }
-
-        size_t textLengthWithoutNul = 0u;
-        while (textLengthWithoutNul < bound && text[textLengthWithoutNul] != '\0') {
-            ++textLengthWithoutNul;
-        }
-
-        const uint16_t currentPayloadByteCount = messageStorage->PayloadByteCount();
-        const uint16_t remainingAfterLength =
-            messageStorage->RemainingAppendableByteCount();
-        if (remainingAfterLength < 2u) {
-            return 0u;
-        }
-
-        const uint16_t storedLength = static_cast<uint16_t>(
-            std::min<size_t>(textLengthWithoutNul + 1u, remainingAfterLength - 2u));
-        const uint16_t requestedGrowth = static_cast<uint16_t>(storedLength + 2u);
-        const uint16_t newPayloadByteCount =
-            messageStorage->GrowPayloadByteCount(requestedGrowth);
-        if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
-            return 0u;
-        }
-
-        uint8_t* const reservationHeader = static_cast<uint8_t*>(payloadAlias10) + currentPayloadByteCount;
-        if (!reservationHeader || reservationHeader < packetPayload) {
-            return 0u;
-        }
-
-        const uint16_t payloadRelativeOffset = static_cast<uint16_t>(
-            reservationHeader - packetPayload);
-        WritePayloadU16LE(offsetField, payloadRelativeOffset);
-        reservationHeader[0] = static_cast<uint8_t>(storedLength & 0xffu);
-        reservationHeader[1] = static_cast<uint8_t>((storedLength >> 8) & 0xffu);
-
-        if (reservation) {
-            reservation->writePointer00 = reservationHeader + 2u;
-            reservation->reservedContentByteCount04 = storedLength;
-        }
-        return storedLength;
-    }
-
-    void WriteReservedCString(
-        const ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold& reservation,
-        const char* text) {
-        if (!text || !reservation.writePointer00 || reservation.reservedContentByteCount04 == 0u) {
-            return;
-        }
-
-        if (reservation.reservedContentByteCount04 > 1u) {
-            std::copy_n(
-                text,
-                reservation.reservedContentByteCount04 - 1u,
-                reinterpret_cast<char*>(reservation.writePointer00));
-        }
-        reservation.writePointer00[reservation.reservedContentByteCount04 - 1u] = 0u;
-    }
-
-    ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c messageRef_;
-    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope_{};
 };
+
+// cls_0x4b5418 layout:
+//   Packet_0x4af2a4 base: 0x28 bytes (+0x00..+0x27)
+// Total: 0x28 bytes
+static_assert(sizeof(cls_0x4b5418) == 0x28, "cls_0x4b5418 size mismatch");
+
+}  // namespace mxo::ltlogin
+
+// =============================================================================
+// Packet builder envelope base - shared helpers (source-only convenience)
+// =============================================================================
+// Note: These helpers are source-only conveniences. The original launcher.exe
+// uses direct payload manipulation inlined into the packet-specific builders.
+// Keep these for source code clarity, but anchor packet builders to static-RE.
+namespace mxo::ltlogin {
+
+// Note: The original launcher.exe does NOT have a shared "PacketBuilderEnvelopeBase" class.
+// Each packet builder class directly inherits from Packet_0x4af2a4 with its own vtable.
+// Source code should use the concrete classes (cls_0x4b53b4, cls_0x4b53c8, cls_0x4b53f0, cls_0x4b5418)
+// and access fields directly.
 
 struct State7Packet0x0dFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
@@ -239,41 +173,50 @@ struct State7Packet0x0dFixedPayload {
     static constexpr size_t kFixedByteCount = 0x0b;
 };
 
-class State7Packet0x0dBuilder final : public PacketBuilderEnvelopeBase {
+// anchor: launcher.exe vtable 0x004b53f0 / packet 0x0d builder
+// anchor: launcher.exe:0x43a9a0 = ResetAndInitialize
+// anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper, not class method)
+//
+// Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
+class cls_0x4b53f0 : public Packet_0x4af2a4 {
 public:
-    // anchor: launcher.exe:0x43a9a0 / local packet-builder family `0x004b53f0`
+    // anchor: launcher.exe:0x43a9a0
     void ResetAndInitialize() {
-        ResetPacketPayloadBuilderScaffold(
-            State7Packet0x0dFixedPayload::kFixedByteCount);
-        ClearReservation(reservation14_);
-        WritePayloadByte(0x00, State7Packet0x0dFixedPayload::kPayloadTag0d);
-        WritePayloadU16LE(State7Packet0x0dFixedPayload::kCharacterNameOffset, 0u);
-        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdLowOffset, 0u);
-        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdHighOffset, 0u);
-    }
-
-    // anchor: launcher.exe:0x43aa80
-    void SetCharacterName(const char* text) {
-        if (!text || reservation14_.reservedContentByteCount04 != 0u) {
-            return;
+        // Initialize message ref if not already done by ctor
+        if (!messageRef08) {
+            messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+            if (messageRef08) {
+                messageRef08->AddRef();
+                messageRef08->ResetForPacketBuilder(false, 0);
+            }
         }
-        if (ReserveLengthPrefixedString(
-                State7Packet0x0dFixedPayload::kCharacterNameOffset,
-                text,
-                0xffffu,
-                &reservation14_) != 0u) {
-            WriteReservedCString(reservation14_, text);
+        
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->ResetPayloadByteCount(
+                State7Packet0x0dFixedPayload::kFixedByteCount);
+            payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
         }
+
+        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        if (payload) {
+            payload[0] = State7Packet0x0dFixedPayload::kPayloadTag0d;
+            *reinterpret_cast<uint16_t*>(payload + State7Packet0x0dFixedPayload::kCharacterNameOffset) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + State7Packet0x0dFixedPayload::kCharacterIdLowOffset) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + State7Packet0x0dFixedPayload::kCharacterIdHighOffset) = 0u;
+        }
+
+        reservation14_.writePointer00 = nullptr;
+        reservation14_.reservedContentByteCount04 = 0u;
+        reservation14_.reservedPadding06 = 0u;
     }
 
-    void SetCharacterIdPair(uint32_t low, uint32_t high) {
-        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdLowOffset, low);
-        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdHighOffset, high);
-    }
-
-private:
+    // Reservation scaffold for character name (follows base class fields).
+    // anchor: launcher.exe:0x43a9a0 decompilation shows this field pattern.
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
 };
+
+static_assert(offsetof(cls_0x4b53f0, reservation14_) == 0x28, "cls_0x4b53f0 reservation14_ offset mismatch");
 
 struct State10Packet0x0aFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
@@ -283,120 +226,104 @@ struct State10Packet0x0aFixedPayload {
     static constexpr size_t kFixedByteCount = 0x03;
 };
 
-class State10Packet0x0aBuilder_0x4b53b4 final : public PacketBuilderEnvelopeBase {
+// anchor: launcher.exe vtable 0x004b53b4 / packet 0x0a builder
+// anchor: launcher.exe:0x43a1f0 = ResetAndInitialize
+// anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
+//
+// Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
+class cls_0x4b53b4 : public Packet_0x4af2a4 {
 public:
-    // anchor: launcher.exe:0x43a1f0 / local packet-builder family `0x004b53b4`
+    // anchor: launcher.exe:0x43a1f0
     void ResetAndInitialize() {
-        ResetPacketPayloadBuilderScaffold(
-            State10Packet0x0aFixedPayload::kFixedByteCount);
-        ClearReservation(reservation14_);
-        WritePayloadByte(0x00, State10Packet0x0aFixedPayload::kPayloadTag0a);
-        WritePayloadU16LE(State10Packet0x0aFixedPayload::kCharacterNameOffset, 0u);
+        if (!messageRef08) {
+            messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+            if (messageRef08) {
+                messageRef08->AddRef();
+                messageRef08->ResetForPacketBuilder(false, 0);
+            }
+        }
+        
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->ResetPayloadByteCount(
+                State10Packet0x0aFixedPayload::kFixedByteCount);
+            payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+        }
+
+        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        if (payload) {
+            payload[0] = State10Packet0x0aFixedPayload::kPayloadTag0a;
+            *reinterpret_cast<uint16_t*>(payload + State10Packet0x0aFixedPayload::kCharacterNameOffset) = 0u;
+        }
+
+        reservation14_.writePointer00 = nullptr;
+        reservation14_.reservedContentByteCount04 = 0u;
+        reservation14_.reservedPadding06 = 0u;
     }
 
-    // anchor: launcher.exe:0x43aa80
-    void SetCharacterName(const char* text) {
-        if (!text || reservation14_.reservedContentByteCount04 != 0u) {
-            return;
-        }
-        if (ReserveLengthPrefixedString(
-                State10Packet0x0aFixedPayload::kCharacterNameOffset,
-                text,
-                0xffffu,
-                &reservation14_) != 0u) {
-            WriteReservedCString(reservation14_, text);
-        }
-    }
-
-private:
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
 };
 
-class State11Packet0x4dBuilder final : public PacketBuilderEnvelopeBase {
+static_assert(offsetof(cls_0x4b53b4, reservation14_) == 0x28, "cls_0x4b53b4 reservation14_ offset mismatch");
+
+// anchor: launcher.exe vtable 0x004b53c8 / packet 0x0c builder
+// anchor: launcher.exe:0x43a470 = ResetAndInitialize
+// anchor: launcher.exe:0x43a640/0x43a740/0x43a840/0x43a940 = Set* helpers (mediator methods)
+//
+// Object layout: inherits Packet_0x4af2a4 at +0x00, then 4 reservation scaffolds at +0x28/+0x30/+0x38/+0x40
+class cls_0x4b53c8 : public Packet_0x4af2a4 {
 public:
-    // anchor: launcher.exe:0x43a470 / local packet-builder family `0x004b53c8`
+    // anchor: launcher.exe:0x43a470
     void ResetAndInitialize() {
-        ResetPacketPayloadBuilderScaffold(
-            State11Packet0x4dFixedPayload::kFixedByteCount);
+        if (!messageRef08) {
+            messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+            if (messageRef08) {
+                messageRef08->AddRef();
+                messageRef08->ResetForPacketBuilder(false, 0);
+            }
+        }
+        
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->ResetPayloadByteCount(
+                State11Packet0x4dFixedPayload::kFixedByteCount);
+            payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+        }
+
+        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        if (payload) {
+            payload[0] = State11Packet0x4dFixedPayload::kPayloadTag0c;
+            *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kRealFirstNameOffset) = 0u;
+            *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kRealLastNameOffset) = 0u;
+            *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kBackgroundOffset) = 0u;
+            *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kGameSessionIdOffset) = 0u;
+        }
+
         ClearReservation(realFirstName14_);
         ClearReservation(realLastName1c_);
         ClearReservation(background24_);
         ClearReservation(gameSessionId2c_);
-        WritePayloadByte(0x00, State11Packet0x4dFixedPayload::kPayloadTag0c);
-        WritePayloadU16LE(State11Packet0x4dFixedPayload::kRealFirstNameOffset, 0u);
-        WritePayloadU16LE(State11Packet0x4dFixedPayload::kRealLastNameOffset, 0u);
-        WritePayloadU16LE(State11Packet0x4dFixedPayload::kBackgroundOffset, 0u);
-        WritePayloadU16LE(State11Packet0x4dFixedPayload::kGameSessionIdOffset, 0u);
     }
 
-    void SetFixedDword(size_t payloadOffset, uint32_t value) {
-        WritePayloadU32LE(payloadOffset, value);
-    }
-
-    // anchor: launcher.exe:0x43a640
-    void SetRealFirstName(const char* text) {
-        if (!text || realFirstName14_.reservedContentByteCount04 != 0u) {
-            return;
-        }
-        if (ReserveLengthPrefixedString(
-                State11Packet0x4dFixedPayload::kRealFirstNameOffset,
-                text,
-                0x20u,
-                &realFirstName14_) != 0u) {
-            WriteReservedCString(realFirstName14_, text);
-        }
-    }
-
-    // anchor: launcher.exe:0x43a740
-    void SetRealLastName(const char* text) {
-        if (!text || realLastName1c_.reservedContentByteCount04 != 0u) {
-            return;
-        }
-        if (ReserveLengthPrefixedString(
-                State11Packet0x4dFixedPayload::kRealLastNameOffset,
-                text,
-                0x20u,
-                &realLastName1c_) != 0u) {
-            WriteReservedCString(realLastName1c_, text);
-        }
-    }
-
-    // anchor: launcher.exe:0x43a840
-    void SetBackground(const char* text) {
-        if (!text || background24_.reservedContentByteCount04 != 0u) {
-            return;
-        }
-        if (ReserveLengthPrefixedString(
-                State11Packet0x4dFixedPayload::kBackgroundOffset,
-                text,
-                0x20u,
-                &background24_) != 0u) {
-            WriteReservedCString(background24_, text);
-        }
-    }
-
-    // anchor: launcher.exe:0x43a940
-    void SetGameSessionId(const char* text) {
-        if (!text || gameSessionId2c_.reservedContentByteCount04 != 0u) {
-            return;
-        }
-        if (ReserveLengthPrefixedString(
-                State11Packet0x4dFixedPayload::kGameSessionIdOffset,
-                text,
-                0xffffu,
-                &gameSessionId2c_) != 0u) {
-            WriteReservedCString(gameSessionId2c_, text);
-        }
-    }
-
-private:
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold realFirstName14_{};
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold realLastName1c_{};
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold background24_{};
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold gameSessionId2c_{};
+
+private:
+    void ClearReservation(::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold& res) {
+        res.writePointer00 = nullptr;
+        res.reservedContentByteCount04 = 0u;
+        res.reservedPadding06 = 0u;
+    }
 };
 
-struct State8StructuredMarginPacketFixedPayload {
+static_assert(offsetof(cls_0x4b53c8, realFirstName14_) == 0x28, "cls_0x4b53c8 realFirstName14_ offset mismatch");
+static_assert(offsetof(cls_0x4b53c8, realLastName1c_) == 0x30, "cls_0x4b53c8 realLastName1c_ offset mismatch");
+static_assert(offsetof(cls_0x4b53c8, background24_) == 0x38, "cls_0x4b53c8 background24_ offset mismatch");
+static_assert(offsetof(cls_0x4b53c8, gameSessionId2c_) == 0x40, "cls_0x4b53c8 gameSessionId2c_ offset mismatch");
+
+struct State8MarginPacketFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
     // raw margin opcode `0x0f` = `MS_LoadCharacterRequest`
     static constexpr uint8_t kPayloadTag0f = 0x0f;
@@ -404,49 +331,18 @@ struct State8StructuredMarginPacketFixedPayload {
     static constexpr size_t kFixedByteCount = 0xbb;
 };
 
-class State8StructuredMarginPacket_0x4af2a4 final : public PacketBuilderEnvelopeBase {
-public:
-    // anchor: launcher.exe:0x43ac10 = CLTLoginMediatorPacket0x0f_ResetAndInitialize
-    void ResetAndInitialize() {
-        ResetPacketPayloadBuilderScaffold(
-            State8StructuredMarginPacketFixedPayload::kFixedByteCount);
-        ClearReservation(reservation14_);
-        WritePayloadByte(0x00, State8StructuredMarginPacketFixedPayload::kPayloadTag0f);
-        WritePayloadU32LE(0x01, 0u);
-        WritePayloadU32LE(0x05, 0u);
-        WritePayloadU16LE(State8StructuredMarginPacketFixedPayload::kGameSessionIdOffset, 0u);
-    }
-
-    void SetFixedDword(size_t payloadOffset, uint32_t value) {
-        WritePayloadU32LE(payloadOffset, value);
-    }
-
-    void SetSelectionBlock(size_t payloadOffset, const std::array<uint32_t, 4>& block) {
-        WritePayloadU32LE(payloadOffset + 0x0u, block[0]);
-        WritePayloadU32LE(payloadOffset + 0x4u, block[1]);
-        WritePayloadU32LE(payloadOffset + 0x8u, block[2]);
-        WritePayloadU32LE(payloadOffset + 0xcu, block[3]);
-    }
-
-    // anchor: launcher.exe:0x43ada0 = CLTLoginMediatorPacket0x0f_SetGameSessionId
-    // helper-local length reservation/writeback mirrors launcher.exe:0x43acf0 =
-    // CLTLoginMediatorPacket0x0f_ReserveGameSessionId.
-    void SetGameSessionId(const char* text) {
-        if (!text || reservation14_.reservedContentByteCount04 != 0u) {
-            return;
-        }
-        if (ReserveLengthPrefixedString(
-                State8StructuredMarginPacketFixedPayload::kGameSessionIdOffset,
-                text,
-                0xffffu,
-                &reservation14_) != 0u) {
-            WriteReservedCString(reservation14_, text);
-        }
-    }
-
-private:
-    ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
-};
+// Note: The original launcher.exe does NOT have a separate derived class for
+// packet 0x0f building. Code at 0x43bd20 uses cls_0x4b5418 directly on the stack.
+// The SetGameSessionId logic at 0x43ada0 is a CLTLoginMediator method that operates
+// on the mediator's caching fields (networkEngine14, authConnection18), not on the
+// packet object itself.
+//
+// For source code clarity, packet 0x0f sending should:
+//   1. Stack-allocate cls_0x4b5418
+//   2. Call ResetAndInitialize()
+//   3. Write payload fields directly via PayloadBase()
+//   4. Call CLTLoginMediator::SetGameSessionIdOnPacket() helper (mediator method)
+//   5. Send via CLTLoginMediator::SendCurrentMarginPacket()
 
 struct State6Packet0x06FixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
@@ -465,46 +361,49 @@ struct State6Packet0x06FixedPayload {
     static constexpr size_t kFixedByteCount = 0x23;
 };
 
-class State6Packet0x06Builder_0x4b5364 final : public PacketBuilderEnvelopeBase {
+// anchor: launcher.exe vtable 0x004b5364 / packet 0x06 builder
+// anchor: launcher.exe:0x43b8f0 = ResetAndInitialize
+class cls_0x4b5364 : public Packet_0x4af2a4 {
 public:
-    // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
+    // anchor: launcher.exe:0x43b8f0
     void ResetAndInitialize() {
-        ResetPacketPayloadBuilderScaffold(
-            State6Packet0x06FixedPayload::kFixedByteCount);
-        WritePayloadByte(0x00, State6Packet0x06FixedPayload::kPayloadTag06);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, 0u);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, 0u);
-        WritePayloadByte(
-            State6Packet0x06FixedPayload::kStateByteOffset,
-            State6Packet0x06FixedPayload::kStateByteValue);
-        WritePayloadU32LE(
-            State6Packet0x06FixedPayload::kFixedDwordAOffset,
-            State6Packet0x06FixedPayload::kFixedDwordA);
-        WritePayloadU32LE(
-            State6Packet0x06FixedPayload::kFixedDwordEOffset,
-            State6Packet0x06FixedPayload::kFixedDwordE);
-        SetGobFileGuid({0u, 0u, 0u, 0u});
-        WritePayloadByte(State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset, 0u);
+        if (!messageRef08) {
+            messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+            if (messageRef08) {
+                messageRef08->AddRef();
+                messageRef08->ResetForPacketBuilder(false, 0);
+            }
+        }
+        
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->ResetPayloadByteCount(
+                State6Packet0x06FixedPayload::kFixedByteCount);
+            payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+        }
+
+        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        if (payload) {
+            payload[0] = State6Packet0x06FixedPayload::kPayloadTag06;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kLauncherVersionOffset) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kClientVersionOffset) = 0u;
+            payload[State6Packet0x06FixedPayload::kStateByteOffset] = State6Packet0x06FixedPayload::kStateByteValue;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordAOffset) = State6Packet0x06FixedPayload::kFixedDwordA;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordEOffset) = State6Packet0x06FixedPayload::kFixedDwordE;
+            // GobFileGuid at +0x12 (4 dwords)
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc) = 0u;
+            payload[State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset] = 0u;
+        }
     }
 
-    void SetLauncherVersion(uint32_t value) {
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, value);
-    }
-
-    void SetClientVersion(uint32_t value) {
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, value);
-    }
-
-    void SetGobFileGuid(const std::array<uint32_t, 4>& guidWords) {
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0, guidWords[0]);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4, guidWords[1]);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8, guidWords[2]);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc, guidWords[3]);
-    }
-
-    void SetCurrentHelperPhaseByte(uint8_t value) {
-        WritePayloadByte(State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset, value);
-    }
+    // Direct payload access for static-RE faithful manipulation.
+    uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadAlias10); }
+    const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
 };
+
+static_assert(sizeof(cls_0x4b5364) == sizeof(Packet_0x4af2a4), "cls_0x4b5364 size mismatch");
 
 }  // namespace mxo::ltlogin
