@@ -2774,10 +2774,13 @@ void* CMarginConnectionAuthBootstrapDecryptor_0x4b69b4::PerformRSADecryption(
             plaintextInteger.Encode(paddedPlaintext.data(), paddedPlaintext.size());
 
             // OAEP-SHA1 unpadding on big-endian bytes
+            // FIDELITY: Original passes bitCount-1 to OAEP_Unpad, not bitCount.
+            // For a 768-bit modulus, paddedBitCount=767 causes CryptoPP to check
+            // and skip the leading 0x00 byte, matching original behavior.
             CryptoPP::OAEP<CryptoPP::SHA1> oaep;
             std::vector<uint8_t> unpaddedBuffer(modulusByteCount);
             CryptoPP::DecodingResult result = oaep.Unpad(
-                paddedPlaintext.data(), modulusByteCount * 8,
+                paddedPlaintext.data(), static_cast<uint32_t>(modulus.BitCount()) - 1,
                 unpaddedBuffer.data(), CryptoPP::g_nullNameValuePairs);
 
             if (result.isValidCoding) {

@@ -1669,8 +1669,17 @@ public:
 
     // C++ vtable replaces raw uint32_t vtable pointers
     // Note: Original object size was 0xe0, but with C++ vtable we'll have different alignment
+    //
+    // FIDELITY: offset 0x08 in original is NOT a raw uint32_t. It is an embedded
+    // MSVC_VTableAdjustor_PrepStateAccess_0x4b6ad4 (vtable 0x4b6ad4, 3 slots).
+    // This is a compiler-generated secondary vtable used for virtual inheritance
+    // adjustor thunks. Its methods adjust 'this' back to the outer object and
+    // forward to vtable+0x28 (GetPrepState, returns &field_0xc) and vtable+0x28+0x30.
+    // In our reimplementation we do not use virtual inheritance, so this field
+    // is dead storage; PerformRSADecryption accesses field_0xc directly.
+    uint32_t prepStateAccessAdjustor_0x8 = 0u;  // was rsaModulus / MSVC adjustor
     CMarginConnectionBootstrapPrepState_0x4b659c field_0xc{};
-    uint32_t mbr_0xd0 = 0u;  // was field_0xd0 - inner vtable pointer
+    uint32_t mbr_0xd0 = 0u;  // was field_0xd0 - inner vtable pointer (cls_0x4b6acc)
     uint32_t mbr_0xd4 = 0u;  // was field_0xd4 - vtable pointer for component
     uint32_t mbr_0xd8 = 0u;  // was cls_0x4b3e18 - vtable pointer for component
     uint32_t mbr_0xdc = 0u;  // was field_0xdc
@@ -1690,7 +1699,7 @@ static_assert(sizeof(CMarginConnectionAuthBootstrapCrypto_0x4b6778) >= 0xe0, "bo
 //   +0x24: PerformRSADecryption (0x468130)
 //   +0x34: MaxUnpaddedLength (0x464b80)
 //   +0x38: OAEP_Pad (0x467640)
-//   +0x3c: OAEP_Unpad (0x467740)
+//   +0x3c: OAEP_Unpad (0x467780)
 class CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
     : public CMarginConnectionAuthBootstrapCrypto_0x4b6778 {
 public:
@@ -1707,6 +1716,25 @@ public:
         const void* cryptoContext,
         uint32_t encryptedBlobPtr,
         void* localBufferPtr) override;
+
+    // anchor: launcher.exe:0x464b80 / vtable+0x34
+    uint32_t MaxUnpaddedLength();
+
+    // anchor: launcher.exe:0x467640 / vtable+0x38
+    void* OAEP_Pad(
+        void* outputBuffer,
+        const void* messageBuffer,
+        uint32_t messageBitCount,
+        uint32_t paddedBitCount);
+
+    // anchor: launcher.exe:0x467780 / vtable+0x3c
+    // Original uses __stdcall (RET 0x10); callee cleans 4 stack params.
+    // Params: outputBuffer, paddedBufferPtr, paddedBitCount, messageOutputBuffer
+    void* OAEP_Unpad(
+        void* outputBuffer,
+        uint8_t* paddedBufferPtr,
+        uint32_t paddedBitCount,
+        void* messageOutputBuffer);
 };
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
