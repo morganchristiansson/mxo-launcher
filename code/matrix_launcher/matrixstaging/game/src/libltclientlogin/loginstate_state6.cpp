@@ -279,9 +279,8 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     //   and calls its vtable `+0x18` to choose the next helper state
 
     // Get payload directly from message ref (matching state10 pattern at 0x4401c0)
-    // Use Packet_MarginConnectReplyView_0x4b5378 to mirror original view creation
-    Packet_MarginConnectReplyView_0x4b5378 replyView;
-    const uint8_t* payloadBytes = static_cast<uint8_t*>(replyView.payloadAlias10);
+    // Use payload directly from workItem (matching state10 pattern)
+    const uint8_t* payloadBytes = workItem->messageStorage0c->PayloadBase();
     const uint16_t payloadByteCount = workItem->PayloadByteCount();
     if (!payloadBytes || payloadByteCount == 0u) {
         spdlog::info(
