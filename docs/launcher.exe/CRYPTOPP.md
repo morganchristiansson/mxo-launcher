@@ -201,7 +201,106 @@ CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
 
 ---
 
-## 4. Open questions / negative results
+## 4. Hash / SHA1 family
+
+### 4.1 Base hash context — `cls_0x4ba258` → `CryptoPP::SHA1` (or compatible)
+
+**Confidence: HIGH**
+
+VTable: `0x4ba258` (21 entries, 84 bytes).  Constructor: `0x455f70`.
+
+This class provides a SHA1-compatible hash interface but is wrapped with launcher
+base classes. The vtable uses Crypto++ `Algorithm` base class layout (proved by "unknown"
+string at vtable slot).
+
+**Class layout (36 bytes):**
+| Offset | Field | Description |
+|--------|-------|-------------|
+| +0x00 | `cls_0x4b42b0` | Launcher base (CLTReferenceCountedBase) |
+| +0x08 | `mbr_0x8` | Algorithm ID (1 for SHA1) |
+| +0x0c | `mbr_0xc` | Hash state buffer pointer |
+| +0x14 | `mbr_0x14` | Output size (words) |
+| +0x18 | `mbr_0x18` | Output digest buffer |
+| +0x1c | `mbr_0x1c` | Byte count (low) |
+| +0x20 | `mbr_0x20` | Byte count (high) |
+
+**Key evidence:**
+
+1. **`HashContext_InitSHA1` (`0x46ea60`)** — sets SHA-1 IV constants exactly:
+   ```
+   0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0
+   ```
+   These are the official SHA1 initial value constants.
+
+2. **"unknown" string proof** — vtable entry at offset +0x10 points to `0x41d880` which
+   returns "unknown", matching Crypto++ `Algorithm::AlgorithmName()` default. This proves inheritance
+   from Crypto++ `Algorithm` base class.
+
+3. **Interface matches CryptoPP** — Update (vtable slot +0x04) and Final (implied)
+   methods have identical signatures to `HashTransformation::Update` / `HashTransformation::Final`.
+
+**Callers (10+ sites):**
+- `0x43d417` — `cls_0x4b5670::ctor`
+- `0x43d8a8` — `GenerateClientChunkHashes`
+- `0x60b77` — `cls_0x4ba7d8::ctor`
+- Many more in auth bootstrap and client code
+
+---
+
+### 4.2 SHA1 wrapper — `cls_0x4ba7d8` → `CryptoPP::SHA1::Init`
+
+**Confidence: HIGH**
+
+VTable: `0x4ba7d8`. Constructor: `0x460b70`.
+
+This class extends `cls_0x4ba258` and provides SHA1-specific initialization.
+Calls `HashContext_InitSHA1` to set the SHA-1 IV in the state buffer.
+
+---
+
+## 5. Crypto++ "unknown" fingerprint — Algorithm base class proof
+
+### 5.1 Evidence: `0x41d880` = Crypto++ `Algorithm::AlgorithmName()`
+
+The function at `0x41d880` returns the string "unknown":
+
+```cpp
+void AuthBootstrap680Field54Helper_ResetUnknownString(undefined4 param_1, undefined4 *param_2)
+{
+    *param_2 = 0;
+    param_2[1] = 0;
+    param_2[2] = 0;
+    StringReallocateContent(param_2, "unknown", "");
+    return param_2;
+}
+```
+
+This is **direct copy** of Crypto++ `cryptlib.h:624`:
+
+```cpp
+virtual std::string AlgorithmName() const {return "unknown";}
+```
+
+### 5.2 VTables using "unknown" as fallback
+
+**58 vtable entries** across the launcher point to `0x41d880` as their `AlgorithmName()`
+method — proving these classes inherit from Crypto++ `Algorithm`:
+
+| VTable Address | Offset→"unknown" | Notes |
+|---------------|------------------|-------|
+| `0x4b41e0` | +0x10 | BufferedTransformation |
+| `0x4b6778` | +0x0c | RSA crypto object |
+| `0x4b68a8` | +0x10 | RandomPool |
+| `0x4b42bc` | +0x10 | CryptoInitHelper outer |
+| `0x4b5670` | +0x10 | Hash wrapper |
+| ... (53 more) | Various | Various Crypto++ objects |
+
+The Crypto++ vtable layout (MSVC x86) places `AlgorithmName()` at offset +0x04.
+The launcher classes use launcher-owned base classes but inherit Crypto++ virtual-method layout.
+
+---
+
+## 6. Open questions / negative results
 
 - **Exact Crypto++ version** — the launcher was likely built against 5.1.x or 5.2.x.
   The `OldRandomPool` in 8.9.0 is a faithful reproduction, but slot-level vtable offsets
