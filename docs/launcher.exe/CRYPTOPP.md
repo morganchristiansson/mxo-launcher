@@ -97,7 +97,7 @@ helperVtable08 = 0x004b41e0u;   // ResetAuthBootstrap680Field54Helper
 |---------|------|------------|
 | `0x4b9fa0` | 45-entry temp vtable set during RNG ctor | Medium — intermediate base before MI resolution |
 | `0x4bace0` | 8-entry vtable also placed at `this+4` during ctor | Medium — `RandomNumberGenerator` pure-interface slice |
-| `0x4b3e18` | Tiny 2-entry vtable placed at `this+8` during ctor | Medium — `Algorithm` or `CLTReferenceCountedBase` stub |
+| `0x4b3e18` | Tiny 2-entry vtable placed at `this+8` during ctor | Low — launcher-specific stub; not a Crypto++ class |
 
 ---
 
@@ -195,6 +195,8 @@ CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
 | `0x4bace0` transient vtable | `CryptoPP::RandomNumberGenerator` interface slice | **Medium** | Pure interface used during construction |
 | `0x4b6778` vtable | `CryptoPP::InvertibleRSAFunction` / `TF_DecryptorBase` | **Medium-High** | vbptr + adjustor thunks match MI hierarchy |
 | `0x4b69b4` vtable | `CryptoPP::RSAES<OAEP<SHA1>>::Decryptor` (`RSAES_OAEP_SHA_Decryptor`) | **Medium-High** | Inherits from `0x4b6778`, `PerformRSADecryption` matches `Decrypt` |
+| `0x4b9fa0` | 45-entry temp vtable set during RNG ctor | **Medium** | Intermediate base before MI resolution; not in final object |
+| `0x4b3e18` | Tiny 2-entry vtable placed at `this+8` during ctor | **Low** | Launcher-specific stub; no Crypto++ equivalent identified |
 | `0x468130` `PerformRSADecryption` | `PK_Decryptor::Decrypt` / `TF_DecryptorBase::Decrypt` | **High** | Exact call shape and algorithm |
 
 ---
