@@ -308,8 +308,18 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
         g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
         g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
 
-        // Original: builds and sends challenge-response packet (opcode 0x09) then PostEvent(0x11)
-        // Post event to trigger challenge-response packet construction and send
+        // Original builds and sends challenge-response packet first, then switches helper
+        // For now: directly call SendCurrentMarginPacket - simplified stub
+        // Note: Full packet construction not yet source-owned - this is a stub
+        // g_CurrentLoginMediator->SendCurrentMarginPacket(...); // packet builder not yet implemented
+
+        // Then switch states through cached upstream (if available)
+        if (cachedUpstreamOrArg_0x4 != nullptr) {
+            const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
+            g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
+        }
+
+        // Post event to continue flow
         g_CurrentLoginMediator->PostEvent(0x11u);
         return 1u;
     }
