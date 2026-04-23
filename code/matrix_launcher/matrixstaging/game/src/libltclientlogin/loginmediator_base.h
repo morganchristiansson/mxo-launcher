@@ -57,7 +57,14 @@ public:
 public:
     // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
     // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
-    virtual ~Packet_0x4af2a4() = default;
+    virtual ~Packet_0x4af2a4() {
+        // anchor: launcher.exe:0x443aa0
+        // Original destructor releases the retained outer message-ref via vtable+8,
+        // then optionally deletes the object itself (based on the flag in param_1).
+        if (messageRef08) {
+            messageRef08->Release();
+        }
+    }
     // anchor: launcher.exe:0x437b50 / vtable +0x04
     // Stub method returning 0 - inherited by all derived builders
     virtual uint32_t StubReturn0() { return 0; }
