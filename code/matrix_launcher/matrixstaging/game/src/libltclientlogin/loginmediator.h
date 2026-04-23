@@ -1643,8 +1643,8 @@ public:
     uint16_t marginServerPortHostOrder_;
     bool ignoreHostsFileForMargin_;
 
-    mxo::liblttcp::LTTCPEndpointKey authEndpoint_;
-    mxo::liblttcp::LTTCPEndpointKey marginEndpoint_;
+    mxo::liblttcp::LTTCPEndpointKey_0x44b070 authEndpoint_;
+    mxo::liblttcp::LTTCPEndpointKey_0x44b070 marginEndpoint_;
 
     std::string authUsername_;
     std::string authPassword_;

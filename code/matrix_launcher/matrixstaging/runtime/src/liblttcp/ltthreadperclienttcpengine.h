@@ -397,7 +397,7 @@ public:
     uint32_t SendBufferWithEndpoint(
         void* buffer,
         uint32_t byteCount,
-        LTTCPEndpointKey* remoteEndpoint,
+        LTTCPEndpointKey_0x44b070* remoteEndpoint,
         void* contextKey,
         void* ownershipMode) override;
     // anchor: launcher.exe:0x443810
@@ -494,9 +494,9 @@ public:
 
 private:
     // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
-    static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
+    static LTTCPEndpointKey_0x44b070 MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
     // anchor: launcher.exe:0x42fdb0 search shape over the endpoint-keyed `+0x80` tree family.
-    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey& key);
+    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey_0x44b070& key);
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindWorker(void* contextKey);
     // Source-owned shared engine-slot connection resolver.

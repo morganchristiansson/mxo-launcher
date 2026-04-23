@@ -29,26 +29,26 @@ enum class LTTCPEngineConnectionState : uint32_t {
     kClosed = 8,            // required by connection-wrapper and engine prechecks
 };
 
-class LTTCPEndpointKey {
+class LTTCPEndpointKey_0x44b070 {
 public:
     // anchor: launcher.exe:0x44b070
     // Default endpoint-key constructor used by the connection / parser / worker families.
     // Original body zeros the full 16-byte block first, then writes `family = AF_INET`.
-    LTTCPEndpointKey();
+    LTTCPEndpointKey_0x44b070();
 
     // anchor: launcher.exe:0x44b090
     // Parameterized constructor: zeroes all 16 bytes, sets family=AF_INET, stores ipv4,
     // and converts port to network order via htons (IAT slot at 0x004a9818).
-    LTTCPEndpointKey(uint32_t ipv4NetworkOrder, uint16_t portHostOrder);
+    LTTCPEndpointKey_0x44b070(uint32_t ipv4NetworkOrder, uint16_t portHostOrder);
 
     // anchor: launcher.exe:0x44b020
     // Original helper compares the 16-byte key as four dwords (`repe cmpsd`) and returns true
     // when any dword differs.
-    bool DiffersFrom(const LTTCPEndpointKey& other) const;
+    bool DiffersFrom(const LTTCPEndpointKey_0x44b070& other) const;
 
     // anchor: launcher.exe:0x44aff0
     // Original helper copies the 16-byte key as four dwords.
-    void CopyTo(LTTCPEndpointKey* outEndpointKey) const;
+    void CopyTo(LTTCPEndpointKey_0x44b070* outEndpointKey) const;
 
     uint16_t family = 0; // AF_INET after ctor
     uint16_t portNetworkOrder = 0;
@@ -57,7 +57,7 @@ public:
     uint32_t reserved1 = 0;
 };
 
-static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
+static_assert(sizeof(LTTCPEndpointKey_0x44b070) == 0x10, "endpoint key size mismatch");
 
 // Recovered parser input fragment family consumed by connection `+0x6c`
 // (`CVariableLengthPrefixedTCPStreamParser::Parse`).
@@ -254,7 +254,7 @@ public:
     // - current source embeds the storage descriptor directly to keep the active worker-send path
     //   simple while the helper-family meaning stays visible in comments/docs
     CLTTCPConnection_QueuedSendBufferStorage sendBufferStorage00;
-    LTTCPEndpointKey remoteEndpoint04;
+    LTTCPEndpointKey_0x44b070 remoteEndpoint04;
 };
 
 class CLTTCPConnection_PendingSendQueue {
@@ -265,7 +265,7 @@ public:
     bool QueueSendBufferWithEndpoint(
         const void* sendBuffer,
         uint32_t byteCount,
-        const LTTCPEndpointKey& remoteEndpoint,
+        const LTTCPEndpointKey_0x44b070& remoteEndpoint,
         uintptr_t ownershipMode);
     // anchor: launcher.exe:0x44ad80
     bool QueueSendBuffer(const void* sendBuffer, uint32_t byteCount, uintptr_t ownershipMode);
@@ -438,7 +438,7 @@ public:
     // vtable: launcher.exe:0x004b8050
     // This wrapper is first introduced on the concrete `CLTTCPConnection` table, not on
     // `CBaseConnection`.
-    uint32_t Connect(const LTTCPEndpointKey& endpoint);
+    uint32_t Connect(const LTTCPEndpointKey_0x44b070& endpoint);
 
     // anchor: launcher.exe:0x449d20
     // vtable: launcher.exe:0x004b8054
@@ -480,7 +480,7 @@ public:
     bool QueueSendBufferWithEndpoint(
         const void* buffer,
         uint32_t byteCount,
-        const LTTCPEndpointKey& remoteEndpoint,
+        const LTTCPEndpointKey_0x44b070& remoteEndpoint,
         uintptr_t ownershipMode);
     // anchor: launcher.exe:0x44aa70
     bool TryPopQueuedSendBufferWithEndpoint(CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem);
@@ -503,7 +503,7 @@ public:
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem);
 
     // anchor: launcher.exe:0x41de6a - endpoint at connection +0x24
-    LTTCPEndpointKey remoteEndpoint_;
+    LTTCPEndpointKey_0x44b070 remoteEndpoint_;
 
 private:
     void* ownerContext_;

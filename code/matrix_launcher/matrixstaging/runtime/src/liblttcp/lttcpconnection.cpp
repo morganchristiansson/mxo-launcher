@@ -205,7 +205,7 @@ static void* CLTTCPReadOperation_AllocateStorage() noexcept {
 }  // namespace
 
 // anchor: launcher.exe:0x44b070
-LTTCPEndpointKey::LTTCPEndpointKey()
+LTTCPEndpointKey_0x44b070::LTTCPEndpointKey_0x44b070()
     : family(0),
       portNetworkOrder(0),
       ipv4NetworkOrder(0),
@@ -215,7 +215,7 @@ LTTCPEndpointKey::LTTCPEndpointKey()
 }
 
 // anchor: launcher.exe:0x44b090
-LTTCPEndpointKey::LTTCPEndpointKey(uint32_t ipv4NetOrder, uint16_t portHostOrder)
+LTTCPEndpointKey_0x44b070::LTTCPEndpointKey_0x44b070(uint32_t ipv4NetOrder, uint16_t portHostOrder)
     : family(0),
       portNetworkOrder(0),
       ipv4NetworkOrder(0),
@@ -227,12 +227,12 @@ LTTCPEndpointKey::LTTCPEndpointKey(uint32_t ipv4NetOrder, uint16_t portHostOrder
 }
 
 // anchor: launcher.exe:0x44b020
-bool LTTCPEndpointKey::DiffersFrom(const LTTCPEndpointKey& other) const {
+bool LTTCPEndpointKey_0x44b070::DiffersFrom(const LTTCPEndpointKey_0x44b070& other) const {
     return std::memcmp(this, &other, sizeof(*this)) != 0;
 }
 
 // anchor: launcher.exe:0x44aff0
-void LTTCPEndpointKey::CopyTo(LTTCPEndpointKey* outEndpointKey) const {
+void LTTCPEndpointKey_0x44b070::CopyTo(LTTCPEndpointKey_0x44b070* outEndpointKey) const {
     std::memcpy(outEndpointKey, this, sizeof(*this));
 }
 
@@ -367,7 +367,7 @@ static void EnsureBaseConnectionQueueContextVtableInitialized() {
 // UNANCHORED: source-owned endpoint formatting helper that mirrors the byte/port extraction shape
 // used by `CLTTCPConnection::OnReceive` terminal parser-error logging.
 static unsigned EndpointIpv4OctetForOnReceiveLogScaffold(
-    const LTTCPEndpointKey& endpoint,
+    const LTTCPEndpointKey_0x44b070& endpoint,
     unsigned byteIndex) {
     return static_cast<unsigned>((endpoint.ipv4NetworkOrder >> (byteIndex * 8u)) & 0xffu);
 }
@@ -566,7 +566,7 @@ CLTTCPConnection_PendingSendQueue::CLTTCPConnection_PendingSendQueue()
 bool CLTTCPConnection_PendingSendQueue::QueueSendBufferWithEndpoint(
     const void* sendBuffer,
     uint32_t byteCount,
-    const LTTCPEndpointKey& remoteEndpoint,
+    const LTTCPEndpointKey_0x44b070& remoteEndpoint,
     uintptr_t ownershipMode) {
     CLTTCPConnection_QueuedSendBufferWithEndpoint queuedSendBuffer = {};
     if (!queuedSendBuffer.sendBufferStorage00.InitializeFromSendBuffer(
@@ -590,7 +590,7 @@ bool CLTTCPConnection_PendingSendQueue::QueueSendBuffer(
     const void* sendBuffer,
     uint32_t byteCount,
     uintptr_t ownershipMode) {
-    LTTCPEndpointKey defaultEndpoint;
+    LTTCPEndpointKey_0x44b070 defaultEndpoint;
     return QueueSendBufferWithEndpoint(sendBuffer, byteCount, defaultEndpoint, ownershipMode);
 }
 
@@ -646,7 +646,7 @@ bool CLTTCPConnection::QueueSendBuffer(
 bool CLTTCPConnection::QueueSendBufferWithEndpoint(
     const void* buffer,
     uint32_t byteCount,
-    const LTTCPEndpointKey& remoteEndpoint,
+    const LTTCPEndpointKey_0x44b070& remoteEndpoint,
     uintptr_t ownershipMode) {
     return pendingSendQueueState38_.QueueSendBufferWithEndpoint(
         buffer,
@@ -811,7 +811,7 @@ uint32_t CBaseConnection::Close(bool graceful) {
 }
 
 // anchor: launcher.exe:0x449cd0
-uint32_t CLTTCPConnection::Connect(const LTTCPEndpointKey& endpoint) {
+uint32_t CLTTCPConnection::Connect(const LTTCPEndpointKey_0x44b070& endpoint) {
     if (remoteEndpoint_.DiffersFrom(endpoint)) {
         (void)Close(false);
         endpoint.CopyTo(&remoteEndpoint_);

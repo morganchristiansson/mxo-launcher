@@ -87,8 +87,8 @@ static void EraseMarginBootstrapState(const CLTLoginMediator* mediator) {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOrder) {
-    mxo::liblttcp::LTTCPEndpointKey key = {};
+static mxo::liblttcp::LTTCPEndpointKey_0x44b070 BuildLoopbackEndpoint(uint16_t portHostOrder) {
+    mxo::liblttcp::LTTCPEndpointKey_0x44b070 key = {};
     key.family = 2;  // AF_INET
     key.portNetworkOrder = static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
     key.ipv4NetworkOrder = 0;

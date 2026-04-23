@@ -4,7 +4,7 @@
 
 namespace mxo::liblttcp {
 
-class LTTCPEndpointKey;
+class LTTCPEndpointKey_0x44b070;
 
 // =============================================================================
 // ILTTCPEngine - VTable 0x004b2768 pure virtual interface
@@ -49,7 +49,7 @@ public:
     virtual uint32_t SendBufferWithEndpoint(
         void* buffer,
         uint32_t byteCount,
-        LTTCPEndpointKey* remoteEndpoint,
+        LTTCPEndpointKey_0x44b070* remoteEndpoint,
         void* contextKey,
         void* ownershipMode) = 0;
     // +0x28

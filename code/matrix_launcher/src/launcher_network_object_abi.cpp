@@ -442,7 +442,7 @@ static uint32_t __thiscall LauncherObject_SendBufferWithEndpoint(
         ? engine->SendBufferWithEndpoint(
             buffer,
             static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
-            static_cast<mxo::liblttcp::LTTCPEndpointKey*>(remoteEndpoint),
+            static_cast<mxo::liblttcp::LTTCPEndpointKey_0x44b070*>(remoteEndpoint),
             contextKey,
             ownershipMode)
         : 0u;

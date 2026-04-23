@@ -776,7 +776,7 @@ public:
     // the auth-bootstrap transform family. Source now keeps that recovered large/decrypting
     // `AssemblyTwofish` adapter object explicit instead of collapsing this worker down to raw seed
     // bytes only. `0x44d500` then wraps each stored worker in a `StreamTransformationFilter` and
-    // passes a copied `LTTCPEndpointKey` peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`.
+    // passes a copied `LTTCPEndpointKey_0x44b070` peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`.
     std::array<uint8_t, 16> associatedSeedBytes{};
     mxo::auth::internal::FeedbackSizeTransformAdapterLarge feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
@@ -795,7 +795,7 @@ public:
     // Source now keeps that recovered small/encrypting `AssemblyTwofish` adapter object explicit
     // instead of only caching the 16-byte seed. `0x44d250` then resolves the parameter block fed
     // into `0x44c750 = CPacketEncryptor_EncryptPacket`, while the helper also snapshots
-    // `configuredConnection10->+0x24 = LTTCPEndpointKey` for the same packet-crypto family.
+    // `configuredConnection10->+0x24 = LTTCPEndpointKey_0x44b070` for the same packet-crypto family.
     std::array<uint8_t, 16> associatedSeedBytes{};
     mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
@@ -909,8 +909,8 @@ public:
     // - helper `+0x04` is the downstream helper-family link used by the agenda chains
     // - helper `+0x08` is the owning `CStreamPacketEncryptionModule*`
     //   - the transform bodies then read owner `+0x10 = configuredConnection10`
-    //     and copy connection `+0x24 = LTTCPEndpointKey` through
-    //     `0x44aff0 = LTTCPEndpointKey_Copy`
+    //     and copy connection `+0x24 = LTTCPEndpointKey_0x44b070` through
+    //     `0x44aff0 = LTTCPEndpointKey_0x44b070_Copy`
     //   - read side passes that 16-byte peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`
     //     for discard/expiry logging
     //   - write side likewise passes it into `0x44c750 = CPacketEncryptor_EncryptPacket`

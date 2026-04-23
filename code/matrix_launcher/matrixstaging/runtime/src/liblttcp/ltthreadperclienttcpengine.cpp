@@ -116,10 +116,10 @@ static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_Queue*, std::vect
 
 static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
 using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
+    std::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
 using CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode =
     std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
-static_assert(sizeof(std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>) == 0x14, "endpoint tree value size mismatch");
+static_assert(sizeof(std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>) == 0x14, "endpoint tree value size mismatch");
 static_assert(sizeof(std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>) == 0x8, "context tree value size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode) == 0x24, "endpoint tree node size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode) == 0x18, "context tree node size mismatch");
@@ -236,8 +236,8 @@ static const Node* TreeRootNode(const Head* head) {
 // - `family/reserved0/reserved1` remain part of the copied key payload, but are not currently
 //   evidenced as tree-ordering fields in launcher.exe
 static int CompareEndpointTreeKeys(
-    const LTTCPEndpointKey& lhs,
-    const LTTCPEndpointKey& rhs) {
+    const LTTCPEndpointKey_0x44b070& lhs,
+    const LTTCPEndpointKey_0x44b070& rhs) {
     if (lhs.portNetworkOrder != rhs.portNetworkOrder) {
         return (lhs.portNetworkOrder < rhs.portNetworkOrder) ? -1 : 1;
     }
@@ -287,7 +287,7 @@ static bool LauncherTreeEraseOwnedNode(Backing* backing, Head* head, Node* node)
 // anchor: launcher.exe:0x42fdb0
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeFindNode(
     const CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
-    const LTTCPEndpointKey& key) {
+    const LTTCPEndpointKey_0x44b070& key) {
     return LauncherTreeFindNode<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode>(
         head,
         key,
@@ -319,7 +319,7 @@ static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry* FindEngineEndp
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeInsertUniqueNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
-    const LTTCPEndpointKey& key,
+    const LTTCPEndpointKey_0x44b070& key,
     bool* outInserted) {
     if (outInserted) {
         *outInserted = false;
@@ -2234,7 +2234,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     }
 
     const uint32_t ipv4NetworkOrder = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(reservedArg3));
-    const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
+    const LTTCPEndpointKey_0x44b070 key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
     bool inserted = false;
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node = EndpointTreeInsertUniqueNode(
         this,
@@ -2344,7 +2344,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Slot4_42F7C0(void* arg1) {
 // anchor: launcher.exe:0x431840
 // vtable: launcher.exe:0x004b2768 slot +0x14
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) {
-    const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
+    const LTTCPEndpointKey_0x44b070 key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
         EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
     if (!node || !(node)->_M_valptr()->second) {
@@ -2388,7 +2388,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     }
 
     void* queuedConnectionContext = connection->QueueContextScaffold();
-    const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
+    const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
             "CLTThreadPerClientTCPEngine_0x4b2768::Connect rejected connection={} state={} remoteHost='{}' port={} ip=0x{:08x}",
@@ -2580,7 +2580,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Close(void* contextKey, bool grac
         // anchor: launcher.exe:0x42f9af / shutdown(socket, 1)
         const int shutdownResult = shutdown(static_cast<SOCKET>(connection->SocketHandle()), SD_SEND);
         if (shutdownResult == SOCKET_ERROR) {
-            const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
+            const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
             const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
             const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
             const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
@@ -2606,7 +2606,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Close(void* contextKey, bool grac
     // anchor: launcher.exe:0x42fac0 / closesocket(socket)
     const int closeResult = closesocket(static_cast<SOCKET>(connection->SocketHandle()));
     if (closeResult == SOCKET_ERROR) {
-        const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
+        const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
         const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
         const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
         const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
@@ -2668,7 +2668,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SendBuffer(
         return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
     }
 
-    const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
+    const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
     const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
     const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
@@ -2695,7 +2695,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SendBuffer(
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SendBufferWithEndpoint(
     void* buffer,
     uint32_t byteCount,
-    LTTCPEndpointKey* remoteEndpoint,
+    LTTCPEndpointKey_0x44b070* remoteEndpoint,
     void* contextKey,
     void* ownershipMode) {
     // Current best static read of `0x42fd10`:
@@ -3477,8 +3477,8 @@ CMessageConnection_0x4b7928* CLTThreadPerClientTCPEngine_0x4b2768::FindMessageCo
 
 // UNANCHORED starter helper.
 // No direct launcher.exe helper body is assigned yet; this just mirrors the recovered key shape.
-LTTCPEndpointKey CLTThreadPerClientTCPEngine_0x4b2768::MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    LTTCPEndpointKey key = {};
+LTTCPEndpointKey_0x44b070 CLTThreadPerClientTCPEngine_0x4b2768::MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
+    LTTCPEndpointKey_0x44b070 key = {};
     key.family = 2;
     key.portNetworkOrder = static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
     key.ipv4NetworkOrder = ipv4NetworkOrder;
@@ -3486,7 +3486,7 @@ LTTCPEndpointKey CLTThreadPerClientTCPEngine_0x4b2768::MakeEndpointKey(uint16_t 
 }
 
 // anchor: launcher.exe:0x42fdb0
-CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* CLTThreadPerClientTCPEngine_0x4b2768::FindMonitoredPort(const LTTCPEndpointKey& key) {
+CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* CLTThreadPerClientTCPEngine_0x4b2768::FindMonitoredPort(const LTTCPEndpointKey_0x44b070& key) {
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
         EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
     return node ? node->_M_valptr()->second : nullptr;
