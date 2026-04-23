@@ -1889,35 +1889,9 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
     }
     lastReceivedPacketHeaderlessScaffold_ = (copiedMessageRef->headerless10 != 0u);
 
-    // anchor: launcher.exe:0x4492a0 - packet agenda processing
+    // anchor: launcher.exe:0x449340 - headerless locator validation
     CMessageConnectionMessageRef_0x4ba23c* messageRefForDispatch = copiedMessageRef;
     bool agendaTouched = false;
-    if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
-        agenda && agenda->created) {
-        spdlog::debug("CMessageConnection::OnOperationCompleted applying packet agenda to messageRef={} agenda={}",
-                     fmt::ptr(copiedMessageRef), fmt::ptr(agenda));
-        messageRefForDispatch = agenda->ApplyReceivePacketAgenda(copiedMessageRef, &agendaTouched);
-
-        if (agendaTouched) {
-            spdlog::debug("CMessageConnection::OnOperationCompleted packet agenda touched messageRef={} -> result={}",
-                         fmt::ptr(copiedMessageRef), fmt::ptr(messageRefForDispatch));
-            // Update last received packet info if agenda modified the message
-            lastReceivedPacketBodyBytesScaffold_.clear();
-            if (const CMessageConnectionMessageStorage_0x4ba208* const agendaMessageStorage = messageRefForDispatch->messageStorage0c) {
-                const uint16_t agendaPayloadByteCount = agendaMessageStorage->PayloadByteCount();
-                if (const uint8_t* const agendaPayloadBytes = agendaMessageStorage->PayloadBase();
-                    agendaPayloadBytes && agendaPayloadByteCount != 0u) {
-                    lastReceivedPacketBodyBytesScaffold_.assign(
-                        agendaPayloadBytes,
-                        agendaPayloadBytes + agendaPayloadByteCount);
-                }
-            }
-            lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
-        } else {
-            spdlog::debug("CMessageConnection::OnOperationCompleted packet agenda processed but did not modify message");
-        }
-    }
-
     if (messageRefForDispatch->headerless10 != 0u) {
         uint8_t targetLocatorType = 0u;
         uint8_t senderLocatorType = 0u;
