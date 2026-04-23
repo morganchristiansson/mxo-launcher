@@ -290,9 +290,27 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     }
 
     if (messageCode == 0x07u) {
+        // MS_ConnectChallenge: parse fields and send challenge response
+        if (payloadByteCount < 0x0du) {
+            spdlog::info(
+                "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 payload too short={}",
+                static_cast<unsigned>(payloadByteCount));
+            return 0u;
+        }
+        const uint32_t goHereAddr = ReadU32LE(payloadBytes + 0x01u);
+        const uint32_t goHerePort = ReadU32LE(payloadBytes + 0x05u);
+        const uint32_t sessionSecret = ReadU32LE(payloadBytes + 0x09u);
         spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage observed opcode-0x07; client.dll/module-path-derived branch is still not source-owned");
-        return 0u;
+            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x}; mirroring original challenge-response flow",
+            static_cast<unsigned>(goHereAddr),
+            static_cast<unsigned>(goHerePort),
+            static_cast<unsigned>(sessionSecret));
+        // Store for use in challenge-response construction
+        g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
+        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+        // Original: sends margin packet then PostEvent(0x11)
+        // For now, just return success and let caller flow handle the send+event
+        return 1u;
     }
 
     // Opcode 0x09 = MS_ConnectChallengeResponse or similar margin reply
