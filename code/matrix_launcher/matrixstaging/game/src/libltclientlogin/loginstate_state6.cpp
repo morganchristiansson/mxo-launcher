@@ -236,12 +236,10 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
         *reinterpret_cast<uint32_t*>(payloadBase + 0x16) = gobGuidWords[1];
         *reinterpret_cast<uint32_t*>(payloadBase + 0x1a) = gobGuidWords[2];
         *reinterpret_cast<uint32_t*>(payloadBase + 0x1e) = gobGuidWords[3];
-        // Helper phase from current state through vtable call
-        const uint8_t currentHelperPhase = static_cast<uint8_t>(
-            g_CurrentLoginMediator->currentState_
-                ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode()
-                : 0u);
-        payloadBase[0x22] = currentHelperPhase;
+        // mbr_0x5 is a boolean: 0 by default, set to 1 by SetUnknownByte05()
+        // Static-RE faithful: write the boolean field, not the state phase
+        // Server warns about non-zero but accepts the packet
+        payloadBase[0x22] = 0u;
     }
 
     // Build envelope for send
