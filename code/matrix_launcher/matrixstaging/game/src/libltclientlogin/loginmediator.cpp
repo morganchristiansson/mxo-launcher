@@ -2260,6 +2260,11 @@ const uint32_t* CLTLoginMediator::GetNoPatchClientVersionValuePtr0c() const {
     return &nopatchClientVersionValue0c_;
 }
 
+// anchor: launcher.exe:0x41f050
+uint8_t CLTLoginMediator::GetUnknownByte05() const {
+    return unknownByte05_;
+}
+
 namespace {
 
 static size_t LateEntryList1470EntryCountScaffold(const LateEntryList1470VectorLikeSketch& list) {

@@ -728,12 +728,16 @@ public:
     // family around `0x41f060/0x41f070` and `0x41f080/0x41f090`.
     uint32_t nopatchLauncherVersionValue08_ = 0;  // original owner `+0x08`
     uint32_t nopatchClientVersionValue0c_ = 0;    // original owner `+0x0c`
+    uint8_t unknownByte05_ = 0;                // original owner `+0x05` (GetUnknownByte05)
     mutable bool liveCuiCfgAbsentNoteLogged90_ = false;     // +0x90 one-shot caveat log moved from ABI wrapper
-
-    // anchor: launcher.exe:0x41f070
     // Tiny owner getter reached from state2 `0x439210` through owner vtable `+0x20`.
     // Exact original body returns `owner + 0x08`; callers then dereference that dword.
     const uint32_t* GetNoPatchLauncherVersionValuePtr08() const;
+
+    // anchor: launcher.exe:0x41f050 = vtable +0x18
+    // Returns owner `+0x05` (mbr_0x5). Default 0, set to 1 by SetUnknownByte05().
+    // This byte is written to MS_ConnectRequest offset 0x22.
+    uint8_t GetUnknownByte05() const;
 
     // source-owned narrow accessor for owner `+0x94 + 0x60` small-string begin pointer.
     // Current concrete state7 use from `0x43ba20`:

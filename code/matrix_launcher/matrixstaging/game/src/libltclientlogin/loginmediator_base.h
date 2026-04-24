@@ -481,8 +481,8 @@ public:
     virtual uint32_t IsReady() = 0;
     // +0x14
     void UnknownSlot5();
-    // +0x18
-    void UnknownSlot6();
+    // +0x18 anchor: launcher.exe:0x41f050 = vtable slot +0x18
+    virtual uint8_t GetUnknownByte05() const = 0;
     // +0x1c
     virtual void SetValue1(void* value) = 0;
     // +0x20

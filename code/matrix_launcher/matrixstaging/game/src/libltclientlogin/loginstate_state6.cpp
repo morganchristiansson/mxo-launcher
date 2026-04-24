@@ -237,9 +237,8 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
         *reinterpret_cast<uint32_t*>(payloadBase + 0x1a) = gobGuidWords[2];
         *reinterpret_cast<uint32_t*>(payloadBase + 0x1e) = gobGuidWords[3];
         // mbr_0x5 is a boolean: 0 by default, set to 1 by SetUnknownByte05()
-        // Static-RE faithful: write the boolean field, not the state phase
-        // Server warns about non-zero but accepts the packet
-        payloadBase[0x22] = 0u;
+        // Static-RE faithful: call GetUnknownByte05() (vtable +0x18)
+        payloadBase[0x22] = g_CurrentLoginMediator->GetUnknownByte05();
     }
 
     // Build envelope for send
