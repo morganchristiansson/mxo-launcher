@@ -241,9 +241,9 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     replySectionsExpected_ = 0;
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
     
-    // anchor: launcher.exe:0x43bd6a = construct cls_0x4b5418 on stack
+    // anchor: launcher.exe:0x43bd6a = construct Packet_MsLoadCharacterRequest_0x4b5418 on stack
     // anchor: launcher.exe:0x43ac10 = ResetAndInitialize
-    cls_0x4b5418 packetBuilder;
+    Packet_MsLoadCharacterRequest_0x4b5418 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload

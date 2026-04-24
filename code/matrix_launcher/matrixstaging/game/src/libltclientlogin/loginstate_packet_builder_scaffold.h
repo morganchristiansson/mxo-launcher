@@ -46,10 +46,10 @@ static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, gameSessionId2c) == 
 }  // namespace ltlogin
 
 // =============================================================================
-// cls_0x4b5418 - Packet 0x0f (MS_LoadCharacterRequest) builder
+// Packet_MsLoadCharacterRequest_0x4b5418 - Packet 0x0f (MS_LoadCharacterRequest) builder
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b5418 (5 slots, 20 bytes)
-// anchor: launcher.exe:0x43ac10 = cls_0x4b5418::ResetAndInitialize
+// anchor: launcher.exe:0x43ac10 = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
 // anchor: launcher.exe:0x43acf0 = CLTLoginMediator::ReserveGameSessionId (mediator helper)
 // anchor: launcher.exe:0x43ada0 = CLTLoginMediator::SetGameSessionId (mediator helper)
 //
@@ -66,7 +66,7 @@ static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, gameSessionId2c) == 
 // GameSessionID reservation write pointer and length.
 //
 // Usage pattern from 0x43bd20 (State8 slot3):
-//   1. Stack-allocate cls_0x4b5418
+//   1. Stack-allocate Packet_MsLoadCharacterRequest_0x4b5418
 //   2. Call 0x43ac10 = ResetAndInitialize
 //   3. Write fixed dwords at payload +0x01 and +0x05 (character ID pair)
 //   4. Write selection blocks at payload +0x09, +0x19, +0x29, etc.
@@ -78,10 +78,12 @@ namespace mxo::ltlogin {
 
 // Static-RE faithful implementation of packet 0x0f builder.
 // anchor: launcher.exe:0x43ac10
-class cls_0x4b5418 : public Packet_0x4af2a4 {
+//
+// Margin opcode 0x0f = MS_LoadCharacterRequest (used by state8)
+class Packet_MsLoadCharacterRequest_0x4b5418 : public Packet_0x4af2a4 {
 public:
 
-    // anchor: launcher.exe:0x43ac10 = cls_0x4b5418::ResetAndInitialize
+    // anchor: launcher.exe:0x43ac10 = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
     // Original implementation:
     //   1. Calls Packet_0x4af2a4 default ctor (sets vtable to 0x4af2a4, creates message ref)
     //   2. Overwrites vtable to 0x4b5418
@@ -96,7 +98,7 @@ public:
         // Step 1-2: Base ctor already called if constructed on stack
         // Note: In C++ the vtable pointer is implicit, set by the constructor.
         // The original at 0x43ac14 calls Packet_0x4af2a4 ctor, then overwrites vtable.
-        // With C++ inheritance, the vtable is already correct for cls_0x4b5418.
+        // With C++ inheritance, the vtable is already correct for Packet_MsLoadCharacterRequest_0x4b5418.
         
         // Step 3: Clear flag
         createRefParam0c = 0u;
@@ -135,17 +137,17 @@ public:
 
 public:
     // Override virtual methods to match 5-slot vtable
-    ~cls_0x4b5418() override = default;
+    ~Packet_MsLoadCharacterRequest_0x4b5418() override = default;
     uint32_t StubReturn0() override { return 0u; }
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
     void* GetPayloadBase() override { return payloadAlias10; }
 };
 
-// cls_0x4b5418 layout:
+// Packet_MsLoadCharacterRequest_0x4b5418 layout:
 //   Packet_0x4af2a4 base: 0x28 bytes (+0x00..+0x27)
 // Total: 0x28 bytes
-static_assert(sizeof(cls_0x4b5418) == 0x28, "cls_0x4b5418 size mismatch");
+static_assert(sizeof(Packet_MsLoadCharacterRequest_0x4b5418) == 0x28, "Packet_MsLoadCharacterRequest_0x4b5418 size mismatch");
 
 }  // namespace mxo::ltlogin
 
@@ -159,7 +161,7 @@ namespace mxo::ltlogin {
 
 // Note: The original launcher.exe does NOT have a shared "PacketBuilderEnvelopeBase" class.
 // Each packet builder class directly inherits from Packet_0x4af2a4 with its own vtable.
-// Source code should use the concrete classes (cls_0x4b53b4, cls_0x4b53c8, cls_0x4b53f0, cls_0x4b5418)
+// Source code should use the concrete classes (Packet_MsDeleteCharacterRequest_0x4b53f0, Packet_MsClaimCharacterNameRequest_0x4b53b4, Packet_MsCreateCharacterRequest_0x4b53c8, Packet_MsLoadCharacterRequest_0x4b5418)
 // and access fields directly.
 
 struct State7Packet0x0dFixedPayload {
@@ -178,7 +180,9 @@ struct State7Packet0x0dFixedPayload {
 // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper, not class method)
 //
 // Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
-class cls_0x4b53f0 : public Packet_0x4af2a4 {
+//
+// Margin opcode 0x0d = MS_DeleteCharacterRequest (used by state7 for character selection probe)
+class Packet_MsDeleteCharacterRequest_0x4b53f0 : public Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a9a0
     void ResetAndInitialize() {
@@ -216,7 +220,7 @@ public:
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
 };
 
-static_assert(offsetof(cls_0x4b53f0, reservation14_) == 0x28, "cls_0x4b53f0 reservation14_ offset mismatch");
+static_assert(offsetof(Packet_MsDeleteCharacterRequest_0x4b53f0, reservation14_) == 0x28, "Packet_MsDeleteCharacterRequest_0x4b53f0 reservation14_ offset mismatch");
 
 struct State10Packet0x0aFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
@@ -231,7 +235,9 @@ struct State10Packet0x0aFixedPayload {
 // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
 //
 // Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
-class cls_0x4b53b4 : public Packet_0x4af2a4 {
+//
+// Margin opcode 0x0a = MS_ClaimCharacterNameRequest (used by state10)
+class Packet_MsClaimCharacterNameRequest_0x4b53b4 : public Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a1f0
     void ResetAndInitialize() {
@@ -264,14 +270,16 @@ public:
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
 };
 
-static_assert(offsetof(cls_0x4b53b4, reservation14_) == 0x28, "cls_0x4b53b4 reservation14_ offset mismatch");
+static_assert(offsetof(Packet_MsClaimCharacterNameRequest_0x4b53b4, reservation14_) == 0x28, "Packet_MsClaimCharacterNameRequest_0x4b53b4 reservation14_ offset mismatch");
 
 // anchor: launcher.exe vtable 0x004b53c8 / packet 0x0c builder
 // anchor: launcher.exe:0x43a470 = ResetAndInitialize
 // anchor: launcher.exe:0x43a640/0x43a740/0x43a840/0x43a940 = Set* helpers (mediator methods)
 //
 // Object layout: inherits Packet_0x4af2a4 at +0x00, then 4 reservation scaffolds at +0x28/+0x30/+0x38/+0x40
-class cls_0x4b53c8 : public Packet_0x4af2a4 {
+//
+// Margin opcode 0x0c (0x4d) = MS_CreateCharacterRequest (used by state11)
+class Packet_MsCreateCharacterRequest_0x4b53c8 : public Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a470
     void ResetAndInitialize() {
@@ -318,10 +326,10 @@ private:
     }
 };
 
-static_assert(offsetof(cls_0x4b53c8, realFirstName14_) == 0x28, "cls_0x4b53c8 realFirstName14_ offset mismatch");
-static_assert(offsetof(cls_0x4b53c8, realLastName1c_) == 0x30, "cls_0x4b53c8 realLastName1c_ offset mismatch");
-static_assert(offsetof(cls_0x4b53c8, background24_) == 0x38, "cls_0x4b53c8 background24_ offset mismatch");
-static_assert(offsetof(cls_0x4b53c8, gameSessionId2c_) == 0x40, "cls_0x4b53c8 gameSessionId2c_ offset mismatch");
+static_assert(offsetof(Packet_MsCreateCharacterRequest_0x4b53c8, realFirstName14_) == 0x28, "Packet_MsCreateCharacterRequest_0x4b53c8 realFirstName14_ offset mismatch");
+static_assert(offsetof(Packet_MsCreateCharacterRequest_0x4b53c8, realLastName1c_) == 0x30, "Packet_MsCreateCharacterRequest_0x4b53c8 realLastName1c_ offset mismatch");
+static_assert(offsetof(Packet_MsCreateCharacterRequest_0x4b53c8, background24_) == 0x38, "Packet_MsCreateCharacterRequest_0x4b53c8 background24_ offset mismatch");
+static_assert(offsetof(Packet_MsCreateCharacterRequest_0x4b53c8, gameSessionId2c_) == 0x40, "Packet_MsCreateCharacterRequest_0x4b53c8 gameSessionId2c_ offset mismatch");
 
 struct State8MarginPacketFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
@@ -332,13 +340,13 @@ struct State8MarginPacketFixedPayload {
 };
 
 // Note: The original launcher.exe does NOT have a separate derived class for
-// packet 0x0f building. Code at 0x43bd20 uses cls_0x4b5418 directly on the stack.
+// packet 0x0f building. Code at 0x43bd20 uses Packet_MsLoadCharacterRequest_0x4b5418 directly on the stack.
 // The SetGameSessionId logic at 0x43ada0 is a CLTLoginMediator method that operates
 // on the mediator's caching fields (networkEngine14, authConnection18), not on the
 // packet object itself.
 //
 // For source code clarity, packet 0x0f sending should:
-//   1. Stack-allocate cls_0x4b5418
+//   1. Stack-allocate Packet_MsLoadCharacterRequest_0x4b5418
 //   2. Call ResetAndInitialize()
 //   3. Write payload fields directly via PayloadBase()
 //   4. Call CLTLoginMediator::SetGameSessionIdOnPacket() helper (mediator method)
@@ -363,7 +371,9 @@ struct State6Packet0x06FixedPayload {
 
 // anchor: launcher.exe vtable 0x004b5364 / packet 0x06 builder
 // anchor: launcher.exe:0x43b8f0 = ResetAndInitialize
-class cls_0x4b5364 : public Packet_0x4af2a4 {
+//
+// Margin opcode 0x06 = MS_ConnectRequest (used by state6)
+class Packet_MsConnectRequest_0x4b5364 : public Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43b8f0
     void ResetAndInitialize() {
@@ -404,6 +414,6 @@ public:
     const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
 };
 
-static_assert(sizeof(cls_0x4b5364) == sizeof(Packet_0x4af2a4), "cls_0x4b5364 size mismatch");
+static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
 
 }  // namespace mxo::ltlogin

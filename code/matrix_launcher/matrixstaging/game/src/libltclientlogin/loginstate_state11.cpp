@@ -100,8 +100,8 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     sourceDwords134[16] = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.bodyWord6c;
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
-    // anchor: launcher.exe:0x43a470 = cls_0x4b53c8::ResetAndInitialize
-    cls_0x4b53c8 packetBuilder;
+    // anchor: launcher.exe:0x43a470 = Packet_MsCreateCharacterRequest_0x4b53c8::ResetAndInitialize
+    Packet_MsCreateCharacterRequest_0x4b53c8 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     // Keep write order aligned with the original disassembly of `0x43c020`.

@@ -82,8 +82,8 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
     const char* sourceBlock94String60Begin = g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
 
-    // anchor: launcher.exe:0x43a9a0 = cls_0x4b53f0::ResetAndInitialize
-    cls_0x4b53f0 packetBuilder;
+    // anchor: launcher.exe:0x43a9a0 = Packet_MsDeleteCharacterRequest_0x4b53f0::ResetAndInitialize
+    Packet_MsDeleteCharacterRequest_0x4b53f0 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)

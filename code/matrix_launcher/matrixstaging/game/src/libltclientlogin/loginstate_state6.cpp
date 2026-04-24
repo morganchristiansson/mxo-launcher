@@ -203,8 +203,8 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // - payload `+0x0a/+0x0e` = fixed dwords `0x11186887` / `0x7460a4b0`
     // - payload `+0x12..+0x21` = packed-GOB LTGUID from `0x438e60` fallback family
     // - payload `+0x22` = owner current helper phase byte
-    // anchor: launcher.exe:0x43b8f0 = cls_0x4b5364::ResetAndInitialize
-    cls_0x4b5364 packetBuilder;
+    // anchor: launcher.exe:0x43b8f0 = Packet_MsConnectRequest_0x4b5364::ResetAndInitialize
+    Packet_MsConnectRequest_0x4b5364 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
@@ -220,11 +220,17 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     if (payload) {
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kLauncherVersionOffset) = launcherVersion;
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kClientVersionOffset) = clientVersion;
+        // Fixed 9-byte block at +0x09 that server expects: byte=1, dword=0x11186887, dword=0x7460a4b0
+        payload[State6Packet0x06FixedPayload::kStateByteOffset] = State6Packet0x06FixedPayload::kStateByteValue;
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordAOffset) = State6Packet0x06FixedPayload::kFixedDwordA;
+        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordEOffset) = State6Packet0x06FixedPayload::kFixedDwordE;
+        // Packed GOB LTGUID from launcher resource
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0) = gobFileGuidWords[0];
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4) = gobFileGuidWords[1];
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8) = gobFileGuidWords[2];
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc) = gobFileGuidWords[3];
-        payload[State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset] = currentHelperPhaseByte;
+        // Note: helper phase byte is internal launcher state, NOT sent to server
+        // Server expects 0x00 at offset 0x22 after weirdSequence
     }
 
     // Build envelope for send
