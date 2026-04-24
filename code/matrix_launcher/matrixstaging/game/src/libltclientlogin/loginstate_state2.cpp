@@ -181,6 +181,33 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         ++g_CurrentLoginMediator->worldDescriptorCountD80_;
                     }
                 }
+                // anchor: launcher.exe:0x43f386-0x43f3a2 — world descriptor validation logging
+                // Binary validates each world's status (offset 0x17) and type (offset 0x18)
+                // For invalid values, it logs using LogRouter_FprintfCompatUsingTlsSourceLoc
+                // and forces the field to 0 (invalid). This is inline, no function calls.
+                for (size_t i = 0; i < g_CurrentLoginMediator->worldDescriptorCountD80_; ++i) {
+                    mxo::auth::AuthWorldEntry& entry =
+                        g_CurrentLoginMediator->lastAuthReply_.worlds[i];
+                    // FIDELITY: binary checks status byte at offset 0x17, type byte at offset 0x18
+                    // If invalid (==0), it logs "World %s (id = %d) has an invalid status/type!"
+                    // and forces the field to 0. This is inline processing.
+                    if (entry.status == 0u) {
+                        std::string worldName = entry.worldName;
+                        uint16_t worldId = entry.worldId;
+                        spdlog::warn(
+                            "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): World %s (id = %d) has an invalid status!  Forcing it to WORLDSTATUS_INVALID.",
+                            worldName.c_str(), worldId);
+                        entry.status = 0u;  // FIDELITY: binary forces field to 0
+                    }
+                    if (entry.type == 0u) {
+                        std::string worldName = entry.worldName;
+                        uint16_t worldId = entry.worldId;
+                        spdlog::warn(
+                            "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): World %s (id = %d) has an invalid type!  Forcing it to WORLDTYPE_INVALID.",
+                            worldName.c_str(), worldId);
+                        entry.type = 0u;  // FIDELITY: binary forces field to 0
+                    }
+                }
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
                     *g_CurrentLoginMediator->authBootstrapChild680_,
                     g_CurrentLoginMediator->lastAuthReply_);
@@ -234,6 +261,26 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
               }
               g_CurrentLoginMediator->SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
             }
+                // anchor: launcher.exe:0x43f3f4-0x43f410 — character slot validation logging
+                // Binary validates each character's status (offset 0xb)
+                // If invalid (==0), it logs "Character %s (gcid = ...) has an invalid status!"
+                // and forces the field to 7 (AUTHDBCHARSTATUS_INVALID). This is inline.
+                for (size_t i = 0; i < g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_; ++i) {
+                    SlotRecordState_0x4b5328& slotRecord =
+                        g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
+                    // FIDELITY: binary checks status byte at offset 0xb (status3a field)
+                    // If invalid (==0), it logs "Character %s (gcid = ...) has an invalid status!"
+                    // and forces the field to 7. This is inline processing.
+                    if (slotRecord.debugString14 != nullptr && slotRecord.status3a == 0u) {
+                        uint64_t gcid =
+                            (static_cast<uint64_t>(slotRecord.characterIdHigh36) << 32) | slotRecord.characterIdLow32;
+                        spdlog::warn(
+                            "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): Character %s (gcid = %I64u) has an invalid status!  Forcing it to AUTHDBCHARSTATUS_INVALID.",
+                            slotRecord.debugString14,
+                            gcid);
+                        slotRecord.status3a = 7u;  // FIDELITY: binary forces field to 7
+                    }
+                }
                 g_CurrentLoginMediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
                 g_CurrentLoginMediator->PostEvent(6u);
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
