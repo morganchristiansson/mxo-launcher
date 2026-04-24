@@ -254,27 +254,46 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     }
 
     // anchor: launcher.exe:0x43bd84-0x43bdfa = write selection blocks directly to payload
-    // Keep block write order aligned with the original `0x43bd20` disassembly, not numeric order.
+    // FIXED: Server expects 32 zeroes then 9 consecutive copies of the weird sequence from MS_ConnectRequest.
+    // The server stores the weird sequence (first non-zero block from Cf0/D00/D10/D20/D30/D40/D50/D60/D70)
+    // and expects MS_LoadCharacterRequest to contain 9 consecutive 16-byte copies of that sequence.
+    // anchor: pickWeirdSequence logic matches original around 0x41e500
     if (payload) {
-        // cf0 = il.cfg, d00 = hl.cfg, d10 = an.cfg, d20 = rl.cfg, d30 = cl.cfg,
-        // d40 = pi.cfg, d50 = ai.cfg, d60 = cs/bl, d70 = cui.cfg
-        auto WriteBlock = [payload](size_t offset, const std::array<uint32_t, 4>& block) {
-            *reinterpret_cast<uint32_t*>(payload + offset + 0x0) = block[0];
-            *reinterpret_cast<uint32_t*>(payload + offset + 0x4) = block[1];
-            *reinterpret_cast<uint32_t*>(payload + offset + 0x8) = block[2];
-            *reinterpret_cast<uint32_t*>(payload + offset + 0xc) = block[3];
-        };
-        WriteBlock(0x09, g_CurrentLoginMediator->SelectionContextBlockCd0());
-        WriteBlock(0x19, g_CurrentLoginMediator->SelectionContextBlockCe0());
-        WriteBlock(0x29, g_CurrentLoginMediator->SelectionContextBlockCf0());
-        WriteBlock(0x79, g_CurrentLoginMediator->SelectionContextBlockD40());
-        WriteBlock(0x89, g_CurrentLoginMediator->SelectionContextBlockD50());
-        WriteBlock(0x99, g_CurrentLoginMediator->SelectionContextBlockD60());
-        WriteBlock(0xa9, g_CurrentLoginMediator->SelectionContextBlockD70());
-        WriteBlock(0x39, g_CurrentLoginMediator->SelectionContextBlockD00());
-        WriteBlock(0x49, g_CurrentLoginMediator->SelectionContextBlockD10());
-        WriteBlock(0x59, g_CurrentLoginMediator->SelectionContextBlockD20());
-        WriteBlock(0x69, g_CurrentLoginMediator->SelectionContextBlockD30());
+        // Write 32 zeroes at offset 0x08 (bytes 8-39)
+        // Server reads these as justZeroes and validates they're all zero
+        std::memset(payload + 0x08, 0, 32);
+
+        // Inline pickWeirdSequence logic (same as MS_ConnectRequest pickWeirdSequence lambda)
+        // Select first non-zero block from: Cf0, D00, D10, D20, D30, D40, D50, D60, D70
+        std::array<uint8_t, 16> weirdSequence = {};
+        const std::array<const std::array<uint32_t, 4>*, 9> candidates = {
+            &g_CurrentLoginMediator->SelectionContextBlockCf0(),
+            &g_CurrentLoginMediator->SelectionContextBlockD00(),
+            &g_CurrentLoginMediator->SelectionContextBlockD10(),
+            &g_CurrentLoginMediator->SelectionContextBlockD20(),
+            &g_CurrentLoginMediator->SelectionContextBlockD30(),
+            &g_CurrentLoginMediator->SelectionContextBlockD40(),
+            &g_CurrentLoginMediator->SelectionContextBlockD50(),
+            &g_CurrentLoginMediator->SelectionContextBlockD60(),
+            &g_CurrentLoginMediator->SelectionContextBlockD70()};
+        for (const auto* candidate : candidates) {
+            if (!candidate) continue;
+            if ((*candidate)[0] == 0u && (*candidate)[1] == 0u && (*candidate)[2] == 0u && (*candidate)[3] == 0u) continue;
+            for (size_t j = 0; j < 4u; ++j) {
+                const uint32_t value = (*candidate)[j];
+                weirdSequence[j * 4u + 0u] = static_cast<uint8_t>(value & 0xffu);
+                weirdSequence[j * 4u + 1u] = static_cast<uint8_t>((value >> 8u) & 0xffu);
+                weirdSequence[j * 4u + 2u] = static_cast<uint8_t>((value >> 16u) & 0xffu);
+                weirdSequence[j * 4u + 3u] = static_cast<uint8_t>((value >> 24u) & 0xffu);
+            }
+            break;
+        }
+
+        // Write 9 consecutive copies of the weird sequence at offset 0x28 (bytes 40-183)
+        // Server increments strangeCounter for each matching 16-byte block, expects 9
+        for (size_t i = 0; i < 9u; ++i) {
+            std::memcpy(payload + 0x28 + (i * 16u), weirdSequence.data(), 16);
+        }
     }
 
     // anchor: launcher.exe:0x43ada0 = SetGameSessionId (mediator helper)
@@ -324,23 +343,37 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x09u);
 
+    const std::array<uint8_t, 16> weirdSeq = []() {
+        std::array<uint8_t, 16> bytes = {};
+        const std::array<const std::array<uint32_t, 4>*, 9> candidates = {
+            &g_CurrentLoginMediator->SelectionContextBlockCf0(),
+            &g_CurrentLoginMediator->SelectionContextBlockD00(),
+            &g_CurrentLoginMediator->SelectionContextBlockD10(),
+            &g_CurrentLoginMediator->SelectionContextBlockD20(),
+            &g_CurrentLoginMediator->SelectionContextBlockD30(),
+            &g_CurrentLoginMediator->SelectionContextBlockD40(),
+            &g_CurrentLoginMediator->SelectionContextBlockD50(),
+            &g_CurrentLoginMediator->SelectionContextBlockD60(),
+            &g_CurrentLoginMediator->SelectionContextBlockD70()};
+        for (const auto* candidate : candidates) {
+            if (!candidate) continue;
+            if ((*candidate)[0] == 0u && (*candidate)[1] == 0u && (*candidate)[2] == 0u && (*candidate)[3] == 0u) continue;
+            for (size_t j = 0; j < 4u; ++j) {
+                const uint32_t value = (*candidate)[j];
+                bytes[j * 4u + 0u] = static_cast<uint8_t>(value & 0xffu);
+                bytes[j * 4u + 1u] = static_cast<uint8_t>((value >> 8u) & 0xffu);
+                bytes[j * 4u + 2u] = static_cast<uint8_t>((value >> 16u) & 0xffu);
+                bytes[j * 4u + 3u] = static_cast<uint8_t>((value >> 24u) & 0xffu);
+            }
+            break;
+        }
+        return bytes;
+    }();
     spdlog::debug(
-        "CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0(il.cfg)={} d00(hl.cfg)={} d10(an.cfg)={} d20(rl.cfg)={} d30(cl.cfg)={} d40(pi.cfg)={} d50(ai.cfg)={} d60(bl/cs.cfg)={} d70(cui.cfg)={}",
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockCd0()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockCe0()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockCf0()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD00()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD10()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD20()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD30()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD40()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD50()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD60()),
-        FormatU32x4Block(g_CurrentLoginMediator->SelectionContextBlockD70()));
+        "CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue state8 weirdSequence bytes (first 16 of 9 copies): first4=0x{:08x}",
+        *reinterpret_cast<const uint32_t*>(weirdSeq.data()));
 
-    const unsigned nonZeroSnapshotBlockCount =
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCd0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCe0())) +
+    const unsigned weirdSequenceNonZeroCount =
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCf0())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD00())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD10())) +
@@ -353,15 +386,17 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // gameSessionId already declared above in SetGameSessionId block
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} weirdSequenceCandidateCount={} weirdSeq[0..3]=[0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}] GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
         0xbbu,
         packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
             ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
-        nonZeroSnapshotBlockCount,
-        g_CurrentLoginMediator->SelectionContextBlockCd0()[0],
-        g_CurrentLoginMediator->SelectionContextBlockD70()[3],
+        weirdSequenceNonZeroCount,
+        weirdSeq[0],
+        weirdSeq[1],
+        weirdSeq[2],
+        weirdSeq[3],
         gameSessionId ? gameSessionId : "<empty>",
         sendResult);
     return;
