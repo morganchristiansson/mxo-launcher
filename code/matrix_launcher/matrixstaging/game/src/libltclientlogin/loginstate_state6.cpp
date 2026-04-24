@@ -229,8 +229,9 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4) = gobFileGuidWords[1];
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8) = gobFileGuidWords[2];
         *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc) = gobFileGuidWords[3];
-        // Note: helper phase byte is internal launcher state, NOT sent to server
         // Server expects 0x00 at offset 0x22 after weirdSequence
+        payload[State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset] = 0u;
+        // Note: helper phase byte is internal launcher state, read separately from mediator
     }
 
     // Build envelope for send
