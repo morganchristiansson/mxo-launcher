@@ -227,12 +227,8 @@ CLTLoginMediator::CLTLoginMediator()
       marginAddressList3c_{},
       authBootstrapChild680_(nullptr),
       launchPadClient65c_(nullptr),
-      selectionRouteState684_{},
-      selectionContext0ecCopy_{},
-      selectionContext0ecCopyValid_(false),
-      selection0ecCount_(0),
-      profile0f4Count_(0),
-      postAuthMarginLoadingState_0xf14{},
+    selectionRouteState684_{},
+    postAuthMarginLoadingState_0xf14{},
       authServerPortHostOrder_(11000),
       ignoreHostsFileForAuth_(false),
       marginServerPortHostOrder_(10000),
@@ -1474,84 +1470,65 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 }
 
 // anchor: launcher.exe:0x41c1f0 +0xec
-// Fidelity note: Original 0x41c1f0 structure guards entire body behind DispatchPhaseCode() > 2 (phase 3+) check
+// Fidelity: Original 0x41c1f0 directly writes from param_1 into selectionRouteState684.
+// No intermediate storage or diagnostic counters exist in the original binary.
 uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) {
-    // anchor: launcher.exe:0x41c1f0
-  // Fidelity: Original checks DispatchPhaseCode() > 2 (phase 3+) before any operation
-  // Disassembly: 0x41c1f6 MOV ECX,[ESI+0x10]; 0x41c1fb CALL [EAX+0x18]; 0x41c201 JL out
-  if (currentState_ == nullptr || currentState_->DispatchPhaseCode() <= 2u) {
-    return 0u;
-  }
+ // anchor: launcher.exe:0x41c1f0 +0xec
+ // Fidelity: Original checks DispatchPhaseCode() > 2 (phase 3+) before any operation
+ // Disassembly: 0x41c1f6 MOV ECX,[ESI+0x10]; 0x41c1fb CALL [EAX+0x18]; 0x41c201 JL out
+ if (currentState_ == nullptr || currentState_->DispatchPhaseCode() <= 2u) {
+ return 0u;
+ }
 
-    // Owner-side state3-wait advance:
-    // - the early route reaches this while current helper `+0x10` is still state3
-    // - this method, not a state3-local slot-3 body, copies the `0xb4` selection/config snapshot
-    //   into owner `+0xcc8/+0xcd0..+0xd7f`
-    // - then it switches to helper/state `8`
-    // Fresh happy-path proof tightens the transition boundary too:
-    // - the already-proven upstream chain is
-    //   `state0 -> ProcessLoginRequest -> state2 -> state1 -> state2 -> state3(wait) -> 0x41c1f0`
-    // - no additional early helper-switch hits were observed in the narrow state3 wait window
-    //   before the live `0x41c1f0` stop
-    // - newer launcher/client bridge tightening also narrows the immediate producer split:
-    //   - launcher-side selection resolution currently closes through `0x40d6f0` writing
-    //     `CLauncher+0xa8/+0xac` plus `Last_WorldName`
-    //   - the direct success-side `+0xec` call is then best read from
-    //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`, where the client
-    //     zero-initializes and fills the stack-local `0xb4` handoff immediately before calling
-    //     this owner method
-    selectionContext0ecCopy_ = input;
-    selectionContext0ecCopyValid_ = true;
-    ++selection0ecCount_;
-    if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 3u) {
-        spdlog::info(
-            "ROUTE CHECKPOINT: early-auth state2 -> state3(wait) -> owner+0xec/0x41c1f0 currentState={} slot=0x{:02x}",
-            currentState_->DebugName(),
-            static_cast<unsigned>(selectionContext0ecCopy_.slotOrSelectionIndex00 & 0xffu));
-    }
-    spdlog::info(
-        "CLTLoginMediator::PersistSelectionContextForState8 captured selection mirror [count={}] slot=0x{:02x} block04_0=0x{:08x} blockA4_3=0x{:08x}",
-        selection0ecCount_,
-        static_cast<unsigned>(selectionContext0ecCopy_.slotOrSelectionIndex00 & 0xffu),
-        selectionContext0ecCopy_.block04[0],
-        selectionContext0ecCopy_.blockA4[3]);
-    if (input.slotOrSelectionIndex00 >= 100u) {
-        return 0u;
-    }
+ // Owner-side state3-wait advance:
+ // - the early route reaches this while current helper `+0x10` is still state3
+ // - this method, not a state3-local slot-3 body, copies the `0xb4` selection/config snapshot
+ // into owner `+0xcc8/+0xcd0..+0xd7f` (via selectionRouteState684_ at owner +0x684)
+ // - then it switches to helper/state `8`
+ //
+ // Fidelity note: Original 0x41c1f0 directly writes from param_1 into selectionRouteState684
+ // without intermediate storage. No selectionContext0ecCopy_, selectionContext0ecCopyValid_,
+ // or selection0ecCount_ exist in the original binary - these were diagnostic additions.
+ if (input.slotOrSelectionIndex00 >= 100u) {
+ return 0u;
+ }
 
-    SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(input.slotOrSelectionIndex00));
-    static_assert(
-        sizeof(selectionRouteState684_.persistedSelectionContext64c_) == sizeof(input) - sizeof(input.slotOrSelectionIndex00),
-        "0x41c1f0 should copy the contiguous state3 snapshot body after the leading slot dword");
-    std::copy_n(
-        reinterpret_cast<const uint32_t*>(&input.block04),
-        sizeof(selectionRouteState684_.persistedSelectionContext64c_) / sizeof(uint32_t),
-        reinterpret_cast<uint32_t*>(&selectionRouteState684_.persistedSelectionContext64c_));
+ // anchor: launcher.exe:0x41c390 = SetCurrentCharacterRouteIndexCc8Scaffold
+ // Write slot index to owner +0xcc8 / selectionRouteState684_.currentSlotOrSelectionIndex644_
+ SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(input.slotOrSelectionIndex00));
 
-    const CLTLoginState* const oldState = currentState_;
-    uint32_t state8EntryResult = 0u;
-    if (LoginHelperStateByIdScaffold(8u) != nullptr) {
-        // anchor: launcher.exe:0x41c1f0 -> 0x41b450(8)
-        // Important existing-character continuation detail:
-        // - the original owner `+0xec` tail does not stop at `currentState = state8`
-        // - `0x41b450` immediately re-enters the new helper's slot 3 with the old helper object
-        // - on the active path that means `state8 slot3` runs right here, sees margin state != 2,
-        //   and hands off into helper/state4 before the later margin connect-status arrives
-        // - without that immediate slot-3 continuation, the later type-2 margin completion lands on
-        //   shared state8 slot2 and returns 0 instead of restoring the original state4/state5/state6
-        //   chain back toward the first natural state8 raw-0x0f send
-        state8EntryResult = SetCurrentState(8u);
-    }
+ // anchor: launcher.exe:0x41c1f0 body - direct field copies from param_1 to selectionRouteState684_
+ // Original directly assigns: (this->selectionRouteState684).currentSlotOrSelectionIndex644 = (byte)*param_1;
+ // Then copies param_1[1..0x2c] into the selectionContextBlock* fields
+ static_assert(
+ sizeof(selectionRouteState684_.persistedSelectionContext64c_) == sizeof(input) - sizeof(input.slotOrSelectionIndex00),
+ "0x41c1f0 should copy the contiguous state3 snapshot body after the leading slot dword");
+ std::copy_n(
+ reinterpret_cast<const uint32_t*>(&input.block04),
+ sizeof(selectionRouteState684_.persistedSelectionContext64c_) / sizeof(uint32_t),
+ reinterpret_cast<uint32_t*>(&selectionRouteState684_.persistedSelectionContext64c_));
 
-    spdlog::info(
-        "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} oldState={} currentState={} state8EntryResult=0x{:08x}",
-        selectionRouteState684_.CurrentSlotOrSelectionIndex644(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
-        selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
-        oldState ? oldState->DebugName() : "<null>",
-        currentState_ ? currentState_->DebugName() : "<unchanged>",
-        static_cast<unsigned>(state8EntryResult));
-    return 0u;
+ // anchor: launcher.exe:0x41c1f0 tail -> 0x41b450(8) = SetCurrentState
+ const CLTLoginState* const oldState = currentState_;
+ uint32_t state8EntryResult = 0u;
+ if (LoginHelperStateByIdScaffold(8u) != nullptr) {
+ // Important existing-character continuation detail:
+ // - the original owner `+0xec` tail does not stop at `currentState = state8`
+ // - `0x41b450` immediately re-enters the new helper's slot 3 with the old helper object
+ // - on the active path that means `state8 slot3` runs right here, sees margin state != 2,
+ // and hands off into helper/state4 before the later margin connect-status arrives
+ state8EntryResult = SetCurrentState(8u);
+ }
+
+ spdlog::info(
+ "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} oldState={} currentState={} state8EntryResult=0x{:08x}",
+ selectionRouteState684_.CurrentSlotOrSelectionIndex644(),
+ selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
+ selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
+ oldState ? oldState->DebugName() : "<null>",
+ currentState_ ? currentState_->DebugName() : "<unchanged>",
+ static_cast<unsigned>(state8EntryResult));
+ return 0u;
 }
 
 // anchor: launcher.exe:0x41c390 +0xf0
@@ -1579,24 +1556,10 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectedS
 
 // anchor: launcher.exe:0x41f1c0 / owner vtable +0xf4
 const void* CLTLoginMediator::GetState8PersistenceF1c() const {
-    // Keep the wrapper-facing body close to the original tiny getter:
-    // - original `0x41f1c0` returns owner `+0xf1c`
-    const CLTLoginMediatorCharacterPersistenceData* const snapshot =
-        &postAuthMarginLoadingState_0xf14.state8PersistenceDataF1c;
-    ++profile0f4Count_;
-    spdlog::debug(
-        "CLTLoginMediator::GetState8PersistenceF1c(+0xf4) -> {} [count={} copiedFrom0ec={} valid0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
-        fmt::ptr(snapshot),
-        profile0f4Count_,
-        selection0ecCount_,
-        selectionContext0ecCopyValid_ ? 1u : 0u,
-        snapshot->characterName00[0] ? snapshot->characterName00.data() : "<empty>",
-        snapshot->realFirstName70[0] ? snapshot->realFirstName70.data() : "<empty>",
-        snapshot->realLastName90[0] ? snapshot->realLastName90.data() : "<empty>",
-        snapshot->backgroundB0[0] ? snapshot->backgroundB0.data() : "<empty>",
-        static_cast<unsigned>(snapshot->selectedWorldField24),
-        static_cast<unsigned>(snapshot->section0OverflowLength4d8));
-    return snapshot;
+ // anchor: launcher.exe:0x41f1c0
+ // Original tiny body: return &owner->postAuthMarginLoadingState_0xf14.state8PersistenceDataF1c;
+ // No diagnostic counters exist in original binary - they were source additions.
+ return &postAuthMarginLoadingState_0xf14.state8PersistenceDataF1c;
 }
 
 // anchor: launcher.exe:0x41af30 / launcher.exe:0x40e5b0
@@ -2176,13 +2139,12 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
 }
 
 // anchor: launcher.exe:0x41ecd0
+// Original 0x41ecd0: Clears state. No diagnostic counters exist in original binary.
 void CLTLoginMediator::ResetSelectionContext0ecMirror() {
-    selectionContext0ecCopy_ = {};
-    selectionContext0ecCopyValid_ = false;
-    ++selection0ecCount_;
-    spdlog::info(
-        "CLTLoginMediator::ResetSelectionContext0ecMirror cleared selection mirror [count={}]",
-        selection0ecCount_);
+ // Fidelity note: Original does not maintain selectionContext0ecCopy_, selectionContext0ecCopyValid_,
+ // or selection0ecCount_ - these were diagnostic additions. The original simply clears the state
+ // or performs minimal cleanup as part of owner state management.
+ // It also duplicates CLTLoginMediator::ProcessLoginRequest anchor
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

@@ -846,14 +846,19 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
         mediator->ResetSelectionContext0ecMirror();
     }
 
-    // Keep the wrapper-facing arg6 `+0x1c` semantic split explicit.
-    // The copy now lives on `CLTLoginMediator`, but the stub object still exposes a direct
-    // pointer-shaped field that client-side code may read without going back through the owner
-    // vtable family.
-    if (self) {
-        self->field1C = const_cast<mxo::ltlogin::State3SelectionContextInputSketch*>(
-            &mediator->SelectionContext0ecCopy());
+  // Keep the wrapper-facing arg6 `+0x1c` semantic split explicit.
+  // Store the input in the stub for client-side code that may read it without going through
+  // the owner vtable family. This is an ABI-wrapper concern, not a CLTLoginMediator field.
+  if (self) {
+    // Copy the input to stub-owned storage for field1C exposure
+    static thread_local mxo::ltlogin::State3SelectionContextInputSketch tl_input{};
+    if (selectionContext) {
+      std::memcpy(&tl_input, selectionContext, sizeof(tl_input));
+    } else {
+      tl_input = {};
     }
+    self->field1C = &tl_input;
+  }
 
     (void)returnAddress;
 }

@@ -1322,15 +1322,16 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Owner-side narrower state3-wait advance: stores selection index and switches to state7.
     uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) override;
 
-    // +0xec
-    // anchor: launcher.exe:0x41c1f0
-    // Owner-side state3-wait advance: persists the selection/config snapshot and switches to state8.
-    uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) override;
-    const void* GetState8PersistenceF1c() const override;
-    const State3SelectionContextInputSketch& SelectionContext0ecCopy() const { return selectionContext0ecCopy_; }
-    void ResetSelectionContext0ecMirror();
+  // +0xec / +0xf4 wrapper-owned mirrors
+  // anchor: launcher.exe:0x41c1f0 (PersistSelectionContextForState8)
+  // anchor: launcher.exe:0x41ecd0 (ResetSelectionContext0ecMirror)
+  // anchor: launcher.exe:0x41f1c0 (GetState8PersistenceF1c)
+  // Owner-side state3-wait advance: persists the selection/config snapshot and switches to state8.
+  uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) override;
+  void ResetSelectionContext0ecMirror();
+  const void* GetState8PersistenceF1c() const override;
 
-    // +0x120
+  // +0x120
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
@@ -1615,15 +1616,9 @@ public:
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
     // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).
-    CLTLoginMediatorSelectionRouteState selectionRouteState684_{};
-    // +0xec / +0xf4 wrapper-owned mirrors now live on the mediator instance instead of in the
-    // launcher ABI shell.
-    State3SelectionContextInputSketch selectionContext0ecCopy_{};
-    bool selectionContext0ecCopyValid_ = false;
-    uint32_t selection0ecCount_ = 0;
-    mutable uint32_t profile0f4Count_ = 0;
-    // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
-    PostAuthMarginLoadingState postAuthMarginLoadingState_0xf14;
+  CLTLoginMediatorSelectionRouteState selectionRouteState684_{};
+  // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
+  PostAuthMarginLoadingState postAuthMarginLoadingState_0xf14;
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18
     // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
     std::array<WorldDescriptorState_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
