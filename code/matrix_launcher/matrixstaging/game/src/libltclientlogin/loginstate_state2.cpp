@@ -4,144 +4,6 @@
 #include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
-namespace {
-
-// Phase A of the auth-reply adoption: build +0xd84 world descriptors.
-// anchor: launcher.exe:0x43f300 (world-descriptor loop in the one-time gate body)
-//
-// The original at 0x43f300 builds world descriptors first, then writes field114/118,
-// then resets selection-route state and builds character slot records. This phase A
-// covers only the world-descriptor portion so the caller can interleave field114/118
-// between phases A and B to match binary ordering.
-void AdoptAuthReplyIntoRecoveredMediatorState_WorldDescriptors(CLTLoginMediator* mediator) {
-    if (!mediator) {
-        return;
-    }
-
-    // Address anchors:
-    // - launcher.exe:0x43f300 broader auth-reply writer
-    // - launcher.exe:0x441260 / 0x441330 narrower auth-reply adoption helpers nearby in the same
-    //   broader early-auth corridor
-    // Keep this helper scoped to the broader auth-reply adoption used by state2/current existing-
-    // character auth bridges.
-    // Important create/delete correction from the latest static pass:
-    // - `0x4401a0` is not an auth-reply adopter
-    // - it is the later margin-side `MS_ClaimCharacterNameReply` append helper for state10 slot 6
-    // - so do not treat this broader auth-table rebuild as the owner-side body for `0x4401a0`
-    mediator->worldSlots_.fill(nullptr);
-    mediator->worldPayloadSlots_.fill(nullptr);
-    mediator->worldDescriptorValidD84_.fill(false);
-    mediator->worldDescriptorCountD80_ = 0;
-
-    const size_t worldCount = std::min(mediator->worldSlots_.size(), mediator->lastAuthReply_.worlds.size());
-    for (size_t i = 0; i < worldCount; ++i) {
-        mediator->worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&mediator->lastAuthReply_.worlds[i]);
-        mediator->worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&mediator->lastAuthReply_.worlds[i]);
-        mediator->SeedRecoveredWorldDescriptorFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.worlds[i]);
-        ++mediator->worldDescriptorCountD80_;
-    }
-}
-
-// Phase B of the auth-reply adoption: reset selection-route state, cap +0x684 slot count to <=100,
-// populate +0x688 slot records, seed +0x818 route-host strings by matching slot worldId
-// against descriptor worldId.
-// anchor: launcher.exe:0x43f300 (character-slot loop + route-host seeding in the one-time gate body)
-//
-// NOTE: the original at 0x43f300 does NOT write back to owner +0x80 inside the one-time gate body;
-// +0x80 was already set from authBootstrapChild680.inboundAuthStatusEc before the switch.
-// The former monolithic AdoptAuthReplyIntoRecoveredMediatorStateScaffold incorrectly wrote
-// worldListCountOrStatus80 = worlds.size() here; that write has been removed.
-void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMediator* mediator) {
-    if (!mediator) {
-        return;
-    }
-
-    const size_t worldCount = std::min(mediator->worldSlots_.size(), mediator->lastAuthReply_.worlds.size());
-
-    mediator->selectionRouteState684_.ResetSelectionRouteState();
-
-    const size_t characterCount = std::min(
-        mediator->selectionRouteState684_.slotRecordTable04_.size(),
-        mediator->lastAuthReply_.characters.size());
-    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(characterCount);
-    for (size_t i = 0; i < characterCount; ++i) {
-        mediator->SeedRecoveredCharacterSlotRecordFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.characters[i]);
-        const SlotRecordState_0x4b5328& slotRecord = mediator->selectionRouteState684_.slotRecordTable04_[i];
-        const int matchedWorldIndex = mediator->FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId3c);
-        if (matchedWorldIndex >= 0) {
-            // anchor: launcher.exe:0x43f74a
-            // Original joins the just-built slot-record world id against the earlier +0xd84 table,
-            // then copies the descriptor inline name into +0x818[currentCharacterIndex].
-            mediator->selectionRouteState684_.routeHostStringTriples194_[i].Assign(
-                mediator->worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03);
-        }
-    }
-
-    // NOTE: the binary does NOT write owner +0x80 inside the one-time gate body. It was already
-    // set from inboundAuthStatusEc before the switch. Do not add a worldListCountOrStatus80
-    // writeback here.
-
-    if (characterCount != 0) {
-        // Replacement-side mirror only:
-        // - broader `0x43f300` resets `+0xcc8` through `0x41d270` and does not show a direct
-        //   rewrite of the current-slot byte during the one-time auth adoption body
-        // - current source still seeds slot 0 here so the non-GUI launcher path keeps a concrete
-        //   current-slot mirror after the original table rebuild
-        mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0u);
-    }
-
-    if (characterCount != 0) {
-        const SlotRecordState_0x4b5328& currentSlotRecord =
-            mediator->selectionRouteState684_.slotRecordTable04_[0];
-        mediator->marginRouteState_.pendingWorldId = currentSlotRecord.worldId3c;
-        mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord.worldId3c);
-    } else if (worldCount != 0) {
-        const mxo::auth::AuthWorldEntry& firstWorld = mediator->lastAuthReply_.worlds[0];
-        mediator->marginRouteState_.pendingWorldId = firstWorld.worldId;
-        mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(firstWorld.worldId);
-    }
-
-    if (const char* routeHostPrefix =
-            mediator->LookupRouteHostPrefixBySlot(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)) {
-        mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
-    } else {
-        mediator->marginRouteState_.routeHostPrefix.clear();
-    }
-
-    mediator->SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
-
-    const char* currentDescriptorName = "<empty>";
-    if (characterCount != 0) {
-        const int matchedWorldIndex =
-            mediator->FindRecoveredWorldDescriptorIndexByWorldId(
-                mediator->selectionRouteState684_.slotRecordTable04_[0].worldId3c);
-        if (matchedWorldIndex >= 0) {
-            if (const char* name = mediator->GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex))) {
-                currentDescriptorName = name;
-            }
-        }
-    } else if (worldCount != 0) {
-        if (const char* name = mediator->GetDescriptorInlineNameByIndex(0)) {
-            currentDescriptorName = name;
-        }
-    }
-
-    spdlog::info(
-        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount={} characterCount={} currentCharacterOrRouteIndex={} currentSlotWorldId={} routeHostPrefix='{}' slotRecordHeapString='{}' currentWorldDescriptorName='{}'",
-        static_cast<unsigned>(worldCount),
-        static_cast<unsigned>(characterCount),
-        static_cast<unsigned>(mediator->marginRouteState_.currentCharacterOrRouteIndex),
-        characterCount == 0
-            ? 0u
-            : static_cast<unsigned>(mediator->selectionRouteState684_.slotRecordTable04_[0].worldId3c),
-        mediator->marginRouteState_.routeHostPrefix.empty() ? "<empty>" : mediator->marginRouteState_.routeHostPrefix.c_str(),
-        mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)
-            ? mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)
-            : "<empty>",
-        currentDescriptorName);
-}
-
-}  // namespace
 
 // anchor: launcher.exe vtable 0x004b5014
 const char* CLTLoginState_AuthenticatePending_0x4b5014::DebugName() const {
@@ -291,19 +153,87 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // anchor: launcher.exe:0x43f300 one-time gate body
                 //
                 // Binary ordering (verified against Ghidra decompilation of 0x43f300):
-                // 1. World descriptor loop (AdoptAuthReply_WorldDescriptors)
+                // 1. World descriptor loop (inline at 0x43f300, fidelity: no function call)
                 // 2. AuthBootstrap680_StoreField114AndTimestamp118 (field114/118)
                 // 3. ResetSelectionRouteState + character count cap
-                // 4. Character slot loop + route-host seeding (AdoptAuthReply_CharacterSlotRecords)
+                // 4. Character slot loop + route-host seeding (inline at 0x43f300, fidelity: no function call)
                 // 5. PersistCharactersIni
                 // 6. PostEvent(6)
                 // 7. AuthBootstrap680_CopyReplyString54 + SetLaunchPadSourceBlock94FirstString
                 // 8. AuthBootstrap680_CopyOpaqueReplyBlobs108_10c
-                AdoptAuthReplyIntoRecoveredMediatorState_WorldDescriptors(g_CurrentLoginMediator);
+                // anchor: launcher.exe:0x43f300 world-descriptor loop (inline, no function call)
+                // FIDELITY: original binary has inline loops here, not function calls
+                g_CurrentLoginMediator->worldSlots_.fill(nullptr);
+                g_CurrentLoginMediator->worldPayloadSlots_.fill(nullptr);
+                g_CurrentLoginMediator->worldDescriptorValidD84_.fill(false);
+                g_CurrentLoginMediator->worldDescriptorCountD80_ = 0;
+                {
+                    const size_t worldCount = std::min(
+                        g_CurrentLoginMediator->worldSlots_.size(),
+                        g_CurrentLoginMediator->lastAuthReply_.worlds.size());
+                    for (size_t i = 0; i < worldCount; ++i) {
+                        g_CurrentLoginMediator->worldSlots_[i] =
+                            const_cast<mxo::auth::AuthWorldEntry*>(&g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
+                        g_CurrentLoginMediator->worldPayloadSlots_[i] =
+                            const_cast<mxo::auth::AuthWorldEntry*>(&g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
+                        g_CurrentLoginMediator->SeedRecoveredWorldDescriptorFromAuthReply(
+                            static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
+                        ++g_CurrentLoginMediator->worldDescriptorCountD80_;
+                    }
+                }
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
                     *g_CurrentLoginMediator->authBootstrapChild680_,
                     g_CurrentLoginMediator->lastAuthReply_);
-                AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(g_CurrentLoginMediator);
+                // anchor: launcher.exe:0x43f300 character-slot loop + route-host seeding (inline, no function call)
+            // FIDELITY: original binary has inline loops here, not function calls
+            {
+              const size_t worldCount = std::min(
+                  g_CurrentLoginMediator->worldSlots_.size(),
+                  g_CurrentLoginMediator->lastAuthReply_.worlds.size());
+              g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
+              const size_t characterCount = std::min(
+                  g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size(),
+                  g_CurrentLoginMediator->lastAuthReply_.characters.size());
+              g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ =
+                  static_cast<uint8_t>(characterCount);
+              for (size_t i = 0; i < characterCount; ++i) {
+                g_CurrentLoginMediator->SeedRecoveredCharacterSlotRecordFromAuthReply(
+                    static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.characters[i]);
+                const SlotRecordState_0x4b5328& slotRecord =
+                    g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
+                const int matchedWorldIndex =
+                    g_CurrentLoginMediator->FindRecoveredWorldDescriptorIndexByWorldId(
+                        slotRecord.worldId3c);
+                if (matchedWorldIndex >= 0) {
+                  // anchor: launcher.exe:0x43f74a
+                  g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[i]
+                      .Assign(g_CurrentLoginMediator->worldDescriptorsD84_[static_cast<size_t>(
+                                                                                matchedWorldIndex)]
+                                  .inlineNamePlus03);
+                }
+              }
+              if (characterCount != 0) {
+                g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(0u);
+                const SlotRecordState_0x4b5328& currentSlotRecord =
+                    g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[0];
+                g_CurrentLoginMediator->marginRouteState_.pendingWorldId = currentSlotRecord.worldId3c;
+                g_CurrentLoginMediator->marginRouteState_.currentWorldId =
+                    static_cast<int32_t>(currentSlotRecord.worldId3c);
+              } else if (worldCount != 0) {
+                const mxo::auth::AuthWorldEntry& firstWorld =
+                    g_CurrentLoginMediator->lastAuthReply_.worlds[0];
+                g_CurrentLoginMediator->marginRouteState_.pendingWorldId = firstWorld.worldId;
+                g_CurrentLoginMediator->marginRouteState_.currentWorldId =
+                    static_cast<int32_t>(firstWorld.worldId);
+              }
+              if (const char* routeHostPrefix = g_CurrentLoginMediator->LookupRouteHostPrefixBySlot(
+                      g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)) {
+                g_CurrentLoginMediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
+              } else {
+                g_CurrentLoginMediator->marginRouteState_.routeHostPrefix.clear();
+              }
+              g_CurrentLoginMediator->SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
+            }
                 g_CurrentLoginMediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
                 g_CurrentLoginMediator->PostEvent(6u);
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(

@@ -1474,8 +1474,15 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 }
 
 // anchor: launcher.exe:0x41c1f0 +0xec
+// Fidelity note: Original 0x41c1f0 structure guards entire body behind DispatchPhaseCode() > 2 (phase 3+) check
 uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) {
     // anchor: launcher.exe:0x41c1f0
+  // Fidelity: Original checks DispatchPhaseCode() > 2 (phase 3+) before any operation
+  // Disassembly: 0x41c1f6 MOV ECX,[ESI+0x10]; 0x41c1fb CALL [EAX+0x18]; 0x41c201 JL out
+  if (currentState_ == nullptr || currentState_->DispatchPhaseCode() <= 2u) {
+    return 0u;
+  }
+
     // Owner-side state3-wait advance:
     // - the early route reaches this while current helper `+0x10` is still state3
     // - this method, not a state3-local slot-3 body, copies the `0xb4` selection/config snapshot

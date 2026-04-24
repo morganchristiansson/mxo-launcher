@@ -389,18 +389,6 @@ public:
     // anchor: launcher.exe:0x004396f0 (vtable 0x004b512c slot 10 initializer)
     CLTLoginState_State10_0x4b512c() = default;
 
-    // UNANCHORED: source-owned shared owner-state writeback helpers used by the broader state2
-    // slot-5 auth-reply success path (`0x43f300`) and by the current existing-character auth
-    // bridge. Keep this separate from the later state10 margin-side claim-name reply append at
-    // `0x4401a0`.
-    //
-    // Split into two phases to match binary ordering:
-    // - Phase A builds world descriptors (after which the binary writes field114/118)
-    // - Phase B resets selection-route state and builds character slot records
-    static void AdoptAuthReplyIntoRecoveredMediatorState_WorldDescriptors(CLTLoginMediator* mediator);
-    static void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMediator* mediator);
-
-    // anchor: launcher.exe vtable 0x004b512c
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
