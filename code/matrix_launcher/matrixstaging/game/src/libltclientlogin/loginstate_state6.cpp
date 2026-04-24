@@ -2,11 +2,14 @@
 #include "loginstate.h"
 #include "loginmediator.h"
 #include "loginstate_packet_builder_scaffold.h"
+#include "client_chunk_hashes.h"
 #include "../../../../src/diagnostics.h"
 
 #include <array>
 #include <cstring>
 #include <sstream>
+#include <string>
+#include <windows.h>
 
 namespace mxo::ltlogin {
 namespace {
@@ -335,14 +338,45 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
         const uint32_t goHereAddr = ReadU32LE(payloadBytes + 0x01u);
         const uint32_t goHerePort = ReadU32LE(payloadBytes + 0x05u);
         const uint32_t sessionSecret = ReadU32LE(payloadBytes + 0x09u);
-        spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x}; mirroring original challenge-response flow",
-            static_cast<unsigned>(goHereAddr),
-            static_cast<unsigned>(goHerePort),
-            static_cast<unsigned>(sessionSecret));
-        // Store for use in challenge-response construction
-        g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+    spdlog::info(
+        "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x}; mirroring original challenge-response flow",
+        static_cast<unsigned>(goHereAddr),
+        static_cast<unsigned>(goHerePort),
+        static_cast<unsigned>(sessionSecret));
+
+    // Call hash generation before constructing challenge response
+    // anchor: launcher.exe:0x440780 -> 0x43d800 = GenerateClientChunkHashes
+    // State6 Slot6 generates client.dll chunk hashes on MS_ConnectChallenge
+    // These hashes populate the selection context blocks sent in MS_LoadCharacterRequest
+    g_ClientChunkHashStorage.Clear();
+    
+    // Build client.dll path from game directory
+    // anchor: launcher.exe:0x43d800 GetExecutableBasePathAndFilename
+    std::string clientDllPath;
+    {
+      wchar_t exePathW[MAX_PATH] = {};
+      GetModuleFileNameW(nullptr, exePathW, MAX_PATH);
+      std::wstring exeDirW(exePathW);
+      size_t lastSlash = exeDirW.find_last_of(L"\\/");
+      if (lastSlash != std::wstring::npos) {
+        exeDirW = exeDirW.substr(0, lastSlash);
+      }
+      clientDllPath.assign(exeDirW.begin(), exeDirW.end());
+      if (!clientDllPath.empty() && clientDllPath.back() != '\\' && clientDllPath.back() != '/') {
+        clientDllPath += "/";
+      }
+      clientDllPath += "client.dll";
+    }
+    
+    std::vector<std::string> clientFiles = {clientDllPath};
+    auto hashes = GenerateClientChunkHashes(clientFiles);
+    g_ClientChunkHashStorage.SetHashes(hashes);
+
+    spdlog::info("State6 Slot6: Generated {} chunk hashes for client verification", hashes.size());
+
+    // Store for use in challenge-response construction
+    g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
+    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
 
         // Original builds and sends challenge-response packet first, then switches helper
         // For now: directly call SendCurrentMarginPacket - simplified stub

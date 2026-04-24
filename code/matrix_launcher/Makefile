@@ -74,6 +74,7 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state17.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state18.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state19.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/client_chunk_hashes.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/filters.o \

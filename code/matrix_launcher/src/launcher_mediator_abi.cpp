@@ -818,37 +818,39 @@ static mxo::ltlogin::LateEntryList1470VectorLikeSketch* __thiscall Mediator_GetL
 }
 
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.
-extern "C" void Mediator_ConsumeSelectionContext_Impl(
+// thin wrapper forwarding to CLTLoginMediator::PersistSelectionContextForState8
+extern "C" void Mediator_PersistSelectionContextForState8_Impl(
     MinimalLoginMediatorStub* self,
     void* selectionContext,
     void* returnAddress) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator) {
-        return;
-    }
+  mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+  if (!mediator) {
+    return;
+  }
 
-    if (selectionContext) {
-        mxo::ltlogin::State3SelectionContextInputSketch input = {};
-        std::memcpy(&input, selectionContext, sizeof(input));
-        mediator->PersistSelectionContextForState8(input);
-        // Current bounded client-side proof:
-        // - `ClientShell_OnEngineInitialized` (`0x6216f060`) earlier pushes a direct visible status
-        //   sequence
-        // - `InitClientDLL_BeginLoadingCharacterFlow` then sets visible text `"Loading Character"`
-        //   at `0x62170f2a`
-        // - it then immediately calls arg6 `+0xec` at `0x62170f48`
-        // Diagnostic stance:
-        // - the earlier launcher-owned progress-text mirrors were removed because they were not a
-        //   trustworthy source of exact client-visible text
-        // - exact loading/status logging now comes only from the opt-in `client.dll:0x6215b930`
-        //   hook when that diagnostic env flag is enabled
-    } else {
-        mediator->ResetSelectionContext0ecMirror();
-    }
+  if (selectionContext) {
+    mxo::ltlogin::State3SelectionContextInputSketch input = {};
+    std::memcpy(&input, selectionContext, sizeof(input));
+    mediator->PersistSelectionContextForState8(input);
+    // Current bounded client-side proof:
+    // - `ClientShell_OnEngineInitialized` (`0x6216f060`) earlier pushes a direct visible status
+    // sequence
+    // - `InitClientDLL_BeginLoadingCharacterFlow` then sets visible text `"Loading Character"`
+    // at `0x62170f2a`
+    // - it then immediately calls arg6 `+0xec` at `0x62170f48`
+    // Diagnostic stance:
+    // - the earlier launcher-owned progress-text mirrors were removed because they were not a
+    // trustworthy source of exact client-visible text
+    // - exact loading/status logging now comes only from the opt-in `client.dll:0x6215b930`
+    // hook when that diagnostic env flag is enabled
+  } else {
+    mediator->ResetSelectionContext0ecMirror();
+  }
 
   // Keep the wrapper-facing arg6 `+0x1c` semantic split explicit.
   // Store the input in the stub for client-side code that may read it without going through
   // the owner vtable family. This is an ABI-wrapper concern, not a CLTLoginMediator field.
+  // The actual PersistSelectionContextForState8 call is made above (lines 830-846).
   if (self) {
     // Copy the input to stub-owned storage for field1C exposure
     static thread_local mxo::ltlogin::State3SelectionContextInputSketch tl_input{};
@@ -860,25 +862,25 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
     self->field1C = &tl_input;
   }
 
-    (void)returnAddress;
+  (void)returnAddress;
 }
 
 // anchor: client.dll:0x62170f48 consumes the assembled 0xb4 selection/config handoff through arg6 +0xec
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xec
-__attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
-    __asm__ volatile(
-        "mov 4(%%esp), %%eax\n\t"
-        "mov 0(%%esp), %%edx\n\t"
-        "push %%edx\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $12, %%esp\n\t"
-        "ret $4\n\t"
-        :
-        : "i"(Mediator_ConsumeSelectionContext_Impl)
-        : "eax", "edx");
+__attribute__((naked)) static void Mediator_PersistSelectionContextForState8() {
+  __asm__ volatile(
+      "mov 4(%%esp), %%eax\n\t"
+      "mov 0(%%esp), %%edx\n\t"
+      "push %%edx\n\t"
+      "push %%eax\n\t"
+      "push %%ecx\n\t"
+      "mov %0, %%eax\n\t"
+      "call *%%eax\n\t"
+      "add $12, %%esp\n\t"
+      "ret $4\n\t"
+      :
+      : "i"(Mediator_PersistSelectionContextForState8_Impl)
+      : "eax", "edx");
 }
 
 // UNANCHORED: C helper behind the recovered +0x120 ABI wrapper.
@@ -1222,7 +1224,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
     g_LoginMediatorVtable[56] = (void*)Mediator_GetVariantWorldName; // +0xe0
     g_LoginMediatorVtable[57] = (void*)Mediator_GetVariantState; // +0xe4
-    g_LoginMediatorVtable[59] = (void*)Mediator_ConsumeSelectionContext; // +0xec
+    g_LoginMediatorVtable[59] = (void*)Mediator_PersistSelectionContextForState8; // +0xec
     g_LoginMediatorVtable[61] = (void*)Mediator_GetState8PersistenceF1c; // +0xf4
     g_LoginMediatorVtable[62] = (void*)Mediator_GetWorldCount; // +0xf8
     g_LoginMediatorVtable[63] = (void*)Mediator_GetWorldNameByIndex; // +0xfc
