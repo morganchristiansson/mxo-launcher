@@ -254,46 +254,75 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     }
 
     // anchor: launcher.exe:0x43bd84-0x43bdfa = write selection blocks directly to payload
-    // FIXED: Server expects 32 zeroes then 9 consecutive copies of the weird sequence from MS_ConnectRequest.
-    // The server stores the weird sequence (first non-zero block from Cf0/D00/D10/D20/D30/D40/D50/D60/D70)
-    // and expects MS_LoadCharacterRequest to contain 9 consecutive 16-byte copies of that sequence.
-    // anchor: pickWeirdSequence logic matches original around 0x41e500
+    // Write block order matches original `0x43bd20` disassembly exactly.
+    // anchor: matches launcher.exe:0x43bd84-0x43bdfa original offsets exactly
+    // fidelity: direct element access like original decompile (not helper lambda)
     if (payload) {
-        // Write 32 zeroes at offset 0x08 (bytes 8-39)
-        // Server reads these as justZeroes and validates they're all zero
-        std::memset(payload + 0x08, 0, 32);
+        // Block Cd0 at 0x09-0x17 (selection context, 16 bytes total)
+        *reinterpret_cast<uint32_t*>(payload + 0x09) = g_CurrentLoginMediator->SelectionContextBlockCd0()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x0d) = g_CurrentLoginMediator->SelectionContextBlockCd0()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x11) = g_CurrentLoginMediator->SelectionContextBlockCd0()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x15) = g_CurrentLoginMediator->SelectionContextBlockCd0()[3];
 
-        // Inline pickWeirdSequence logic (same as MS_ConnectRequest pickWeirdSequence lambda)
-        // Select first non-zero block from: Cf0, D00, D10, D20, D30, D40, D50, D60, D70
-        std::array<uint8_t, 16> weirdSequence = {};
-        const std::array<const std::array<uint32_t, 4>*, 9> candidates = {
-            &g_CurrentLoginMediator->SelectionContextBlockCf0(),
-            &g_CurrentLoginMediator->SelectionContextBlockD00(),
-            &g_CurrentLoginMediator->SelectionContextBlockD10(),
-            &g_CurrentLoginMediator->SelectionContextBlockD20(),
-            &g_CurrentLoginMediator->SelectionContextBlockD30(),
-            &g_CurrentLoginMediator->SelectionContextBlockD40(),
-            &g_CurrentLoginMediator->SelectionContextBlockD50(),
-            &g_CurrentLoginMediator->SelectionContextBlockD60(),
-            &g_CurrentLoginMediator->SelectionContextBlockD70()};
-        for (const auto* candidate : candidates) {
-            if (!candidate) continue;
-            if ((*candidate)[0] == 0u && (*candidate)[1] == 0u && (*candidate)[2] == 0u && (*candidate)[3] == 0u) continue;
-            for (size_t j = 0; j < 4u; ++j) {
-                const uint32_t value = (*candidate)[j];
-                weirdSequence[j * 4u + 0u] = static_cast<uint8_t>(value & 0xffu);
-                weirdSequence[j * 4u + 1u] = static_cast<uint8_t>((value >> 8u) & 0xffu);
-                weirdSequence[j * 4u + 2u] = static_cast<uint8_t>((value >> 16u) & 0xffu);
-                weirdSequence[j * 4u + 3u] = static_cast<uint8_t>((value >> 24u) & 0xffu);
-            }
-            break;
-        }
+        // Block Ce0 at 0x19-0x27
+        *reinterpret_cast<uint32_t*>(payload + 0x19) = g_CurrentLoginMediator->SelectionContextBlockCe0()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x1d) = g_CurrentLoginMediator->SelectionContextBlockCe0()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x21) = g_CurrentLoginMediator->SelectionContextBlockCe0()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x25) = g_CurrentLoginMediator->SelectionContextBlockCe0()[3];
 
-        // Write 9 consecutive copies of the weird sequence at offset 0x28 (bytes 40-183)
-        // Server increments strangeCounter for each matching 16-byte block, expects 9
-        for (size_t i = 0; i < 9u; ++i) {
-            std::memcpy(payload + 0x28 + (i * 16u), weirdSequence.data(), 16);
-        }
+        // Block Cf0 at 0x29-0x37
+        *reinterpret_cast<uint32_t*>(payload + 0x29) = g_CurrentLoginMediator->SelectionContextBlockCf0()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x2d) = g_CurrentLoginMediator->SelectionContextBlockCf0()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x31) = g_CurrentLoginMediator->SelectionContextBlockCf0()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x35) = g_CurrentLoginMediator->SelectionContextBlockCf0()[3];
+
+        // Block D40 at 0x79-0x87
+        *reinterpret_cast<uint32_t*>(payload + 0x79) = g_CurrentLoginMediator->SelectionContextBlockD40()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x7d) = g_CurrentLoginMediator->SelectionContextBlockD40()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x81) = g_CurrentLoginMediator->SelectionContextBlockD40()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x85) = g_CurrentLoginMediator->SelectionContextBlockD40()[3];
+
+        // Block D50 at 0x89-0x97
+        *reinterpret_cast<uint32_t*>(payload + 0x89) = g_CurrentLoginMediator->SelectionContextBlockD50()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x8d) = g_CurrentLoginMediator->SelectionContextBlockD50()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x91) = g_CurrentLoginMediator->SelectionContextBlockD50()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x95) = g_CurrentLoginMediator->SelectionContextBlockD50()[3];
+
+        // Block D60 at 0x99-0xa7
+        *reinterpret_cast<uint32_t*>(payload + 0x99) = g_CurrentLoginMediator->SelectionContextBlockD60()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x9d) = g_CurrentLoginMediator->SelectionContextBlockD60()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0xa1) = g_CurrentLoginMediator->SelectionContextBlockD60()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0xa5) = g_CurrentLoginMediator->SelectionContextBlockD60()[3];
+
+        // Block D70 at 0xa9-0xb7
+        *reinterpret_cast<uint32_t*>(payload + 0xa9) = g_CurrentLoginMediator->SelectionContextBlockD70()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0xad) = g_CurrentLoginMediator->SelectionContextBlockD70()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0xb1) = g_CurrentLoginMediator->SelectionContextBlockD70()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0xb5) = g_CurrentLoginMediator->SelectionContextBlockD70()[3];
+
+        // Block D00 at 0x39-0x47
+        *reinterpret_cast<uint32_t*>(payload + 0x39) = g_CurrentLoginMediator->SelectionContextBlockD00()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x3d) = g_CurrentLoginMediator->SelectionContextBlockD00()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x41) = g_CurrentLoginMediator->SelectionContextBlockD00()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x45) = g_CurrentLoginMediator->SelectionContextBlockD00()[3];
+
+        // Block D10 at 0x49-0x57
+        *reinterpret_cast<uint32_t*>(payload + 0x49) = g_CurrentLoginMediator->SelectionContextBlockD10()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x4d) = g_CurrentLoginMediator->SelectionContextBlockD10()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x51) = g_CurrentLoginMediator->SelectionContextBlockD10()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x55) = g_CurrentLoginMediator->SelectionContextBlockD10()[3];
+
+        // Block D20 at 0x59-0x67
+        *reinterpret_cast<uint32_t*>(payload + 0x59) = g_CurrentLoginMediator->SelectionContextBlockD20()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x5d) = g_CurrentLoginMediator->SelectionContextBlockD20()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x61) = g_CurrentLoginMediator->SelectionContextBlockD20()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x65) = g_CurrentLoginMediator->SelectionContextBlockD20()[3];
+
+        // Block D30 at 0x69-0x77
+        *reinterpret_cast<uint32_t*>(payload + 0x69) = g_CurrentLoginMediator->SelectionContextBlockD30()[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x6d) = g_CurrentLoginMediator->SelectionContextBlockD30()[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x71) = g_CurrentLoginMediator->SelectionContextBlockD30()[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x75) = g_CurrentLoginMediator->SelectionContextBlockD30()[3];
     }
 
     // anchor: launcher.exe:0x43ada0 = SetGameSessionId (mediator helper)
@@ -343,37 +372,9 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x09u);
 
-    const std::array<uint8_t, 16> weirdSeq = []() {
-        std::array<uint8_t, 16> bytes = {};
-        const std::array<const std::array<uint32_t, 4>*, 9> candidates = {
-            &g_CurrentLoginMediator->SelectionContextBlockCf0(),
-            &g_CurrentLoginMediator->SelectionContextBlockD00(),
-            &g_CurrentLoginMediator->SelectionContextBlockD10(),
-            &g_CurrentLoginMediator->SelectionContextBlockD20(),
-            &g_CurrentLoginMediator->SelectionContextBlockD30(),
-            &g_CurrentLoginMediator->SelectionContextBlockD40(),
-            &g_CurrentLoginMediator->SelectionContextBlockD50(),
-            &g_CurrentLoginMediator->SelectionContextBlockD60(),
-            &g_CurrentLoginMediator->SelectionContextBlockD70()};
-        for (const auto* candidate : candidates) {
-            if (!candidate) continue;
-            if ((*candidate)[0] == 0u && (*candidate)[1] == 0u && (*candidate)[2] == 0u && (*candidate)[3] == 0u) continue;
-            for (size_t j = 0; j < 4u; ++j) {
-                const uint32_t value = (*candidate)[j];
-                bytes[j * 4u + 0u] = static_cast<uint8_t>(value & 0xffu);
-                bytes[j * 4u + 1u] = static_cast<uint8_t>((value >> 8u) & 0xffu);
-                bytes[j * 4u + 2u] = static_cast<uint8_t>((value >> 16u) & 0xffu);
-                bytes[j * 4u + 3u] = static_cast<uint8_t>((value >> 24u) & 0xffu);
-            }
-            break;
-        }
-        return bytes;
-    }();
-    spdlog::debug(
-        "CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue state8 weirdSequence bytes (first 16 of 9 copies): first4=0x{:08x}",
-        *reinterpret_cast<const uint32_t*>(weirdSeq.data()));
-
-    const unsigned weirdSequenceNonZeroCount =
+    const unsigned nonZeroSnapshotBlockCount =
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCd0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCe0())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCf0())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD00())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD10())) +
@@ -386,17 +387,15 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // gameSessionId already declared above in SetGameSessionId block
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} weirdSequenceCandidateCount={} weirdSeq[0..3]=[0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}] GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
         0xbbu,
         packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
             ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
-        weirdSequenceNonZeroCount,
-        weirdSeq[0],
-        weirdSeq[1],
-        weirdSeq[2],
-        weirdSeq[3],
+        nonZeroSnapshotBlockCount,
+        g_CurrentLoginMediator->SelectionContextBlockCd0()[0],
+        g_CurrentLoginMediator->SelectionContextBlockD70()[3],
         gameSessionId ? gameSessionId : "<empty>",
         sendResult);
     return;
