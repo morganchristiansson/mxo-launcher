@@ -29,6 +29,7 @@
 #include "loginmediator.h"
 #include "loginmediator_events.h"
 #include "launchpad.h"
+#include "client_chunk_hashes.h"
 
 #include "loginstate.h"
 #include "../../../../src/launcher_mediator_abi.h"
@@ -3429,4 +3430,55 @@ mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::EnsureMarginConnec
 // ILTLoginMediator_0x4af2b8::Default - static member initialization (original: launcher.exe:0x4d2c58)
 ILTLoginMediator_0x4af2b8* ILTLoginMediator_0x4af2b8::Default = new mxo::ltlogin::CLTLoginMediator();
 
-}  // namespace mxo::ltlogin
+// Populate selection context blocks from generated chunk hashes
+// anchor: launcher.exe:0x4of79d8 / DAT_004f79dc pattern - copy from global hash storage
+void CLTLoginMediator::PopulateSelectionContextBlocksFromChunkHashes() {
+  const auto& hashes = g_ClientChunkHashStorage.GetHashes();
+  if (hashes.size() < 9) {
+    spdlog::warn(
+        "PopulateSelectionContextBlocksFromChunkHashes: Expected 9 hashes, got {}",
+        hashes.size());
+    return;
+  }
+
+  // Map the 9 chunk hashes to the 11 selection context blocks
+  // Server expects 9 blocks at specific offsets (see MarginSocket.cpp)
+  auto& ctx = selectionRouteState684_.persistedSelectionContext64c_;
+
+  // blockCd0 - first hash
+  std::copy_n(hashes[0].hashWords.begin(), 4, ctx.blockCd0.begin());
+
+  // blockCe0 - second hash
+  std::copy_n(hashes[1].hashWords.begin(), 4, ctx.blockCe0.begin());
+
+  // blockCf0 - third hash
+  std::copy_n(hashes[2].hashWords.begin(), 4, ctx.blockCf0.begin());
+
+  // blockD00 - fourth hash
+  std::copy_n(hashes[3].hashWords.begin(), 4, ctx.blockD00.begin());
+
+  // blockD10 - fifth hash
+  std::copy_n(hashes[4].hashWords.begin(), 4, ctx.blockD10.begin());
+
+  // blockD20 - sixth hash
+  std::copy_n(hashes[5].hashWords.begin(), 4, ctx.blockD20.begin());
+
+  // blockD30 - seventh hash
+  std::copy_n(hashes[6].hashWords.begin(), 4, ctx.blockD30.begin());
+
+  // blockD40 - eighth hash
+  std::copy_n(hashes[7].hashWords.begin(), 4, ctx.blockD40.begin());
+
+  // blockD50 - ninth hash
+  std::copy_n(hashes[8].hashWords.begin(), 4, ctx.blockD50.begin());
+
+  // blocks D60 and D70 remain zero (padding/leftover)
+  ctx.blockD60 = {};
+  ctx.blockD70 = {};
+
+  spdlog::info(
+      "PopulateSelectionContextBlocksFromChunkHashes: Copied {} chunk hashes into selection context blocks (blocks D60/D70 remain zero)",
+      hashes.size());
+}
+
+} // namespace mxo::ltlogin

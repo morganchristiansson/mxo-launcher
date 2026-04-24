@@ -374,6 +374,10 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
 
     spdlog::info("State6 Slot6: Generated {} chunk hashes for client verification", hashes.size());
 
+    // Copy hashes into selection context blocks for State8 to use
+    // anchor: launcher.exe:0x440780 -> DAT_004f79d8 hash storage path
+    g_CurrentLoginMediator->PopulateSelectionContextBlocksFromChunkHashes();
+
     // Store for use in challenge-response construction
     g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
     g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;

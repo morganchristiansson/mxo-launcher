@@ -1416,9 +1416,12 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     const std::array<uint32_t, 4>& SelectionContextBlockD40() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD40; }
     const std::array<uint32_t, 4>& SelectionContextBlockD50() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD50; }
     const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
+const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
 
-    // State-owned slot-6 bodies mutate this mediator-owned owner-state block directly.
+// Populate selection context blocks from generated chunk hashes
+void PopulateSelectionContextBlocksFromChunkHashes();
+
+ // State-owned slot-6 bodies mutate this mediator-owned owner-state block directly.
 
     // Post-auth load-character reply outputs (0x440320) plus neighboring auth/margin send flags:
     // Caution: original `0x4390b0` writes owner `+0x2c` on its non-zero payload branch, while the
