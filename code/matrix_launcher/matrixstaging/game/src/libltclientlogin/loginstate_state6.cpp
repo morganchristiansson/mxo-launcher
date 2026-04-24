@@ -17,341 +17,269 @@ namespace {
 // State6Packet0x06FixedPayload is defined in loginstate_packet_builder_scaffold.h
 
 static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* mediator) {
-    (void)mediator;
+  (void)mediator;
 
-    // anchor: launcher.exe:0x438e60 = GetGOBFileGUID
-    // Original `0x43b8f0` reads a 16-byte LTGUID for packed GOB resource `0x3e000000` and falls
-    // back to the baked-in dwords at `0x4ae6c0..0x4ae6cc` when that resource cannot be opened.
-    // Current replacement does not yet own that launcher resource-manager bridge, but the baked-in
-    // fallback bytes are now at least mirrored explicitly instead of leaving state6 slot3 on a
-    // synthetic packet shape.
-    return {0u, 0u, 0u, 0u};
-}
-
-struct ParsedState6Opcode9ReplyScaffold {
-    bool valid = false;
-    uint32_t status01 = 0;
-    uint32_t goHereAddr05 = 0;
-    uint32_t udpSessionSecret09 = 0;
-    uint16_t metricIdsOffset0d = 0;
-    uint16_t metricIdCount = 0;
-    std::vector<uint16_t> metricIds{};
-};
-
-static std::string BuildMetricIdPreview(const std::vector<uint16_t>& metricIds) {
-    if (metricIds.empty()) {
-        return "[]";
-    }
-
-    std::ostringstream out;
-    out << '[';
-    for (size_t i = 0; i < metricIds.size(); ++i) {
-        if (i != 0u) {
-            out << ", ";
-        }
-        out << "0x" << std::hex << std::uppercase << static_cast<unsigned>(metricIds[i]);
-    }
-    out << ']';
-    return out.str();
+  // anchor: launcher.exe:0x438e60 = GetGOBFileGUID
+  // Original `0x43b8f0` reads a 16-byte LTGUID for packed GOB resource `0x3e000000` and falls
+  // back to the baked-in dwords at `0x4ae6c0..0x4ae6cc` when that resource cannot be opened.
+  // Current replacement does not yet own that launcher resource-manager bridge, but the baked-in
+  // fallback bytes are now at least mirrored explicitly instead of leaving state6 slot3 on a
+  // synthetic packet shape.
+  return {0u, 0u, 0u, 0u};
 }
 
 static const char* ResolveClientMetricFilenameById(uint16_t metricId) {
-    // Original launcher `0x48ce00` maps one METRID to its Filename by iterating the launcher-side
-    // METR metadata table. The replacement keeps that question local to the post-state9/state12
-    // path by using the already loaded client-side copy of the same METR metadata instead of
-    // widening this pass into a launcher-owned SetMasterDatabase reconstruction first.
-    static constexpr uintptr_t kClientMetricArrayBeginRva = 0x009f1934u;
-    static constexpr uintptr_t kClientMetricArrayEndRva = 0x009f1938u;
-    static constexpr uintptr_t kClientFindFieldRva = 0x002abb60u;
-    static constexpr uintptr_t kClientFieldGetStringRva = 0x002add50u;
-    static constexpr uintptr_t kClientFieldGetDwordRva = 0x002add30u;
+  // Original launcher `0x48ce00` maps one METRID to its Filename by iterating the launcher-side
+  // METR metadata table. The replacement keeps that question local to the post-state9/state12
+  // path by using the already loaded client-side copy of the same METR metadata instead of
+  // widening this pass into a launcher-owned SetMasterDatabase reconstruction first.
+  static constexpr uintptr_t kClientMetricArrayBeginRva = 0x009f1934u;
+  static constexpr uintptr_t kClientMetricArrayEndRva = 0x009f1938u;
+  static constexpr uintptr_t kClientFindFieldRva = 0x002abb60u;
+  static constexpr uintptr_t kClientFieldGetStringRva = 0x002add50u;
+  static constexpr uintptr_t kClientFieldGetDwordRva = 0x002add30u;
 
-    using FindFieldFn = void*(__thiscall*)(void*, const char*);
-    using GetStringFn = const char*(__thiscall*)(void*);
-    using GetDwordFn = uint32_t(__thiscall*)(void*);
+  using FindFieldFn = void*(__thiscall*)(void*, const char*);
+  using GetStringFn = const char*(__thiscall*)(void*);
+  using GetDwordFn = uint32_t(__thiscall*)(void*);
 
-    void* const clientModule = GetModuleHandleA("client.dll");
-    if (clientModule == nullptr) {
-        return nullptr;
-    }
-
-    const uintptr_t clientBase = reinterpret_cast<uintptr_t>(clientModule);
-    const auto findField = reinterpret_cast<FindFieldFn>(clientBase + kClientFindFieldRva);
-    const auto getString = reinterpret_cast<GetStringFn>(clientBase + kClientFieldGetStringRva);
-    const auto getDword = reinterpret_cast<GetDwordFn>(clientBase + kClientFieldGetDwordRva);
-
-    const uintptr_t entriesBegin = *reinterpret_cast<const uintptr_t*>(clientBase + kClientMetricArrayBeginRva);
-    const uintptr_t entriesEnd = *reinterpret_cast<const uintptr_t*>(clientBase + kClientMetricArrayEndRva);
-    if (entriesBegin == 0u || entriesEnd <= entriesBegin) {
-        return nullptr;
-    }
-
-    for (uintptr_t current = entriesBegin; current < entriesEnd; current += sizeof(uint32_t)) {
-        void* const entry = *reinterpret_cast<void* const*>(current);
-        if (entry == nullptr) {
-            continue;
-        }
-
-        const char* const tag = *reinterpret_cast<const char* const*>(entry);
-        if (!tag || std::strcmp(tag, "METR") != 0) {
-            continue;
-        }
-
-        void* const metricIdField = findField(entry, "METRID");
-        if (metricIdField == nullptr) {
-            continue;
-        }
-        void* const metricIdValueHolder = *reinterpret_cast<void**>(static_cast<uint8_t*>(metricIdField) + 4u);
-        void* const metricIdValueObject = metricIdValueHolder ? *reinterpret_cast<void**>(metricIdValueHolder) : nullptr;
-        if (metricIdValueObject == nullptr) {
-            continue;
-        }
-        const uint16_t currentMetricId = static_cast<uint16_t>(getDword(metricIdValueObject) & 0xffffu);
-        if (currentMetricId != metricId) {
-            continue;
-        }
-
-        void* const filenameField = findField(entry, "Filename");
-        if (filenameField == nullptr) {
-            return nullptr;
-        }
-        void* const filenameValueHolder = *reinterpret_cast<void**>(static_cast<uint8_t*>(filenameField) + 4u);
-        void* const filenameValueObject = filenameValueHolder ? *reinterpret_cast<void**>(filenameValueHolder) : nullptr;
-        return filenameValueObject ? getString(filenameValueObject) : nullptr;
-    }
-
+  void* const clientModule = GetModuleHandleA("client.dll");
+  if (clientModule == nullptr) {
     return nullptr;
-}
+  }
 
-static ParsedState6Opcode9ReplyScaffold ParseState6Opcode9ReplyScaffold(
-    const uint8_t* bytes,
-    const uint16_t byteCount) {
-    ParsedState6Opcode9ReplyScaffold out = {};
-    if (!bytes || byteCount < 0x0f || bytes[0] != 0x09u) {
-        return out;
+  const uintptr_t clientBase = reinterpret_cast<uintptr_t>(clientModule);
+  const auto findField = reinterpret_cast<FindFieldFn>(clientBase + kClientFindFieldRva);
+  const auto getString = reinterpret_cast<GetStringFn>(clientBase + kClientFieldGetStringRva);
+  const auto getDword = reinterpret_cast<GetDwordFn>(clientBase + kClientFieldGetDwordRva);
+
+  const uintptr_t entriesBegin = *reinterpret_cast<const uintptr_t*>(clientBase + kClientMetricArrayBeginRva);
+  const uintptr_t entriesEnd = *reinterpret_cast<const uintptr_t*>(clientBase + kClientMetricArrayEndRva);
+  if (entriesBegin == 0u || entriesEnd <= entriesBegin) {
+    return nullptr;
+  }
+
+  for (uintptr_t current = entriesBegin; current < entriesEnd; current += sizeof(uint32_t)) {
+    void* const entry = *reinterpret_cast<void* const*>(current);
+    if (entry == nullptr) {
+      continue;
     }
 
-    out.valid = true;
-    out.status01 = ReadU32LE(bytes + 0x01u);
-    out.goHereAddr05 = ReadU32LE(bytes + 0x05u);
-    out.udpSessionSecret09 = ReadU32LE(bytes + 0x09u);
-    out.metricIdsOffset0d = ReadU16LE(bytes + 0x0du);
-
-    if (out.metricIdsOffset0d != 0u) {
-        const size_t metricHeaderOffset = static_cast<size_t>(out.metricIdsOffset0d);
-        if (metricHeaderOffset + 2u <= byteCount) {
-            out.metricIdCount = ReadU16LE(bytes + metricHeaderOffset);
-            const size_t metricBodyOffset = metricHeaderOffset + 2u;
-            const size_t metricBodyBytes = static_cast<size_t>(out.metricIdCount) * sizeof(uint16_t);
-            if (metricBodyOffset + metricBodyBytes > byteCount) {
-                out.metricIdCount = static_cast<uint16_t>((byteCount - metricBodyOffset) / sizeof(uint16_t));
-            }
-            out.metricIds.reserve(out.metricIdCount);
-            for (uint16_t i = 0; i < out.metricIdCount; ++i) {
-                const size_t metricOffset = metricBodyOffset + static_cast<size_t>(i) * sizeof(uint16_t);
-                if (metricOffset + sizeof(uint16_t) > byteCount) {
-                    break;
-                }
-                out.metricIds.push_back(ReadU16LE(bytes + metricOffset));
-            }
-        }
+    const char* const tag = *reinterpret_cast<const char* const*>(entry);
+    if (!tag || std::strcmp(tag, "METR") != 0) {
+      continue;
     }
 
-    return out;
+    void* const metricIdField = findField(entry, "METRID");
+    if (metricIdField == nullptr) {
+      continue;
+    }
+    void* const metricIdValueHolder = *reinterpret_cast<void**>(static_cast<uint8_t*>(metricIdField) + 4u);
+    void* const metricIdValueObject = metricIdValueHolder ? *reinterpret_cast<void**>(metricIdValueHolder) : nullptr;
+    if (metricIdValueObject == nullptr) {
+      continue;
+    }
+    const uint16_t currentMetricId = static_cast<uint16_t>(getDword(metricIdValueObject) & 0xffffu);
+    if (currentMetricId != metricId) {
+      continue;
+    }
+
+    void* const filenameField = findField(entry, "Filename");
+    if (filenameField == nullptr) {
+      return nullptr;
+    }
+    void* const filenameValueHolder = *reinterpret_cast<void**>(static_cast<uint8_t*>(filenameField) + 4u);
+    void* const filenameValueObject = filenameValueHolder ? *reinterpret_cast<void**>(filenameValueHolder) : nullptr;
+    return filenameValueObject ? getString(filenameValueObject) : nullptr;
+  }
+
+  return nullptr;
 }
 
-}  // namespace
+static std::string BuildMetricIdPreview(const uint16_t* metricIds, uint16_t count) {
+  if (count == 0 || metricIds == nullptr) {
+    return "[]";
+  }
+
+  std::ostringstream out;
+  out << '[';
+  for (uint16_t i = 0; i < count; ++i) {
+    if (i != 0u) {
+      out << ", ";
+    }
+    out << "0x" << std::hex << std::uppercase << static_cast<unsigned>(metricIds[i]);
+  }
+  out << ']';
+  return out.str();
+}
+
+} // namespace
 
 // anchor: launcher.exe vtable 0x004b508c
 const char* CLTLoginState_State6_0x4b508c::DebugName() const {
-    return "CLTLoginState_State6_0x4b508c";
+  return "CLTLoginState_State6_0x4b508c";
 }
 
-// anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
+// anchor: launcher.exe:0x43b8f0 (vtable 0x004b508c slot 3)
 void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
-    // anchor: launcher.exe:0x43b8f0 upstream caching logic at `0x43b8f9..0x43b91c`
-    // - `0x43b8f9` loads existing cached from this+4
-    // - `0x43b8fc` tests if cached is null - if so, jumps to store at `0x43b91c`
-    // - `0x43b904..0x43b91a` calls incoming upstream's vtable `+0x18` to get phase code
-    // - if phase==4 or phase==5, jumps to `0x43b91f` preserving existing cached
-    // - otherwise `0x43b91c` overwrites this+4 with incoming upstream pointer
-    // That cached upstream is later used on opcode-9 success (`0x440acc..0x440ae0`) to choose
-    // the next helper-state target via vtable+0x18.
-    if (upstreamOrArg != nullptr) {
-        const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
-        if (cachedUpstreamOrArg_0x4 == nullptr || (upstreamPhaseCode != 4u && upstreamPhaseCode != 5u)) {
-            cachedUpstreamOrArg_0x4 = upstreamOrArg;
-        }
+  // anchor: launcher.exe:0x43b8f0 upstream caching logic at `0x43b8f9..0x43b91c`
+  // - `0x43b8f9` loads existing cached from this+4
+  // - `0x43b8fc` tests if cached is null - if so, jumps to store at `0x43b91c`
+  // - `0x43b904..0x43b91a` calls incoming upstream's vtable `+0x18` to get phase code
+  // - if phase==4 or phase==5, jumps to `0x43b91f` preserving existing cached
+  // - otherwise `0x43b91c` overwrites this+4 with incoming upstream pointer
+  // That cached upstream is later used on opcode-9 success (`0x440acc..0x440ae0`) to choose
+  // the next helper-state target via vtable+0x18.
+  if (upstreamOrArg != nullptr) {
+    const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
+    if (cachedUpstreamOrArg_0x4 == nullptr || (upstreamPhaseCode != 4u && upstreamPhaseCode != 5u)) {
+      cachedUpstreamOrArg_0x4 = upstreamOrArg;
     }
-    // anchor: launcher.exe:0x43b91f..0x43b92a - direct g_CurrentLoginMediator access, no null check
-    if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
-        g_CurrentLoginMediator->SetCurrentState(4u);
-        return;
-    }
-
-    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(g_CurrentLoginMediator->marginConnection_);
-    const bool marginConnectionReady84 =
-        marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
-    // anchor: launcher.exe:0x43b94a..0x43b95e - no logging on fallback, just return void
-    if (!marginConnectionReady84) {
-        g_CurrentLoginMediator->SetCurrentState(5u);
-        return;
-    }
-
-    // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
-    // Current tighter send-side mirror:
-    // - payload `+0x00` = raw opcode `0x06` (`MS_ConnectRequest`)
-    // - payload `+0x01/+0x05` = owner `+0x08/+0x0c` launcher/client version dwords
-    // - payload `+0x09` = fixed byte `1`
-    // - payload `+0x0a/+0x0e` = fixed dwords `0x11186887` / `0x7460a4b0`
-    // - payload `+0x12..+0x21` = packed-GOB LTGUID from `0x438e60` fallback family
-    // - payload `+0x22` = owner current helper phase byte
-    // anchor: launcher.exe:0x43b8f0 = Packet_MsConnectRequest_0x4b5364::ResetAndInitialize
-    Packet_MsConnectRequest_0x4b5364 packetBuilder;
-    packetBuilder.ResetAndInitialize();
-
-    // Get payload base for writes
-    uint8_t* payloadBase = packetBuilder.PayloadBase();
-    // Get version values from mediator and write directly to payload
-    const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
-    const uint32_t* clientVersionPtr = g_CurrentLoginMediator->GetNoPatchClientVersionValuePtr0c();
-
-    // Write fields directly to payload (static-RE faithful)
-    if (payloadBase) {
-        // Version dwords at +0x01 and +0x05
-        *reinterpret_cast<uint32_t*>(payloadBase + 1) =
-            launcherVersionPtr ? *launcherVersionPtr : 0u;
-        *reinterpret_cast<uint32_t*>(payloadBase + 5) =
-            clientVersionPtr ? *clientVersionPtr : 0u;
-        // Fixed 9-byte block at +0x09: byte=1, dword=0x11186887, dword=0x7460a4b0
-        payloadBase[9] = 1;
-        payloadBase[10] = 0x87;
-        payloadBase[0xb] = 0x68;
-        payloadBase[0xc] = 0x18;
-        payloadBase[0xd] = 0x11;
-        payloadBase[0xe] = 0xb0;
-        payloadBase[0xf] = 0xa4;
-        payloadBase[0x10] = 0x60;
-        payloadBase[0x11] = 0x74;
-        // Packed GOB LTGUID from launcher resource at +0x12..+0x21
-        const auto gobGuidWords = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
-        *reinterpret_cast<uint32_t*>(payloadBase + 0x12) = gobGuidWords[0];
-        *reinterpret_cast<uint32_t*>(payloadBase + 0x16) = gobGuidWords[1];
-        *reinterpret_cast<uint32_t*>(payloadBase + 0x1a) = gobGuidWords[2];
-        *reinterpret_cast<uint32_t*>(payloadBase + 0x1e) = gobGuidWords[3];
-        // mbr_0x5 is a boolean: 0 by default, set to 1 by SetUnknownByte05()
-        // Static-RE faithful: call GetUnknownByte05() (vtable +0x18)
-        payloadBase[0x22] = g_CurrentLoginMediator->GetUnknownByte05();
-    }
-
-    // Build envelope for send
-    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
-    envelope.payloadBase04 = payloadBase;
-    envelope.messageRef08 = packetBuilder.messageRef08;
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
-    g_CurrentLoginMediator->PostEvent(0x11u);
-    // Log version values for diagnostics (dereferenced from pointers)
-    const uint32_t loggedLauncherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
-    const uint32_t loggedClientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
-    const auto loggedGobGuid = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
-    const uint8_t loggedHelperPhase = static_cast<uint8_t>(
-        g_CurrentLoginMediator->currentState_
-            ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode()
-            : 0u);
-    spdlog::info(
-        "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
-        State6Packet0x06FixedPayload::kFixedByteCount,
-        static_cast<unsigned>(loggedLauncherVersion),
-        static_cast<unsigned>(loggedClientVersion),
-        static_cast<unsigned>(loggedGobGuid[0]),
-        static_cast<unsigned>(loggedGobGuid[1]),
-        static_cast<unsigned>(loggedGobGuid[2]),
-        static_cast<unsigned>(loggedGobGuid[3]),
-        static_cast<unsigned>(loggedHelperPhase),
-        static_cast<unsigned>(sendResult),
-        g_CurrentLoginMediator->currentState_
-            ? g_CurrentLoginMediator->currentState_->DebugName()
-            : "<null>");
+  }
+  // anchor: launcher.exe:0x43b91f..0x43b92a - direct g_CurrentLoginMediator access, no null check
+  if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
+    g_CurrentLoginMediator->SetCurrentState(4u);
     return;
+  }
+
+  auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(g_CurrentLoginMediator->marginConnection_);
+  const bool marginConnectionReady84 =
+    marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
+  // anchor: launcher.exe:0x43b94a..0x43b95e - no logging on fallback, just return void
+  if (!marginConnectionReady84) {
+    g_CurrentLoginMediator->SetCurrentState(5u);
+    return;
+  }
+
+  // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
+  // Current tighter send-side mirror:
+  // - payload `+0x00` = raw opcode `0x06` (`MS_ConnectRequest`)
+  // - payload `+0x01/+0x05` = owner `+0x08/+0x0c` launcher/client version dwords
+  // - payload `+0x09` = fixed byte `1`
+  // - payload `+0x0a/+0x0e` = fixed dwords `0x11186887` / `0x7460a4b0`
+  // - payload `+0x12..+0x21` = packed-GOB LTGUID from `0x438e60` fallback family
+  // - payload `+0x22` = owner current helper phase byte
+  // anchor: launcher.exe:0x43b8f0 = Packet_MsConnectRequest_0x4b5364::ResetAndInitialize
+  Packet_MsConnectRequest_0x4b5364 packetBuilder;
+  packetBuilder.ResetAndInitialize();
+
+  // Get payload base for writes
+  uint8_t* payloadBase = packetBuilder.PayloadBase();
+  // Get version values from mediator and write directly to payload
+  const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
+  const uint32_t* clientVersionPtr = g_CurrentLoginMediator->GetNoPatchClientVersionValuePtr0c();
+
+  // Write fields directly to payload (static-RE faithful)
+  if (payloadBase) {
+    // Version dwords at +0x01 and +0x05
+    *reinterpret_cast<uint32_t*>(payloadBase + 1) =
+      launcherVersionPtr ? *launcherVersionPtr : 0u;
+    *reinterpret_cast<uint32_t*>(payloadBase + 5) =
+      clientVersionPtr ? *clientVersionPtr : 0u;
+    // Fixed 9-byte block at +0x09: byte=1, dword=0x11186887, dword=0x7460a4b0
+    payloadBase[9] = 1;
+    payloadBase[10] = 0x87;
+    payloadBase[0xb] = 0x68;
+    payloadBase[0xc] = 0x18;
+    payloadBase[0xd] = 0x11;
+    payloadBase[0xe] = 0xb0;
+    payloadBase[0xf] = 0xa4;
+    payloadBase[0x10] = 0x60;
+    payloadBase[0x11] = 0x74;
+    // Packed GOB LTGUID from launcher resource at +0x12..+0x21
+    const auto gobGuidWords = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
+    *reinterpret_cast<uint32_t*>(payloadBase + 0x12) = gobGuidWords[0];
+    *reinterpret_cast<uint32_t*>(payloadBase + 0x16) = gobGuidWords[1];
+    *reinterpret_cast<uint32_t*>(payloadBase + 0x1a) = gobGuidWords[2];
+    *reinterpret_cast<uint32_t*>(payloadBase + 0x1e) = gobGuidWords[3];
+    // mbr_0x5 is a boolean: 0 by default, set to 1 by SetUnknownByte05()
+    // Static-RE faithful: call GetUnknownByte05() (vtable +0x18)
+    payloadBase[0x22] = g_CurrentLoginMediator->GetUnknownByte05();
+  }
+
+  // Build envelope for send
+  ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+  envelope.payloadBase04 = payloadBase;
+  envelope.messageRef08 = packetBuilder.messageRef08;
+  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
+  g_CurrentLoginMediator->PostEvent(0x11u);
+  // Log version values for diagnostics (dereferenced from pointers)
+  const uint32_t loggedLauncherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
+  const uint32_t loggedClientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
+  const auto loggedGobGuid = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
+  const uint8_t loggedHelperPhase = static_cast<uint8_t>(
+    g_CurrentLoginMediator->currentState_
+    ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode()
+    : 0u);
+  spdlog::info(
+    "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
+    State6Packet0x06FixedPayload::kFixedByteCount,
+    static_cast<unsigned>(loggedLauncherVersion),
+    static_cast<unsigned>(loggedClientVersion),
+    static_cast<unsigned>(loggedGobGuid[0]),
+    static_cast<unsigned>(loggedGobGuid[1]),
+    static_cast<unsigned>(loggedGobGuid[2]),
+    static_cast<unsigned>(loggedGobGuid[3]),
+    static_cast<unsigned>(loggedHelperPhase),
+    static_cast<unsigned>(sendResult),
+    g_CurrentLoginMediator->currentState_
+    ? g_CurrentLoginMediator->currentState_->DebugName()
+    : "<null>");
+  return;
 }
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
 uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+  spdlog::info(
+    "DIAGNOSTIC: CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage entered this={} currentState={}",
+    fmt::ptr(this),
+    (g_CurrentLoginMediator && g_CurrentLoginMediator->currentState_) ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+  if (!g_CurrentLoginMediator) {
+    return 0u;
+  }
+
+  // anchor: launcher.exe:0x440793 - CMessageConnectionMessageRef_DecodeMessageCode returns opcode in AX
+  uint16_t messageCode = 0;
+  if (!CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
+    // Decode failed - original dispatches as opcode 0
+  }
+
+  // Get payload directly from message ref (matching state10 pattern)
+  const uint8_t* payloadBytes = workItem->messageStorage0c->PayloadBase();
+  const uint16_t payloadByteCount = workItem->PayloadByteCount();
+  if (!payloadBytes || payloadByteCount == 0u) {
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage entered this={} currentState={}",
-        fmt::ptr(this),
-        (g_CurrentLoginMediator && g_CurrentLoginMediator->currentState_) ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-    if (!g_CurrentLoginMediator) {
-        return 0u;
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected empty payload");
+    return 0u;
+  }
+
+  // anchor: launcher.exe:0x44079b - CMP AX, 0x7; JZ opcode7_path
+  if (messageCode == 0x07u) {
+    // anchor: launcher.exe:0x44079e..0x440a30 - opcode 7 MS_ConnectChallenge handling
+    // The original builds and sends a challenge response packet (opcode 0x08)
+
+    if (payloadByteCount < 0x0du) {
+      spdlog::info(
+        "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 payload too short={}",
+        static_cast<unsigned>(payloadByteCount));
+      return 0u;
     }
 
-    // Static-RE fidelity: the original at 0x440793 calls DecodeMessageCode (0x41bc20)
-    // which returns the message opcode in AX. Then 0x44079b CMP AX,0x7
-    // dispatches opcode-7 to one path, others to another. Use the same decode approach
-    // as state10: CMessageConnection_0x4b7928_DecodeMessageCode to get opcode.
-    uint16_t messageCode = 0;
-    if (!CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
-        // Decode failed - original sees opcode 0, dispatches to reject path
-    }
+    const uint32_t goHereAddr = ReadU32LE(payloadBytes + 0x01u);
+    const uint32_t goHerePort = ReadU32LE(payloadBytes + 0x05u);
+    const uint32_t sessionSecret = ReadU32LE(payloadBytes + 0x09u);
 
-    // Positive `owner +0xf18` writer result:
-    // - `0x00440780 = CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply`
-    // - tighter parser/layout review around `0x43a0b0 / 0x43a060 / 0x43c950` now bounds the
-    //   opcode-`9` reply body as:
-    //   - `+0x01` = `Status`
-    //   - `+0x05` = `GoHereAddr`
-    //   - `+0x09` = original debug label `UDPSessionSecret`
-    //   - `+0x0d` = offset to `MetrIds` array header `(u16 count, then u16 ids...)`
-    // - for this function's static source mirror, the important direct fact is narrower:
-    //   `parsedReply(+0x09)` is the dword copied into owner `+0xf18`
-    // - on the opcode-`9` success side, the original writes owner byte `+0xf14 = 1`
-    //   and owner dword `+0xf18 = parsedReply(+0x09)` before switching helper state and posting
-    //   event `0x12`
-    // - concrete assembly shape at `0x440ab9..0x440ac9`:
-    //   - `mov eax, [0x004f78b8]`
-    //   - `mov edx, [edi+0x9]`
-    //   - `add eax, 0xf14`
-    //   - `mov [eax+4], edx`  -> owner `+0xf18`
-    //   - `mov byte ptr [eax], 1` -> owner `+0xf14`
-    // - importantly, the immediate helper-state switch target is **not** derived from that dword:
-    //   `0x440acc..0x440ae0` reloads state6 `this`, reads the cached upstream object at `this+4`,
-    //   and calls its vtable `+0x18` to choose the next helper state
-
-    // Get payload directly from message ref (matching state10 pattern at 0x4401c0)
-    // Use payload directly from workItem (matching state10 pattern)
-    const uint8_t* payloadBytes = workItem->messageStorage0c->PayloadBase();
-    const uint16_t payloadByteCount = workItem->PayloadByteCount();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected empty payload");
-        return 0u;
-    }
-
-    if (messageCode == 0x07u) {
-        // MS_ConnectChallenge: parse fields and send challenge response
-        if (payloadByteCount < 0x0du) {
-            spdlog::info(
-                "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 payload too short={}",
-                static_cast<unsigned>(payloadByteCount));
-            return 0u;
-        }
-        const uint32_t goHereAddr = ReadU32LE(payloadBytes + 0x01u);
-        const uint32_t goHerePort = ReadU32LE(payloadBytes + 0x05u);
-        const uint32_t sessionSecret = ReadU32LE(payloadBytes + 0x09u);
     spdlog::info(
-        "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x}; mirroring original challenge-response flow",
-        static_cast<unsigned>(goHereAddr),
-        static_cast<unsigned>(goHerePort),
-        static_cast<unsigned>(sessionSecret));
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x}; mirroring original challenge-response flow",
+      static_cast<unsigned>(goHereAddr),
+      static_cast<unsigned>(goHerePort),
+      static_cast<unsigned>(sessionSecret));
 
-    // Call hash generation before constructing challenge response
-    // anchor: launcher.exe:0x440780 -> 0x43d800 = GenerateClientChunkHashes
+    // anchor: launcher.exe:0x43d800 = GenerateClientChunkHashes
     // State6 Slot6 generates client.dll chunk hashes on MS_ConnectChallenge
-    // These hashes populate the selection context blocks sent in MS_LoadCharacterRequest
     g_ClientChunkHashStorage.Clear();
-    
+
     // Build client.dll path from game directory
-    // anchor: launcher.exe:0x43d800 GetExecutableBasePathAndFilename
     std::string clientDllPath;
     {
       wchar_t exePathW[MAX_PATH] = {};
@@ -367,7 +295,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
       }
       clientDllPath += "client.dll";
     }
-    
+
     std::vector<std::string> clientFiles = {clientDllPath};
     auto hashes = GenerateClientChunkHashes(clientFiles);
     g_ClientChunkHashStorage.SetHashes(hashes);
@@ -375,121 +303,177 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     spdlog::info("State6 Slot6: Generated {} chunk hashes for client verification", hashes.size());
 
     // Copy hashes into selection context blocks for State8 to use
-    // anchor: launcher.exe:0x440780 -> DAT_004f79d8 hash storage path
     g_CurrentLoginMediator->PopulateSelectionContextBlocksFromChunkHashes();
 
     // Store for use in challenge-response construction
     g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
     g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
 
-        // Original builds and sends challenge-response packet first, then switches helper
-        // For now: directly call SendCurrentMarginPacket - simplified stub
-        // Note: Full packet construction not yet source-owned - this is a stub
-        // g_CurrentLoginMediator->SendCurrentMarginPacket(...); // packet builder not yet implemented
-
-        // Then switch states through cached upstream (if available)
-        if (cachedUpstreamOrArg_0x4 != nullptr) {
-            const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
-            g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
-        }
-
-        // Post event to continue flow
-        g_CurrentLoginMediator->PostEvent(0x11u);
-        return 1u;
-    }
-
-    // Opcode 0x09 = MS_ConnectChallengeResponse or similar margin reply
-    const ParsedState6Opcode9ReplyScaffold parsed = ParseState6Opcode9ReplyScaffold(payloadBytes, payloadByteCount);
-    if (!parsed.valid) {
-        spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected payloadCode=0x{:02x} payloadBytes={}; state6 slot6 currently source-owns only opcode-0x09",
-            static_cast<unsigned>(messageCode),
-            static_cast<unsigned>(payloadByteCount));
-        return 0u;
-    }
-
-    g_CurrentLoginMediator->worldListCountOrStatus80 = parsed.status01;
-    if (parsed.status01 != 0u) {
-        spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage observed opcode-0x09 failure status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x}; success-side owner+0xf14/+0xf18 write is source-owned but the broader failure-side helper-switch/error path is still not",
-            static_cast<unsigned>(parsed.status01),
-            static_cast<unsigned>(parsed.goHereAddr05),
-            static_cast<unsigned>(parsed.udpSessionSecret09));
-        return 1u;
-    }
-
-    g_CurrentLoginMediator->ClearLateEntryList1470Scaffold();
-
-    // Original at 0x440a42 calls FUN_0048dbc0 with (DAT_004f9cd4 + 0x200):
-    // - Constructs a logrouter hook path string and calls into cls_0x48d020 registration system
-    // - This is an internal launcher infrastructure hook, not needed for the replacement path
-    // Original at 0x440ab4 calls FUN_0048cfd0 -> meth_0x48cea0:
-    // - Iterates internal margin state arrays and calls destructors (meth_0x48e010)
-    // - Cleanup of per-connection state; not needed for the self-contained replacement
-    // Both functions omitted with comment documenting intentional fidelity gap.
-
-    uint32_t resolvedMetricFilenameCount = 0u;
-    uint32_t unresolvedMetricFilenameCount = 0u;
-    for (uint16_t metricId : parsed.metricIds) {
-        const char* const filename = ResolveClientMetricFilenameById(metricId);
-        if (filename && filename[0] != '\0') {
-            const size_t filenameLength = std::strlen(filename);
-            LateEntryList1470EntrySketch metricFilenameStringTriple{};
-            metricFilenameStringTriple.begin = const_cast<char*>(filename);
-            metricFilenameStringTriple.current = metricFilenameStringTriple.begin + filenameLength;
-            metricFilenameStringTriple.capacity = metricFilenameStringTriple.current + 1u;
-            g_CurrentLoginMediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple);
-            ++resolvedMetricFilenameCount;
-            continue;
-        }
-
-        ++unresolvedMetricFilenameCount;
-        spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage could not resolve opcode-0x09 metricId=0x{:04x} to a Filename through the loaded client METR table",
-            static_cast<unsigned>(metricId));
-    }
-
-    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
-    g_CurrentLoginMediator->state6UdpSessionSecretF18_ = parsed.udpSessionSecret09;
-
-    if (cachedUpstreamOrArg_0x4 == nullptr) {
-        spdlog::info(
-            "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} but has no cached upstream helper at this+4 yet; leaving helper-switch/event-0x12 to the broader caller flow currentState={}",
-            static_cast<unsigned>(parsed.udpSessionSecret09),
-            static_cast<unsigned>(parsed.metricIdCount),
-            resolvedMetricFilenameCount,
-            unresolvedMetricFilenameCount,
-            BuildMetricIdPreview(parsed.metricIds),
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-        return 1u;
-    }
-
-    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
-    const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
-    g_CurrentLoginMediator->PostEvent(0x12u);
+    // anchor: launcher.exe:0x43fd20..0x440a30 - Build and send opcode 0x08 challenge response
+    // Original constructs packet buffer and sends via vtable +0x68 / SendCurrentMarginPacket
+    // Packet layout: [0x08][statusCode:4][metricIdBase:4][goHereAddr:4][sessionSecret:4]
+    // Full implementation requires CMessageConnectionMessageRef_0x4ba23c packet construction
+    // with proper envelope. Current simplified stub omits the actual packet send to avoid
+    // envelope signature mismatch - the original builds a full packet through
+    // CMessageConnection_0x4b7928::BuildRawMarginPacket family.
     spdlog::info(
-        "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
-        static_cast<unsigned>(parsed.udpSessionSecret09),
-        static_cast<unsigned>(nextHelperStateId),
-        static_cast<unsigned>(switchDispatchResult));
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 challenge response send path (opcode 0x08) - original sends packet via vtable+0x68, current stub");
 
-    spdlog::info(
-        "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} -> nextHelperState={} currentState={}",
-        static_cast<unsigned>(parsed.status01),
-        static_cast<unsigned>(parsed.goHereAddr05),
-        static_cast<unsigned>(parsed.udpSessionSecret09),
-        static_cast<unsigned>(parsed.metricIdCount),
-        resolvedMetricFilenameCount,
-        unresolvedMetricFilenameCount,
-        BuildMetricIdPreview(parsed.metricIds),
-        static_cast<unsigned>(nextHelperStateId),
-        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+    // Then switch states through cached upstream (if available)
+    if (cachedUpstreamOrArg_0x4 != nullptr) {
+      const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
+      g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
+    }
+
+    // Post event to continue flow
+    g_CurrentLoginMediator->PostEvent(0x11u);
     return 1u;
+  }
+
+  // anchor: launcher.exe:0x440a33 - CMP AX, 0x9; JNZ not_opcode9
+  if (messageCode != 0x09u) {
+    // anchor: launcher.exe:0x440b7f
+    g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005;
+    return 0u;
+  }
+
+  // anchor: launcher.exe:0x440a3a..0x440b81 - opcode 9 handling
+  // Original reads directly from payload, no helper struct
+  if (payloadByteCount < 0x0fu) {
+    spdlog::info(
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x09 payload too short={}",
+      static_cast<unsigned>(payloadByteCount));
+    return 0u;
+  }
+
+  // Parse directly from payload (no helper function - all inline in original)
+  // anchor: launcher.exe:0x440a40 - reads status from +0x01
+  const uint32_t status01 = ReadU32LE(payloadBytes + 0x01u);
+  g_CurrentLoginMediator->worldListCountOrStatus80 = status01;
+
+  // anchor: launcher.exe:0x440a4b - tests status != 0
+  if (status01 != 0u) {
+    // anchor: launcher.exe:0x440b08..0x440b6d - failure handling
+    // Status values: 0x0b000012 = try next margin, 0x19000001 = auth error, other = error
+    if (status01 == 0x0b000012u) {
+      // Try next margin address if available
+      // anchor: launcher.exe:0x440b0e - compares marginBeginCount24_ < address count
+      // Original: (uint)((int)(marginAddressList3c_End - marginAddressList3c_Begin) >> 2)
+      const uint32_t marginCount = g_CurrentLoginMediator->marginAddressList3c_.Count();
+      const uint32_t currentMarginIndex = g_CurrentLoginMediator->marginBeginCount24_;
+      if (currentMarginIndex < marginCount) {
+        // anchor: launcher.exe:0x440b18..0x440b32 - store goHereAddr at +0x7c (marginSelectedIpv4_7c_) and switch to state 4
+        const uint32_t goHereAddr05 = ReadU32LE(payloadBytes + 0x05u);
+        g_CurrentLoginMediator->marginSelectedIpv4_7c_ = goHereAddr05;
+        g_CurrentLoginMediator->SetCurrentState(4u);
+        return 1u;
+      }
+    } else if (status01 == 0x19000001u) {
+      // Auth error - go to state 2
+      g_CurrentLoginMediator->SetCurrentState(2u);
+      return 1u;
+    }
+
+    // General error path
+    g_CurrentLoginMediator->marginBeginCount24_ = 0;
+    g_CurrentLoginMediator->SetCurrentState(3u);
+    g_CurrentLoginMediator->PostError(8u);
+    return 1u;
+  }
+
+  // anchor: launcher.exe:0x440a5e..0x440ae0 - success path (status == 0)
+  g_CurrentLoginMediator->marginBeginCount24_ = 0;
+  g_CurrentLoginMediator->ClearLateEntryList1470Scaffold();
+
+  // Original at 0x440a42 calls FUN_0048dbc0 with (DAT_004f9cd4 + 0x200):
+  // - Constructs a logrouter hook path string and calls into cls_0x48d020 registration system
+  // - This is an internal launcher infrastructure hook, not needed for the replacement path
+  // Original at 0x440ab4 calls FUN_0048cfd0 -> meth_0x48cea0:
+  // - Iterates internal margin state arrays and calls destructors (meth_0x48e010)
+  // - Cleanup of per-connection state; not needed for the self-contained replacement
+  // Both functions omitted with comment documenting intentional fidelity gap.
+
+  // anchor: launcher.exe:0x440a60..0x440aa6 - read metric IDs from payload and resolve filenames
+  // Original directly accesses payload[0x0d] for metricIdsOffset
+  const uint16_t metricIdsOffset0d = ReadU16LE(payloadBytes + 0x0du);
+  const uint16_t metricIdCount = (metricIdsOffset0d != 0u && (metricIdsOffset0d + 2u) <= payloadByteCount)
+    ? ReadU16LE(payloadBytes + metricIdsOffset0d)
+    : 0u;
+
+  uint32_t resolvedMetricFilenameCount = 0u;
+  uint32_t unresolvedMetricFilenameCount = 0u;
+  for (uint16_t i = 0; i < metricIdCount; ++i) {
+    const size_t metricOffset = static_cast<size_t>(metricIdsOffset0d) + 2u + (static_cast<size_t>(i) * sizeof(uint16_t));
+    if (metricOffset + sizeof(uint16_t) > payloadByteCount) {
+      break;
+    }
+    const uint16_t metricId = ReadU16LE(payloadBytes + metricOffset);
+    const char* const filename = ResolveClientMetricFilenameById(metricId);
+    if (filename && filename[0] != '\0') {
+      const size_t filenameLength = std::strlen(filename);
+      LateEntryList1470EntrySketch metricFilenameStringTriple{};
+      metricFilenameStringTriple.begin = const_cast<char*>(filename);
+      metricFilenameStringTriple.current = metricFilenameStringTriple.begin + filenameLength;
+      metricFilenameStringTriple.capacity = metricFilenameStringTriple.current + 1u;
+      g_CurrentLoginMediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple);
+      ++resolvedMetricFilenameCount;
+      continue;
+    }
+
+    ++unresolvedMetricFilenameCount;
+    spdlog::info(
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage could not resolve opcode-0x09 metricId=0x{:04x} to a Filename through the loaded client METR table",
+      static_cast<unsigned>(metricId));
+  }
+
+  // anchor: launcher.exe:0x440ab9..0x440ac9 - write owner +0xf14 = 1 and owner +0xf18 = session secret
+  const uint32_t udpSessionSecret09 = ReadU32LE(payloadBytes + 0x09u);
+  g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+  g_CurrentLoginMediator->state6UdpSessionSecretF18_ = udpSessionSecret09;
+
+  // anchor: launcher.exe:0x440acc..0x440ae0 - get next helper state from cached upstream vtable+0x18
+  if (cachedUpstreamOrArg_0x4 == nullptr) {
+    spdlog::info(
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} but has no cached upstream helper at this+4 yet; leaving helper-switch/event-0x12 to the broader caller flow currentState={}",
+      static_cast<unsigned>(udpSessionSecret09),
+      static_cast<unsigned>(metricIdCount),
+      resolvedMetricFilenameCount,
+      unresolvedMetricFilenameCount,
+      g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+    return 1u;
+  }
+
+  const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
+  const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
+
+  // anchor: launcher.exe:0x440ae1 - PostEvent(0x12)
+  g_CurrentLoginMediator->PostEvent(0x12u);
+
+  const uint32_t goHereAddr05 = ReadU32LE(payloadBytes + 0x05u);
+  spdlog::info(
+    "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
+    static_cast<unsigned>(udpSessionSecret09),
+    static_cast<unsigned>(nextHelperStateId),
+    static_cast<unsigned>(switchDispatchResult));
+
+  spdlog::info(
+    "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} -> nextHelperState={} currentState={}",
+    static_cast<unsigned>(status01),
+    static_cast<unsigned>(goHereAddr05),
+    static_cast<unsigned>(udpSessionSecret09),
+    static_cast<unsigned>(metricIdCount),
+    resolvedMetricFilenameCount,
+    unresolvedMetricFilenameCount,
+    BuildMetricIdPreview(reinterpret_cast<const uint16_t*>(payloadBytes + metricIdsOffset0d + 2), metricIdCount),
+    static_cast<unsigned>(nextHelperStateId),
+    g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+
+  return 1u;
 }
 
 // anchor: launcher.exe:0x00438c70 (vtable 0x004b508c slot 7)
 uint32_t CLTLoginState_State6_0x4b508c::GetStateId() const {
-    return 6;
+  return 6;
 }
 
-}  // namespace mxo::ltlogin
+} // namespace mxo::ltlogin
