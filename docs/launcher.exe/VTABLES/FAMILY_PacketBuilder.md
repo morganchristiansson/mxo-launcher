@@ -5,79 +5,79 @@ All vtable addresses pointing to:
 - `PacketBuilder_GetPacketPayloadBase` at `0x481760` - 10 byte offset.
 
 ## VTable Addresses
-
-0x4af2a4 base class
-0x4b00b2
-0x4b00be
-0x4b010a
-0x4b0116
-0x4b51aa
-0x4b532e
-0x4b533c
-0x4b5342
-0x4b5350
-0x4b5356
-0x4b5364
-0x4b536a
-0x4b5378
-0x4b537e
-0x4b538c
-0x4b5392
-0x4b53a0
-0x4b53a6
-0x4b53b4
-0x4b53ba
-0x4b53c8
-0x4b53ce
-0x4b53dc
-0x4b53e2
-0x4b53f0
-0x4b53f6
-0x4b5404
-0x4b540a
-0x4b5418
-0x4b541e
-0x4b542c
-0x4b5432
-0x4b5440
-0x4b5446
-0x4b5454
-0x4b545a
-0x4b5468
-0x4b546e
-0x4b6524
-0x4b652a
-0x4b6538
-0x4b653e
-0x4b654c
-0x4b6552
-0x4b6560
-0x4b6566
-0x4b6574
-0x4b657a
-0x4b6588
-0x4b658e
-0x4b6c7a
-0x4b6c90
-0x4b6c96
-0x4b6ca4
-0x4b6caa
-0x4b6cb8
-0x4b6cbe
-0x4b6ccc
-0x4b6cd2
-0x4b6ce0
-0x4b6ce6
-0x4b6cf4
-0x4b6cfa
-0x4b6d08
-0x4b6d0e
-0x4b7502
-0x4b750e
-0x4b7622
-0x4b762e
-0x4b86aa
-0x4b86b6
-0x4bae36
-0x4c056e
-0x4c0592
+| vtable   | code | class name      |
+| 0x4af2a4 | n/a  | Packet_0x4af2a4 |
+| 0x4b00b2 |      |                 |
+| 0x4b00be |      |                 |
+| 0x4b010a |      |                 |
+| 0x4b0116 |      |                 |
+| 0x4b51aa |      |                 |
+| 0x4b532e |      |                 |
+| 0x4b533c |      |                 |
+| 0x4b5342 |      |                 |
+| 0x4b5350 |      |                 |
+| 0x4b5356 |      |                 |
+| 0x4b5364 |      |                 |
+| 0x4b536a |      |                 |
+| 0x4b5378 |      |                 |
+| 0x4b537e |      |                 |
+| 0x4b538c |      |                 |
+| 0x4b5392 |      |                 |
+| 0x4b53a0 |      |                 |
+| 0x4b53a6 |      |                 |
+| 0x4b53b4 |      |                 |
+| 0x4b53ba |      |                 |
+| 0x4b53c8 |      |                 |
+| 0x4b53ce |      |                 |
+| 0x4b53dc |      |                 |
+| 0x4b53e2 |      |                 |
+| 0x4b53f0 |      |                 |
+| 0x4b53f6 |      |                 |
+| 0x4b5404 |      |                 |
+| 0x4b540a |      |                 |
+| 0x4b5418 |      |                 |
+| 0x4b541e |      |                 |
+| 0x4b542c |      |                 |
+| 0x4b5432 |      |                 |
+| 0x4b5440 |      |                 |
+| 0x4b5446 |      |                 |
+| 0x4b5454 |      |                 |
+| 0x4b545a |      |                 |
+| 0x4b5468 |      |                 |
+| 0x4b546e |      |                 |
+| 0x4b6524 |      |                 |
+| 0x4b652a |      |                 |
+| 0x4b6538 |      |                 |
+| 0x4b653e |      |                 |
+| 0x4b654c |      |                 |
+| 0x4b6552 |      |                 |
+| 0x4b6560 |      |                 |
+| 0x4b6566 |      |                 |
+| 0x4b6574 |      |                 |
+| 0x4b657a |      |                 |
+| 0x4b6588 |      |                 |
+| 0x4b658e |      |                 |
+| 0x4b6c7a |      |                 |
+| 0x4b6c90 |      |                 |
+| 0x4b6c96 |      |                 |
+| 0x4b6ca4 |      |                 |
+| 0x4b6caa |      |                 |
+| 0x4b6cb8 |      |                 |
+| 0x4b6cbe |      |                 |
+| 0x4b6ccc |      |                 |
+| 0x4b6cd2 |      |                 |
+| 0x4b6ce0 |      |                 |
+| 0x4b6ce6 |      |                 |
+| 0x4b6cf4 |      |                 |
+| 0x4b6cfa |      |                 |
+| 0x4b6d08 |      |                 |
+| 0x4b6d0e |      |                 |
+| 0x4b7502 |      |                 |
+| 0x4b750e |      |                 |
+| 0x4b7622 |      |                 |
+| 0x4b762e |      |                 |
+| 0x4b86aa |      |                 |
+| 0x4b86b6 |      |                 |
+| 0x4bae36 |      |                 |
+| 0x4c056e |      |                 |
+| 0x4c0592 |      |                 |
