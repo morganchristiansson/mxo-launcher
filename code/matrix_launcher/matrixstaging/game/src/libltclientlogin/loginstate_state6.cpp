@@ -207,51 +207,67 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     Packet_MsConnectRequest_0x4b5364 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
+    // Get payload base for writes
+    uint8_t* payloadBase = packetBuilder.PayloadBase();
+    // Get version values from mediator and write directly to payload
     const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
     const uint32_t* clientVersionPtr = g_CurrentLoginMediator->GetNoPatchClientVersionValuePtr0c();
-    const uint32_t launcherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
-    const uint32_t clientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
-    const auto gobFileGuidWords = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
-    const uint8_t currentHelperPhaseByte = static_cast<uint8_t>(
-        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode() : 0u);
 
     // Write fields directly to payload (static-RE faithful)
-    uint8_t* payload = packetBuilder.PayloadBase();
-    if (payload) {
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kLauncherVersionOffset) = launcherVersion;
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kClientVersionOffset) = clientVersion;
-        // Fixed 9-byte block at +0x09 that server expects: byte=1, dword=0x11186887, dword=0x7460a4b0
-        payload[State6Packet0x06FixedPayload::kStateByteOffset] = State6Packet0x06FixedPayload::kStateByteValue;
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordAOffset) = State6Packet0x06FixedPayload::kFixedDwordA;
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordEOffset) = State6Packet0x06FixedPayload::kFixedDwordE;
-        // Packed GOB LTGUID from launcher resource
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0) = gobFileGuidWords[0];
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4) = gobFileGuidWords[1];
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8) = gobFileGuidWords[2];
-        *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc) = gobFileGuidWords[3];
+    if (payloadBase) {
+        // Version dwords at +0x01 and +0x05
+        *reinterpret_cast<uint32_t*>(payloadBase + 1) =
+            launcherVersionPtr ? *launcherVersionPtr : 0u;
+        *reinterpret_cast<uint32_t*>(payloadBase + 5) =
+            clientVersionPtr ? *clientVersionPtr : 0u;
+        // Fixed 9-byte block at +0x09: byte=1, dword=0x11186887, dword=0x7460a4b0
+        payloadBase[9] = 1;
+        payloadBase[10] = 0x87;
+        payloadBase[0xb] = 0x68;
+        payloadBase[0xc] = 0x18;
+        payloadBase[0xd] = 0x11;
+        payloadBase[0xe] = 0xb0;
+        payloadBase[0xf] = 0xa4;
+        payloadBase[0x10] = 0x60;
+        payloadBase[0x11] = 0x74;
+        // Packed GOB LTGUID from launcher resource at +0x12..+0x21
+        const auto gobGuidWords = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
+        *reinterpret_cast<uint32_t*>(payloadBase + 0x12) = gobGuidWords[0];
+        *reinterpret_cast<uint32_t*>(payloadBase + 0x16) = gobGuidWords[1];
+        *reinterpret_cast<uint32_t*>(payloadBase + 0x1a) = gobGuidWords[2];
+        *reinterpret_cast<uint32_t*>(payloadBase + 0x1e) = gobGuidWords[3];
         // Server expects 0x00 at offset 0x22 after weirdSequence
-        payload[State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset] = 0u;
-        // Note: helper phase byte is internal launcher state, read separately from mediator
+        payloadBase[0x22] = 0u;
     }
 
     // Build envelope for send
     ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
-    envelope.payloadBase04 = payload;
+    envelope.payloadBase04 = payloadBase;
     envelope.messageRef08 = packetBuilder.messageRef08;
     const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
     g_CurrentLoginMediator->PostEvent(0x11u);
+    // Log version values for diagnostics (dereferenced from pointers)
+    const uint32_t loggedLauncherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
+    const uint32_t loggedClientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
+    const auto loggedGobGuid = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
+    const uint8_t loggedHelperPhase = static_cast<uint8_t>(
+        g_CurrentLoginMediator->currentState_
+            ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode()
+            : 0u);
     spdlog::info(
         "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
         State6Packet0x06FixedPayload::kFixedByteCount,
-        static_cast<unsigned>(launcherVersion),
-        static_cast<unsigned>(clientVersion),
-        static_cast<unsigned>(gobFileGuidWords[0]),
-        static_cast<unsigned>(gobFileGuidWords[1]),
-        static_cast<unsigned>(gobFileGuidWords[2]),
-        static_cast<unsigned>(gobFileGuidWords[3]),
-        static_cast<unsigned>(currentHelperPhaseByte),
+        static_cast<unsigned>(loggedLauncherVersion),
+        static_cast<unsigned>(loggedClientVersion),
+        static_cast<unsigned>(loggedGobGuid[0]),
+        static_cast<unsigned>(loggedGobGuid[1]),
+        static_cast<unsigned>(loggedGobGuid[2]),
+        static_cast<unsigned>(loggedGobGuid[3]),
+        static_cast<unsigned>(loggedHelperPhase),
         static_cast<unsigned>(sendResult),
-        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+        g_CurrentLoginMediator->currentState_
+            ? g_CurrentLoginMediator->currentState_->DebugName()
+            : "<null>");
     return;
 }
 
