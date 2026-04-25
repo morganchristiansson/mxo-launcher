@@ -338,11 +338,8 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
       static_cast<unsigned>(goHereAddr), static_cast<unsigned>(sessionSecret),
       static_cast<unsigned>(sendResult));
 
-  // FIDELITY FIX: Do NOT transition states after sending challenge response!
-  // In original launcher, state transition happens AFTER receiving and processing
-  // the ConnectReply (0x09), not immediately after sending 0x08.
-  // The old code immediately transitioned to next state which caused us to miss
-  // processing opcode 0x09 in state6.
+  // anchor: launcher.exe:0x440a18..0x440a30 - no state transition after sending 0x08
+  // In original, state transition happens AFTER receiving the ConnectReply (0x09), not after sending 0x08.
 
   // Stay in state6 - wait for next message (should be 0x09 ConnectReply)
   return 1u;
