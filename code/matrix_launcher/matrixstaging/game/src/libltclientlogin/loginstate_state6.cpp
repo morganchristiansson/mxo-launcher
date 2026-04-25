@@ -240,13 +240,15 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
 
   // anchor: launcher.exe:0x440793 - CMessageConnectionMessageRef_DecodeMessageCode returns opcode in AX
   uint16_t messageCode = 0;
+  // Get payload directly from message ref (matching state10 pattern)
+  const uint8_t* payloadBytes = workItem->messageStorage0c->PayloadBase();
+  const uint16_t payloadByteCount = workItem->PayloadByteCount();
   if (!CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
     // Decode failed - original dispatches as opcode 0
   }
 
-  // Get payload directly from message ref (matching state10 pattern)
-  const uint8_t* payloadBytes = workItem->messageStorage0c->PayloadBase();
-  const uint16_t payloadByteCount = workItem->PayloadByteCount();
+  spdlog::debug("CLTLoginState_State6_Slot6: decoded messageCode=0x{:02x} payloadBytes={}",
+      static_cast<unsigned>(messageCode), static_cast<unsigned>(payloadByteCount));
   if (!payloadBytes || payloadByteCount == 0u) {
     spdlog::info(
       "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage rejected empty payload");
