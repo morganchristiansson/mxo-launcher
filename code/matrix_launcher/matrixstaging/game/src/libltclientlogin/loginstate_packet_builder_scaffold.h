@@ -643,11 +643,93 @@ public:
  }
 
  // anchor: launcher.exe:0x444040 = meth_0x444040 - AppendEncryptedChallenge
- // anchor: launcher.exe:0x444140 = meth_0x444140 - AppendPassword
- // anchor: launcher.exe:0x4441a0 = meth_0x4441a0 - ReserveFieldLength
- // anchor: launcher.exe:0x443660 = meth_0x443660 - SetPadding
+ // Appends length-prefixed string to +0x14 field (encryptedChallenge)
+ // Logic: if (param_1 && payloadLength14 == 0) { reserve len+1; strncpy(field+0x14, param_1, len); }
+ void AppendEncryptedChallenge(const char* str) {
+   if (!str) return;
+   // Already has content
+   if (payloadSize18 != 0) return;
+   size_t len = strlen(str);
+   // Reserve space for string + null terminator
+   uint16_t reserved = ReserveLengthPrefixedTail(static_cast<uint16_t>(len + 1));
+   if (reserved != 0 && encryptedChallengeField14_.writePointer00) {
+     // Write the string at the reserved position
+     char* dest = reinterpret_cast<char*>(encryptedChallengeField14_.writePointer00);
+     strncpy(dest, str, reserved - 1);
+     dest[reserved - 1] = '\0';
+   }
+ }
 
- // Reservation scaffolds for length-prefixed fields (offsets 0x28, 0x30, 0x38)
+ // anchor: launcher.exe:0x444140 = meth_0x444140 - AppendPassword
+ // Appends length-prefixed string to +0x1c/+0x20 field (password)
+ // Logic: if (param_1 && characterIdHigh20 == 0) { reserve len+1; strncpy(characterIdLow1c, param_1, len); }
+ void AppendPassword(const char* str) {
+   if (!str) return;
+   // Already has content
+   if (characterIdHigh20 != 0) return;
+   size_t len = strlen(str);
+   // Reserve space for string + null terminator
+   uint16_t reserved = ReserveLengthPrefixedTailForField(passwordField1c_, static_cast<uint16_t>(len + 1));
+   if (reserved != 0 && passwordField1c_.writePointer00) {
+     char* dest = reinterpret_cast<char*>(passwordField1c_.writePointer00);
+     strncpy(dest, str, reserved - 1);
+     dest[reserved - 1] = '\0';
+   }
+ }
+
+ // anchor: launcher.exe:0x4441a0 = meth_0x4441a0 - ReserveFieldLength
+ // Reserves length-prefixed field of specified size
+ // Returns actual bytes reserved (may be clamped to available space)
+ uint16_t ReserveFieldLength(uint16_t byteCount) {
+   return ReserveLengthPrefixedTail(byteCount);
+ }
+
+ // anchor: launcher.exe:0x443660 = meth_0x443660 - SetPadding
+ // Sets the padding value at offset +0x28
+ // Logic: mbr_0x28 = param_1; update word at (payloadBegin10 + 0x15)
+ void SetPadding(uint16_t paddingBytes) {
+   // Store padding in field at +0x28 (worldId24 is at +0x24, mbr_0x28 at +0x28)
+   // The original writes to a word at payloadBegin10 + 0x15
+   uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+   if (payload) {
+     // Update the length field at +0x15 to reflect padding
+     *reinterpret_cast<uint16_t*>(payload + 0x15) = paddingBytes;
+   }
+ }
+
+private:
+ // helper to reserve space for a specific field
+ uint16_t ReserveLengthPrefixedTailForField(
+     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold& field,
+     uint16_t contentByteCount) {
+   if (!messageRef08 || !messageRef08->messageStorage0c) {
+     return 0;
+   }
+
+   // Calculate available space (max 0xFFC bytes per message)
+   uint8_t* storage = reinterpret_cast<uint8_t*>(messageRef08->messageStorage0c);
+   uint16_t currentSize = *reinterpret_cast<uint16_t*>(storage + 0x08);
+   uint16_t maxSize = *reinterpret_cast<uint16_t*>(storage + 0x0a) & 0x7FFF;
+   uint16_t available = 0xFFC - maxSize - currentSize;
+
+   uint16_t actualCount = contentByteCount;
+   if (available < contentByteCount) {
+     actualCount = available;
+   }
+
+   // Grow payload to make room
+   if (messageRef08->messageStorage0c) {
+     messageRef08->messageStorage0c->GrowPayloadByteCount(actualCount + 2);
+   }
+
+   // Update field scaffold
+   field.reservedContentByteCount04 = actualCount;
+   field.writePointer00 = messageRef08->messageStorage0c->PayloadBase();
+
+   return actualCount;
+ }
+
+public:
  ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold encryptedChallengeField14_{};
  ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold passwordField1c_{};
  ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold soePasswordField24_{};
