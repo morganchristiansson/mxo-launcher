@@ -82,78 +82,102 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
 
 // anchor: launcher.exe:0x41de40
 uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t helperWord6) {
-    // Current focused state9 submit read:
-    // - natural original now proves `0x439780 -> 0x41de40 -> 0x43c180`
-    // - `0x41de40` first queries callback84 `+0x38`, then builds submit target text from the
-    //   margin connection address, then branches through object88 `(+0x44)->(+0x30)` into:
-    //   - direct `+0x28`
-    //   - or managed `+0x1c / +0x18 / +0x24`
-    // - the remaining gap is now much narrower than generic "missing collaborators":
-    //   - callback84 pair generation is source-owned via `+0x18c`
-    //   - owner `+0x88` provenance is now bounded tightly enough to preserve the startup-provided
-    //     netMgr wrapper on the active path
-    // - current bounded provenance answer to preserve while doing that work:
-    //   - owner `+0x84/+0x88/+0x8c` are zeroed at `0x41ee60`
-    //   - set from the startup `arg6->+0x124(netShell, netMgr, distrObjExecutive)` triple by
-    //     `0x41f1d0`
-    //   - live original now also proves owner `+0x88` stays unchanged from that store through
-    //     `0x439780 -> 0x41de40 -> 0x43c180`
-    // - callback84 is also now tighter than a generic opaque blob provider:
-    //   launcher `+0x18c / 0x41e690` seeds blob `+0x10` from owner `+0xf18`, then runs the
-    //   16-byte region through `0x41df60 / 0x44b190 / 0x44b570`, and the active one-block result is
-    //   now live-matched as a Twofish zero-IV block transform over `[ownerF18, 0, 0, 0]`
-    const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
-    uint32_t callbackOutLow = 0u;
-    uint32_t callbackOutHigh = 0u;
-    // call through callback84 vtable+0x38 (client.dll ClientNetShell)
-    const bool callbackPairReady =
-        mxo::ltlogin::TryCallback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
+  // Ghidra decompile analysis (0x41de40 - 0x41df50):
+  // Method: State9SubmitFollowup(this, helperByte4, helperWord6)
+  // Stack frame: SUB ESP, 0x24 (36 bytes local)
+  // - EBP-0x4: callbackOutHigh (dword)
+  // - EBP-0x8: callbackOutLow (dword)
+  // - EBP-0x14: submitTargetString (std::string ptr - from 0x44b0d0)
+  // - EBP-0x24: local submitAddressBlock (16 bytes copied from marginConnection+0x24)
+  //
+  // Assembly flow (verified):
+  // 0x41de4c: ECX = [ESI + 0x84] (ownerCallback84)
+  // 0x41de67: CALL [EAX + 0x38] (callback84 vtable slot +0x38)
+  // 0x41de6a: EAX = [ESI + 0x1c] (marginConnection1c)
+  // 0x41de6d: ADD EAX, 0x24 (endpoint offset)
+  // 0x41de70-0x41de84: Copy 16 bytes from marginConnection+0x24 into local block at EBP-0x24
+  // 0x41de8e: CALL 0x44afd0 (SubmitAddress_SetPortFromHelperWord)
+  // 0x41de9c: CALL 0x44b0d0 (SubmitAddressBlock_FormatHostPortString)
+  // 0x41dea1: ECX = [ESI + 0x88] (ownerObject88)
+  // 0x41dea9: CALL [EDX + 0x44] (INetMgr::GetSocket)
+  // 0x41deb0: CALL [EDX + 0x30] (isSocketManaged)
+  // 0x41deb5: JZ 0x41df0d (branch to direct send if not managed)
+  //
+  // Managed send path (0x41deb7 - 0x41df0b):
+  // - If ownerCachedHandle147c != -1: call [EDX + 0x1c](handle) to close old
+  // - Call [EDX + 0x18](0) to get new handle, store in ownerCachedHandle147c
+  // - Call [EDX + 0x24](handle, targetString, callbackOutLow, callbackOutHigh, forwardedArg90)
+  //
+  // Direct send path (0x41df0d - 0x41df36):
+  // - Call [EDX + 0x28](targetString, callbackOutLow, callbackOutHigh, forwardedArg90)
+  //
+  // String cleanup:
+  // 0x41df38-0x41df4e: If submitTargetString != NULL, call FUN_00403c20 to free
 
-    std::string submitTargetText;
-    std::string remoteHostName = "<empty>";
-    bool submitTargetReady = false;
-    uint32_t submitTargetIpv4NetworkOrder = 0u;
-    if (marginConnection_ != nullptr) {
-        // Copy endpoint bytes directly from marginConnection +0x24 (matches assembly 0x41de6a)
-        // anchor: launcher.exe:0x41de6a
-        if (!marginConnection_->RemoteHostName().empty()) {
-            remoteHostName = marginConnection_->RemoteHostName();
-        }
-        mxo::ltlogin::SubmitAddressBlock localBlock{};
-        // Copy +0x24..+0x30: family, port, ipv4, reserved
-        // endpoint is public at connection +0x24
-        localBlock.family_ = marginConnection_->remoteEndpoint_.family;
-        localBlock.portNetworkOrder_ = marginConnection_->remoteEndpoint_.portNetworkOrder;
-        localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
-        submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
-        localBlock.SetPortFromHelperWord(helperWord6);
-        submitTargetText = localBlock.FormatHostPortString(/*appendPortFlag=*/1);
-        submitTargetReady = !submitTargetText.empty();
+  const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
+  uint32_t callbackOutLow = 0u;
+  uint32_t callbackOutHigh = 0u;
+
+  // vtable+0x38 on callback84 (client.dll ClientNetShell)
+  // Returns a callback pair (low/high) for the session
+  const bool callbackPairReady =
+  mxo::ltlogin::TryCallback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
+
+  std::string submitTargetText;
+  std::string remoteHostName = "<empty>";
+  bool submitTargetReady = false;
+  uint32_t submitTargetIpv4NetworkOrder = 0u;
+
+  if (marginConnection_ != nullptr) {
+    // Copy endpoint from marginConnection+0x24 (matches 0x41de6a pattern)
+    // anchor: launcher.exe:0x41de6a
+    // Original copies 16 bytes: family, port, ipv4, reserved
+    if (!marginConnection_->RemoteHostName().empty()) {
+      remoteHostName = marginConnection_->RemoteHostName();
     }
+    mxo::ltlogin::SubmitAddressBlock localBlock{};
+    localBlock.family_ = marginConnection_->remoteEndpoint_.family;
+    localBlock.portNetworkOrder_ = marginConnection_->remoteEndpoint_.portNetworkOrder;
+    localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
+    submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
 
-    // call through object88 vtable+0x44 (client.dll INetMgr)
-    const mxo::ltlogin::Object88SubmitPlan object88Plan =
-        mxo::ltlogin::BuildObject88SubmitPlan(
-            ownerObject88_,
-            callbackPairReady,
-            submitTargetReady,
-            forwardedArg90,
-            ownerCachedHandle147c_);
+    // 0x44afd0: Set port from helperWord6 via htons
+    localBlock.SetPortFromHelperWord(helperWord6);
 
-    uint32_t submitResult = 0u;
-    const bool shouldExecuteSubmit =
-        object88Plan.modeQueryReady && callbackPairReady && submitTargetReady &&
-        (object88Plan.wouldCallDirectSend28 || object88Plan.wouldCallManagedSend24);
-    if (shouldExecuteSubmit) {
-        submitResult = mxo::ltlogin::ExecuteObject88Submit(
-            ownerObject88_,
-            object88Plan.managedSendMode,
-            &ownerCachedHandle147c_,
-            submitTargetText.c_str(),
-            callbackOutLow,
-            callbackOutHigh,
-            forwardedArg90);
-    }
+    // 0x44b0d0: Format host:port string, stores result at EBP-0x14
+    submitTargetText = localBlock.FormatHostPortString(/*appendPortFlag=*/1);
+    submitTargetReady = !submitTargetText.empty();
+  }
+
+  // vtable+0x44 -> +0x30 mode query, then either:
+  // - Managed: +0x1c(close old), +0x18(get new handle), +0x24(send)
+  // - Direct: +0x28(send)
+  const mxo::ltlogin::Object88SubmitPlan object88Plan =
+  mxo::ltlogin::BuildObject88SubmitPlan(
+      ownerObject88_,
+      callbackPairReady,
+      submitTargetReady,
+      forwardedArg90,
+      ownerCachedHandle147c_);
+
+  uint32_t submitResult = 0u;
+  const bool shouldExecuteSubmit =
+      object88Plan.modeQueryReady && callbackPairReady && submitTargetReady &&
+      (object88Plan.wouldCallDirectSend28 || object88Plan.wouldCallManagedSend24);
+
+  if (shouldExecuteSubmit) {
+    // Per Ghidra 0x41dea1-0x41df36:
+    // Managed path: +0x1c(oldHandle), +0x18(0), store handle, +0x24(newHandle, ...)
+    // Direct path: +0x28(submitTarget, callbackOutLow, callbackOutHigh, forwardedArg90)
+    submitResult = mxo::ltlogin::ExecuteObject88Submit(
+        ownerObject88_,
+        object88Plan.managedSendMode,
+        &ownerCachedHandle147c_,
+        submitTargetText.c_str(),
+        callbackOutLow,
+        callbackOutHigh,
+        forwardedArg90);
+  }
 
     spdlog::info(
         "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x}",
@@ -175,8 +199,8 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
         remoteHostName,
         shouldExecuteSubmit ? 1u : 0u,
         static_cast<unsigned>(submitResult));
-    if (shouldExecuteSubmit && submitResult == 3u) {
-        spdlog::warn(
+  if (shouldExecuteSubmit && submitResult == 3u) {
+    spdlog::warn(
             "CLTLoginMediator::State9SubmitFollowup managed join returned 0x00000003 (client.dll: CUDPDriver_ReallyJoinSession timeout path) target='{}' callbackBlobPtr=0x{:08x} callbackBlobLen=0x{:08x} cachedHandle147c={} -- current boundary is before state9 raw-0x11 success / event=0x18",
             submitTargetText,
             static_cast<unsigned>(callbackOutLow),
