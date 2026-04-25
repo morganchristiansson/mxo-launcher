@@ -23,10 +23,14 @@ struct ChunkHashResult {
 
 // Generates SHA1 hashes of client file(s)
 // anchor: launcher.exe:0x43d800
+//
+// ORIGINAL FIDELITY: In original 0x43d800, ALL logic is inlined in a single function.
+// This implementation matches that structure - no separate helper functions exist.
+//
 // Parameters:
 //   filenames - list of file paths to hash
 // Returns:
-//   bool - true if hash generation succeeded for at least one file
+//   bool - true if at least 9 hashes generated (what server expects)
 bool GenerateClientChunkHashes(
     const std::vector<std::string>& filenames);
 

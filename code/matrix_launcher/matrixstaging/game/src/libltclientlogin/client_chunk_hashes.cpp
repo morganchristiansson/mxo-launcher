@@ -9,7 +9,10 @@
 // - Reads file in 0x100000 byte (1MB) chunks
 // - Hashes each chunk with SHA1
 // - Stores first 16 bytes of each digest in global storage
-// - Server expects 9 total chunks (see MarginSocket.cpp)
+// - Returns 1 on success, 0 on failure
+//
+// NOTE: In original 0x43d800, ALL logic is inlined in a single function.
+// This implementation matches that structure - no separate helper functions.
 
 #include "client_chunk_hashes.h"
 
@@ -24,122 +27,98 @@ namespace mxo::ltlogin {
 // anchor: launcher.exe static storage pattern (DAT_004f79d8 / DAT_004f79dc)
 ClientChunkHashStorage g_ClientChunkHashStorage;
 
-namespace {
-
-// Hash a single file in 1MB chunks
-// anchor: launcher.exe:0x43d800 inner loop
-bool ComputeChunkedFileHashes(
-    const std::string& filename,
-    std::vector<ChunkHashResult>* outResults) {
-  if (!outResults) {
-    return false;
-  }
-
-  outResults->clear();
-
-  FILE* file = std::fopen(filename.c_str(), "rb");
-  if (!file) {
-    spdlog::warn("GenerateClientChunkHashes(): Could not open file '{}'", filename);
-    return false;
-  }
-
-  // Get file size
-  std::fseek(file, 0, SEEK_END);
-  const long fileSize = std::ftell(file);
-  std::fseek(file, 0, SEEK_SET);
-
-  if (fileSize <= 0) {
-    std::fclose(file);
-    spdlog::warn("GenerateClientChunkHashes(): Empty or invalid file '{}'", filename);
-    return false;
-  }
-
-  // Process in 1MB chunks (0x100000 bytes)
-  // anchor: launcher.exe:0x43d800 chunk size = 0x100000
-  constexpr size_t kChunkSize = 0x100000U;  // 1MB
-  std::vector<uint8_t> buffer(kChunkSize);
-
-  size_t totalBytesProcessed = 0;
-  size_t chunkIndex = 0;
-
-  while (totalBytesProcessed < static_cast<size_t>(fileSize)) {
-    const size_t bytesToRead = std::min(
-        kChunkSize,
-        static_cast<size_t>(fileSize) - totalBytesProcessed);
-
-    const size_t bytesRead = std::fread(buffer.data(), 1, bytesToRead, file);
-    if (bytesRead != bytesToRead) {
-      std::fclose(file);
-      spdlog::warn(
-          "GenerateClientChunkHashes(): Short read at chunk {} (expected {}, got {})",
-          chunkIndex, bytesToRead, bytesRead);
-      return false;
-    }
-
-    // Compute SHA1 of this chunk
-    CryptoPP::SHA1 sha1;
-    sha1.Update(buffer.data(), static_cast<uint32_t>(bytesRead));
-
-    uint8_t digest[20] = {};
-    sha1.Final(digest);
-
-    // Store first 16 bytes (4 uint32s) of digest
-    // anchor: launcher.exe:0x43d800 stores only first 16 bytes
-    ChunkHashResult result{};
-    std::memcpy(result.hashWords.data(), digest, sizeof(result.hashWords));
-    outResults->push_back(result);
-
-    totalBytesProcessed += bytesRead;
-    ++chunkIndex;
-  }
-
-  std::fclose(file);
-
-  spdlog::debug(
-      "GenerateClientChunkHashes(): Processed '{}' ({} bytes) into {} chunks",
-      filename, fileSize, outResults->size());
-
-  return true;
-}
-
-}  // namespace
-
+// anchor: launcher.exe:0x43d800
 bool GenerateClientChunkHashes(
     const std::vector<std::string>& filenames) {
-  // Use the global storage instance
   g_ClientChunkHashStorage.Clear();
 
   spdlog::info(
       "GenerateClientChunkHashes(): Starting hash generation for {} files",
       filenames.size());
 
-  // The original hashes each file in 1MB chunks
-  // Usually just client.dll, but supports multiple files
+  // ORIGINAL 0x43d800: iterates over filename array, opens each file,
+  // reads in 1MB chunks, SHA1 hashes each chunk, stores in global.
+  // Matching that flow exactly now.
   for (const auto& filename : filenames) {
-    std::vector<ChunkHashResult> fileResults;
-    if (ComputeChunkedFileHashes(filename, &fileResults)) {
-      // Add all chunks from this file to the total
-      for (size_t i = 0; i < fileResults.size(); ++i) {
-        g_ClientChunkHashStorage.AddHash(fileResults[i]);
-        if (i < 3 || i >= fileResults.size() - 3) {
-          // Log first 3 and last 3 chunks
-          spdlog::debug(
-              " [{}] chunk[{}] = {:08x} {:08x} {:08x} {:08x}",
-              filename, i,
-              fileResults[i].hashWords[0],
-              fileResults[i].hashWords[1],
-              fileResults[i].hashWords[2],
-              fileResults[i].hashWords[3]);
-        }
-      }
+    FILE* file = std::fopen(filename.c_str(), "rb");
+    if (!file) {
+      spdlog::warn("GenerateClientChunkHashes(): Could not open file '{}'", filename);
+      continue;  // Continue to next file
     }
+
+    // Get file size
+    std::fseek(file, 0, SEEK_END);
+    const long fileSize = std::ftell(file);
+    std::fseek(file, 0, SEEK_SET);
+
+    if (fileSize <= 0) {
+      std::fclose(file);
+      spdlog::warn("GenerateClientChunkHashes(): Empty or invalid file '{}'", filename);
+      continue;
+    }
+
+    // Process in 1MB chunks (0x100000 bytes)
+    // anchor: launcher.exe:0x43d800 chunk size
+    constexpr size_t kChunkSize = 0x100000U;
+    std::vector<uint8_t> buffer(kChunkSize);
+
+    size_t totalBytesProcessed = 0;
+    size_t chunkIndex = 0;
+
+    while (totalBytesProcessed < static_cast<size_t>(fileSize)) {
+      const size_t bytesToRead = std::min(
+          kChunkSize,
+          static_cast<size_t>(fileSize) - totalBytesProcessed);
+
+      const size_t bytesRead = std::fread(buffer.data(), 1, bytesToRead, file);
+      if (bytesRead != bytesToRead) {
+        std::fclose(file);
+        spdlog::warn(
+            "GenerateClientChunkHashes(): Short read at chunk {} (expected {}, got {})",
+            chunkIndex, bytesToRead, bytesRead);
+        break;
+      }
+
+      // Compute SHA1 of this chunk
+      // anchor: launcher.exe:0x43d800 SHA1 hash computation
+      CryptoPP::SHA1 sha1;
+      sha1.Update(buffer.data(), static_cast<uint32_t>(bytesRead));
+
+      uint8_t digest[20] = {};
+      sha1.Final(digest);
+
+      // Store first 16 bytes (4 uint32s) of digest
+      // anchor: launcher.exe:0x43d800 stores only first 16 bytes
+      ChunkHashResult result{};
+      std::memcpy(result.hashWords.data(), digest, sizeof(result.hashWords));
+      g_ClientChunkHashStorage.AddHash(result);
+
+      // Log first 3 and last 3 chunks for diagnostics
+      if (chunkIndex < 3 || chunkIndex + 3 >= (fileSize / kChunkSize)) {
+        spdlog::debug(
+            " [{}] chunk[{}] = {:08x} {:08x} {:08x} {:08x}",
+            filename, chunkIndex,
+            result.hashWords[0],
+            result.hashWords[1],
+            result.hashWords[2],
+            result.hashWords[3]);
+      }
+
+      totalBytesProcessed += bytesRead;
+      ++chunkIndex;
+    }
+
+    std::fclose(file);
+    spdlog::debug(
+        "GenerateClientChunkHashes(): Processed '{}' ({} bytes) into {} chunks",
+        filename, fileSize, chunkIndex);
   }
 
   spdlog::info(
-      "GenerateClientChunkHashes(): Generated {} total chunk hashes across all files",
+      "GenerateClientChunkHashes(): Generated {} total chunk hashes",
       g_ClientChunkHashStorage.GetHashes().size());
 
-  // Return true if at least one hash was generated
+  // Return true if at least 9 hashes (what server expects)
   return g_ClientChunkHashStorage.HasValidHashCount();
 }
 
