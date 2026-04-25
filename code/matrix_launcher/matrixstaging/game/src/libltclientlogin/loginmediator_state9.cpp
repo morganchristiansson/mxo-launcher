@@ -141,8 +141,13 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
     localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
     submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
 
-    // 0x44afd0: Set port from helperWord6 via htons
-    localBlock.SetPortFromHelperWord(helperWord6);
+    // Only overwrite port if helperWord6 matches expected UDP game server port (10000 = 0x2710)
+    // The server sends this in the LoadCharacterReply, but may send garbage/unset if not implemented.
+    // Use marginConnection port (10000) by default when invalid.
+    if (helperWord6 == 0x2710) {
+        localBlock.SetPortFromHelperWord(helperWord6);
+    }
+    // Otherwise keep port from marginConnection (line 140) - already set above
 
     // 0x44b0d0: Format host:port string, stores result at EBP-0x14
     submitTargetText = localBlock.FormatHostPortString(/*appendPortFlag=*/1);
