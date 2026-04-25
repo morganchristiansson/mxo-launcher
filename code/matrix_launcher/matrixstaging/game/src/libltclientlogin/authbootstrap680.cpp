@@ -15,6 +15,7 @@
 
 #include "loginmediator.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
+#include "authbootstrap680.h"
 
 #include <algorithm>
 #include <ctime>
@@ -225,12 +226,12 @@ static constexpr std::array<uint8_t, 0x100u> kAuthBootstrap680PubkeyDatFallbackM
     0x67u, 0x9cu, 0x71u, 0x73u,
 };
 
-static std::unordered_map<const AuthBootstrap680Child_0x441290*, AuthBootstrap680ChildOwnedState>
-    g_authBootstrap680ChildOwnedStateByChild;
+static std::unordered_map<const AuthBootstrap680ChildBase_0x4b7134*, AuthBootstrap680ChildOwnedState>
+ g_authBootstrap680ChildOwnedStateByChild;
 
 static AuthBootstrap680ChildOwnedState& MutableAuthBootstrap680ChildOwnedState(
-    const AuthBootstrap680Child_0x441290* child) {
-    return g_authBootstrap680ChildOwnedStateByChild[child];
+ const AuthBootstrap680ChildBase_0x4b7134* child) {
+ return g_authBootstrap680ChildOwnedStateByChild[child];
 }
 
 static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t maxPreviewBytes) {
@@ -470,24 +471,24 @@ bool AuthBootstrap680ReplyAuthDataValidatorACSketch::ConstructFromReplyPublicKey
 namespace {
 
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
-    AuthBootstrap680Child_0x441290& child,
-    AuthBootstrap680ChildOwnedState& ownedState) {
-    child.raw08PublicKeyWorkerA8 = nullptr;
-    child.replyAuthDataValidatorAC = nullptr;
+ AuthBootstrap680ChildBase_0x4b7134& child,
+ AuthBootstrap680ChildOwnedState& ownedState) {
+ child.raw08PublicKeyWorkerA8 = nullptr;
+ child.replyAuthDataValidatorAC = nullptr;
 
-    ownedState.raw08PublicKeyWorkerA8.object.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.raw08PublicKeyWorkerA8.publicKeyPair0c);
-    ownedState.replyAuthDataValidatorAC.object.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.replyAuthDataValidatorAC.publicKeyPair0c);
+ ownedState.raw08PublicKeyWorkerA8.object.reset();
+ ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.raw08PublicKeyWorkerA8.publicKeyPair0c);
+ ownedState.replyAuthDataValidatorAC.object.reset();
+ ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.replyAuthDataValidatorAC.publicKeyPair0c);
 }
 
 static void ResetAuthBootstrap680FeedbackTransforms(
-    AuthBootstrap680Child_0x441290& child,
-    AuthBootstrap680ChildOwnedState& ownedState) {
-    child.feedbackTransformLarge94 = nullptr;
-    child.feedbackTransformSmall98 = nullptr;
-    ownedState.feedbackTransformLarge94.reset();
-    ownedState.feedbackTransformSmall98.reset();
+ AuthBootstrap680ChildBase_0x4b7134& child,
+ AuthBootstrap680ChildOwnedState& ownedState) {
+ child.feedbackTransformLarge94 = nullptr;
+ child.feedbackTransformSmall98 = nullptr;
+ ownedState.feedbackTransformLarge94.reset();
+ ownedState.feedbackTransformSmall98.reset();
 }
 
 // anchor: launcher.exe:0x447260 / 0x447c10
@@ -586,8 +587,8 @@ static void ResetAuthBootstrap680AuthReplyParseAccessor(
 }
 
 static void ResetAuthBootstrap680ReplyParseObject(
-    AuthBootstrap680Child_0x441290& child,
-    AuthBootstrap680ChildOwnedState& ownedState) {
+ AuthBootstrap680ChildBase_0x4b7134& child,
+ AuthBootstrap680ChildOwnedState& ownedState) {
     child.authReplyParseObjectF0 = nullptr;
     ownedState.authReplyParseObjectF0.reset();
     ownedState.authReplyParsePacketBodyBytes.clear();
@@ -749,8 +750,8 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
 }
 
 static void ResetAuthBootstrap680ReplyMaterialization(
-    AuthBootstrap680Child_0x441290& child,
-    AuthBootstrap680ChildOwnedState& ownedState) {
+ AuthBootstrap680ChildBase_0x4b7134& child,
+ AuthBootstrap680ChildOwnedState& ownedState) {
     child.authReplyCopyShadowF4 = nullptr;
     ownedState.authReplyCopyShadowF4.reset();
     ResetAuthBootstrap680BigIntObject(&child.modulusBigIntB0, &ownedState.modulusBigIntB0OwnedDigits);
@@ -1198,47 +1199,43 @@ static bool HasTrailingSlashSixDigitSuffix(const std::string& text) {
 }  // namespace
 
 // anchor: launcher.exe:0x445500
-void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_ctor() {
-    // Compiler handles vtable at +0x00
-    // +0x04, +0x08, +0x0c: small string mirrors cleared by UpdateExceptionState(8) pattern
-    // +0x10, +0x14, +0x18: more small string mirrors cleared by UpdateExceptionState(8)
-    // +0x1c, +0x20, +0x24: final small string mirrors cleared by UpdateExceptionState(8)
+AuthBootstrap680ChildBase_0x4b7134::AuthBootstrap680ChildBase_0x4b7134() {
+ // Compiler handles vtable at +0x00
+ // +0x04, +0x08, +0x0c: small string mirrors cleared by UpdateExceptionState(8) pattern
+ // +0x10, +0x14, +0x18: more small string mirrors cleared by UpdateExceptionState(8)
+ // +0x1c, +0x20, +0x24: final small string mirrors cleared by UpdateExceptionState(8)
 
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
-    ResetAuthBootstrap680Field54Helper(&feedbackSeedHelper54, &ownedState.field54Helper);
+ AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
+ ResetAuthBootstrap680Field54Helper(&feedbackSeedHelper54, &ownedState.field54Helper);
 
-    // +0x80, +0x94, +0x98, +0x9c, +0xa0: zeroed
-    // +0xa4: lazy validator object reset below
-    ResetAuthBootstrap680ReplyPublicKeyWorkers(*this, ownedState);
-    // +0xa8: raw08 worker reset in ReplyPublicKeyWorkers
-    // +0xac: validator reset in ReplyPublicKeyWorkers
+ // +0x80, +0x94, +0x98, +0x9c, +0xa0: zeroed
+ // +0xa4: lazy validator object reset below
+ ResetAuthBootstrap680ReplyPublicKeyWorkers(*this, ownedState);
+ // +0xa8: raw08 worker reset in ReplyPublicKeyWorkers
+ // +0xac: validator reset in ReplyPublicKeyWorkers
 
-    ResetAuthBootstrap680FeedbackTransforms(*this, ownedState);
-    // +0x94: large transform nulled
-    // +0x98: small transform nulled
+ ResetAuthBootstrap680FeedbackTransforms(*this, ownedState);
+ // +0x94: large transform nulled
+ // +0x98: small transform nulled
 
-    ownedState.lazyPubkeyDatValidatorA4.object.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c);
-    lazyPubkeyDatValidatorA4 = nullptr;  // +0xa4 = 0
+ ownedState.lazyPubkeyDatValidatorA4.object.reset();
+ ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c);
+ lazyPubkeyDatValidatorA4 = nullptr; // +0xa4 = 0
 
-    ResetAuthBootstrap680ReplyParseObject(*this, ownedState);
-    // +0xf0: parse object nulled
+ ResetAuthBootstrap680ReplyParseObject(*this, ownedState);
+ // +0xf0: parse object nulled
 
-    ResetAuthBootstrap680ReplyMaterialization(*this, ownedState);
-    // +0xb0, +0xc4, +0xd8: big-int objects reset
+ ResetAuthBootstrap680ReplyMaterialization(*this, ownedState);
+ // +0xb0, +0xc4, +0xd8: big-int objects reset
 
-    inboundAuthStatusEc = 1u;  // +0xec = 1
+ inboundAuthStatusEc = 1u; // +0xec = 1
 
-    // +0xf4: auth reply copy shadow pointer nulled in ResetAuthBootstrap680ReplyMaterialization
+ // +0xf4: auth reply copy shadow pointer nulled in ResetAuthBootstrap680ReplyMaterialization
 }
 
 // anchor: launcher.exe:0x441290
-AuthBootstrap680Child_0x441290::AuthBootstrap680Child_0x441290() {
-    // AuthBootstrap680ChildBase_ctor handles +0x00 through +0xf4
-    // This phase handles +0xf8 through +0x118
-    AuthBootstrap680ChildBase_ctor();
-
-    ClearSmallStringMirror(stringF8);  // +0xf8
+AuthBootstrap680Child_0x441290::AuthBootstrap680Child_0x441290()
+ : AuthBootstrap680ChildBase_0x4b7134() {
 
     // +0x108, +0x10c: opaque blob pointers
     opaqueReplyBlob108 = nullptr;
@@ -1252,126 +1249,126 @@ AuthBootstrap680Child_0x441290::AuthBootstrap680Child_0x441290() {
 
 // anchor: launcher.exe:0x445a40 (dtor in vtable, calls base dtor then optionally frees this)
 // Handles +0xf8..+0x118 fields (opaque blobs, stringF8, success fields)
+// The base class destructor (~AuthBootstrap680ChildBase_0x4b7134) handles +0x00..+0xf4
 AuthBootstrap680Child_0x441290::~AuthBootstrap680Child_0x441290() {
-    // meth_0x4410b0 (0x4410b0) handles +0x108, +0x10c opaque blob freeing
-    // with InterlockedExchangeAdd tracked deallocation
-    // +0xf8: stringF8 small string mirror (if allocated, call FUN_00403c20)
-    // +0x110, +0x114, +0x118: success fields (no dynamic allocation)
+ // meth_0x4410b0 (0x4410b0) handles +0x108, +0x10c opaque blob freeing
+ // with InterlockedExchangeAdd tracked deallocation
+ // +0xf8: stringF8 small string mirror (if allocated, call FUN_00403c20)
+ // +0x110, +0x114, +0x118: success fields (no dynamic allocation)
 
-    // Release opaque blob at +0x108 with tracked deallocation
-    if (opaqueReplyBlob108 != nullptr) {
-        // Tracked deallocation pattern: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
-        void* blob = opaqueReplyBlob108;
-        opaqueReplyBlob108 = nullptr;
-        // TODO: implement tracked deallocation properly
-        (void)blob;
-    }
+ // Release opaque blob at +0x108 with tracked deallocation
+ if (opaqueReplyBlob108 != nullptr) {
+ // Tracked deallocation pattern: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
+ void* blob = opaqueReplyBlob108;
+ opaqueReplyBlob108 = nullptr;
+ // TODO: implement tracked deallocation properly
+ (void)blob;
+ }
 
-    // Release opaque blob at +0x10c with tracked deallocation
-    if (opaqueReplyBlob10C != nullptr) {
-        void* blob = opaqueReplyBlob10C;
-        opaqueReplyBlob10C = nullptr;
-        // TODO: implement tracked deallocation properly
-        (void)blob;
-    }
+ // Release opaque blob at +0x10c with tracked deallocation
+ if (opaqueReplyBlob10C != nullptr) {
+ void* blob = opaqueReplyBlob10C;
+ opaqueReplyBlob10C = nullptr;
+ // TODO: implement tracked deallocation properly
+ (void)blob;
+ }
 
-    // +0xf8: stringF8 - free if begin != current (FUN_00403c20 pattern)
-    if (stringF8.begin != nullptr && stringF8.begin != stringF8.current) {
-        // FUN_00403c20(begin, current - begin) to deallocate
-        // Currently just clear in source
-        stringF8 = {};
-    }
+ // +0xf8: stringF8 - free if begin != current (FUN_00403c20 pattern)
+ if (stringF8.begin != nullptr && stringF8.begin != stringF8.current) {
+ // FUN_00403c20(begin, current - begin) to deallocate
+ // Currently just clear in source
+ stringF8 = {};
+ }
 
-    // Then call base dtor for +0x00..+0xf4
-    AuthBootstrap680ChildBase_dtor();
+ // Base class destructor handles +0x00..+0xf4
 }
 
 // anchor: launcher.exe:0x445610
 // Base dtor handles +0x00..+0xf4 (validators, helpers, big-ints, parse objects, copy shadow)
-void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_dtor() {
-    // +0x94: feedbackTransformLarge94 - call dtor(1) if non-null
-    if (feedbackTransformLarge94 != nullptr) {
-        // feedbackTransformLarge94->~FeedbackSizeTransformAdapterLarge();
-        feedbackTransformLarge94 = nullptr;
-    }
+AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {
+ // +0x94: feedbackTransformLarge94 - call dtor(1) if non-null
+ if (feedbackTransformLarge94 != nullptr) {
+ // feedbackTransformLarge94->~FeedbackSizeTransformAdapterLarge();
+ feedbackTransformLarge94 = nullptr;
+ }
 
-    // +0x98: feedbackTransformSmall98 - call dtor(1) if non-null
-    if (feedbackTransformSmall98 != nullptr) {
-        // feedbackTransformSmall98->~FeedbackSizeTransformAdapterSmall();
-        feedbackTransformSmall98 = nullptr;
-    }
+ // +0x98: feedbackTransformSmall98 - call dtor(1) if non-null
+ if (feedbackTransformSmall98 != nullptr) {
+ // feedbackTransformSmall98->~FeedbackSizeTransformAdapterSmall();
+ feedbackTransformSmall98 = nullptr;
+ }
 
-    // +0xa4: lazyPubkeyDatValidatorA4 - call dtor(1) if non-null
-    if (lazyPubkeyDatValidatorA4 != nullptr) {
-        // lazyPubkeyDatValidatorA4->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
-        lazyPubkeyDatValidatorA4 = nullptr;
-    }
+ // +0xa4: lazyPubkeyDatValidatorA4 - call dtor(1) if non-null
+ if (lazyPubkeyDatValidatorA4 != nullptr) {
+ // lazyPubkeyDatValidatorA4->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
+ lazyPubkeyDatValidatorA4 = nullptr;
+ }
 
-    // +0xa8: raw08PublicKeyWorkerA8 - call dtor(1) if non-null
-    if (raw08PublicKeyWorkerA8 != nullptr) {
-        // raw08PublicKeyWorkerA8->~AuthBootstrap680Raw08PublicKeyWorkerA8Sketch();
-        raw08PublicKeyWorkerA8 = nullptr;
-    }
+ // +0xa8: raw08PublicKeyWorkerA8 - call dtor(1) if non-null
+ if (raw08PublicKeyWorkerA8 != nullptr) {
+ // raw08PublicKeyWorkerA8->~AuthBootstrap680Raw08PublicKeyWorkerA8Sketch();
+ raw08PublicKeyWorkerA8 = nullptr;
+ }
 
-    // +0xac: replyAuthDataValidatorAC - call dtor(1) if non-null
-    if (replyAuthDataValidatorAC != nullptr) {
-        // replyAuthDataValidatorAC->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
-        replyAuthDataValidatorAC = nullptr;
-    }
+ // +0xac: replyAuthDataValidatorAC - call dtor(1) if non-null
+ if (replyAuthDataValidatorAC != nullptr) {
+ // replyAuthDataValidatorAC->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
+ replyAuthDataValidatorAC = nullptr;
+ }
 
-    // anchor: launcher.exe:0x444900 - called at this point in base dtor flow
-    ClearReplyParseAndCopyShadowFields();
+ // anchor: launcher.exe:0x444900 - called at this point in base dtor flow
+ ClearReplyParseAndCopyShadowFields();
 
-    // +0xb0, +0xc4, +0xd8: big-int objects reset (vtable reset, no heap)
-    modulusBigIntB0 = {};
-    publicExponentBigIntC4 = {};
-    privateExponentBigIntD8 = {};
+ // +0xb0, +0xc4, +0xd8: big-int objects reset (vtable reset, no heap)
+ modulusBigIntB0 = {};
+ publicExponentBigIntC4 = {};
+ privateExponentBigIntD8 = {};
 
-    // +0x54: feedbackSeedHelper54 - clear/reset (calls FUN_0041c750 pattern for each buffer)
-    feedbackSeedHelper54 = {};
+ // +0x54: feedbackSeedHelper54 - clear/reset (calls FUN_0041c750 pattern for each buffer)
+ feedbackSeedHelper54 = {};
 
-    // +0x04..+0x24: small string mirrors cleared (three groups of three pointers)
-    string04 = {};
-    string10 = {};
-    string1C = {};
+ // +0x04..+0x24: small string mirrors cleared (three groups of three pointers)
+ string04 = {};
+ string10 = {};
+ string1C = {};
 
-    // Erase owned state from global map
-    g_authBootstrap680ChildOwnedStateByChild.erase(this);
+ // Erase owned state from global map
+ g_authBootstrap680ChildOwnedStateByChild.erase(this);
 }
 
 // anchor: launcher.exe:0x444900
 // Handles +0x04 (string04), +0x10 (string10), +0x28..+0x4c (block30, block40, sendTarget50, loginType28, launcherVersion2C)
 // +0xf0 (authReplyParseObjectF0), +0xf4 (authReplyCopyShadowF4)
-void AuthBootstrap680Child_0x441290::ClearReplyParseAndCopyShadowFields() {
-    // +0x04: string04 small string mirror - zero if begin != capacity
-    if (string04.begin != nullptr && string04.begin != string04.capacity) {
-        string04 = {};
-    }
+void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
+ // +0x04: string04 small string mirror - zero if begin != capacity
+ if (string04.begin != nullptr && string04.begin != string04.capacity) {
+ string04 = {};
+ }
 
-    // +0x10: string10 small string mirror - zero if begin != capacity
-    if (string10.begin != nullptr && string10.begin != string10.capacity) {
-        string10 = {};
-    }
+ // +0x10: string10 small string mirror - zero if begin != capacity
+ if (string10.begin != nullptr && string10.begin != string10.capacity) {
+ string10 = {};
+ }
 
-    // +0x28..+0x4c: zero these fields
-    loginType28 = 0u;
-    launcherVersion2C = 0u;
-    // +0x30: block30 - already zeroed with ={}
-    // +0x40: block40 - already zeroed with ={}
-    // +0x50: sendTarget50 - zeroed below
-    sendTarget50 = nullptr;
+ // +0x28..+0x4c: zero these fields
+ loginType28 = 0u;
+ launcherVersion2C = 0u;
+ // +0x30: block30 - already zeroed with ={}
+ // +0x40: block40 - already zeroed with ={}
+ // +0x50: sendTarget50 - zeroed below
+ sendTarget50 = nullptr;
 
-    // +0xf4: authReplyCopyShadowF4 - tracked deallocation
-    if (authReplyCopyShadowF4 != nullptr) {
-        // Tracked: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
-        authReplyCopyShadowF4 = nullptr;
-    }
+ // +0xf4: authReplyCopyShadowF4 - tracked deallocation
+ if (authReplyCopyShadowF4 != nullptr) {
+ // Tracked: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
+ authReplyCopyShadowF4 = nullptr;
+ }
 
-    // +0xf0: authReplyParseObjectF0 - call dtor(1) if non-null
-    if (authReplyParseObjectF0 != nullptr) {
-        // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
-        authReplyParseObjectF0 = nullptr;
-    }
+ // +0xf0: authReplyParseObjectF0 - call dtor(1) if non-null
+ if (authReplyParseObjectF0 != nullptr) {
+ // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
+ authReplyParseObjectF0 = nullptr;
+ }
 }
 
 // anchor: launcher.exe:0x448050
@@ -1800,17 +1797,17 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
         (now > static_cast<std::time_t>(timeBias))
             ? static_cast<uint32_t>(now - static_cast<std::time_t>(timeBias))
             : 0u;
-    
+
     // Read expiry from signedData80 + 0x2c (= +0xac in class)
     const uint32_t expiryTimeAc = *reinterpret_cast<const uint32_t*>(signedData80.data() + 0x2c);
     if (currentAuthServerTime >= expiryTimeAc) {
         return 0;
     }
-    
+
     // Build MD5 over signed data (0xb6 bytes from +0x80)
     std::array<uint8_t, 16> md5Digest10{};
     BuildSignedDataMd5Digest(&md5Digest10);
-    
+
     // Call validator verify with public key pair
     return validator->VerifySignatureRecoveredFinalizeScaffold(
         publicKeyPair,

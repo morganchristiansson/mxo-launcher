@@ -422,75 +422,99 @@ static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldDescri
 static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, slotRecordAccessor70) == 0x70u);
 static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
 
-class AuthBootstrap680Child_0x441290 {
+// anchor: launcher.exe:0x4b7134 / vtable 0x004b7134
+// Base class containing fields +0x00 through +0xf4
+// Constructor: launcher.exe:0x445500 = AuthBootstrap680ChildBase_0x4b7134::ctor
+// Destructor: launcher.exe:0x445610 = AuthBootstrap680ChildBase_0x4b7134::dtor
+class AuthBootstrap680ChildBase_0x4b7134 {
 public:
-    // Current best source-owned class boundary for the separate phase-2 auth/bootstrap child
-    // allocated by:
-    // - launcher.exe:0x41b160 = owner init path
-    // - launcher.exe:0x441290 = child ctor used by that path
-    // - launcher.exe:0x445500 = earlier base-ctor layer used by the same child
-    //
-    // High-value child/module anchors:
-    // - vtable `0x004b7134`
-    // - ready-side dispatcher `0x448050`
-    // - raw `0x06` builder `0x447eb0`
-    // - raw `0x08` builder `0x4474f0`
-    // - auth-reply copy/materializer `0x448140`
-    //
-    // Keep this source-owned mirror explicitly child-scoped:
-    // - it is rooted at mediator owner `+0x680`
-    // - it is not evidence that the original child type was literally named after the mediator
-    // - state and owner code should call the child directly instead of routing through fake
-    //   mediator methods
+ // VTable at 0x004b7134:
+ // +0x00: destructor (0x00445610)
+ // +0x04..+0x44: virtual methods
+ // +0x48..+0x4b: null terminator (0x004b7194-0x004b7197)
+ // +0x4c..+0x50: additional vmethods including ~dtor wrapper (0x004469a0)
+ // +0x54..+0x68: more vmethods (0x00446f10, 0x00443830, 0x00443850, etc.)
 
-    // Direct `0x439210 -> 0x448050` staging writes now closed concretely enough to keep the
-    // destination mapping inline here:
-    // - child `+0x04` <- owner `+0x94 + 0x00` inline string
-    // - child `+0x10` <- owner `+0x94 + 0x20` inline string
-    // - child `+0x1c` <- owner `+0x94 + 0x60` small-string begin/data pointer (NULL becomes "")
-    // - child `+0x28` <- ready-branch immediate `1`
-    // - child `+0x2c` <- first dword from the owner-side getter reached through `0x439210`
-    // - child `+0x30 .. +0x3f` <- owner `+0x94 + 0x40 .. + 0x4f`
-    // - child `+0x40 .. +0x4f` <- owner `+0x94 + 0x50 .. + 0x5f`
-    // - child `+0x50` <- owner-side send target result returned to `0x439210`
-    AuthBootstrap680SmallStringMirror string04;  // original child `+0x04`
-    AuthBootstrap680SmallStringMirror string10;  // original child `+0x10`
-    AuthBootstrap680SmallStringMirror string1C;  // original child `+0x1c`
-    uint32_t loginType28 = 0;                    // original child `+0x28`; current ready-branch call shape pushes immediate `1`; `0x4474f0` later uses the low byte as raw `0x08` loginType
-    uint32_t launcherVersion2C = 0;              // original child `+0x2c`; `0x447eb0` uses it in raw `0x06`
-    std::array<uint8_t, 16> block30{};          // original child `+0x30 .. +0x3f`
-    std::array<uint8_t, 16> block40{};          // original child `+0x40 .. +0x4f`
-    void* sendTarget50 = nullptr;                // original child `+0x50`; indirect sender target consumed by `0x447eb0/0x4474f0`
+ // anchor: launcher.exe:0x41b160 = owner init path
+ // anchor: launcher.exe:0x445500 = base ctor
+ //
+ // High-value child/module anchors:
+ // - vtable `0x004b7134`
+ // - ready-side dispatcher `0x448050`
+ // - raw `0x06` builder `0x447eb0`
+ // - raw `0x08` builder `0x4474f0`
+ // - auth-reply copy/materializer `0x448140`
 
-    // Original child `+0x54 .. +0x7f` is the concrete helper subobject above, not an opaque gap.
-    // `0x4474f0` calls helper vtable `+0x18 / 0x468640` here and copies the returned `0x10` bytes
-    // into child `+0x84 .. +0x93`.
-    AuthBootstrap680Field54HelperSketch feedbackSeedHelper54{}; // original child `+0x54 .. +0x7f`
+ // Direct `0x439210 -> 0x448050` staging writes now closed concretely enough to keep the
+ // destination mapping inline here:
+ // - child `+0x04` <- owner `+0x94 + 0x00` inline string
+ // - child `+0x10` <- owner `+0x94 + 0x20` inline string
+ // - child `+0x1c` <- owner `+0x94 + 0x60` small-string begin/data pointer (NULL becomes "")
+ // - child `+0x28` <- ready-branch immediate `1`
+ // - child `+0x2c` <- first dword from the owner-side getter reached through `0x439210`
+ // - child `+0x30 .. +0x3f` <- owner `+0x94 + 0x40 .. + 0x4f`
+ // - child `+0x40 .. +0x4f` <- owner `+0x94 + 0x50 .. + 0x5f`
+ // - child `+0x50` <- owner-side send target result returned to `0x439210`
+ AuthBootstrap680SmallStringMirror string04; // original child `+0x04`
+ AuthBootstrap680SmallStringMirror string10; // original child `+0x10`
+ AuthBootstrap680SmallStringMirror string1C; // original child `+0x1c`
+ uint32_t loginType28 = 0; // original child `+0x28`; current ready-branch call shape pushes immediate `1`; `0x4474f0` later uses the low byte as raw `0x08` loginType
+ uint32_t launcherVersion2C = 0; // original child `+0x2c`; `0x447eb0` uses it in raw `0x06`
+ std::array<uint8_t, 16> block30{}; // original child `+0x30 .. +0x3f`
+ std::array<uint8_t, 16> block40{}; // original child `+0x40 .. +0x4f`
+ void* sendTarget50 = nullptr; // original child `+0x50`; indirect sender target consumed by `0x447eb0/0x4474f0`
 
-    uint32_t authServerTimeBias80 = 0;           // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0` / `AuthBootstrapReplyCopyShadowF4_IsFresh` / `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` use it to reconstruct current auth-server time
-    std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; helper-generated seed block from child `+0x54`, later reused by the `0x4474f0` transform-worker setup
-    mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr; // original child `+0x94`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructLarge`
-    mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr; // original child `+0x98`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructSmall`
-    uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
-    uint8_t authRequestReadyA0 = 0;              // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
-    std::array<uint8_t, 3> paddingA1ToA3{};      // original child `+0xa1 .. +0xa3`
-    AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` validator family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
-    AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780` and consumed by `0x4474f0` through `0x468ea0/0x468f00`
-    AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780` and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
+ // Original child `+0x54 .. +0x7f` is the concrete helper subobject above, not an opaque gap.
+ // `0x4474f0` calls helper vtable `+0x18 / 0x468640` here and copies the returned `0x10` bytes
+ // into child `+0x84 .. +0x93`.
+ AuthBootstrap680Field54HelperSketch feedbackSeedHelper54{}; // original child `+0x54 .. +0x7f`
 
-    // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
-    // explicit as the same three adjacent `0x14`-byte big-int objects the launcher ctor seeds with
-    // `0x45d000` and the success path overwrites via `0x45de10`:
-    // - `+0xb0` <- modulus bytes from copied `+0xf4 + 0xd2 .. + 0x131`
-    // - `+0xc4` <- low public-exponent byte from copied `+0xf4 + 0xd1`
-    // - `+0xd8` <- derived 96-byte private-exponent/transform output used by the same prep path
-    AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{};        // original child `+0xb0`
-    AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{}; // original child `+0xc4`
-    AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{}; // original child `+0xd8`
+ uint32_t authServerTimeBias80 = 0; // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0` / `AuthBootstrapReplyCopyShadowF4_IsFresh` / `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` use it to reconstruct current auth-server time
+ std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; helper-generated seed block from child `+0x54`, later reused by the `0x4474f0` transform-worker setup
+ mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr; // original child `+0x94`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructLarge`
+ mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr; // original child `+0x98`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructSmall`
+ uint32_t currentPublicKeyId9C = 0; // original child `+0x9c`
+ uint8_t authRequestReadyA0 = 0; // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
+ std::array<uint8_t, 3> paddingA1ToA3{}; // original child `+0xa1 .. +0xa3`
+ AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` validator family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
+ AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780` and consumed by `0x4474f0` through `0x468ea0/0x468f00`
+ AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780` and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
 
-    uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
-    AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
-    AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`
+ // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
+ // explicit as the same three adjacent `0x14`-byte big-int objects the launcher ctor seeds with
+ // `0x45d000` and the success path overwrites via `0x45de10`:
+ // - `+0xb0` <- modulus bytes from copied `+0xf4 + 0xd2 .. + 0x131`
+ // - `+0xc4` <- low public-exponent byte from copied `+0xf4 + 0xd1`
+ // - `+0xd8` <- derived 96-byte private-exponent/transform output used by the same prep path
+ AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{}; // original child `+0xb0`
+ AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{}; // original child `+0xc4`
+ AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{}; // original child `+0xd8`
+
+ uint32_t inboundAuthStatusEc = 1; // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
+ AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
+ AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`
+
+ // anchor: launcher.exe:0x445500
+ AuthBootstrap680ChildBase_0x4b7134();
+ // anchor: launcher.exe:0x445610
+ virtual ~AuthBootstrap680ChildBase_0x4b7134();
+
+protected:
+ // anchor: launcher.exe:0x444900 (called by base dtor)
+ void ClearReplyParseAndCopyShadowFields();
+};
+
+// anchor: launcher.exe:0x441290 / vtable 0x004b7134 (shares base vtable)
+// Derived class containing fields +0xf8 through +0x118
+// Constructor: launcher.exe:0x441290 = AuthBootstrap680Child_0x441290::ctor (calls base ctor then handles +0xf8..+0x118)
+// Destructor: launcher.exe:0x445a40 = AuthBootstrap680Child_0x441290::dtor (calls base dtor)
+class AuthBootstrap680Child_0x441290 : public AuthBootstrap680ChildBase_0x4b7134 {
+public:
+ // Keep this source-owned mirror explicitly child-scoped:
+ // - it is rooted at mediator owner `+0x680`
+ // - it is not evidence that the original child type was literally named after the mediator
+ // - state and owner code should call the child directly instead of routing through fake
+ // mediator methods
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; `0x441330` writes the prompt-password small-string neighboring the `+0xf0` auth-reply parse/copy family, and owner vtable `+0x60 / 0x41f3c0` later surfaces its begin pointer
     uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; sibling `0x441330` SecurID-tail flag surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`
@@ -500,12 +524,12 @@ public:
     uint32_t authReplySuccessField15_114 = 0; // original child `+0x114`; `0x441260` writes the fixed raw reply-header dword at `authReplyParseObjectF0->replyHeader10 + 0x15`
     uint32_t authReplySuccessField15Timestamp118 = 0; // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
 
-    // anchor: launcher.exe:0x441290 / 0x445500 (two-phase constructor)
-    AuthBootstrap680Child_0x441290();
-    // anchor: launcher.exe:0x445a40 (dtor in vtable), then base dtor at 0x445610
-    ~AuthBootstrap680Child_0x441290();
+ // anchor: launcher.exe:0x441290 / 0x445500 (two-phase constructor)
+ AuthBootstrap680Child_0x441290();
+ // anchor: launcher.exe:0x445a40 (dtor in vtable), then base dtor at 0x445610
+ ~AuthBootstrap680Child_0x441290() override;
 
-    // anchor: launcher.exe:0x448050
+ // anchor: launcher.exe:0x448050
     // Static RE mirrors original signature:
     //   void __thiscall AuthBootstrap680Child_0x441290::AuthBootstrap680_PrepareAndDispatch(
     //       AuthBootstrap680Child_0x441290 *this, char *pszUsername, char *pszPassword,
@@ -530,15 +554,7 @@ public:
     // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
     uint32_t HandleGetPublicKeyReply(CLTLoginMediator& owner, const mxo::auth::GetPublicKeyReply& reply);
     // Source-owned (NOT static-RE): inlined into HandleInboundAuthMessage case 0x09u at 0x44831c..0x448467
-    uint32_t SendAuthChallengeResponse_SOURCEOWNED_NO_RE(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
-
-private:
-    // anchor: launcher.exe:0x445500
-    void AuthBootstrap680ChildBase_ctor();
-    // anchor: launcher.exe:0x445610
-    void AuthBootstrap680ChildBase_dtor();
-    // anchor: launcher.exe:0x444900 (called by base dtor)
-    void ClearReplyParseAndCopyShadowFields();
+ uint32_t SendAuthChallengeResponse_SOURCEOWNED_NO_RE(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 };
 
 class AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0 {
