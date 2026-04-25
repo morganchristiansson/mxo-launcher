@@ -362,7 +362,12 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
 
   // anchor: launcher.exe:0x440a4b - tests status != 0
   if (status01 != 0u) {
-    // anchor: launcher.exe:0x440b08..0x440b6d - failure handling
+    // anchor: launcher.exe:0x440af7..0x440b08 - UNCONDITIONALLY call vtable +0x16c first
+    // Original at 0x440af7: MOV ECX,[0x004f78b8] -> MOV EAX,[ECX] -> CALL [EAX+0x16c]
+    // This calls HandleState9Opcode11SuccessSideEffect_364 unconditionally before checking status
+    g_CurrentLoginMediator->HandleState9Opcode11SuccessSideEffect();
+
+    // anchor: launcher.exe:0x440b08..0x440b6d - failure handling AFTER side effect
     // Status values: 0x0b000012 = try next margin, 0x19000001 = auth error, other = error
     if (status01 == 0x0b000012u) {
       // Try next margin address if available
@@ -379,11 +384,13 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
       }
     } else if (status01 == 0x19000001u) {
       // Auth error - go to state 2
+      // anchor: launcher.exe:0x440b1c..0x440b23 - PUSH 0x2, CALL 0x41b450
       g_CurrentLoginMediator->SetCurrentState(2u);
       return 1u;
     }
 
     // General error path
+    // anchor: launcher.exe:0x440b61..0x440b7e - [ECX+0x24]=0, SetCurrentState(3), PostError(8)
     g_CurrentLoginMediator->marginBeginCount24_ = 0;
     g_CurrentLoginMediator->SetCurrentState(3u);
     g_CurrentLoginMediator->PostError(8u);
