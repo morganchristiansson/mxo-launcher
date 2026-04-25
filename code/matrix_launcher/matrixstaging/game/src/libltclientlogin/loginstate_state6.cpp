@@ -305,21 +305,30 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     // Copy hashes into selection context blocks for State8 to use
     g_CurrentLoginMediator->PopulateSelectionContextBlocksFromChunkHashes();
 
-    // Store for use in challenge-response construction
-    g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
-    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+  // Store for use in challenge-response construction
+  g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
+  g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
 
-    // anchor: launcher.exe:0x43fd20..0x440a30 - Build and send opcode 0x08 challenge response
-    // Original constructs packet buffer and sends via vtable +0x68 / SendCurrentMarginPacket
-    // Packet layout: [0x08][statusCode:4][metricIdBase:4][goHereAddr:4][sessionSecret:4]
-    // Full implementation requires CMessageConnectionMessageRef_0x4ba23c packet construction
-    // with proper envelope. Current simplified stub omits the actual packet send to avoid
-    // envelope signature mismatch - the original builds a full packet through
-    // CMessageConnection_0x4b7928::BuildRawMarginPacket family.
-    spdlog::info(
-      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 challenge response send path (opcode 0x08) - original sends packet via vtable+0x68, current stub");
+  // anchor: launcher.exe:0x43fd20..0x440a30 - Build and send opcode 0x08 challenge response
+  // Original constructs packet via vtable +0x68 / SendCurrentMarginPacket at 0x440a18
+  // Packet layout: [0x08][statusCode:4][metricIdBase:4][goHereAddr:4][sessionSecret:4]
+  // Using Packet_MsConnectChallengeResponse_0x4b5378 builder faithful to static-RE
+  Packet_MsConnectChallengeResponse_0x4b5378 packetBuilder;
+  packetBuilder.ResetAndInitialize();
+  packetBuilder.SetChallengeResponseFields(goHereAddr, sessionSecret);
 
-    // Then switch states through cached upstream (if available)
+  // Build envelope for send
+  ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
+  envelope.payloadBase04 = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+  envelope.messageRef08 = packetBuilder.messageRef08;
+  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
+
+  spdlog::info(
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage sent opcode-0x08 challenge response goHereAddr=0x{:08x} sessionSecret=0x{:08x} sendResult=0x{:08x}",
+      static_cast<unsigned>(goHereAddr), static_cast<unsigned>(sessionSecret),
+      static_cast<unsigned>(sendResult));
+
+  // Then switch states through cached upstream (if available)
     if (cachedUpstreamOrArg_0x4 != nullptr) {
       const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
       g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);

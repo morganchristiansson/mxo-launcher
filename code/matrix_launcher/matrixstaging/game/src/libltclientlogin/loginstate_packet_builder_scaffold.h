@@ -43,6 +43,98 @@ static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, realLastName1c) == 0
 static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, background24) == 0x24, "state11 builder background offset mismatch");
 static_assert(offsetof(State11Packet0x4dBuilderRawScaffold, gameSessionId2c) == 0x2c, "state11 builder gameSessionId offset mismatch");
 
+} // namespace ltlogin
+
+// =============================================================================
+// Packet_MsConnectChallengeResponse_0x4b5378 - Packet 0x08 (MS_ConnectChallengeResponse) builder
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b5378 (10 slots, 40 bytes)
+// anchor: launcher.exe:0x43fd20..0x440a30 = State6 opcode-7 handler builds opcode-0x08 reply
+//
+// VTable layout at 0x4b5378 (10 slots observed in object scanner):
+// - Slot 0 (+0x00): destructor
+// - Slot 1 (+0x04): StubReturn0
+// - Slot 2 (+0x08): DebugString
+// - Slot 3 (+0x0c): ResetAndInitialize (packet 0x08 setup at 0x43fd20..0x43fd70)
+// - Slot 4 (+0x10): GetPayloadBase
+// - Remaining slots: inherited patterns
+//
+// Object layout: inherits Packet_0x4af2a4 base at +0x00, size = 0x28 bytes
+// No reservation scaffolds needed - this is a fixed-size 17-byte payload.
+//
+// Usage pattern from 0x4409b0 (State6 slot6 opcode-7 handling):
+// 1. Stack-allocate Packet_MsConnectChallengeResponse_0x4b5378
+// 2. Call ResetAndInitialize - reserves 0x11 bytes, writes opcode 0x08, clears fields
+// 3. Write goHereAddr at +0x09 (from opcode-7 reply payload +0x01)
+// 4. Write sessionSecret at +0x0d (from opcode-7 reply payload +0x09)
+// 5. Send through 0x41af70 = CLTLoginMediator_SendCurrentMarginPacket
+// =============================================================================
+
+namespace mxo::ltlogin {
+
+struct State6ChallengeResponsePayload {
+  // anchor: launcher.exe opcode analysis at 0x4409b0..0x4409d0
+  // Packet layout: [0x08][statusCode:4][metricIdBase:4][goHereAddr:4][sessionSecret:4]
+  static constexpr uint8_t kPayloadTag08 = 0x08;
+  static constexpr size_t kStatusCodeOffset = 0x01;
+  static constexpr size_t kMetricIdBaseOffset = 0x05;
+  static constexpr size_t kGoHereAddrOffset = 0x09;
+  static constexpr size_t kSessionSecretOffset = 0x0d;
+  static constexpr size_t kFixedByteCount = 0x11;  // 17 bytes total
+};
+
+// anchor: launcher.exe:0x43fd20 / packet 0x08 challenge response builder for state6
+// Margin opcode 0x08 = MS_ConnectChallengeResponse (reply to opcode 0x07)
+class Packet_MsConnectChallengeResponse_0x4b5378 : public Packet_0x4af2a4 {
+ public:
+  // anchor: launcher.exe:0x43fd20..0x43fd70
+  // Original implementation pattern:
+  // 1. Creates/retains message ref CMessageConnectionMessageRef_0x4ba23c
+  // 2. Reserves payload byte count 0x11 (17 bytes)
+  // 3. Writes opcode byte 0x08 at payload[0]
+  // 4. Clears statusCode, metricIdBase, goHereAddr, sessionSecret to 0
+  void ResetAndInitialize() {
+    if (!messageRef08) {
+      messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+      if (messageRef08) {
+        messageRef08->AddRef();
+        messageRef08->ResetForPacketBuilder(false, 0);
+      }
+    }
+
+    if (messageRef08 && messageRef08->messageStorage0c) {
+      messageRef08->messageStorage0c->ResetPayloadByteCount(
+          State6ChallengeResponsePayload::kFixedByteCount);
+      payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+      payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+    }
+
+    uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+    if (payload) {
+      payload[0] = State6ChallengeResponsePayload::kPayloadTag08;
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kStatusCodeOffset) = 0u;
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kMetricIdBaseOffset) =
+          0u;
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kGoHereAddrOffset) =
+          0u;
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kSessionSecretOffset) =
+          0u;
+    }
+  }
+
+  // anchor: launcher.exe:0x4409c0..0x4409d0 - inline writes from parsed opcode-7 reply
+  void SetChallengeResponseFields(uint32_t goHereAddr, uint32_t sessionSecret) {
+    uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+    if (payload) {
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kGoHereAddrOffset) =
+          goHereAddr;
+      *reinterpret_cast<uint32_t*>(payload +
+                                    State6ChallengeResponsePayload::kSessionSecretOffset) =
+          sessionSecret;
+    }
+  }
+};
+
 }  // namespace ltlogin
 
 // =============================================================================
