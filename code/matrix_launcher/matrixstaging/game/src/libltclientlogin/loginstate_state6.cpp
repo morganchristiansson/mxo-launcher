@@ -330,15 +330,14 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
       static_cast<unsigned>(goHereAddr), static_cast<unsigned>(sessionSecret),
       static_cast<unsigned>(sendResult));
 
-  // Then switch states through cached upstream (if available)
-    if (cachedUpstreamOrArg_0x4 != nullptr) {
-      const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
-      g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
-    }
+  // FIDELITY FIX: Do NOT transition states after sending challenge response!
+  // In original launcher, state transition happens AFTER receiving and processing
+  // the ConnectReply (0x09), not immediately after sending 0x08.
+  // The old code immediately transitioned to next state which caused us to miss
+  // processing opcode 0x09 in state6.
 
-    // Post event to continue flow
-    g_CurrentLoginMediator->PostEvent(0x11u);
-    return 1u;
+  // Stay in state6 - wait for next message (should be 0x09 ConnectReply)
+  return 1u;
   }
 
   // anchor: launcher.exe:0x440a33 - CMP AX, 0x9; JNZ not_opcode9
