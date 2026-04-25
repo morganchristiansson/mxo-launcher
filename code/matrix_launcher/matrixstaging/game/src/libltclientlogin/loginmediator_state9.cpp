@@ -141,9 +141,11 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
     localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
     submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
 
-    // Only overwrite port if helperWord6 matches expected UDP game server port (10000 = 0x2710)
-    // The server sends this in the LoadCharacterReply, but may send garbage/unset if not implemented.
-    // Use marginConnection port (10000) by default when invalid.
+    // Original static-RE: 0x44afd0 unconditionally calls SetPortFromHelperWord(helperWord6)
+    // The server sends handoff port in LoadCharacterReply at offset +9, but test server
+    // doesn't implement this field - reading uninitialized memory each run.
+    // Only use server value if it matches expected UDP port 0x2710 (10000)
+    // Otherwise keep port from marginConnection (line 140)
     if (helperWord6 == 0x2710) {
         localBlock.SetPortFromHelperWord(helperWord6);
     }
