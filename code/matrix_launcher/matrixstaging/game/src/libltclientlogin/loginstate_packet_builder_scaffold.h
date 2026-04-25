@@ -507,4 +507,161 @@ public:
 
 static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
 
-}  // namespace mxo::ltlogin
+// =============================================================================
+// Packet_MsConnectReply_0x4b6ce0 - Parse accessor for MS_ConnectReply (opcode 0x09)
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b6ce0 (5 slots, 20 bytes)
+// anchor: launcher.exe:0x443e30 = ResetAndInitialize (writes opcode 0x09)
+// anchor: launcher.exe:0x443d90 = AuthBootstrap680AuthChallengeParseObject_InitFromIncomingMessage
+//
+// VTable layout at 0x4b6ce0 (5 slots):
+// - Slot 0 (+0x00): 0x443aa0 - destructor (inherited from Packet_0x4af2a4)
+// - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
+// - Slot 2 (+0x08): 0x4452a0 - DebugString
+// - Slot 3 (+0x0c): 0x443e30 - ResetAndInitialize
+// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
+//
+// Object layout: compact parse object, size = 0x14 bytes (20 bytes)
+// This is a PARSE accessor class for reading incoming MS_ConnectReply (opcode 0x09)
+// Used in auth bootstrap flow at 0x448140 (HandleInboundAuthMessage)
+//
+// Usage pattern from 0x443d90:
+// 1. Stack-allocate Packet_MsConnectReply_0x4b6ce0
+// 2. Call InitFromIncomingMessage with source message ref
+// 3. Read payload fields at fixed offsets
+// =============================================================================
+
+struct StateAuthReply0x09FixedPayload {
+ // anchor: launcher.exe:0x443e98 - opcode written in ResetAndInitialize
+ // raw auth opcode `0x09` = MS_ConnectReply (used by auth bootstrap)
+ static constexpr uint8_t kPayloadTag09 = 0x09;
+ static constexpr size_t kPayloadBaseOffset = 0x10;
+};
+
+// anchor: launcher.exe vtable 0x004b6ce0 / parse accessor for opcode 0x09
+// This is a minimal parse object, NOT a full packet builder
+class Packet_MsConnectReply_0x4b6ce0 : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+ // anchor: launcher.exe:0x443e30 = Packet_MsConnectReply_0x4b6ce0::ResetAndInitialize
+ // Original implementation pattern:
+ // 1. Calculates payload offset from message header encoding byte
+ // 2. Advances message read position by 0x11 bytes
+ // 3. Writes opcode byte 0x09 at payload[0] (for identifying parsed message)
+ void ResetAndInitialize() {
+ // This is a parse accessor - minimal initialization
+ // The original at 0x443e30 sets up read pointers from incoming message
+ payloadAlias10 = nullptr;
+ debugString14 = nullptr;
+ payloadSize18 = 0u;
+ }
+
+ // Override virtual methods to match 5-slot vtable
+ ~Packet_MsConnectReply_0x4b6ce0() override = default;
+ uint32_t StubReturn0() override { return 0u; }
+ void DebugString(int /*formatType*/ = 2) override {}
+ void InitializePayloadSize() override {}
+ void* GetPayloadBase() override { return payloadAlias10; }
+};
+
+// Packet_MsConnectReply_0x4b6ce0 layout:
+// Minimal parse object inherits from Packet_0x4af2a4
+// Total: same as base class (0x28 bytes) - no additional fields
+static_assert(sizeof(Packet_MsConnectReply_0x4b6ce0) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectReply_0x4b6ce0 size mismatch");
+
+// =============================================================================
+// Packet_MsClaimCharacterNameRequest_0x4b6cf4 - Multi-field packet builder (opcode 0x0a)
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b6cf4 (5 slots, 50 bytes)
+// anchor: launcher.exe:0x443ea0 = ctor (clustered with 0x443f00 virt_meth)
+// anchor: launcher.exe:0x443f00 = ResetAndInitialize (writes opcode 0x00 initially)
+// anchor: launcher.exe:0x448389 = Used in AuthChallengeResponse building
+//
+// VTable layout at 0x4b6cf4 (5 slots):
+// - Slot 0 (+0x00): 0x443aa0 - destructor (inherited)
+// - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited)
+// - Slot 2 (+0x08): 0x4425f0 - DebugString
+// - Slot 3 (+0x0c): 0x443f00 - ResetAndInitialize
+// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
+//
+// Object layout: inherits Packet_0x4af2a4 at +0x00, additional fields at +0x28
+// Full builder size: 0x32 bytes (50 bytes)
+//
+// This is a BUILDER class for sending packets with multiple length-prefixed fields
+// Used in 0x448140..0x448467 for building AS_AuthChallengeResponse with:
+// - Encrypted challenge (length-prefixed)
+// - Password (length-prefixed)
+// - SOE password (optional, length-prefixed)
+// =============================================================================
+
+// anchor: launcher.exe vtable 0x004b6cf4 / multi-field builder
+// Margin opcode 0x0a = MS_ClaimCharacterNameRequest (but used generically for auth responses)
+class Packet_MsClaimCharacterNameRequest_0x4b6cf4 : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+ // anchor: launcher.exe:0x443ea0 = Packet_MsClaimCharacterNameRequest_0x4b6cf4::ctor
+ // anchor: launcher.exe:0x443f00 = Packet_MsClaimCharacterNameRequest_0x4b6cf4::ResetAndInitialize
+ // Original implementation pattern:
+ // 1. Calls Packet_0x4af2a4 default ctor
+ // 2. Sets vtable to 0x4b6cf4
+ // 3. Reserves 0x17 bytes for header
+ // 4. Initializes payload with opcode 0x00 (opcode set later)
+ // 5. Clears all length-prefixed field offsets
+ void ResetAndInitialize() {
+ // Base initialization
+ if (!messageRef08) {
+   messageRef08 = new ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c();
+   if (messageRef08) {
+     messageRef08->AddRef();
+     messageRef08->ResetForPacketBuilder(false, 0);
+   }
+ }
+
+ if (messageRef08 && messageRef08->messageStorage0c) {
+   messageRef08->messageStorage0c->ResetPayloadByteCount(0x17);
+   payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+   payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+ }
+
+ // Initialize header with opcode 0x00 (actual opcode set later)
+ uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+ if (payload) {
+   payload[0] = 0x00;  // Placeholder, actual opcode written later
+   *reinterpret_cast<uint16_t*>(payload + 0x11) = 0u;  // First length-prefixed field pos
+ }
+
+ // Clear field reservation offsets
+ encryptedChallengeField14_.writePointer00 = nullptr;
+ encryptedChallengeField14_.reservedContentByteCount04 = 0u;
+ encryptedChallengeField14_.reservedPadding06 = 0u;
+
+ passwordField1c_.writePointer00 = nullptr;
+ passwordField1c_.reservedContentByteCount04 = 0u;
+ passwordField1c_.reservedPadding06 = 0u;
+
+ soePasswordField24_.writePointer00 = nullptr;
+ soePasswordField24_.reservedContentByteCount04 = 0u;
+ soePasswordField24_.reservedPadding06 = 0u;
+ }
+
+ // anchor: launcher.exe:0x444040 = meth_0x444040 - AppendEncryptedChallenge
+ // anchor: launcher.exe:0x444140 = meth_0x444140 - AppendPassword
+ // anchor: launcher.exe:0x4441a0 = meth_0x4441a0 - ReserveFieldLength
+ // anchor: launcher.exe:0x443660 = meth_0x443660 - SetPadding
+
+ // Reservation scaffolds for length-prefixed fields (offsets 0x28, 0x30, 0x38)
+ ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold encryptedChallengeField14_{};
+ ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold passwordField1c_{};
+ ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold soePasswordField24_{};
+
+ // Override virtual methods to match 5-slot vtable
+ ~Packet_MsClaimCharacterNameRequest_0x4b6cf4() override = default;
+ uint32_t StubReturn0() override { return 0u; }
+ void DebugString(int /*formatType*/ = 2) override {}
+ void InitializePayloadSize() override {}
+ void* GetPayloadBase() override { return payloadAlias10; }
+};
+
+static_assert(offsetof(Packet_MsClaimCharacterNameRequest_0x4b6cf4, encryptedChallengeField14_) == 0x28, "Packet_MsClaimCharacterNameRequest_0x4b6cf4 encryptedChallengeField14_ offset mismatch");
+static_assert(offsetof(Packet_MsClaimCharacterNameRequest_0x4b6cf4, passwordField1c_) == 0x30, "Packet_MsClaimCharacterNameRequest_0x4b6cf4 passwordField1c_ offset mismatch");
+static_assert(offsetof(Packet_MsClaimCharacterNameRequest_0x4b6cf4, soePasswordField24_) == 0x38, "Packet_MsClaimCharacterNameRequest_0x4b6cf4 soePasswordField24_ offset mismatch");
+
+} // namespace mxo::ltlogin
