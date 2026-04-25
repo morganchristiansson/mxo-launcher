@@ -247,7 +247,9 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     }
 
     valid = currentMessage10_ != nullptr;
-    if (!valid) {
+    // Verify this is actually a LoadCharacterReply (0x10) before parsing
+    if (valid && currentMessage10_[0] != 0x10u) {
+        spdlog::debug("LoadCharacterReplyEnvelope: expected msgType=0x10 but got 0x{:02x}, marking invalid", currentMessage10_[0]);
         return;
     }
 
@@ -255,6 +257,11 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     status = ReadU32LE(currentMessage10_ + 1u);
     field05 = ReadU32LE(currentMessage10_ + 5u);
     handoffWord09 = ReadU16LE(currentMessage10_ + 9u);
+    spdlog::debug("LoadCharacterReplyEnvelope parsed: msgType=0x{:02x} handoffWord=0x{:04x} bytes[8..15]=[0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}]",
+        currentMessage10_[0],
+        handoffWord09,
+        currentMessage10_[8], currentMessage10_[9], currentMessage10_[10], currentMessage10_[11],
+        currentMessage10_[12], currentMessage10_[13], currentMessage10_[14], currentMessage10_[15]);
     expectedSectionCount0b = currentMessage10_[0x0b];
     shouldSeedExpectedSectionCount = (currentMessage10_[0x0c] == 0x01u);
     sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage10_[0x0d] - 2u);
