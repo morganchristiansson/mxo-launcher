@@ -249,7 +249,7 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     valid = currentMessage10_ != nullptr;
     // Verify this is actually a LoadCharacterReply (0x10) before parsing
     if (valid && currentMessage10_[0] != 0x10u) {
-        spdlog::debug("LoadCharacterReplyEnvelope: expected msgType=0x10 but got 0x{:02x}, marking invalid", currentMessage10_[0]);
+        spdlog::debug("LoadCharacterReplyEnvelope: expected msgType=0x10 but got 0x{:02x}, will fallback to callback84", currentMessage10_[0]);
         return;
     }
 
