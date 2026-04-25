@@ -135,55 +135,90 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
     if (!marginConnection_->RemoteHostName().empty()) {
       remoteHostName = marginConnection_->RemoteHostName();
     }
+
+    // Build submit address block from margin connection endpoint
+    // anchor: launcher.exe:0x41de6a-0x41de84
     mxo::ltlogin::SubmitAddressBlock localBlock{};
     localBlock.family_ = marginConnection_->remoteEndpoint_.family;
     localBlock.portNetworkOrder_ = marginConnection_->remoteEndpoint_.portNetworkOrder;
     localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
     submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
 
-    // Original static-RE: 0x44afd0 unconditionally calls SetPortFromHelperWord(helperWord6)
-    // The server sends handoff port in LoadCharacterReply at offset +9, but test server
-    // doesn't implement this field - reading uninitialized memory each run.
-    // Only use server value if it matches expected UDP port 0x2710 (10000)
-    // Otherwise keep port from marginConnection (line 140)
-    if (helperWord6 == 0x2710) {
-        localBlock.SetPortFromHelperWord(helperWord6);
-    }
-    // Otherwise keep port from marginConnection (line 140) - already set above
+    // Original at 0x44afd0: unconditionally sets port from helperWord6 via SetPortFromHelperWord
+    // anchor: launcher.exe:0x44afd0
+    localBlock.SetPortFromHelperWord(helperWord6);
 
     // 0x44b0d0: Format host:port string, stores result at EBP-0x14
+    // anchor: launcher.exe:0x44b0d0
     submitTargetText = localBlock.FormatHostPortString(/*appendPortFlag=*/1);
     submitTargetReady = !submitTargetText.empty();
   }
 
-  // vtable+0x44 -> +0x30 mode query, then either:
-  // - Managed: +0x1c(close old), +0x18(get new handle), +0x24(send)
-  // - Direct: +0x28(send)
-  const mxo::ltlogin::Object88SubmitPlan object88Plan =
-  mxo::ltlogin::BuildObject88SubmitPlan(
-      ownerObject88_,
-      callbackPairReady,
-      submitTargetReady,
-      forwardedArg90,
-      ownerCachedHandle147c_);
+  // Query managed send mode from object88
+  // anchor: launcher.exe:0x41dea1
+  bool managedSendMode = false;
+  const bool modeQueryReady = mxo::ltlogin::TryObject88QueryManagedSendMode(ownerObject88_, &managedSendMode);
 
+  // Execute submit based on mode
+  // anchor: launcher.exe:0x41dea9-0x41df36
   uint32_t submitResult = 0u;
-  const bool shouldExecuteSubmit =
-      object88Plan.modeQueryReady && callbackPairReady && submitTargetReady &&
-      (object88Plan.wouldCallDirectSend28 || object88Plan.wouldCallManagedSend24);
+  if (modeQueryReady && callbackPairReady && submitTargetReady) {
+    if (!managedSendMode) {
+      // Direct send path: +0x28(submitTarget, callbackOutLow, callbackOutHigh, forwardedArg90)
+      // anchor: launcher.exe:0x41df0d
+      void** object88Vtable = *reinterpret_cast<void***>(ownerObject88_);
+      if (object88Vtable && object88Vtable[10]) {
+        using DirectSubmitFn = uint32_t(__thiscall*)(void*, const char*, uint32_t, uint32_t, uint32_t);
+        const auto directSubmitFn = reinterpret_cast<DirectSubmitFn>(object88Vtable[10]); // +0x28
+        submitResult = directSubmitFn(
+            ownerObject88_,
+            submitTargetText.c_str(),
+            callbackOutLow,
+            callbackOutHigh,
+            forwardedArg90);
+      }
+    } else {
+      // Managed send path: +0x1c(close old), +0x18(get new handle), +0x24(send)
+      // anchor: launcher.exe:0x41deb7
+      void** object88Vtable = *reinterpret_cast<void***>(ownerObject88_);
+      if (!object88Vtable) {
+        return 1u;
+      }
 
-  if (shouldExecuteSubmit) {
-    // Per Ghidra 0x41dea1-0x41df36:
-    // Managed path: +0x1c(oldHandle), +0x18(0), store handle, +0x24(newHandle, ...)
-    // Direct path: +0x28(submitTarget, callbackOutLow, callbackOutHigh, forwardedArg90)
-    submitResult = mxo::ltlogin::ExecuteObject88Submit(
-        ownerObject88_,
-        object88Plan.managedSendMode,
-        &ownerCachedHandle147c_,
-        submitTargetText.c_str(),
-        callbackOutLow,
-        callbackOutHigh,
-        forwardedArg90);
+      // Release old handle if present
+      // anchor: launcher.exe:0x41debb
+      if (ownerCachedHandle147c_ != -1) {
+        if (object88Vtable[7]) {
+          using ReleaseHandleFn = void(__thiscall*)(void*, int32_t);
+          const auto releaseHandleFn = reinterpret_cast<ReleaseHandleFn>(object88Vtable[7]); // +0x1c
+          releaseHandleFn(ownerObject88_, ownerCachedHandle147c_);
+        }
+      }
+
+      // Acquire new handle
+      // anchor: launcher.exe:0x41dec1
+      if (!object88Vtable[6]) {
+        return 1u;
+      }
+      using AcquireHandleFn = uint32_t(__thiscall*)(void*, uint32_t);
+      const auto acquireHandleFn = reinterpret_cast<AcquireHandleFn>(object88Vtable[6]); // +0x18
+      const uint32_t acquiredHandle = acquireHandleFn(ownerObject88_, 0u);
+      ownerCachedHandle147c_ = static_cast<int32_t>(acquiredHandle);
+
+      // Managed send with new handle
+      // anchor: launcher.exe:0x41dece
+      if (object88Vtable[9]) {
+        using ManagedSubmitFn = uint32_t(__thiscall*)(void*, uint32_t, const char*, uint32_t, uint32_t, uint32_t);
+        const auto managedSubmitFn = reinterpret_cast<ManagedSubmitFn>(object88Vtable[9]); // +0x24
+        submitResult = managedSubmitFn(
+            ownerObject88_,
+            acquiredHandle,
+            submitTargetText.c_str(),
+            callbackOutLow,
+            callbackOutHigh,
+            forwardedArg90);
+      }
+    }
   }
 
     spdlog::info(
@@ -199,22 +234,23 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
         callbackPairReady ? 1u : 0u,
         static_cast<unsigned>(callbackOutLow),
         static_cast<unsigned>(callbackOutHigh),
-        object88Plan.managedSendMode ? 1u : 0u,
+        managedSendMode ? 1u : 0u,
         submitTargetReady ? 1u : 0u,
         static_cast<unsigned>(submitTargetIpv4NetworkOrder),
         submitTargetText,
         remoteHostName,
-        shouldExecuteSubmit ? 1u : 0u,
+        (modeQueryReady && callbackPairReady && submitTargetReady) ? 1u : 0u,
         static_cast<unsigned>(submitResult));
-  if (shouldExecuteSubmit && submitResult == 3u) {
+
+  if (submitResult == 3u) {
     spdlog::warn(
             "CLTLoginMediator::State9SubmitFollowup managed join returned 0x00000003 (client.dll: CUDPDriver_ReallyJoinSession timeout path) target='{}' callbackBlobPtr=0x{:08x} callbackBlobLen=0x{:08x} cachedHandle147c={} -- current boundary is before state9 raw-0x11 success / event=0x18",
             submitTargetText,
             static_cast<unsigned>(callbackOutLow),
             static_cast<unsigned>(callbackOutHigh),
             ownerCachedHandle147c_);
-    }
-    return submitResult;
+  }
+  return submitResult;
 }
 
 // anchor: launcher.exe:0x41b420
