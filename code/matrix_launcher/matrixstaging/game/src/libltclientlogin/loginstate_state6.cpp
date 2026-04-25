@@ -115,12 +115,12 @@ static std::string BuildMetricIdPreview(const uint16_t* metricIds, uint16_t coun
 
 } // namespace
 
-// anchor: launcher.exe vtable 0x004b508c
+// anchor: launcher.exe vtable 0x4b508c
 const char* CLTLoginState_State6_0x4b508c::DebugName() const {
   return "CLTLoginState_State6_0x4b508c";
 }
 
-// anchor: launcher.exe:0x43b8f0 (vtable 0x004b508c slot 3)
+// anchor: launcher.exe:0x43b8f0 (vtable 0x4b508c slot 3)
 void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
   // anchor: launcher.exe:0x43b8f0 upstream caching logic at `0x43b8f9..0x43b91c`
   // - `0x43b8f9` loads existing cached from this+4
@@ -151,7 +151,7 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     return;
   }
 
-  // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
+  // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x4b5364`
   // Current tighter send-side mirror:
   // - payload `+0x00` = raw opcode `0x06` (`MS_ConnectRequest`)
   // - payload `+0x01/+0x05` = owner `+0x08/+0x0c` launcher/client version dwords
@@ -228,7 +228,7 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
   return;
 }
 
-// anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
+// anchor: launcher.exe:0x440780 (vtable 0x4b508c slot 6)
 uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
   spdlog::info(
     "DIAGNOSTIC: CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage entered this={} currentState={}",
@@ -299,8 +299,16 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     }
 
     std::vector<std::string> clientFiles = {clientDllPath};
-    auto hashes = GenerateClientChunkHashes(clientFiles);
-    g_ClientChunkHashStorage.SetHashes(hashes);
+    const bool hashGenerationSuccess = GenerateClientChunkHashes(clientFiles);
+    if (!hashGenerationSuccess) {
+      // anchor: launcher.exe:0x4409e1..0x4409ed - hash generation failure halts login
+      g_CurrentLoginMediator->worldListCountOrStatus80 = 0x1200000c;
+      g_CurrentLoginMediator->SetCurrentState(0u);
+      g_CurrentLoginMediator->PostError(3u);
+      return 1u;
+    }
+    // Hashes are already stored in global g_ClientChunkHashStorage by GenerateClientChunkHashes
+    const auto hashes = g_ClientChunkHashStorage.GetHashes();
 
     spdlog::info("State6 Slot6: Generated {} chunk hashes for client verification", hashes.size());
 
@@ -488,7 +496,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
   return 1u;
 }
 
-// anchor: launcher.exe:0x00438c70 (vtable 0x004b508c slot 7)
+// anchor: launcher.exe:0x438c70 (vtable 0x4b508c slot 7)
 uint32_t CLTLoginState_State6_0x4b508c::GetStateId() const {
   return 6;
 }

@@ -26,8 +26,8 @@ struct ChunkHashResult {
 // Parameters:
 //   filenames - list of file paths to hash
 // Returns:
-//   vector of 16-byte hash results (first 4 words of SHA1 digest)
-std::vector<ChunkHashResult> GenerateClientChunkHashes(
+//   bool - true if hash generation succeeded for at least one file
+bool GenerateClientChunkHashes(
     const std::vector<std::string>& filenames);
 
 // Stores chunk hashes for later retrieval by client.dll

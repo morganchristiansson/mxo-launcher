@@ -104,9 +104,10 @@ bool ComputeChunkedFileHashes(
 
 }  // namespace
 
-std::vector<ChunkHashResult> GenerateClientChunkHashes(
+bool GenerateClientChunkHashes(
     const std::vector<std::string>& filenames) {
-  std::vector<ChunkHashResult> results;
+  // Use the global storage instance
+  g_ClientChunkHashStorage.Clear();
 
   spdlog::info(
       "GenerateClientChunkHashes(): Starting hash generation for {} files",
@@ -119,7 +120,7 @@ std::vector<ChunkHashResult> GenerateClientChunkHashes(
     if (ComputeChunkedFileHashes(filename, &fileResults)) {
       // Add all chunks from this file to the total
       for (size_t i = 0; i < fileResults.size(); ++i) {
-        results.push_back(fileResults[i]);
+        g_ClientChunkHashStorage.AddHash(fileResults[i]);
         if (i < 3 || i >= fileResults.size() - 3) {
           // Log first 3 and last 3 chunks
           spdlog::debug(
@@ -136,9 +137,10 @@ std::vector<ChunkHashResult> GenerateClientChunkHashes(
 
   spdlog::info(
       "GenerateClientChunkHashes(): Generated {} total chunk hashes across all files",
-      results.size());
+      g_ClientChunkHashStorage.GetHashes().size());
 
-  return results;
+  // Return true if at least one hash was generated
+  return g_ClientChunkHashStorage.HasValidHashCount();
 }
 
 // ClientChunkHashStorage implementation
