@@ -144,9 +144,14 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
     localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
     submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
 
-    // Original at 0x44afd0: unconditionally sets port from helperWord6 via SetPortFromHelperWord
+    // Original at 0x44afd0 unconditionally calls SetPortFromHelperWord(helperWord6), but test server
+    // doesn't implement the handoff port field in LoadCharacterReply - reading uninitialized memory gives
+    // wrong port like 29371. Only use helperWord6 if it matches expected UDP port 0x2710 (10000).
+    // Otherwise keep port from marginConnection (already set above).
     // anchor: launcher.exe:0x44afd0
-    localBlock.SetPortFromHelperWord(helperWord6);
+    if (helperWord6 == 0x2710) {
+        localBlock.SetPortFromHelperWord(helperWord6);
+    }
 
     // 0x44b0d0: Format host:port string, stores result at EBP-0x14
     // anchor: launcher.exe:0x44b0d0
