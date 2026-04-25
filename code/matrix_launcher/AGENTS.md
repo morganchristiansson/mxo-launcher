@@ -6,16 +6,9 @@
   - Rename methods, variables, fields from default ghidra names to improve readability.
   - Work with user to improve incorrect types.
 - Implementations must be faithful to ghidra static-RE of launcher.exe
-- Not addressing decompile output and not being faithful to static-RE leaves a debt to be paid in future sessions.
-- Classes and methods should map directly to orignal launcher.exe vtable and implementation
 - Respect method boundaries in static-RE. Do not inline or split methods if split does not exist in static-RE.
-- Follow method boundaries - don't create helpers when there weren't any in static-RE.
-- Anchor code to static-RE with comments like `// anchor: launcher.exe:0x41f390 / vtable +0x58`
-- Decompile and xrefs nearby anchored methods to discover static-RE faithful implementations
-- methods and fields and should be ordered by VTable offsets from launcher.exe
-- All fidelity improvements that don't require further exploration or static-RE investigation are in scope
-- When discovering new VTables on the active path, exploring, documenting and implementing them as C++ classes is a big improvement to fidelity.
-- VTables are documented in ../../docs/launcher.exe/VTABLES/0x*.md
+- Not addressing decompile output and not being faithful to static-RE leaves a debt to be paid in future sessions.
+- Anchor code to static-RE with comments like `// anchor: launcher.exe:0x123456 / vtable +0x58`
 
 ## Rule 2: Keep launcher working
 
@@ -23,34 +16,23 @@ At end of task:
 - Run `make -j4` to build OR `make -j4 run` to build and run the game.
 
 ### Rule 3: Implementation, documentation and Ghidra should move together
-- Do not treat documentation as a separate afterthought.
-- When experiments, disassembly, or runtime traces change our understanding, update the canonical docs as part of the same work.
 - Keep knowledge consolidated under: `../../docs/<binary>/<component>/`
-- Prefer updating an existing canonical doc rather than creating a new overlapping note.
-- If a doc becomes stale or redundant, prune or merge it.
-- If doc grows large (2000 lines), split it.
 - when an entry becomes resolved or stops steering current work, prune it instead of appending more history
-- prefer owning recovered code structure, local TODOs, and active implementation notes in inline/header source comments
-- avoid duplicate documentation; merge/prune overlapping docs and keep each topic in the smallest obvious canonical home instead of letting one large doc sprawl across many components
-- prefer canonical `../../docs/<binary>/<component>/` docs for experiment evidence, crash references, and cross-component conclusions
 
 # Misc
 
-- deploy built binaries into the game/runtime directory only for execution
 - when finishing one area of work and the next task likely moves into a different area
   - pruning of code that is no longer needed and can be cleaned up
   - suggest areas where further fidelity gains can be made
-- Prefer batching tool calls
-- Prefer batched small edit tool calls over single large edit
-- When done, git add <paths ..> && git commit -m "<commit message>"
+- When done: git add <paths> && git commit -m "<commit message>"
 
 # Ghidra MCP
 
-Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
+Use Ghidra as the primary static-analysis tool
 
-- Prefer decompile and verify with disassembly when extra confidence is needed.
+- Prefer decompile and verify with disassembly as needed
 - **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
-- **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
+- **Rename variables**: Sync ghidra variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename fields / struct members**: When class layouts become clearer, update OOAnalyzer / recovered structs in Ghidra so decompilation uses field names instead of raw offsets.
   - `ghidra_data_types update` supports `member_update_mode:"patch"` for single-member struct edits by offset.
   - use full `members` replacement only when you need to grow/reflow overlapping regions.
@@ -61,22 +43,14 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 - retype parameters / locals / globals in Ghidra when evidence supports it
   - use `ghidra_functions update_prototype` for parameter / return-type edits
   - use `ghidra_functions rename_variable` with `new_data_type` for local-variable retyping
-- when renaming many decompiler locals in one function, prefer small batches and re-run `list_variables` / `decompile` between batches; Ghidra can renumber synthetic locals after a rename
-- when renaming numbered stack locals like `local_1cc`, work from the highest stack offset / highest local number downward; this minimizes fill-gap renumbering churn
-- `ghidra_batch_operations` works well for descending stack-local rename batches, but mixed batches of decompiler temps (`uVar*`, `bVar*`, `extraout_*`) can still fail even when the same renames succeed one-by-one
-- renaming decompiler temps through MCP can leave the old synthetic name visible in `list_variables` while the decompiler switches to the new user-defined alias; treat `decompile` as the source of truth for whether the new name actually stuck
 - mirror confirmed names/types/anchors back into source comments and canonical docs in the same task
 - use callers/callees/xrefs so isolated helper bodies are not over-interpreted
 - when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
 - push confirmed Ghidra findings into source and canonical docs in the same task so knowledge does not live only in Ghidra
-- record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
-- pay extra attention to LauncherLogin world-selection / character-selection / create-character / delete-character flows
-  - when discovering them in Ghidra, prioritize the exact LoginMediator interaction: concrete vtable slot, caller/callee relation, argument mapping, and resulting mediator state/owner-field effects
-- Create function in ghidra when you have high confidence that it should be a function. You have done this before.
 
 ## Ghidra usage
 
-Use the current `ghidra_functions` / `ghidra_inspect` / `ghidra_symbols` tool family below, not the older legacy command names. Default to `file_name: "launcher.exe"` and swap to `client.dll` when needed. Prefer `ghidra_batch_operations` for grouped edits, then `ghidra_project save`.
+Use the current `ghidra_functions` / `ghidra_inspect` / `ghidra_symbols` tool family below, not the older legacy command names. Default to `file_name: "launcher.exe"` and swap to `client.dll` when needed. Prefer `ghidra_batch_operations` for grouped edits.
 - if `ghidra_batch_operations` fails with an active transaction / lock issue, retry the same edits as sequential tool calls.
 - `ghidra_functions update_prototype` parameter entries use `data_type`, **not** `type`.
 - for `ghidra_functions update_prototype`, pointer types are easiest to spell with the Ghidra display name (e.g. `cls_0x4ba23c *`), not the full `/OOAnalyzer/...` path.
@@ -85,7 +59,6 @@ Use the current `ghidra_functions` / `ghidra_inspect` / `ghidra_symbols` tool fa
 ```js
 // Programs
 mcp({ tool: "ghidra_get_program_list", args: '{}' })
-mcp({ tool: "ghidra_project", args: '{"file_name":"launcher.exe","action":"save"}' })
 
 // Find / inspect
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list","name_pattern":"CLauncher.*"}' })
