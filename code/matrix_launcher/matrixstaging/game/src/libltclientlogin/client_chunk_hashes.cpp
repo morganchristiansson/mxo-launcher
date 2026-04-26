@@ -6,9 +6,9 @@
 //
 // Summary from static RE (0x43d800):
 // - Opens client.dll (derived from executable path)
-// - Reads file in 0x100000 byte (1MB) chunks
+// - Reads file in 0x100000 byte (1MB) chunks through DAT_004f79d8/DAT_004f79dc
 // - Hashes each chunk with SHA1
-// - Stores first 16 bytes of each digest in global storage
+// - Stores first 16 bytes of each digest in the caller-provided output container
 // - Returns 1 on success, 0 on failure
 //
 // NOTE: In original 0x43d800, ALL logic is inlined in a single function.
@@ -66,7 +66,7 @@ bool GenerateClientChunkHashes(
     FILE* file = std::fopen(filename.c_str(), "rb");
     if (!file) {
       spdlog::warn("GenerateClientChunkHashes(): Could not open file '{}'", filename);
-      continue;  // Continue to next file
+      return false;
     }
 
     // Get file size
@@ -98,7 +98,7 @@ bool GenerateClientChunkHashes(
         spdlog::warn(
             "GenerateClientChunkHashes(): Short read at chunk {} (expected {}, got {})",
             chunkIndex, bytesToRead, bytesRead);
-        break;
+        return false;
       }
 
       // Compute SHA1 of this chunk
@@ -140,8 +140,7 @@ bool GenerateClientChunkHashes(
       "GenerateClientChunkHashes(): Generated {} total chunk hashes",
       g_ClientChunkHashStorage.GetHashes().size());
 
-  // Return true if at least 9 hashes (what server expects)
-  return g_ClientChunkHashStorage.HasValidHashCount();
+  return true;
 }
 
 // ClientChunkHashStorage implementation
@@ -162,10 +161,5 @@ const std::vector<ChunkHashResult>& ClientChunkHashStorage::GetHashes() const {
   return hashes_;
 }
 
-bool ClientChunkHashStorage::HasValidHashCount() const {
-  // Server expects 9 matching hashes in MS_LoadCharacterRequest
-  // See MarginSocket.cpp: "Strange counter was not 9"
-  return hashes_.size() >= 9;
-}
 
 }  // namespace mxo::ltlogin

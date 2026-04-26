@@ -307,13 +307,14 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
       g_CurrentLoginMediator->PostError(3u);
       return 1u;
     }
-    // Hashes are already stored in global g_ClientChunkHashStorage by GenerateClientChunkHashes
+    // Hashes are already stored in global g_ClientChunkHashStorage by GenerateClientChunkHashes.
+    // Important fidelity correction from launcher.exe:0x440780:
+    // - state6 slot6 uses 0x43d800 + 0x4566a0 only for the opcode-0x08 challenge response path
+    // - it does NOT overwrite owner +0xcd0..+0xd7f / persisted selection-context blocks here
+    // - state8 later serializes the earlier owner-side 0x41c1f0 snapshot directly
     const auto hashes = g_ClientChunkHashStorage.GetHashes();
 
     spdlog::info("State6 Slot6: Generated {} chunk hashes for client verification", hashes.size());
-
-    // Copy hashes into selection context blocks for State8 to use
-    g_CurrentLoginMediator->PopulateSelectionContextBlocksFromChunkHashes();
 
   // Store for use in challenge-response construction
   g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;

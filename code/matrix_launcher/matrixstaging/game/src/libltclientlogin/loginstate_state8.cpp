@@ -257,24 +257,22 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
 uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
     if (rawPayloadForDiag) {
         spdlog::info(
-            "DIAGNOSTIC: State8 Slot3 raw payload after Reset: opcode=0x{:02x} charIdLow=0x{:08x} charIdHigh=0x{:08x} field0c=0x{:02x} field0d=0x{:02x} field0e=0x{:02x} field0f=0x{:02x}",
+            "DIAGNOSTIC: State8 Slot3 raw payload after Reset: opcode=0x{:02x} charIdLow=0x{:08x} charIdHigh=0x{:08x} zeroPrefixDword0=0x{:08x} weirdBlock0=0x{:08x}",
             static_cast<unsigned>(rawPayloadForDiag[0]),
             static_cast<unsigned>(*reinterpret_cast<uint32_t*>(rawPayloadForDiag + 1)),
             static_cast<unsigned>(*reinterpret_cast<uint32_t*>(rawPayloadForDiag + 5)),
-            static_cast<unsigned>(rawPayloadForDiag[0xc]),
-            static_cast<unsigned>(rawPayloadForDiag[0xd]),
-            static_cast<unsigned>(rawPayloadForDiag[0xe]),
-            static_cast<unsigned>(rawPayloadForDiag[0xf]));
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(rawPayloadForDiag + 0x09)),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(rawPayloadForDiag + 0x29)));
     }
 
     // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload
-    // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload
+    // The 0x43bd20 body only writes the GCID pair here. The following 0x09..0x28 zero-prefix and
+    // 0x29..0xb8 repeated-selection blocks come from the persisted owner snapshot writes below;
+    // there is no separate state8-side "counter=9" byte write in the original body.
     uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
     if (payload) {
         *reinterpret_cast<uint32_t*>(payload + 0x01) = currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u;
         *reinterpret_cast<uint32_t*>(payload + 0x05) = currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u;
-        // field0x0c needs to be 9 - server expects this counter value
-        payload[0x0c] = 0x09;
     }
 
     // anchor: launcher.exe:0x43bd84-0x43bdfa = write selection blocks directly to payload
@@ -357,11 +355,13 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     // DIAGNOSTIC: Log payload after all writes
     if (payload) {
         spdlog::info(
-            "DIAGNOSTIC: State8 Slot3 final payload: charIdLow=0x{:08x} charIdHigh=0x{:08x} field0c=0x{:02x} blockCd0_0=0x{:08x}",
+            "DIAGNOSTIC: State8 Slot3 final payload: charIdLow=0x{:08x} charIdHigh=0x{:08x} zeroPrefixDword0=0x{:08x} zeroPrefixDword4=0x{:08x} weirdBlock0=0x{:08x} weirdBlock8=0x{:08x}",
             static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x01)),
             static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x05)),
-            static_cast<unsigned>(payload[0x0c]),
-            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x09)));
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x09)),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x19)),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x29)),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0xa9)));
     }
     
     const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();

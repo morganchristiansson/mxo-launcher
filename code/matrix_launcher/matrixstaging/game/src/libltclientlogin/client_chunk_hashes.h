@@ -30,22 +30,19 @@ struct ChunkHashResult {
 // Parameters:
 //   filenames - list of file paths to hash
 // Returns:
-//   bool - true if at least 9 hashes generated (what server expects)
+//   bool - true on the original success path; launcher.exe:0x43d800 uses these digests for the
+//          opcode-0x08 challenge-response path, not as a state8 selection-context rewrite
 bool GenerateClientChunkHashes(
     const std::vector<std::string>& filenames);
 
-// Stores chunk hashes for later retrieval by client.dll
-// These hashes populate the selection context blocks sent in MS_LoadCharacterRequest
+// Stores chunk hashes for later retrieval by the state6 opcode-0x07/0x08 path.
 class ClientChunkHashStorage {
  public:
   void Clear();
   void AddHash(const ChunkHashResult& result);
   const std::vector<ChunkHashResult>& GetHashes() const;
 
- // Returns true if we have at least 9 hashes (what server expects)
- bool HasValidHashCount() const;
-
- void SetHashes(const std::vector<ChunkHashResult>& hashes);
+  void SetHashes(const std::vector<ChunkHashResult>& hashes);
 
  private:
   std::vector<ChunkHashResult> hashes_;

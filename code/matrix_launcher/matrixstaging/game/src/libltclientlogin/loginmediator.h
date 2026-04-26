@@ -1407,9 +1407,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   through `SetCurrentCharacterRouteIndexCc8Scaffold`
     uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
 
-// Populate selection context blocks from generated chunk hashes
-void PopulateSelectionContextBlocksFromChunkHashes();
-
  // State-owned slot-6 bodies mutate this mediator-owned owner-state block directly.
 
     // Post-auth load-character reply outputs (0x440320) plus neighboring auth/margin send flags:
