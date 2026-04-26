@@ -221,8 +221,8 @@ This replacement has now been done in source.
 Current source direction:
 
 - uses **`CryptoPP::RSAES_OAEP_SHA_Decryptor` directly** for the actual decryptor subobject
-- uses **`CryptoPP::RSA::PrivateKey`** directly for the loaded bootstrap key state
-- uses **`CryptoPP::OldRandomPool`** directly for the recovered RNG helper family
+- uses **`CryptoPP::RSA::PrivateKey` directly** for the loaded bootstrap key state
+- uses **`CryptoPP::OldRandomPool` directly** for the recovered RNG helper family
 - keeps a small launcher wrapper only for the preserved launcher entrypoints / boundaries:
   - `0x443220`
   - `0x437810`
@@ -234,6 +234,40 @@ This is the preferred fidelity tradeoff:
 2. stop pretending identified Crypto++ classes are launcher-local bespoke classes
 3. preserve comments where old MSVC MI / adjustor-thunk behavior cannot be expressed 1:1 in modern source
 4. keep canonical docs and Ghidra naming aligned with the Crypto++ identification
+
+### 2.6 Integer / big-int family — `0x4ba50c`
+
+**Confidence: HIGH**
+
+`CBootstrapBigInt_0x4ba50c` is very likely an old **`CryptoPP::Integer`** family object.
+
+This is not just because RSA key state stores several `0x14`-byte big-int subobjects. The class
+behavior itself matches old Crypto++ integer machinery:
+
+- default ctor `0x45d000` initializes a zero-valued digit array
+- copy ctor `0x45d090` normalizes/copies digit capacity and digit words
+- word ctor `0x45d340` constructs from a scalar value
+- byte-reader ctor `0x45f940` imports from a source object
+- raw-byte ctor `0x461ee0` imports from raw bytes + length + flags
+- vtable `0x4ba50c` has import/export methods matching `ASN1Object`-style integer I/O
+
+Important vtable slots:
+
+| Slot | Address | Best interpretation |
+|------|---------|---------------------|
+| `+0x00` | `0x441610/0x45d040` | destructor / deleting destructor |
+| `+0x04` | `0x45e030` | import / BER-like decode path |
+| `+0x08` | `0x45fca0` | export / DER-like encode path |
+| `+0x0c` | `0x4413a0` | wrapper forwarding one encode form to another |
+
+Best current interpretation:
+- **static-RE**: this is an actual Crypto++ integer-family class, most likely old `CryptoPP::Integer`
+- **source**: it remains useful as a recovered boundary adapter because launcher.exe passes these
+  exact `0x14`-byte objects around at bootstrap seams
+
+Current source has **not** replaced `CBootstrapBigInt_0x4ba50c` with direct `CryptoPP::Integer`
+throughout the messaging layer yet. That would be a larger seam rewrite than the earlier direct
+`CryptoPP::RSA::PrivateKey` replacement.
 
 ---
 
@@ -248,10 +282,13 @@ Yes for several of them — and this should be stated explicitly.
 | `0x4b42b0` / `cls_0x4b42b0` | `CryptoPP::Algorithm` | **Actually Crypto++** |
 | `0x4b68a8` | old `CryptoPP::RandomPool` family (`CryptoPP::OldRandomPool` in modern tree) | **Actually Crypto++** |
 | `0x4b41e0` | `CryptoPP::BufferedTransformation` interface slice | **Actually Crypto++ interface/base** |
+| `0x4bace0` | `CryptoPP::RandomNumberGenerator` interface slice | **Actually Crypto++ interface/base** |
+| `0x4ba50c` / `CBootstrapBigInt_0x4ba50c` | old `CryptoPP::Integer` family object | **Actually Crypto++ or so close that source should treat it that way** |
 | `0x4b659c` / `cls_0x4b659c` | `CryptoPP::InvertibleRSAFunction`-equivalent key state | **Actually Crypto++ semantics** |
 | `0x4b69b4` | `CryptoPP::RSAES_OAEP_SHA_Decryptor` | **Actually Crypto++** |
 | `0x4ba258` | SHA1 hash context/base | **Very likely actual Crypto++ SHA1-family code** |
 | `0x4ba7d8` | SHA1 init wrapper / specialization layer | **Very likely actual Crypto++ SHA1-family code** |
+| `0x4baed8` | old Microsoft crypto provider / OS entropy helper class | **Likely actual Crypto++ helper class** |
 
 ### Not actually a pure Crypto++ class
 
@@ -286,11 +323,16 @@ remaining the top-level mapping/index.
 | Launcher address / name | Crypto++ class (best match) | Confidence | Notes |
 |------------------------|------------------------------|------------|-------|
 | `0x4b42bc` wrapper (`0x4b695c` vtable) | *Launcher-specific* | **Certain** | Wraps RNG + BT subobjects |
+| `0x4b42b0` vtable | `CryptoPP::Algorithm` | **High** | `AlgorithmName()` returns `"unknown"` |
 | `0x4b68a8` vtable at `wrapper+4` | `CryptoPP::RandomPool` (old; `OldRandomPool` in 8.9.0) | **High** | Pool size 384, two-buffer design, MS CAPI seeding |
 | `0x4b41e0` vtable at `wrapper+8` | `CryptoPP::BufferedTransformation` | **Medium-High** | Filter-pipeline interface for old RandomPool |
 | `0x4bace0` transient vtable | `CryptoPP::RandomNumberGenerator` interface slice | **Medium** | Pure interface used during construction |
+| `0x4ba50c` vtable / `CBootstrapBigInt_0x4ba50c` | `CryptoPP::Integer` family object | **High** | import/export + ctor family match old integer machinery |
 | `0x4b6778` vtable | `CryptoPP::InvertibleRSAFunction` / `TF_DecryptorBase` | **Medium-High** | vbptr + adjustor thunks match MI hierarchy |
 | `0x4b69b4` vtable | `CryptoPP::RSAES<OAEP<SHA1>>::Decryptor` (`RSAES_OAEP_SHA_Decryptor`) | **Medium-High** | Inherits from `0x4b6778`, `PerformRSADecryption` matches `Decrypt` |
+| `0x4ba258` | `CryptoPP::SHA1` base/hash context | **High** | SHA1 IV and algorithm layout match |
+| `0x4ba7d8` | `CryptoPP::SHA1` init/specialization layer | **High** | wraps/initializes the SHA1 base context |
+| `0x4baed8` | `CryptoPP::MicrosoftCryptoProvider`-like helper | **Medium** | used in RandomPool seeding path |
 | `0x4b9fa0` | 45-entry temp vtable set during RNG ctor | **Medium** | Intermediate base before MI resolution; not in final object |
 | `0x4b3e18` | Tiny 2-entry vtable placed at `this+8` during ctor | **Low** | Launcher-specific stub; no Crypto++ equivalent identified |
 | `0x468130` `PerformRSADecryption` | `PK_Decryptor::Decrypt` / `TF_DecryptorBase::Decrypt` | **High** | Exact call shape and algorithm |
