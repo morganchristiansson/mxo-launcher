@@ -1655,49 +1655,21 @@ static_assert(sizeof(CBootstrapBigInt_0x4ba50c) == 0x14, "bootstrap prep big-int
 
 // anchor: launcher.exe:0x465d70 / original subobject at decryptor+0x0c
 // This helper converts the recovered `0x14` bootstrap big-int blocks into a real
-// CryptoPP::RSA::PrivateKey while preserving the original `InitializeFromBootstrapBlocks`
-// method boundary.
-class AuthBootstrapRsaPrivateKeyState_0x4b659c {
-public:
-    void InitializeFromBootstrapBlocks(
-        const CBootstrapBigInt_0x4ba50c* modulusBlock,
-        const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
-        const CBootstrapBigInt_0x4ba50c* privateExponentBlock);
-
-    bool HasPrivateKey() const { return privateKeyInitialized_; }
-    uint32_t ModulusBitCount() const;
-    uint32_t CiphertextByteCount() const;
-
-    const CryptoPP::RSA::PrivateKey& PrivateKey() const { return privateKey_; }
-
-    const CBootstrapBigInt_0x4ba50c& ModulusBlock() const { return modulusBlock_0x08; }
-    const CBootstrapBigInt_0x4ba50c& PublicExponentBlock() const { return publicExponentBlock_0x1c; }
-    const CBootstrapBigInt_0x4ba50c& PrivateExponentBlock() const { return privateExponentBlock_0x3c; }
-    const CBootstrapBigInt_0x4ba50c& Prime1Block() const { return prime1Block_0x50; }
-    const CBootstrapBigInt_0x4ba50c& Prime2Block() const { return prime2Block_0x64; }
-    const CBootstrapBigInt_0x4ba50c& CrtExponent1Block() const { return crtExponent1Block_0x78; }
-    const CBootstrapBigInt_0x4ba50c& CrtExponent2Block() const { return crtExponent2Block_0x8c; }
-    const CBootstrapBigInt_0x4ba50c& CrtInverseBlock() const { return crtInverseBlock_0xa0; }
-
-private:
-    CBootstrapBigInt_0x4ba50c modulusBlock_0x08{};
-    CBootstrapBigInt_0x4ba50c publicExponentBlock_0x1c{};
-    CBootstrapBigInt_0x4ba50c privateExponentBlock_0x3c{};
-    CBootstrapBigInt_0x4ba50c prime1Block_0x50{};
-    CBootstrapBigInt_0x4ba50c prime2Block_0x64{};
-    CBootstrapBigInt_0x4ba50c crtExponent1Block_0x78{};
-    CBootstrapBigInt_0x4ba50c crtExponent2Block_0x8c{};
-    CBootstrapBigInt_0x4ba50c crtInverseBlock_0xa0{};
-    CryptoPP::RSA::PrivateKey privateKey_{};
-    bool privateKeyInitialized_ = false;
-};
+// CryptoPP::RSA::PrivateKey while preserving the original `0x465d70`
+// key-loader boundary.
+//
+// Static-RE interpretation:
+// - this is not just a source convenience wrapper
+// - the original `cls_0x4b659c` subobject really behaves like embedded
+//   `CryptoPP::RSA::PrivateKey` / `CryptoPP::InvertibleRSAFunction` state
+// So source now stores that as a direct Crypto++ object.
 
 // anchor: launcher.exe:0x443220 / complete-object ctor reached from `0x443340`
 // This launcher wrapper owns the real Crypto++ objects that static-RE identifies under the
 // original MI-heavy decryptor family:
 // - root `0x4b42b0`  -> older CryptoPP::Algorithm (now represented by the real Crypto++ members)
 // - subobject `0x442b70` -> CryptoPP::RSAES_OAEP_SHA_Decryptor
-// - helper `0x465d70` -> embedded RSA private-key loader
+// - helper `0x465d70` -> direct initialization of embedded CryptoPP::RSA::PrivateKey
 class CMarginConnectionAuthBootstrapState_0x443220 {
 public:
     CMarginConnectionAuthBootstrapState_0x443220(
@@ -1721,12 +1693,12 @@ public:
         uint32_t encryptedBlobPtr,
         void* localBufferPtr);
 
-    const AuthBootstrapRsaPrivateKeyState_0x4b659c& BootstrapPrivateKeyState_0x0c() const {
-        return bootstrapPrivateKeyState_0x0c;
-    }
+    bool HasBootstrapPrivateKey() const { return bootstrapPrivateKeyInitialized_; }
+    const CryptoPP::RSA::PrivateKey& BootstrapPrivateKey() const { return bootstrapPrivateKey_0x0c; }
 
 private:
-    AuthBootstrapRsaPrivateKeyState_0x4b659c bootstrapPrivateKeyState_0x0c{};
+    CryptoPP::RSA::PrivateKey bootstrapPrivateKey_0x0c{};
+    bool bootstrapPrivateKeyInitialized_ = false;
     CryptoPP::RSAES_OAEP_SHA_Decryptor cryptoPPDecryptor_0x442b70{};
 };
 

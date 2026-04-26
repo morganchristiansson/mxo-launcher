@@ -2500,35 +2500,25 @@ CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
 }
 
 // anchor: launcher.exe:0x465d70
-void AuthBootstrapRsaPrivateKeyState_0x4b659c::InitializeFromBootstrapBlocks(
+static bool CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey(
+    CryptoPP::RSA::PrivateKey& outPrivateKey,
     const CBootstrapBigInt_0x4ba50c* modulusBlock,
     const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
     const CBootstrapBigInt_0x4ba50c* privateExponentBlock) {
-    privateKeyInitialized_ = false;
-
-    modulusBlock_0x08 = modulusBlock ? *modulusBlock : CBootstrapBigInt_0x4ba50c();
-    publicExponentBlock_0x1c = publicExponentBlock ? *publicExponentBlock : CBootstrapBigInt_0x4ba50c();
-    privateExponentBlock_0x3c = privateExponentBlock ? *privateExponentBlock : CBootstrapBigInt_0x4ba50c();
-    prime1Block_0x50 = CBootstrapBigInt_0x4ba50c();
-    prime2Block_0x64 = CBootstrapBigInt_0x4ba50c();
-    crtExponent1Block_0x78 = CBootstrapBigInt_0x4ba50c();
-    crtExponent2Block_0x8c = CBootstrapBigInt_0x4ba50c();
-    crtInverseBlock_0xa0 = CBootstrapBigInt_0x4ba50c();
-
     if (!modulusBlock || !publicExponentBlock || !privateExponentBlock) {
-        return;
+        return false;
     }
 
     try {
         const CryptoPP::Integer modulus =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(modulusBlock_0x08);
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(*modulusBlock);
         const CryptoPP::Integer publicExponent =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(publicExponentBlock_0x1c);
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(*publicExponentBlock);
         const CryptoPP::Integer privateExponent =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(privateExponentBlock_0x3c);
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(*privateExponentBlock);
 
         spdlog::debug(
-            "AuthBootstrapRsaPrivateKeyState_0x4b659c::InitializeFromBootstrapBlocks: "
+            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
             "modulusBits={} publicExponentBits={} privateExponentBits={}",
             modulus.BitCount(),
             publicExponent.BitCount(),
@@ -2536,48 +2526,32 @@ void AuthBootstrapRsaPrivateKeyState_0x4b659c::InitializeFromBootstrapBlocks(
 
         if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
             spdlog::warn(
-                "AuthBootstrapRsaPrivateKeyState_0x4b659c::InitializeFromBootstrapBlocks: "
+                "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
                 "zero BigInt component detected");
-            return;
+            return false;
         }
 
-        privateKey_.Initialize(modulus, publicExponent, privateExponent);
-        privateKeyInitialized_ = true;
-
-        prime1Block_0x50 = CBootstrapBigInt_0x4ba50c(privateKey_.GetPrime1());
-        prime2Block_0x64 = CBootstrapBigInt_0x4ba50c(privateKey_.GetPrime2());
-        crtExponent1Block_0x78 =
-            CBootstrapBigInt_0x4ba50c(privateKey_.GetModPrime1PrivateExponent());
-        crtExponent2Block_0x8c =
-            CBootstrapBigInt_0x4ba50c(privateKey_.GetModPrime2PrivateExponent());
-        crtInverseBlock_0xa0 =
-            CBootstrapBigInt_0x4ba50c(privateKey_.GetMultiplicativeInverseOfPrime2ModPrime1());
+        outPrivateKey.Initialize(modulus, publicExponent, privateExponent);
 
         spdlog::debug(
-            "AuthBootstrapRsaPrivateKeyState_0x4b659c::InitializeFromBootstrapBlocks: "
+            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
             "CRT derivation succeeded ciphertextBytes={} prime1Bits={} prime2Bits={}",
-            privateKey_.GetModulus().ByteCount(),
-            privateKey_.GetPrime1().BitCount(),
-            privateKey_.GetPrime2().BitCount());
+            outPrivateKey.GetModulus().ByteCount(),
+            outPrivateKey.GetPrime1().BitCount(),
+            outPrivateKey.GetPrime2().BitCount());
+        return true;
     } catch (const CryptoPP::Exception& exception) {
         spdlog::warn(
-            "AuthBootstrapRsaPrivateKeyState_0x4b659c::InitializeFromBootstrapBlocks failed: {}",
+            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey failed: {}",
             exception.what());
+        return false;
     }
 }
 
-uint32_t AuthBootstrapRsaPrivateKeyState_0x4b659c::ModulusBitCount() const {
-    if (privateKeyInitialized_) {
-        return static_cast<uint32_t>(privateKey_.GetModulus().BitCount());
-    }
-    return modulusBlock_0x08.GetBitCount();
-}
-
-uint32_t AuthBootstrapRsaPrivateKeyState_0x4b659c::CiphertextByteCount() const {
-    if (privateKeyInitialized_) {
-        return static_cast<uint32_t>(privateKey_.GetModulus().ByteCount());
-    }
-    return (ModulusBitCount() + 7u) / 8u;
+static uint32_t CMarginConnectionAuthBootstrapState_0x443220_CiphertextByteCount(
+    const CryptoPP::RSA::PrivateKey& privateKey,
+    bool privateKeyInitialized) {
+    return privateKeyInitialized ? static_cast<uint32_t>(privateKey.GetModulus().ByteCount()) : 0u;
 }
 
 // anchor: launcher.exe:0x443220 / complete-object ctor reached from `0x443340`
@@ -2588,27 +2562,30 @@ CMarginConnectionAuthBootstrapState_0x443220::CMarginConnectionAuthBootstrapStat
     [[maybe_unused]] int constructVirtualBaseStateFlag) {
     // Fidelity notes for launcher.exe:0x443220:
     // - the original complete-object ctor walks MSVC MI/vbptr state before calling 0x465d70
-    // - source now stores the identified CryptoPP::RSAES_OAEP_SHA_Decryptor subobject directly
-    //   as `cryptoPPDecryptor_0x442b70`
+    // - static-RE indicates the embedded key state is genuinely CryptoPP::RSA::PrivateKey /
+    //   CryptoPP::InvertibleRSAFunction semantics, so source stores that directly now
     // - we still preserve the 0x443220 entry point and the 0x465d70 helper boundary explicitly
-    bootstrapPrivateKeyState_0x0c.InitializeFromBootstrapBlocks(
-        modulusBlock, publicExponentBlock, privateExponentBlock);
+    bootstrapPrivateKeyInitialized_ =
+        CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey(
+            bootstrapPrivateKey_0x0c,
+            modulusBlock,
+            publicExponentBlock,
+            privateExponentBlock);
 
-    if (!bootstrapPrivateKeyState_0x0c.HasPrivateKey()) {
+    if (!bootstrapPrivateKeyInitialized_) {
         return;
     }
 
-    const auto& privateKey = bootstrapPrivateKeyState_0x0c.PrivateKey();
     try {
         cryptoPPDecryptor_0x442b70 = CryptoPP::RSAES_OAEP_SHA_Decryptor(
-            privateKey.GetModulus(),
-            privateKey.GetPublicExponent(),
-            privateKey.GetPrivateExponent(),
-            privateKey.GetPrime1(),
-            privateKey.GetPrime2(),
-            privateKey.GetModPrime1PrivateExponent(),
-            privateKey.GetModPrime2PrivateExponent(),
-            privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
+            bootstrapPrivateKey_0x0c.GetModulus(),
+            bootstrapPrivateKey_0x0c.GetPublicExponent(),
+            bootstrapPrivateKey_0x0c.GetPrivateExponent(),
+            bootstrapPrivateKey_0x0c.GetPrime1(),
+            bootstrapPrivateKey_0x0c.GetPrime2(),
+            bootstrapPrivateKey_0x0c.GetModPrime1PrivateExponent(),
+            bootstrapPrivateKey_0x0c.GetModPrime2PrivateExponent(),
+            bootstrapPrivateKey_0x0c.GetMultiplicativeInverseOfPrime2ModPrime1());
     } catch (const CryptoPP::Exception& exception) {
         spdlog::warn(
             "CMarginConnectionAuthBootstrapState_0x443220 ctor failed to initialize CryptoPP::RSAES_OAEP_SHA_Decryptor key: {}",
@@ -2637,7 +2614,7 @@ void* CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption(
         encryptedBlobPtr,
         fmt::ptr(localBufferPtr));
 
-    if (!bootstrapPrivateKeyState_0x0c.HasPrivateKey()) {
+    if (!bootstrapPrivateKeyInitialized_) {
         spdlog::warn(
             "CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption missing private key");
         return outputBuffer;
@@ -2708,7 +2685,9 @@ void* CMarginConnectionAuthBootstrapState_0x443220::DecryptChallenge(
         expectedOutputSize,
         fmt::ptr(localBufferPtr));
 
-    const uint32_t expectedPayloadSize = bootstrapPrivateKeyState_0x0c.CiphertextByteCount();
+    const uint32_t expectedPayloadSize =
+        CMarginConnectionAuthBootstrapState_0x443220_CiphertextByteCount(
+            bootstrapPrivateKey_0x0c, bootstrapPrivateKeyInitialized_);
     if (expectedOutputSize != expectedPayloadSize) {
         spdlog::warn(
             "CMarginConnectionAuthBootstrapState_0x443220::DecryptChallenge size mismatch expected={} actual={}",
@@ -2748,19 +2727,33 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     }
 
     const auto* prepState = connection_.bootstrapPrepStateA0_.get();
-    const auto& bootstrapPrivateKeyState = prepState->BootstrapPrivateKeyState_0x0c();
+
+    uint32_t prime1Cap = 0u;
+    uint32_t prime2Cap = 0u;
+    uint32_t crtExp1Cap = 0u;
+    uint32_t crtExp2Cap = 0u;
+    uint32_t crtInverseCap = 0u;
+    if (prepState->HasBootstrapPrivateKey()) {
+        const auto& privateKey = prepState->BootstrapPrivateKey();
+        prime1Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetPrime1()).digitCapacityWords_0x08;
+        prime2Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetPrime2()).digitCapacityWords_0x08;
+        crtExp1Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetModPrime1PrivateExponent()).digitCapacityWords_0x08;
+        crtExp2Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetModPrime2PrivateExponent()).digitCapacityWords_0x08;
+        crtInverseCap = CBootstrapBigInt_0x4ba50c(privateKey.GetMultiplicativeInverseOfPrime2ModPrime1()).digitCapacityWords_0x08;
+    }
+
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored "
         "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapState_0x443220)),
-        static_cast<unsigned>(bootstrapPrivateKeyState.ModulusBlock().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.PublicExponentBlock().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.PrivateExponentBlock().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.Prime1Block().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.Prime2Block().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.CrtExponent1Block().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.CrtExponent2Block().digitCapacityWords_0x08),
-        static_cast<unsigned>(bootstrapPrivateKeyState.CrtInverseBlock().digitCapacityWords_0x08),
+        static_cast<unsigned>(modulusBlock ? modulusBlock->digitCapacityWords_0x08 : 0u),
+        static_cast<unsigned>(publicExponentBlock ? publicExponentBlock->digitCapacityWords_0x08 : 0u),
+        static_cast<unsigned>(privateExponentBlock ? privateExponentBlock->digitCapacityWords_0x08 : 0u),
+        static_cast<unsigned>(prime1Cap),
+        static_cast<unsigned>(prime2Cap),
+        static_cast<unsigned>(crtExp1Cap),
+        static_cast<unsigned>(crtExp2Cap),
+        static_cast<unsigned>(crtInverseCap),
         fmt::ptr(&connection_),
         fmt::ptr(connection_.OwnerContext()),
         connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
