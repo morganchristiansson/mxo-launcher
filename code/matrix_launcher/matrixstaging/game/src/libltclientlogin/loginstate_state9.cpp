@@ -19,21 +19,75 @@ static uint32_t ReadU32LEState9(const uint8_t* p) {
            (static_cast<uint32_t>(p[3]) << 24);
 }
 
+// anchor: launcher.exe:0x43afd0 / OOAnalyzer::cls_0x4b5440 packet-view helper
+struct Packet_MsEstablishUDPSessionReply_0x4b5440 : public mxo::liblttcp::Packet_0x4af2a4 {
+    explicit Packet_MsEstablishUDPSessionReply_0x4b5440(
+        mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
+        bool initializeOpcodeByte) {
+        if (messageRef08) {
+            messageRef08->Release();
+        }
+        payloadPtr04 = 0;
+        payloadAlias10 = nullptr;
+        debugString14 = nullptr;
+        payloadSize18 = 0;
+        packetType1a = 0;
+
+        messageRef08 = incomingMessageRef;
+        if (!messageRef08) {
+            return;
+        }
+
+        messageRef08->AddRef();
+        if (!messageRef08->messageStorage0c) {
+            return;
+        }
+
+        const uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
+        if (!payloadBase) {
+            return;
+        }
+
+        if (messageRef08->headerless10 == 0) {
+            payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(const_cast<uint8_t*>(payloadBase + 0x0cu)));
+            payloadAlias10 = const_cast<uint8_t*>(payloadBase + 0x0cu);
+        } else {
+            const uint8_t descriptor = payloadBase[0x0du];
+            auto* payloadView = const_cast<uint8_t*>(payloadBase +
+                                                    g_MessageOffsetLookupTable[(descriptor >> 4) & 7u] +
+                                                    g_MessageOffsetLookupTable[descriptor & 7u] + 0x1eu);
+            payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadView));
+            payloadAlias10 = payloadView;
+            messageRef08->headerless10 = 1;
+        }
+
+        if (initializeOpcodeByte && payloadAlias10) {
+            auto* mutablePayloadView = static_cast<uint8_t*>(payloadAlias10);
+            mutablePayloadView[0] = 0x11u;
+            *reinterpret_cast<uint32_t*>(mutablePayloadView + 1u) = 0u;
+        }
+    }
+
+    uint32_t ParsedStatus() const {
+        return payloadAlias10 ? ReadU32LEState9(static_cast<const uint8_t*>(payloadAlias10) + 1u) : 0u;
+    }
+};
+
 }  // namespace
 
-// anchor: launcher.exe vtable 0x004b517c
+// anchor: launcher.exe vtable 0x4b517c
 const char* CLTLoginState_State9_0x4b517c::DebugName() const {
     return "CLTLoginState_State9_0x4b517c";
 }
 
-// anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
+// anchor: launcher.exe:0x439780 (vtable 0x4b517c slot 3)
 void CLTLoginState_State9_0x4b517c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     (void)upstreamOrArg;
     if (!g_CurrentLoginMediator) {
         return;
     }
 
-    // Current best read from `0x00439780` + `0x41de40`:
+    // Current best read from `0x439780` + `0x41de40`:
     // - this state consumes helper-local byte/word payload at `this+4/+6`
     // - forwards them into the owner helper
     // - clears the local payload regardless of branch
@@ -43,8 +97,8 @@ void CLTLoginState_State9_0x4b517c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // - representative natural stop shape:
     //   - `EIP = 0x439780`
     //   - `ECX = this`
-    //   - `EAX = helper-local side pointer / temp = 0x00f9bb10`
-    //   - `EDX = 0x004b517c` (this vtable)
+    //   - `EAX = helper-local side pointer / temp = 0xf9bb10`
+    //   - `EDX = 0x4b517c` (this vtable)
     //   - `this+4 = 0`
     //   - `this+6 = 0x2710`
     const uint8_t consumedByte4 = pendingByte4_;
@@ -54,7 +108,7 @@ void CLTLoginState_State9_0x4b517c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     pendingWord6_ = 0;
 
     if (submitResult < 1u) {
-        // anchor: launcher.exe:0x00439780 success-side event post after the `0x41de40` submit call.
+        // anchor: launcher.exe:0x439780 success-side event post after the `0x41de40` submit call.
         g_CurrentLoginMediator->PostEvent(0x17u);
         spdlog::info(
             "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x} then posts event=0x17",
@@ -71,7 +125,7 @@ void CLTLoginState_State9_0x4b517c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     return;
 }
 
-// anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
+// anchor: launcher.exe:0x43c180 (vtable 0x4b517c slot 6)
 uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     // Current live-status note:
     // - newer natural-original WineDbg now proves this slot-6 body is reached on the natural path
@@ -91,13 +145,15 @@ uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::libltt
     //   of the next faithful-original question too
     // - next natural-original question therefore moves later again, into the post-state9 /
     //   state-`0x0c` continuation after this slot posts event `0x18`
-    (void)workItem;
-    if (!g_CurrentLoginMediator) {
+    if (!g_CurrentLoginMediator || workItem == nullptr) {
         return 0u;
     }
 
-    const std::vector<uint8_t>& bytes = g_CurrentLoginMediator->StagedIncomingMarginPacketBytes();
-    if (bytes.size() < 5u || bytes[0] != 0x11u) {
+    uint16_t messageCode = 0u;
+    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
+        // Original still falls through to the non-0x11 owner callback84 bridge.
+    }
+    if (messageCode != 0x11u) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
             spdlog::info(
@@ -112,7 +168,8 @@ uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::libltt
         return 0u;
     }
 
-    const uint32_t parsedStatus = ReadU32LEState9(bytes.data() + 1u);
+    Packet_MsEstablishUDPSessionReply_0x4b5440 replyView(workItem, /*initializeOpcodeByte=*/false);
+    const uint32_t parsedStatus = replyView.ParsedStatus();
     g_CurrentLoginMediator->worldListCountOrStatus80 = parsedStatus;
     if (parsedStatus < 1u) {
         g_CurrentLoginMediator->HandleState9Opcode11SuccessSideEffect();
@@ -123,7 +180,7 @@ uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::libltt
         // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
         g_CurrentLoginMediator->PostEvent(0x18u);
         spdlog::info(
-            "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
+            "CLTLoginState_State9::Slot6_HandleSecondaryMessage decoded opcode-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
             static_cast<unsigned>(parsedStatus),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
         return 1u;
@@ -133,13 +190,13 @@ uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::libltt
     // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
     g_CurrentLoginMediator->PostError(0x0du);
     spdlog::info(
-        "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
+        "CLTLoginState_State9::Slot6_HandleSecondaryMessage decoded opcode-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
         static_cast<unsigned>(parsedStatus),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
     return 1u;
 }
 
-// anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)
+// anchor: launcher.exe:0x438cc0 (vtable 0x4b517c slot 7)
 uint32_t CLTLoginState_State9_0x4b517c::GetStateId() const {
     return 9;
 }
