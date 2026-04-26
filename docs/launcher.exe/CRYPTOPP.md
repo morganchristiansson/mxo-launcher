@@ -214,26 +214,26 @@ This class family is strongly identified as **old Crypto++ `RSAES<OAEP<SHA1>>::D
 
 ---
 
-### 2.5 Replacement opportunity in source
+### 2.5 Source implementation status
 
-There is a strong fidelity opportunity to delete launcher-local stand-in class names and replace the
-implementation with actual Crypto++ types **where object-layout emulation is not required**.
+This replacement has now been done in source.
 
-Best candidate interpretation:
+Current source direction:
 
-- `CMarginConnectionAuthBootstrapDecryptor_0x4b69b4`
-  ≈ `CryptoPP::RSAES_OAEP_SHA_Decryptor`
-- prep/key state at `field_0xc`
-  ≈ `CryptoPP::InvertibleRSAFunction`
-- `0x4b42b0` root base
-  ≈ old `CryptoPP::Algorithm`
+- uses **`CryptoPP::RSAES_OAEP_SHA_Decryptor` directly** for the actual decryptor subobject
+- uses **`CryptoPP::RSA::PrivateKey`** directly for the loaded bootstrap key state
+- uses **`CryptoPP::OldRandomPool`** directly for the recovered RNG helper family
+- keeps a small launcher wrapper only for the preserved launcher entrypoints / boundaries:
+  - `0x443220`
+  - `0x437810`
+  - `0x468130`
+  - `0x465d70`
 
-Recommended direction:
-1. keep constructor boundaries faithful to launcher.exe (`0x442b70`, `0x442e20`, `0x443220`)
-2. replace local semantic stand-ins with real Crypto++ members / helper calls where possible
-3. preserve comments about MI-adjustor thunks and construction-state flags where source cannot
-   express the original old-MSVC object model exactly
-4. rename prep-state fields to explicit RSA names once Ghidra/source are updated together
+This is the preferred fidelity tradeoff:
+1. keep launcher.exe constructor / helper boundaries visible
+2. stop pretending identified Crypto++ classes are launcher-local bespoke classes
+3. preserve comments where old MSVC MI / adjustor-thunk behavior cannot be expressed 1:1 in modern source
+4. keep canonical docs and Ghidra naming aligned with the Crypto++ identification
 
 ---
 

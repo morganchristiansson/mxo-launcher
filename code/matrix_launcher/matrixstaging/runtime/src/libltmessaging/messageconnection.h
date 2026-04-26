@@ -8,6 +8,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <rsa.h>
+
 // Forward declare CLTLoginMediator to avoid circular include
 namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 #include "../libltcrypto/auth_internal.h"
@@ -559,13 +561,6 @@ public:
                 *packetPayloadPtr = 0x00;  // Opcode byte
             }
         }
-    }
-
-    // anchor: launcher.exe:0x441470 / vtable slot 4 (OVERRIDDEN)
-    // EnsureStreamPacketEncryptionModule - refreshes encryption from challenge material
-    void EnsureStreamPacketEncryptionModule() {
-        // Placeholder - would call CStreamPacketEncryptionModule_RefreshFromChallengeMaterial
-        spdlog::debug("CLTLoginMediatorPacketBuilderEnvelope: EnsureStreamPacketEncryptionModule called");
     }
 
     // Allow default construction for stack-local envelope instances
@@ -1365,9 +1360,9 @@ class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 // ============================================================
 // CBaseMarginConnection_0x4b64a8 class declaration
 // ============================================================
-// Current recovered intermediate base between `CMessageConnection_0x4b7928` and the auth/margin startup
-// leaf families.
-class CMarginConnectionAuthBootstrapCrypto_0x4b6778;
+// Current recovered auth-bootstrap decryptor state stored at connection `+0xa0`.
+// Source wraps real Crypto++ types but preserves the launcher entry points around them.
+class CMarginConnectionAuthBootstrapState_0x443220;
 
 // Scaffold structures for parsed message results
 struct CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold {
@@ -1506,7 +1501,7 @@ private:
     bool messageCode4SuccessFlag84_ = false;
     bool hasBootstrapReplyCopy98_ = false;
     std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
-    std::unique_ptr<CMarginConnectionAuthBootstrapCrypto_0x4b6778> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here, and the first later original consumer is `0x4429b0 -> +0x1c / 0x437810`
+    std::unique_ptr<CMarginConnectionAuthBootstrapState_0x443220> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the auth-bootstrap decryptor state here, and the first later original consumer is `0x4429b0 -> 0x437810`
     std::unique_ptr<CStreamPacketEncryptionModule_0x4b8704> streamPacketEncryptionModule9c_;
 };
 
@@ -1658,170 +1653,81 @@ public:
 };
 static_assert(sizeof(CBootstrapBigInt_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
 
-// anchor: launcher.exe vtable 0x4b42b0 / CryptoPP::Algorithm-compatible base
-// Static-RE notes:
-// - slot +0x08 at 0x41d880 builds the std::string "unknown", which matches the
-//   old Crypto++ Algorithm::AlgorithmName() default implementation.
-// - this launcher predates Crypto++'s later AlgorithmProvider() virtual, so the
-//   3-slot layout is consistent with an older CryptoPP::Algorithm / Clonable base.
-// - slot +0x04 behaves like the older default Clone() stub in the shipped build.
-class CLTReferenceCountedBase_0x4b42b0 {
+// anchor: launcher.exe:0x465d70 / original subobject at decryptor+0x0c
+// This helper converts the recovered `0x14` bootstrap big-int blocks into a real
+// CryptoPP::RSA::PrivateKey while preserving the original `InitializeFromBootstrapBlocks`
+// method boundary.
+class AuthBootstrapRsaPrivateKeyState_0x4b659c {
 public:
-    virtual ~CLTReferenceCountedBase_0x4b42b0() = default;
-    virtual uint32_t StubReturn0() { return 0; }
-    // Slot +0x08: CryptoPP::Algorithm::AlgorithmName() default -> "unknown"
-};
-
-class CMarginConnectionBootstrapPrepState_0x4b659c {
-public:
-    // anchor: launcher.exe:0x465d70
     void InitializeFromBootstrapBlocks(
-        const CBootstrapBigInt_0x4ba50c* param_1,
-        const CBootstrapBigInt_0x4ba50c* param_2,
-        const CBootstrapBigInt_0x4ba50c* param_3);
+        const CBootstrapBigInt_0x4ba50c* modulusBlock,
+        const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
+        const CBootstrapBigInt_0x4ba50c* privateExponentBlock);
 
-    uint32_t vftptr_0x0 = 0u;
-    uint32_t field_0x4 = 0u;
-    CBootstrapBigInt_0x4ba50c field_0x8{};
-    CBootstrapBigInt_0x4ba50c field_0x1c{};
-    std::array<uint8_t, 0x0c> gap_0x30{};
-    CBootstrapBigInt_0x4ba50c field_0x3c{};
-    CBootstrapBigInt_0x4ba50c field_0x50{};
-    CBootstrapBigInt_0x4ba50c field_0x64{};
-    CBootstrapBigInt_0x4ba50c mbr_0x78{};
-    CBootstrapBigInt_0x4ba50c mbr_0x8c{};
-    CBootstrapBigInt_0x4ba50c mbr_0xa0{};
-    uint32_t field_0xb4 = 0u;
-    uint32_t field_0xb8 = 0u;
-    std::array<uint8_t, 0x08> gap_0xbc{};
+    bool HasPrivateKey() const { return privateKeyInitialized_; }
+    uint32_t ModulusBitCount() const;
+    uint32_t CiphertextByteCount() const;
+
+    const CryptoPP::RSA::PrivateKey& PrivateKey() const { return privateKey_; }
+
+    const CBootstrapBigInt_0x4ba50c& ModulusBlock() const { return modulusBlock_0x08; }
+    const CBootstrapBigInt_0x4ba50c& PublicExponentBlock() const { return publicExponentBlock_0x1c; }
+    const CBootstrapBigInt_0x4ba50c& PrivateExponentBlock() const { return privateExponentBlock_0x3c; }
+    const CBootstrapBigInt_0x4ba50c& Prime1Block() const { return prime1Block_0x50; }
+    const CBootstrapBigInt_0x4ba50c& Prime2Block() const { return prime2Block_0x64; }
+    const CBootstrapBigInt_0x4ba50c& CrtExponent1Block() const { return crtExponent1Block_0x78; }
+    const CBootstrapBigInt_0x4ba50c& CrtExponent2Block() const { return crtExponent2Block_0x8c; }
+    const CBootstrapBigInt_0x4ba50c& CrtInverseBlock() const { return crtInverseBlock_0xa0; }
+
+private:
+    CBootstrapBigInt_0x4ba50c modulusBlock_0x08{};
+    CBootstrapBigInt_0x4ba50c publicExponentBlock_0x1c{};
+    CBootstrapBigInt_0x4ba50c privateExponentBlock_0x3c{};
+    CBootstrapBigInt_0x4ba50c prime1Block_0x50{};
+    CBootstrapBigInt_0x4ba50c prime2Block_0x64{};
+    CBootstrapBigInt_0x4ba50c crtExponent1Block_0x78{};
+    CBootstrapBigInt_0x4ba50c crtExponent2Block_0x8c{};
+    CBootstrapBigInt_0x4ba50c crtInverseBlock_0xa0{};
+    CryptoPP::RSA::PrivateKey privateKey_{};
+    bool privateKeyInitialized_ = false;
 };
 
-// Note: keep the member suffixes as the source-of-truth offset cues here.
-// `offsetof` on this class currently trips noisy compiler warnings in the MinGW build.
-static_assert(sizeof(CMarginConnectionBootstrapPrepState_0x4b659c) == 0xc4, "bootstrap prep state subobject +0x0c size mismatch");
-
-class CMarginConnectionAuthBootstrapCrypto_0x4b6778 : public CLTReferenceCountedBase_0x4b42b0 {
+// anchor: launcher.exe:0x443220 / complete-object ctor reached from `0x443340`
+// This launcher wrapper owns the real Crypto++ objects that static-RE identifies under the
+// original MI-heavy decryptor family:
+// - root `0x4b42b0`  -> older CryptoPP::Algorithm (now represented by the real Crypto++ members)
+// - subobject `0x442b70` -> CryptoPP::RSAES_OAEP_SHA_Decryptor
+// - helper `0x465d70` -> embedded RSA private-key loader
+class CMarginConnectionAuthBootstrapState_0x443220 {
 public:
-    // anchor: launcher.exe:0x443220 / object size `0xe0` / vtable 0x4b6778
-    // vtable layout (from CMarginConnectionAuthBootstrapCrypto_0x4b6778::vftable_4b6778):
-    //   +0x00: ~cls_0x4b6e0c
-    //   +0x04: CLTLoginState_State0_0x4b51e0_Slot7_GetStateId
-    //   +0x08: AuthBootstrap680Field54Helper_ResetUnknownString
-    //   +0x0c: virt_meth_0x4415d0
-    //   +0x10: virt_meth_0x4415f0
-    //   +0x14: ImportThunk_48bc34
-    //   +0x18: virt_meth_0x443870
-    //   +0x1c: DecryptChallenge (0x437810) -> validation wrapper that calls vtable+0x24 (virt_meth_0x468130)
-    //   +0x20: virt_meth_0x4383d0
-    //   +0x24: ImportThunk_48bc34
-    CMarginConnectionAuthBootstrapCrypto_0x4b6778(
-        const CBootstrapBigInt_0x4ba50c* param_1,
-        const CBootstrapBigInt_0x4ba50c* param_2,
-        const CBootstrapBigInt_0x4ba50c* param_3,
+    CMarginConnectionAuthBootstrapState_0x443220(
+        const CBootstrapBigInt_0x4ba50c* modulusBlock,
+        const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
+        const CBootstrapBigInt_0x4ba50c* privateExponentBlock,
         int constructVirtualBaseStateFlag);
-    // anchor: launcher.exe:0x443390
-    virtual ~CMarginConnectionAuthBootstrapCrypto_0x4b6778();
 
-    // anchor: launcher.exe:0x437810 / vtable +0x1c
-    // DecryptChallenge: Validation wrapper that checks payload size then calls vtable+0x24 decrypt.
-    // Original: byte* __thiscall DecryptChallenge(byte* outputBuffer, void* cryptoContext, uint keySizeBytes, ushort expectedOutputSize, byte* encryptedChallengeData)
-    // RET 0x14 confirms 5 stack parameters (plus ECX=this).
-    // Returns output buffer with {success, byteCount} at +0x04.
-    // FIDELITY: Entry point called from CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse (0x4429b0).
-    virtual void* DecryptChallenge(
-        void* outputBuffer,
-        const void* cryptoContext,
-        uint32_t keySizeBytes,
-        uint16_t expectedOutputSize,
-        void* encryptedChallengeData);
-
-    // anchor: launcher.exe:0x468130 / vtable+0x24 in cls_0x4b69b4
-    // Original signature (RET 0x10, 4 stack args + ECX=this):
-    //   void* __thiscall PerformRSADecryption(void* outputBuffer, void* cryptoContext,
-    //                                         uint32_t encryptedBlobPtr, void* localBufferPtr)
-    // Note: Ghidra names the 3rd param 'keySizeBytes' and 4th 'encryptedChallengeData',
-    // but assembly shows encryptedBlobPtr is used as a byte buffer for BigInt import
-    // and localBufferPtr is passed to the output-formatter vtable+0x0c call.
-    // Returns outputBuffer pointer in EAX.
-    virtual void* PerformRSADecryption(
+    // anchor: launcher.exe:0x437810
+    void* DecryptChallenge(
         void* outputBuffer,
         const void* cryptoContext,
         uint32_t encryptedBlobPtr,
-        void* localBufferPtr) = 0;
+        uint16_t expectedOutputSize,
+        void* localBufferPtr);
 
-    // Later original use of the stored connection `+0xa0` object starts at
-    // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
-    // 0x437810 (DecryptChallenge)`; current source deliberately stops at ctor/dtor/materialization
-    // until that later consumer path is reimplemented from static-RE.
-
-    // C++ vtable replaces raw uint32_t vtable pointers
-    // Note: Original object size was 0xe0, but with C++ vtable we'll have different alignment
-    //
-    // FIDELITY: offset 0x08 in original is NOT a raw uint32_t. It is an embedded
-    // MSVC_VTableAdjustor_PrepStateAccess_0x4b6ad4 (vtable 0x4b6ad4, 3 slots).
-    // This is a compiler-generated secondary vtable used for virtual inheritance
-    // adjustor thunks. Its methods adjust 'this' back to the outer object and
-    // forward to vtable+0x28 (GetPrepState, returns &field_0xc) and vtable+0x28+0x30.
-    // In our reimplementation we do not use virtual inheritance, so this field
-    // is dead storage; PerformRSADecryption accesses field_0xc directly.
-    uint32_t prepStateAccessAdjustor_0x8 = 0u;  // was rsaModulus / MSVC adjustor
-    CMarginConnectionBootstrapPrepState_0x4b659c field_0xc{};
-    uint32_t mbr_0xd0 = 0u;  // was field_0xd0 - inner vtable pointer (cls_0x4b6acc)
-    uint32_t mbr_0xd4 = 0u;  // was field_0xd4 - vtable pointer for component
-    uint32_t mbr_0xd8 = 0u;  // was cls_0x4b3e18 - vtable pointer for component
-    uint32_t mbr_0xdc = 0u;  // was field_0xdc
-    // Padding to meet original 0xe0 size: C++ vtable adds 4 bytes but we removed 3 vtable ptr fields
-    std::array<uint8_t, 8> padding_0xe0{};
-
-    CMarginConnectionAuthBootstrapCrypto_0x4b6778(const CMarginConnectionAuthBootstrapCrypto_0x4b6778&) = delete;
-    CMarginConnectionAuthBootstrapCrypto_0x4b6778& operator=(const CMarginConnectionAuthBootstrapCrypto_0x4b6778&) = delete;
-};
-
-static_assert(sizeof(CMarginConnectionAuthBootstrapCrypto_0x4b6778) >= 0xe0, "bootstrap prep state +0xa0 object size mismatch");
-
-// anchor: launcher.exe: cls_0x4b69b4 / vtable 0x4b69b4 (subobject) and 0x4b6ae0 (complete object)
-// Derived class that implements the pure virtual PerformRSADecryption from the base.
-// Original constructor at 0x442b70; object is constructed at connection+0xa0 via 0x443220.
-// The derived vtable adds:
-//   +0x24: PerformRSADecryption (0x468130)
-//   +0x34: MaxUnpaddedLength (0x464b80)
-//   +0x38: OAEP_Pad (0x467640)
-//   +0x3c: OAEP_Unpad (0x467780)
-class CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
-    : public CMarginConnectionAuthBootstrapCrypto_0x4b6778 {
-public:
-    CMarginConnectionAuthBootstrapDecryptor_0x4b69b4(
-        const CBootstrapBigInt_0x4ba50c* param_1,
-        const CBootstrapBigInt_0x4ba50c* param_2,
-        const CBootstrapBigInt_0x4ba50c* param_3,
-        int param_4);
-    ~CMarginConnectionAuthBootstrapDecryptor_0x4b69b4() override = default;
-
-    // anchor: launcher.exe:0x468130 / vtable+0x24
+    // anchor: launcher.exe:0x468130
     void* PerformRSADecryption(
         void* outputBuffer,
         const void* cryptoContext,
         uint32_t encryptedBlobPtr,
-        void* localBufferPtr) override;
+        void* localBufferPtr);
 
-    // anchor: launcher.exe:0x464b80 / vtable+0x34
-    uint32_t MaxUnpaddedLength();
+    const AuthBootstrapRsaPrivateKeyState_0x4b659c& BootstrapPrivateKeyState_0x0c() const {
+        return bootstrapPrivateKeyState_0x0c;
+    }
 
-    // anchor: launcher.exe:0x467640 / vtable+0x38
-    void* OAEP_Pad(
-        void* outputBuffer,
-        const void* messageBuffer,
-        uint32_t messageBitCount,
-        uint32_t paddedBitCount);
-
-    // anchor: launcher.exe:0x467780 / vtable+0x3c
-    // Original uses __stdcall (RET 0x10); callee cleans 4 stack params.
-    // Params: outputBuffer, paddedBufferPtr, paddedBitCount, messageOutputBuffer
-    void* OAEP_Unpad(
-        void* outputBuffer,
-        uint8_t* paddedBufferPtr,
-        uint32_t paddedBitCount,
-        void* messageOutputBuffer);
+private:
+    AuthBootstrapRsaPrivateKeyState_0x4b659c bootstrapPrivateKeyState_0x0c{};
+    CryptoPP::RSAES_OAEP_SHA_Decryptor cryptoPPDecryptor_0x442b70{};
 };
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
@@ -1830,8 +1736,9 @@ public:
         : connection_(connection) {}
 
     // anchor: launcher.exe:0x443340
-    // Direct-call helper that allocates a fresh `0xe0` prep object from three child-side `0x14`
-    // byte blocks and stores it at connection `+0xa0`.
+    // Original direct-call helper allocates a fresh `0xe0` prep object from three child-side
+    // `0x14` byte blocks and stores it at connection `+0xa0`. Source stores a wrapper around
+    // the identified real Crypto++ decryptor/key objects.
     void StoreBootstrapPrepStateA0(
         const void* blockB0,
         const void* blockC4,
