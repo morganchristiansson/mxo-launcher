@@ -78,11 +78,6 @@ static std::unordered_map<const CLTLoginMediator*, MarginBootstrapSessionState>
     g_marginBootstrapStateByMediator;
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static MarginBootstrapSessionState& MutableMarginBootstrapState(const CLTLoginMediator* mediator) {
-    return g_marginBootstrapStateByMediator[mediator];
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void EraseMarginBootstrapState(const CLTLoginMediator* mediator) {
     g_marginBootstrapStateByMediator.erase(mediator);
 }
@@ -2816,45 +2811,6 @@ int CLTLoginMediator::FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldI
     return -1;
 }
 
-// UNANCHORED: source-owned synthesis helper for active-branch scaffolding only
-void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
-    // Transitional/source-owned synthesis only:
-    // - newer packet debug printers now make one important negative result explicit:
-    //   `+0x178/+0x198/+0x1b8` are not generic route/world strings but
-    //   `RealFirstName/RealLastName/Background`
-    // - so do **not** synthesize those fields from reconstructed route/world tables
-    // - the only safe active-path seed we currently keep here is the current-slot character name
-    //   and the paired selector/index dword at `+0x12c`
-    //
-    // Fresh tightening from `0x41c3c0` + `0x4401a0`:
-    // - owner `+0x12c` should not be backfilled from slot-record `worldId3c`
-    // - the active branch uses `+0x12c` as a world-descriptor index/selector
-    const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
-    if (currentSlotRecord != nullptr) {
-        if (postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00[0] == '\0' &&
-            currentSlotRecord->debugString14) {
-            const size_t copyCount = std::min(
-                std::strlen(currentSlotRecord->debugString14),
-                postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.size() - 1);
-            std::copy_n(
-                currentSlotRecord->debugString14,
-                copyCount,
-                postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.begin());
-            postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00[copyCount] = '\0';
-        }
-
-        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(currentSlotRecord->worldId3c);
-        if (matchedWorldIndex >= 0 &&
-            (postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 >=
-                 static_cast<uint32_t>(worldDescriptorCountD80_) ||
-             (postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 == 0u &&
-              matchedWorldIndex != 0))) {
-            postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 =
-                static_cast<uint32_t>(matchedWorldIndex);
-        }
-    }
-}
-
 // anchor: launcher.exe:0x41e760
 void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() const {
     const char* profileName = Arg6AuthName();
@@ -2903,10 +2859,6 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
 
 
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {
-    return stagedIncomingMarginPacketBytes_;
-}
 
 /// INFIDEL - original builds inline. Commented out.
 // bool CLTLoginMediator::RebuildMarginAddressList() {

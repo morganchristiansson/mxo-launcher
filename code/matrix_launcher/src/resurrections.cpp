@@ -139,10 +139,6 @@ void DiagnosticShutdownPreclientEnvironment() {
     g_PreclientEnvironment.readyPointer48 = NULL;
 }
 
-bool IsRecoveredPreclientEnvironmentActive() {
-    return g_PreclientEnvironment.threadHandle != NULL;
-}
-
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();

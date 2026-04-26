@@ -45,15 +45,6 @@ private:
     uint32_t& bits_;
 };
 
-static std::string FormatU32x4Block(const std::array<uint32_t, 4>& block) {
-    return fmt::format(
-        "[{:#010x} {:#010x} {:#010x} {:#010x}]",
-        block[0],
-        block[1],
-        block[2],
-        block[3]);
-}
-
 static bool U32x4BlockHasAnyNonZero(const std::array<uint32_t, 4>& block) {
     return block[0] != 0u || block[1] != 0u || block[2] != 0u || block[3] != 0u;
 }
@@ -240,14 +231,14 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
-    
+
     // DIAGNOSTIC: Trace slot record state before using it
     spdlog::info(
         "DIAGNOSTIC: State8 Slot3 currentSlotRecord={} charIdLow=0x{:08x} charIdHigh=0x{:08x}",
         fmt::ptr(currentSlotRecord),
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdLow32) : 0u,
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdHigh36) : 0u);
-    
+
     // anchor: launcher.exe:0x43bd6a = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
     // anchor: launcher.exe:0x43ac10 = ResetAndInitialize
     Packet_MsLoadCharacterRequest_0x4b5418 packetBuilder;
@@ -351,7 +342,7 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     // Note: Original 0x43ada0 is a CLTLoginMediator method that operates on mediator fields.
     // For source fidelity, we implement the reservation logic inline here.
     // The mediator caches the write pointer in its own fields (not packet builder fields).
-    
+
     // DIAGNOSTIC: Log payload after all writes
     if (payload) {
         spdlog::info(
@@ -363,7 +354,7 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
             static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x29)),
             static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0xa9)));
     }
-    
+
     const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
     if (gameSessionId) {
         // Compute string length including NUL

@@ -64,27 +64,7 @@ static ParsedState10ClaimCharacterNameReplyScaffold ParseState10ClaimCharacterNa
     return out;
 }
 
-static std::string DescribeOptionalState10ClaimReplyText(
-    const ParsedState10ClaimCharacterNameReplyScaffold& parsed) {
-    if (!parsed.optionalText || parsed.optionalTextLength == 0u) {
-        return "<empty>";
-    }
-
-    const size_t boundedLength = std::min<size_t>(parsed.optionalTextLength, 96u);
-    std::string text(parsed.optionalText, parsed.optionalText + boundedLength);
-    for (char& ch : text) {
-        if (ch == '\0') {
-            ch = ' ';
-        }
-    }
-    return text;
-}
-
 }  // namespace
-
-
-
-
 
 // anchor: launcher.exe vtable 0x004b512c
 const char* CLTLoginState_State10_0x4b512c::DebugName() const {

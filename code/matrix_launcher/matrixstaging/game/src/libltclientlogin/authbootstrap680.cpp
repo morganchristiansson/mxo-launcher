@@ -1115,47 +1115,6 @@ static uint32_t ReadAuthBootstrap680AuthReplyParseHeaderDword(
     return ReadU32LE(parseObject->replyHeader10 + headerOffset);
 }
 
-static std::string CopyAuthBootstrap680ReplyParseString(
-    const uint8_t* bytes,
-    uint16_t byteLength) {
-    if (!bytes || byteLength == 0u) {
-        return {};
-    }
-
-    const char* text = reinterpret_cast<const char*>(bytes);
-    return std::string(text, BoundedCStringLength(text, byteLength));
-}
-
-static void CopyAuthBootstrap680ParseFieldToOwnedBytes(
-    std::vector<uint8_t>& ownedBytes,
-    const uint8_t* bytes,
-    uint16_t byteLength) {
-    if (!bytes || byteLength == 0u) {
-        ownedBytes.clear();
-        return;
-    }
-    ownedBytes.assign(bytes, bytes + byteLength);
-}
-
-static void PointOpaqueBlobPointerAtOwnedBytes(void*& dstPointer, std::vector<uint8_t>& ownedBytes) {
-    dstPointer = ownedBytes.empty() ? nullptr : ownedBytes.data();
-}
-
-static bool HasTrailingSlashSixDigitSuffix(const std::string& text) {
-    const size_t slash = text.find('/');
-    if (slash == std::string::npos || slash + 7u != text.size()) {
-        return false;
-    }
-
-    for (size_t i = slash + 1u; i < text.size(); ++i) {
-        const unsigned char ch = static_cast<unsigned char>(text[i]);
-        if (ch < static_cast<unsigned char>('0') || ch > static_cast<unsigned char>('9')) {
-            return false;
-        }
-    }
-    return true;
-}
-
 }  // namespace
 
 // anchor: launcher.exe:0x445500
@@ -1457,17 +1416,6 @@ void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
  // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
  authReplyParseObjectF0 = nullptr;
  }
-}
-
-// anchor: launcher.exe:0x448140
-
-
-const mxo::auth::GetPublicKeyReply& AuthBootstrap680Child_0x441290::CachedGetPublicKeyReply_SOURCEOWNED() const {
-    return MutableAuthBootstrap680ChildOwnedState(this).cachedGetPublicKeyReply;
-}
-
-const mxo::auth::AuthChallenge& AuthBootstrap680Child_0x441290::CachedAuthChallenge_SOURCEOWNED() const {
-    return MutableAuthBootstrap680ChildOwnedState(this).cachedAuthChallenge;
 }
 
 const mxo::auth::AuthReply& AuthBootstrap680Child_0x441290::CachedAuthReply_SOURCEOWNED() const {

@@ -1052,10 +1052,6 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplyRec
     return readOutputSlot08;
 }
 
-static void** CMessageConnection_0x4b7928_PacketBuilderVtablePointer(uintptr_t address) {
-    return reinterpret_cast<void**>(address);
-}
-
 // anchor: launcher.exe:0x41cf30
 uint32_t CMessageConnection_0x4b7928::ForwardPacketBuilderEnvelopeToSendPacket(
     CMessageConnectionPacketBuilderEnvelope& envelope) {

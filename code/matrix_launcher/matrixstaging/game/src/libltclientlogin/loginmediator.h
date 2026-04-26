@@ -1176,14 +1176,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   arrive as raw code `0x10` *after* that base-dispatch filter
 
 
-    // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
-    // bodies.
-    // Keep the packet/class ownership split explicit:
-    // - state10 slot 6 / `0x4401a0` now owns the source-side staged auth-reply helpers,
-    //   including the shared owner-state writeback reused by broader state2 slot 5 / `0x43f300`
-    // - state11 slot 6 / `0x440320` owns the load-character reply transition directly
-    // - mediator only keeps the staged bytes for those later paths
-    const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
 
     static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
     static constexpr uint32_t kReceiveActionNone = 0u;
@@ -1423,7 +1415,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
 public:
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
-    void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
 
 private:
     void MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input);
@@ -1630,12 +1621,7 @@ public:
     // - later raw-`0x0b` selected-slot handling and state9 callback84 opcode fallback still
     //   consult this storage
     std::vector<uint8_t> stagedIncomingAuthPacketBytes_;
-    std::vector<uint8_t> stagedIncomingMarginPacketBytes_;
-    // ABI-safety note:
-    // - recovered margin bootstrap/session state derived from auth reply material is stored in a
-    //   sidecar keyed by `this` in `loginmediator.cpp`
-    // - that keeps existing in-class field order stable while we still treat this storage as
-    //   launcher-owned transitional state
+
 
 
     uint32_t lastAuthConnectStatus_;

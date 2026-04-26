@@ -500,12 +500,6 @@ LTTCPEngineConnectionState CLTTCPConnection::State() const {
     return CBaseConnection::State();
 }
 
-
-// UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
-const std::string& CLTTCPConnection::RemoteHostName() const {
-    return remoteHostName_;
-}
-
 CLTTCPConnection_QueuedSendBufferStorage::CLTTCPConnection_QueuedSendBufferStorage()
     : usesPooledBuffer00_(0u),
       padding01_03_{0u, 0u, 0u},

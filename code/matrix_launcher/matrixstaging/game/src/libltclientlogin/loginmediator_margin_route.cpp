@@ -72,22 +72,6 @@ const char* CLTLoginMediator::ResolveMarginRouteFromWorldId(uint32_t worldId) co
     return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
 }
 
-const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
-    // Address anchors:
-    // - launcher.exe:0x439300 case `6`
-    // - owner vtable `+0x10c`
-    //
-    // Current best source-owned mirror of that branch:
-    // - the original fetches an object through `+0x10c`
-    // - then uses the first dword of that object as the string argument into `0x41e500`
-    // - current scaffold keeps this narrow by preferring the already mirrored current-slot
-    //   route-host string and only falling back to older diagnostic route text when needed
-    if (const char* currentSlotRouteHost = LookupRouteHostPrefixBySlot(CurrentCharacterRouteIndexCc8Scaffold())) {
-        return currentSlotRouteHost;
-    }
-    return marginRouteState_.routeHostPrefix.empty() ? nullptr : marginRouteState_.routeHostPrefix.c_str();
-}
-
 // anchor: launcher.exe:0x41e500
 uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint8_t cachedRouteSelector) {
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`

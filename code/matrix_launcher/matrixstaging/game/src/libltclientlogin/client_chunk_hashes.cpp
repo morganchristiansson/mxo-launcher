@@ -153,10 +153,6 @@ void ClientChunkHashStorage::AddHash(const ChunkHashResult& result) {
   hashes_.push_back(result);
 }
 
-void ClientChunkHashStorage::SetHashes(const std::vector<ChunkHashResult>& hashes) {
-  hashes_ = hashes;
-}
-
 const std::vector<ChunkHashResult>& ClientChunkHashStorage::GetHashes() const {
   return hashes_;
 }

@@ -435,18 +435,6 @@ bool DecryptAuthReplyPrivateExponent(
 // - `../../../work/mxoemu/Proxy/Logging.cpp`
 // They are not a claim that final launcher-owned state progression/source ownership should live
 // here permanently.
-struct MarginCertChallenge {
-    bool valid;
-    std::vector<uint8_t> headerBytes;
-    std::vector<uint8_t> payloadBytes;
-    std::vector<uint8_t> bytes;
-    std::vector<uint8_t> encryptedBlobBytes;
-    std::vector<uint8_t> twofishKeyBytes;
-    std::vector<uint8_t> challengeBytes;
-
-    MarginCertChallenge() : valid(false) {}
-};
-
 struct MarginConnectChallenge {
     bool valid;
     std::vector<uint8_t> payloadBytes;
@@ -486,65 +474,6 @@ struct MarginConnectReply {
           field13(0),
           field15(0) {}
 };
-
-// Plaintext raw 0x02 / CERT_Challenge parse helpers.
-bool ParseMarginCertChallengePayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    const AuthSignedData& signedData,
-    const std::vector<uint8_t>& privateExponentBytes,
-    MarginCertChallenge* outChallenge);
-
-// Encrypted raw 0x03 / CERT_ChallengeResponse builder.
-bool BuildMarginCertChallengeResponsePacket(
-    const std::vector<uint8_t>& challengeBytes,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
-
-// Encrypted raw 0x06 / MS_ConnectRequest builder.
-bool BuildMarginMsConnectRequestPacket(
-    uint32_t matrixVersion,
-    uint32_t clientDllVersion,
-    const std::array<uint8_t, 16>& weirdSequenceBytes,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
-
-// Transitional compatibility alias for earlier call sites.
-bool BuildMarginConnectRequestPacket(
-    uint32_t matrixVersion,
-    uint32_t clientDllVersion,
-    const std::array<uint8_t, 16>& weirdSequenceBytes,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
-
-// Plaintext raw 0x07 / MS_ConnectChallenge parse helper.
-bool ParseMarginMsConnectChallengePayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    MarginConnectChallenge* outChallenge);
-
-// Transitional compatibility alias for earlier call sites.
-bool ParseMarginConnectChallengePayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    MarginConnectChallenge* outChallenge);
-
-// Encrypted raw 0x08 / MS_ConnectChallengeResponse builder.
-bool BuildMarginMsConnectChallengeResponsePacket(
-    const MarginConnectChallenge& challenge,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
-
-// Transitional compatibility alias for earlier call sites.
-bool BuildMarginConnectChallengeResponsePacket(
-    const MarginConnectChallenge& challenge,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
 
 // Encrypted raw 0x09 / MS_ConnectReply parse helpers.
 bool ParseMarginMsConnectReplyPayload(
