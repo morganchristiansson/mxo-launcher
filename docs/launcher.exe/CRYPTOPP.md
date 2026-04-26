@@ -103,85 +103,137 @@ helperVtable08 = 0x004b41e0u;   // ResetAuthBootstrap680Field54Helper
 
 ## 2. RSA / OAEP Decryptor family
 
-### 2.1 Base crypto object — `CMarginConnectionAuthBootstrapCrypto_0x4b6778`
+### 2.1 Root base — `0x4b42b0` = older `CryptoPP::Algorithm`
 
-**Confidence: MEDIUM-HIGH**
+**Confidence: HIGH**
 
-VTable: `0x4b6778` (10 entries, 40 bytes).  Constructor: `0x442440`.
+The old name we had in source, `CLTReferenceCountedBase_0x4b42b0`, is misleading.
+This vtable is much better explained as an **older Crypto++ `Algorithm` base**.
 
-The object has:
-- `vfptr_0x0` at `+0x00`
-- `vbptr_0x4` at `+0x04` → points to `DAT_004b6e30` (virtual inheritance table)
-- `rsaModulus` at `+0x08` (actually an embedded `Integer`-like object)
-- `field_0x0c` / `field_0x10` / `mbr_0x14` — MSVC vtable-adjustor thunks (`0x4b6db4`, `0x4b6300`)
+VTable: `0x4b42b0` (3 entries).
 
-This layout is characteristic of Crypto++ trapdoor-function objects that use **virtual
-multiple inheritance**:
+| Slot | Address | Best match |
+|------|---------|------------|
+| `+0x00` | `0x41cda0` | deleting destructor |
+| `+0x04` | `0x437b50` | default `Clone()`-style stub |
+| `+0x08` | `0x41d880` | `AlgorithmName()` returning `"unknown"` |
 
-```
-TF_ObjectImplBase
-  └─ TF_ObjectImpl<TF_DecryptorBase, SchemeOptions, PrivateKey>
-       └─ PK_FinalTemplate<...>
-            └─ RSAES<OAEP<SHA1>>::Decryptor
-```
+Strongest evidence:
+- `0x41d880` zeroes a string and writes `"unknown"`
+- modern Crypto++ still has `Algorithm::AlgorithmName() const { return "unknown"; }`
+- the launcher build predates the later `AlgorithmProvider()` virtual, so a 3-slot layout fits
+  an **older Crypto++ release**
 
-The `vbptr` at `+4` and the adjustor thunks (`0x4b6db4`) are required because
-`RSAFunction` inherits from both `TrapdoorFunction` and `X509PublicKey` (which itself
-inherits virtually from `PublicKey` / `ASN1Object`).
+This finding matters because it explains why so many of the OAEP / SHA1 / RNG objects share the
+same tiny root vtable even when they are not launcher-specific helper classes.
 
 ---
 
-### 2.2 Decryptor leaf — `CMarginConnectionAuthBootstrapDecryptor_0x4b69b4`
+### 2.2 Decryptor hierarchy overview
 
-**Confidence: MEDIUM-HIGH**
+**Confidence: HIGH for family identification; MEDIUM-HIGH for exact MI layering**
 
-VTable: `0x4b69b4` (16 entries, 64 bytes).  Constructor: `0x442b70`.
+The auth-bootstrap decryptor path is best understood as an MSVC multiple-inheritance realization of:
 
-This class **inherits** from `CMarginConnectionAuthBootstrapCrypto_0x4b6778`:
+- `CryptoPP::RSAES<OAEP<SHA1>>::Decryptor`
+- containing / exposing an embedded `CryptoPP::InvertibleRSAFunction`
+- with multiple adjustor/vbptr subobjects produced by old MSVC codegen
 
-```
-CryptoInitHelper_0x4b42bc (outer wrapper)
-  └─ RNG subobject at +4
+Important constructors / states:
 
-CMarginConnectionAuthBootstrapDecryptor_0x4b69b4
-  └─ CMarginConnectionAuthBootstrapCrypto_0x4b6778
-       └─ CryptoPP::RSAES<OAEP<SHA1>>::Decryptor   (most likely)
-```
+| Address | Best current interpretation |
+|---------|-----------------------------|
+| `0x442b70` | `CryptoPP::RSAES_OAEP_SHA_Decryptor`-compatible constructor state |
+| `0x442e20` | intermediate MI construction state for the same decryptor family |
+| `0x443220` | launcher-visible complete-object constructor used by `0x443340` |
+| `0x465d70` | key-material import / CRT derivation into embedded RSA private-key member |
+
+The important correction vs older notes is that `0x443220` is **not** a simple launcher-local ctor.
+It is the complete-object ctor that finishes the MI object and then calls `0x465d70` to load the RSA
+key components.
+
+---
+
+### 2.3 `0x443220` complete-object ctor
+
+**Confidence: HIGH**
+
+Function: `CMarginConnectionBootstrapPrepStateA0_ctor` in current Ghidra output.
+
+Observed sequence:
+1. If `param_4 != 0`, seed temporary vbptr / secondary-vftable state
+2. Call intermediate constructor at `0x442e20`
+3. Rewrite vfptr / adjustor-vtable slots for the final complete-object state
+4. Call `0x465d70` with `(param_1, param_2, param_3)`
+5. Return `this`
+
+The 4th argument is therefore **construction-state plumbing** rather than semantic launcher data.
+That is why the source-side unused `param_4` warning is real but the parameter still belongs in the
+signature for fidelity.
+
+---
+
+### 2.4 Decryptor leaf — `0x4b69b4` = `CryptoPP::RSAES_OAEP_SHA_Decryptor`-compatible
+
+**Confidence: HIGH**
+
+VTable: `0x4b69b4` (16 entries, 64 bytes). Constructor: `0x442b70`.
+
+This class family is strongly identified as **old Crypto++ `RSAES<OAEP<SHA1>>::Decryptor`**.
 
 **Key evidence:**
 
-1. **`PerformRSADecryption` (`0x468130`)** — the vtable slot called by margin bootstrap
-   (`CBaseMarginConnection_HandleCode2ForBootstrap` at `0x4429b0`) to decrypt the server
-   challenge blob.
+1. **`PerformRSADecryption` (`0x468130`)**
+   - imports ciphertext into a Crypto++ integer
+   - uses RNG/blinding context
+   - invokes trapdoor inverse / RSA private op
+   - exports result bytes
+   - hands them to OAEP unpadding-style postprocessing
 
-   Decompiled shape:
-   ```cpp
-   void* PerformRSADecryption(
-       void* outputBuffer,
-       CryptoInitHelper_0x4b42bc* cryptoContext,   // RNG for blinding
-       uint32_t keySizeBytes,
-       byte* encryptedChallengeData);
-   ```
+   This is exactly the shape expected from Crypto++ `TF_DecryptorBase::Decrypt`-style code.
 
-   Internally it:
-   - Queries the modulus bit count → byte count
-   - Imports ciphertext into a big-int (`CryptoPP_Int_0x4ba50c`)
-   - Calls `CalculateInverse` (slot `+0xc` on the trapdoor function) passing the RNG
-   - Exports the result to a byte buffer
-   - Compares / validates the output length
+2. **`MaxUnpaddedLength` (`0x464b80`)**
+   - returns `k - 0x29` when `k > 0x29`
+   - `0x29 == 2*20 + 1`
+   - that is the OAEP overhead for **SHA-1**
 
-   This is **exactly** the `TF_DecryptorBase::Decrypt` implementation in Crypto++.
+3. **`OAEP_Pad` (`0x467640`)** and **`OAEP_Unpad` (`0x467780`)**
+   - both use `0x14` byte hash lengths
+   - both instantiate SHA1 hash context machinery
+   - both run MGF1 masking / unmasking steps
+   - behavior matches Crypto++ OAEP code very closely
 
-2. **Encryptor counterpart is already source-owned** — `authbootstrap680.cpp` uses
-   `CryptoPP::RSAES_OAEP_SHA_Encryptor` for the `AuthBootstrap680Raw08PublicKeyWorker`
-   path.  It is overwhelmingly likely the launcher uses the matching
-   `RSAES_OAEP_SHA_Decryptor` on the margin-connection side.
+4. **Key member semantics at `0x465d70`**
+   - imports `n`, `e`, `d`
+   - derives / stores `p`, `q`, `dp`, `dq`, `u`
+   - this matches `CryptoPP::InvertibleRSAFunction`
 
-3. **Constructor vtable dance** — the ctor walks through three vtable stages
-   (`0x4b6500` → `0x4b6604` → `0x4b6778`) plus a parallel adjustor thunk chain.
-   This matches Crypto++ template-instantiation object construction where each base
-   class constructor sets its own vtable slice before the most-derived ctor overwrites
-   them all.
+5. **Encryptor counterpart already exists in source**
+   - launcher source already uses `CryptoPP::RSAES_OAEP_SHA_Encryptor` in the bootstrap
+     encryptor path, making the matching decryptor identification especially compelling
+
+---
+
+### 2.5 Replacement opportunity in source
+
+There is a strong fidelity opportunity to delete launcher-local stand-in class names and replace the
+implementation with actual Crypto++ types **where object-layout emulation is not required**.
+
+Best candidate interpretation:
+
+- `CMarginConnectionAuthBootstrapDecryptor_0x4b69b4`
+  ≈ `CryptoPP::RSAES_OAEP_SHA_Decryptor`
+- prep/key state at `field_0xc`
+  ≈ `CryptoPP::InvertibleRSAFunction`
+- `0x4b42b0` root base
+  ≈ old `CryptoPP::Algorithm`
+
+Recommended direction:
+1. keep constructor boundaries faithful to launcher.exe (`0x442b70`, `0x442e20`, `0x443220`)
+2. replace local semantic stand-ins with real Crypto++ members / helper calls where possible
+3. preserve comments about MI-adjustor thunks and construction-state flags where source cannot
+   express the original old-MSVC object model exactly
+4. rename prep-state fields to explicit RSA names once Ghidra/source are updated together
 
 ---
 
