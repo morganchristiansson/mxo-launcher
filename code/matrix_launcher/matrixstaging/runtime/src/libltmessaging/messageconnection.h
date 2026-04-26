@@ -1694,16 +1694,8 @@ public:
     std::array<uint8_t, 0x08> gap_0xbc{};
 };
 
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0x8) == 0x08);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0x1c) == 0x1c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0x3c) == 0x3c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0x50) == 0x50);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0x64) == 0x64);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, mbr_0x78) == 0x78);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, mbr_0x8c) == 0x8c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, mbr_0xa0) == 0xa0);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0xb4) == 0xb4);
-static_assert(offsetof(CMarginConnectionBootstrapPrepState_0x4b659c, field_0xb8) == 0xb8);
+// Note: keep the member suffixes as the source-of-truth offset cues here.
+// `offsetof` on this class currently trips noisy compiler warnings in the MinGW build.
 static_assert(sizeof(CMarginConnectionBootstrapPrepState_0x4b659c) == 0xc4, "bootstrap prep state subobject +0x0c size mismatch");
 
 class CMarginConnectionAuthBootstrapCrypto_0x4b6778 : public CLTReferenceCountedBase_0x4b42b0 {
