@@ -1459,11 +1459,6 @@ private:
         LoginObserverTreeNode674* first,
         LoginObserverTreeNode674* last);
 
-    uint32_t SendMarginFramedPacket(
-        const mxo::auth::FramedPacket& packet,
-        uint8_t plainRawCode,
-        const char* stepLabel,
-        bool encryptedTransport);
     // ABI-safety note:
     // - margin CERT/MS bootstrap/session storage is intentionally kept in a sidecar keyed by the
     //   mediator pointer in `loginmediator.cpp`

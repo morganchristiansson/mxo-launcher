@@ -2763,40 +2763,7 @@ uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
     return selectionIndex;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::SendMarginFramedPacket(
-    const mxo::auth::FramedPacket& packet,
-    uint8_t plainRawCode,
-    const char* stepLabel,
-    bool encryptedTransport) {
-    mxo::liblttcp::CMessageConnection_0x4b7928* connection = marginConnection_;
-    if (!connection) {
-        connection = EnsureMarginConnectionObject();
-    }
-    if (!connection || packet.bytes.empty()) {
-        return 0u;
-    }
 
-    // Keep the current narrower builder contract explicit:
-    // - these bootstrap helpers currently materialize already-encrypted/framed bytes
-    // - so they still submit through the raw byte-send seam here
-    // - moving them onto `0x41af70` cleanly requires splitting out the original raw logical
-    //   payload builders first, otherwise the agenda/write path would encrypt them a second time
-    const uint32_t sendResult = connection->SendBuffer(
-        packet.bytes.data(),
-        static_cast<uint32_t>(packet.bytes.size()),
-        nullptr);
-    spdlog::info(
-        "DIAGNOSTIC: launcher-owned margin bootstrap send step='{}' rawCode=0x{:02x} transportEncrypted={} outerHeaderLen={} outerPayloadLen={} outerByteCount={} -> sendResult=0x{:08x}",
-        (stepLabel && stepLabel[0]) ? stepLabel : "<unnamed>",
-        plainRawCode,
-        encryptedTransport ? 1u : 0u,
-        packet.headerBytes.size(),
-        packet.payloadBytes.size(),
-        packet.bytes.size(),
-        sendResult);
-    return sendResult;
-}
 
 // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
 void CLTLoginMediator::PrepareState5MarginConnectionCopySend() {
