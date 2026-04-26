@@ -1052,11 +1052,13 @@ static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub
 }
 
 // anchor: launcher.exe:0x41f210 / owner vtable +0x12c
-// Current bounded read from GetGOBFileGUID (0x438e60): this slot returns owner +0x8c.
-static void* __thiscall Mediator_GetOwnerObject8c(MinimalLoginMediatorStub* self) {
+// Current best type recovery from the client startup triple and later reads:
+// this slot returns owner +0x8c, which currently lines up with the client-side
+// ILTDistrObjExecutive-like third startup object.
+static void* __thiscall Mediator_GetStartupDistrObjExecutive8c(MinimalLoginMediatorStub* self) {
     (void)self;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->GetOwnerObject8c() : nullptr;
+    return mediator ? mediator->GetStartupDistrObjExecutive8c() : nullptr;
 }
 
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
@@ -1247,7 +1249,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[72] = (void*)Mediator_ProcessCreateCharacterInput120; // +0x120
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
     // +0x128
-    g_LoginMediatorVtable[75] = (void*)Mediator_GetOwnerObject8c; // +0x12c
+    g_LoginMediatorVtable[75] = (void*)Mediator_GetStartupDistrObjExecutive8c; // +0x12c
     // +0x130 GetSessionCallbackHelper65c
     // +0x134 EnsureSessionCallbackHelper65c
     // +0x138

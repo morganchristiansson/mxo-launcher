@@ -27,19 +27,19 @@ static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* m
     return gobGuidWords;
   }
 
-  void* const ownerObject8c = mediator->GetOwnerObject8c();
-  if (ownerObject8c == nullptr) {
+  void* const startupDistrObjExecutive8c = mediator->GetStartupDistrObjExecutive8c();
+  if (startupDistrObjExecutive8c == nullptr) {
     return gobGuidWords;
   }
 
-  void** const vtable = *reinterpret_cast<void***>(ownerObject8c);
+  void** const vtable = *reinterpret_cast<void***>(startupDistrObjExecutive8c);
   if (vtable == nullptr || vtable[7] == nullptr) {
     return gobGuidWords;
   }
 
   using GetGuidWordsFn = const uint32_t*(__thiscall*)(void*);
   const auto getGuidWords = reinterpret_cast<GetGuidWordsFn>(vtable[7]); // vtable +0x1c
-  const uint32_t* const guidWords = getGuidWords(ownerObject8c);
+  const uint32_t* const guidWords = getGuidWords(startupDistrObjExecutive8c);
   if (guidWords != nullptr) {
     std::copy_n(guidWords, gobGuidWords.size(), gobGuidWords.begin());
   }

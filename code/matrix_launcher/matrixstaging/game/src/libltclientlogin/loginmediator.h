@@ -1021,9 +1021,11 @@ public:
     //   `ILTLoginMediator_0x4af2b8.Default +0x18c`
     // Wrapper-facing `+0x124` capture remains separate from the owner-side triple mirror.
     void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) override;
-    void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
+    void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* startupDistrObjExecutive8c);
     // anchor: launcher.exe:0x41f210 / mediator vtable +0x12c
-    void* GetOwnerObject8c() const;
+    // Current best type recovery: returns the owner `+0x8c` collaborator copied from the client
+    // startup triple's third argument, matching the client-side `g_StartupDistrObjExecutive124`.
+    void* GetStartupDistrObjExecutive8c() const;
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
@@ -1588,7 +1590,7 @@ public:
     // (`netShell, netMgr, distrObjExecutive`) copied directly into this triple by `0x41f1d0`.
     void* ownerCallback84_ = nullptr;          // owner `+0x84`; bounded active-scope writes now read as init-zero at `0x41ee60`, startup-triple store at `0x41f1d0`, then submit-side reads
     void* ownerObject88_ = nullptr;            // owner `+0x88`; natural-original object88 cross-checks as client `INetMgr.Default` wrapper and no later bounded active-scope launcher write is isolated yet beyond `0x41f1d0`
-    void* ownerObject8c_ = nullptr;            // owner `+0x8c`
+    void* startupDistrObjExecutive8c_ = nullptr; // owner `+0x8c`; current best match is the client startup triple's ILTDistrObjExecutive-like third object
     // +0x124 wrapper-facing startup triple capture state (owner-side mirror remains explicit in
     // `SetState9CallbackObjectTriple84_88_8c`).
     void* provideStartupTripleNetShell_ = nullptr;         // +0x124 netShell

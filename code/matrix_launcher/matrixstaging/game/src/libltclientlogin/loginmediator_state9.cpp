@@ -15,20 +15,20 @@ namespace {
 }  // namespace
 
 // anchor: launcher.exe:0x41f1d0 / owner-side mirror of the startup triple into +0x84/+0x88/+0x8c
-void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c) {
+void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* startupDistrObjExecutive8c) {
     ownerCallback84_ = callback84;
     ownerObject88_ = object88;
-    ownerObject8c_ = object8c;
+    startupDistrObjExecutive8c_ = startupDistrObjExecutive8c;
     spdlog::info(
-        "CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c (owner-side mirror) callback84={} object88={} object8c={} (active bounded launcher scope still reads this as init-zero at 0x41ee60, startup triple store at 0x41f1d0, then submit-side reads at 0x41de40)",
+        "CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c (owner-side mirror) callback84={} object88={} startupDistrObjExecutive8c={} (active bounded launcher scope still reads this as init-zero at 0x41ee60, startup triple store at 0x41f1d0, then submit-side reads at 0x41de40)",
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
-        fmt::ptr(ownerObject8c_));
+        fmt::ptr(startupDistrObjExecutive8c_));
 }
 
 // anchor: launcher.exe:0x41f210 / owner vtable +0x12c
-void* CLTLoginMediator::GetOwnerObject8c() const {
-    return ownerObject8c_;
+void* CLTLoginMediator::GetStartupDistrObjExecutive8c() const {
+    return startupDistrObjExecutive8c_;
 }
 
 // anchor: launcher.exe:0x41c5c0
@@ -242,13 +242,13 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
   }
 
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x}",
+        "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} startupDistrObjExecutive8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x}",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
         static_cast<unsigned>(state6UdpSessionSecretF18_),
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
-        fmt::ptr(ownerObject8c_),
+        fmt::ptr(startupDistrObjExecutive8c_),
         static_cast<unsigned>(forwardedArg90),
         ownerCachedHandle147c_,
         callbackPairReady ? 1u : 0u,
