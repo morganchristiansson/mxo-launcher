@@ -1658,16 +1658,18 @@ public:
 };
 static_assert(sizeof(CBootstrapBigInt_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
 
-// anchor: launcher.exe vtable 0x4b42b0 / CLTReferenceCountedBase_0x4b42b0
-// Base class with 3 vtable slots:
-//   +0x00: ~CLTReferenceCountedBase_0x4b42b0 (0x41cda0)
-//   +0x04: StubReturn0 (0x437b50)
-//   +0x08: ResetString / unknown (0x41d880)
+// anchor: launcher.exe vtable 0x4b42b0 / CryptoPP::Algorithm-compatible base
+// Static-RE notes:
+// - slot +0x08 at 0x41d880 builds the std::string "unknown", which matches the
+//   old Crypto++ Algorithm::AlgorithmName() default implementation.
+// - this launcher predates Crypto++'s later AlgorithmProvider() virtual, so the
+//   3-slot layout is consistent with an older CryptoPP::Algorithm / Clonable base.
+// - slot +0x04 behaves like the older default Clone() stub in the shipped build.
 class CLTReferenceCountedBase_0x4b42b0 {
 public:
     virtual ~CLTReferenceCountedBase_0x4b42b0() = default;
     virtual uint32_t StubReturn0() { return 0; }
-    // Slot +0x08: 0x41d880 (tentative — does not use this pointer)
+    // Slot +0x08: CryptoPP::Algorithm::AlgorithmName() default -> "unknown"
 };
 
 class CMarginConnectionBootstrapPrepState_0x4b659c {
@@ -1716,7 +1718,7 @@ public:
         const CBootstrapBigInt_0x4ba50c* param_1,
         const CBootstrapBigInt_0x4ba50c* param_2,
         const CBootstrapBigInt_0x4ba50c* param_3,
-        int param_4);
+        int constructVirtualBaseStateFlag);
     // anchor: launcher.exe:0x443390
     virtual ~CMarginConnectionAuthBootstrapCrypto_0x4b6778();
 

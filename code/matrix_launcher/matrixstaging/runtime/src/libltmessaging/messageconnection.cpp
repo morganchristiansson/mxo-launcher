@@ -2643,17 +2643,25 @@ CMarginConnectionAuthBootstrapCrypto_0x4b6778::CMarginConnectionAuthBootstrapCry
     const CBootstrapBigInt_0x4ba50c* param_1,
     const CBootstrapBigInt_0x4ba50c* param_2,
     const CBootstrapBigInt_0x4ba50c* param_3,
-    int param_4) {
-    // C++ vtable auto-generated, no raw vtable pointers needed
-    // Original set: mbr_0x4 = 0x004b6b10, mbr_0xd4 = 0x004b6300, mbr_0xd8 = 0x004b3e18, mbr_0xdc = 0x004b67a0
-    // These were vtable pointers for inner components - now handled by C++ vtable
+    [[maybe_unused]] int constructVirtualBaseStateFlag) {
+    // Fidelity notes for launcher.exe:0x443220:
+    // - Ghidra's complete-object constructor is building a funny MSVC multiple-inheritance
+    //   Crypto++ object, not a simple launcher-local POD.
+    // - The fourth parameter gates the pre-base-construction vbptr / secondary-vftable seeding
+    //   in the original complete-object ctor. Our C++ type uses normal compiler-generated MI,
+    //   so the flag is intentionally unused here.
+    // - 0x442b70 / 0x442e20 / 0x443220 line up with CryptoPP RSAES<OAEP<SHA1>>::Decryptor-style
+    //   construction, with field_0xc holding the embedded RSA private key material.
 
-    // Original set: mbr_0x8 = 0x004b6ad4, field_0xd0 = 0x004b6acc (inner vtable pointers)
+    // C++ vtable auto-generated, no raw vtable pointers needed.
+    // Original set transient helper subobjects at +0x04/+0x08/+0xd0/+0xd4/+0xd8/+0xdc while
+    // walking the complete-object construction state machine.
     mbr_0xd0 = 0u;
     mbr_0xd4 = 0u;
     mbr_0xd8 = 0u;
     mbr_0xdc = 0u;
 
+    // anchor: launcher.exe:0x4432e9 -> 0x465d70
     field_0xc.InitializeFromBootstrapBlocks(param_1, param_2, param_3);
 }
 
