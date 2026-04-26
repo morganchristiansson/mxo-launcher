@@ -241,6 +241,13 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     replySectionsExpected_ = 0;
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
     
+    // DIAGNOSTIC: Trace slot record state before using it
+    spdlog::info(
+        "DIAGNOSTIC: State8 Slot3 currentSlotRecord={} charIdLow=0x{:08x} charIdHigh=0x{:08x}",
+        fmt::ptr(currentSlotRecord),
+        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdLow32) : 0u,
+        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdHigh36) : 0u);
+    
     // anchor: launcher.exe:0x43bd6a = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
     // anchor: launcher.exe:0x43ac10 = ResetAndInitialize
     Packet_MsLoadCharacterRequest_0x4b5418 packetBuilder;
@@ -261,10 +268,13 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     }
 
     // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload
+    // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload
     uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
     if (payload) {
         *reinterpret_cast<uint32_t*>(payload + 0x01) = currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u;
         *reinterpret_cast<uint32_t*>(payload + 0x05) = currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u;
+        // field0x0c needs to be 9 - server expects this counter value
+        payload[0x0c] = 0x09;
     }
 
     // anchor: launcher.exe:0x43bd84-0x43bdfa = write selection blocks directly to payload
@@ -273,76 +283,87 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     // fidelity: direct element access like original decompile (not helper lambda)
     if (payload) {
         // Block Cd0 at 0x09-0x17 (selection context, 16 bytes total)
-        *reinterpret_cast<uint32_t*>(payload + 0x09) = g_CurrentLoginMediator->SelectionContextBlockCd0()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x0d) = g_CurrentLoginMediator->SelectionContextBlockCd0()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x11) = g_CurrentLoginMediator->SelectionContextBlockCd0()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x15) = g_CurrentLoginMediator->SelectionContextBlockCd0()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x09) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x0d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x11) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x15) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[3];
 
         // Block Ce0 at 0x19-0x27
-        *reinterpret_cast<uint32_t*>(payload + 0x19) = g_CurrentLoginMediator->SelectionContextBlockCe0()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x1d) = g_CurrentLoginMediator->SelectionContextBlockCe0()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x21) = g_CurrentLoginMediator->SelectionContextBlockCe0()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x25) = g_CurrentLoginMediator->SelectionContextBlockCe0()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x19) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x1d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x21) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x25) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[3];
 
         // Block Cf0 at 0x29-0x37
-        *reinterpret_cast<uint32_t*>(payload + 0x29) = g_CurrentLoginMediator->SelectionContextBlockCf0()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x2d) = g_CurrentLoginMediator->SelectionContextBlockCf0()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x31) = g_CurrentLoginMediator->SelectionContextBlockCf0()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x35) = g_CurrentLoginMediator->SelectionContextBlockCf0()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x29) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x2d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x31) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x35) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[3];
 
         // Block D40 at 0x79-0x87
-        *reinterpret_cast<uint32_t*>(payload + 0x79) = g_CurrentLoginMediator->SelectionContextBlockD40()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x7d) = g_CurrentLoginMediator->SelectionContextBlockD40()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x81) = g_CurrentLoginMediator->SelectionContextBlockD40()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x85) = g_CurrentLoginMediator->SelectionContextBlockD40()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x79) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x7d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x81) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x85) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[3];
 
         // Block D50 at 0x89-0x97
-        *reinterpret_cast<uint32_t*>(payload + 0x89) = g_CurrentLoginMediator->SelectionContextBlockD50()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x8d) = g_CurrentLoginMediator->SelectionContextBlockD50()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x91) = g_CurrentLoginMediator->SelectionContextBlockD50()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x95) = g_CurrentLoginMediator->SelectionContextBlockD50()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x89) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x8d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x91) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x95) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[3];
 
         // Block D60 at 0x99-0xa7
-        *reinterpret_cast<uint32_t*>(payload + 0x99) = g_CurrentLoginMediator->SelectionContextBlockD60()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x9d) = g_CurrentLoginMediator->SelectionContextBlockD60()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0xa1) = g_CurrentLoginMediator->SelectionContextBlockD60()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0xa5) = g_CurrentLoginMediator->SelectionContextBlockD60()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x99) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x9d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[1];
+        *reinterpret_cast<uint32_t*>(payload + 0xa1) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[2];
+        *reinterpret_cast<uint32_t*>(payload + 0xa5) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[3];
 
         // Block D70 at 0xa9-0xb7
-        *reinterpret_cast<uint32_t*>(payload + 0xa9) = g_CurrentLoginMediator->SelectionContextBlockD70()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0xad) = g_CurrentLoginMediator->SelectionContextBlockD70()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0xb1) = g_CurrentLoginMediator->SelectionContextBlockD70()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0xb5) = g_CurrentLoginMediator->SelectionContextBlockD70()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0xa9) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[0];
+        *reinterpret_cast<uint32_t*>(payload + 0xad) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[1];
+        *reinterpret_cast<uint32_t*>(payload + 0xb1) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[2];
+        *reinterpret_cast<uint32_t*>(payload + 0xb5) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[3];
 
         // Block D00 at 0x39-0x47
-        *reinterpret_cast<uint32_t*>(payload + 0x39) = g_CurrentLoginMediator->SelectionContextBlockD00()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x3d) = g_CurrentLoginMediator->SelectionContextBlockD00()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x41) = g_CurrentLoginMediator->SelectionContextBlockD00()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x45) = g_CurrentLoginMediator->SelectionContextBlockD00()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x39) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x3d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x41) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x45) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[3];
 
         // Block D10 at 0x49-0x57
-        *reinterpret_cast<uint32_t*>(payload + 0x49) = g_CurrentLoginMediator->SelectionContextBlockD10()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x4d) = g_CurrentLoginMediator->SelectionContextBlockD10()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x51) = g_CurrentLoginMediator->SelectionContextBlockD10()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x55) = g_CurrentLoginMediator->SelectionContextBlockD10()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x49) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x4d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x51) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x55) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[3];
 
         // Block D20 at 0x59-0x67
-        *reinterpret_cast<uint32_t*>(payload + 0x59) = g_CurrentLoginMediator->SelectionContextBlockD20()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x5d) = g_CurrentLoginMediator->SelectionContextBlockD20()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x61) = g_CurrentLoginMediator->SelectionContextBlockD20()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x65) = g_CurrentLoginMediator->SelectionContextBlockD20()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x59) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x5d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x61) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x65) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[3];
 
         // Block D30 at 0x69-0x77
-        *reinterpret_cast<uint32_t*>(payload + 0x69) = g_CurrentLoginMediator->SelectionContextBlockD30()[0];
-        *reinterpret_cast<uint32_t*>(payload + 0x6d) = g_CurrentLoginMediator->SelectionContextBlockD30()[1];
-        *reinterpret_cast<uint32_t*>(payload + 0x71) = g_CurrentLoginMediator->SelectionContextBlockD30()[2];
-        *reinterpret_cast<uint32_t*>(payload + 0x75) = g_CurrentLoginMediator->SelectionContextBlockD30()[3];
+        *reinterpret_cast<uint32_t*>(payload + 0x69) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[0];
+        *reinterpret_cast<uint32_t*>(payload + 0x6d) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[1];
+        *reinterpret_cast<uint32_t*>(payload + 0x71) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[2];
+        *reinterpret_cast<uint32_t*>(payload + 0x75) = g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[3];
     }
 
     // anchor: launcher.exe:0x43ada0 = SetGameSessionId (mediator helper)
     // Note: Original 0x43ada0 is a CLTLoginMediator method that operates on mediator fields.
     // For source fidelity, we implement the reservation logic inline here.
     // The mediator caches the write pointer in its own fields (not packet builder fields).
+    
+    // DIAGNOSTIC: Log payload after all writes
+    if (payload) {
+        spdlog::info(
+            "DIAGNOSTIC: State8 Slot3 final payload: charIdLow=0x{:08x} charIdHigh=0x{:08x} field0c=0x{:02x} blockCd0_0=0x{:08x}",
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x01)),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x05)),
+            static_cast<unsigned>(payload[0x0c]),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(payload + 0x09)));
+    }
+    
     const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
     if (gameSessionId) {
         // Compute string length including NUL
@@ -387,17 +408,17 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     g_CurrentLoginMediator->PostEvent(0x09u);
 
     const unsigned nonZeroSnapshotBlockCount =
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCd0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCe0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockCf0())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD00())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD10())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD20())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD30())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD40())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD50())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD60())) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->SelectionContextBlockD70()));
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60)) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70));
     // gameSessionId already declared above in SetGameSessionId block
 
     spdlog::info(
@@ -408,8 +429,8 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
         nonZeroSnapshotBlockCount,
-        g_CurrentLoginMediator->SelectionContextBlockCd0()[0],
-        g_CurrentLoginMediator->SelectionContextBlockD70()[3],
+        g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
+        g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
         gameSessionId ? gameSessionId : "<empty>",
         sendResult);
     return;

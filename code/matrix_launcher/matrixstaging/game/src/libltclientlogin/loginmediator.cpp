@@ -2933,15 +2933,15 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
             auto pickWeirdSequence = [this]() {
                 const std::array<const std::array<uint32_t, 4>*, 9> candidates = {
-                    &SelectionContextBlockCf0(),
-                    &SelectionContextBlockD00(),
-                    &SelectionContextBlockD10(),
-                    &SelectionContextBlockD20(),
-                    &SelectionContextBlockD30(),
-                    &SelectionContextBlockD40(),
-                    &SelectionContextBlockD50(),
-                    &SelectionContextBlockD60(),
-                    &SelectionContextBlockD70()};
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockCf0,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD00,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD10,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD20,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD30,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD40,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD50,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD60,
+                    &selectionRouteState684_.persistedSelectionContext64c_.blockD70};
                 std::array<uint8_t, 16> bytes = {};
                 for (const auto* candidate : candidates) {
                     if (!candidate) {

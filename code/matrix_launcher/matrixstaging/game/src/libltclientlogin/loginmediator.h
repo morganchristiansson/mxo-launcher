@@ -1406,17 +1406,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   as the canonical mirror of that owner byte and keeps the later post-auth fields synced
     //   through `SetCurrentCharacterRouteIndexCc8Scaffold`
     uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
-    const std::array<uint32_t, 4>& SelectionContextBlockCd0() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCd0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockCe0() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCe0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockCf0() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCf0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD00() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD00; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD10() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD10; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD20() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD20; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD30() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD30; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD40() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD40; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD50() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD50; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
-const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
 
 // Populate selection context blocks from generated chunk hashes
 void PopulateSelectionContextBlocksFromChunkHashes();
