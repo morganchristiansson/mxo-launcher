@@ -221,42 +221,6 @@ bool EncryptAuthRequestBlob(
     }
 }
 
-bool EncryptAuthRequestBlobWithKeyMaterial(
-    const std::vector<uint8_t>& plaintext,
-    const std::vector<uint8_t>& modulusBytes,
-    const std::vector<uint8_t>& exponentBytes,
-    std::vector<uint8_t>* outCiphertext) {
-    using namespace internal;
-
-    if (!outCiphertext || plaintext.empty()) {
-        return false;
-    }
-
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildPublicKeyFromBytes(modulusBytes, exponentBytes, &publicKey)) {
-        return false;
-    }
-
-    try {
-        CryptoPP::AutoSeededRandomPool rng;
-        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
-        std::string ciphertext;
-        CryptoPP::StringSource source(
-            plaintext.data(),
-            plaintext.size(),
-            true,
-            new CryptoPP::PK_EncryptorFilter(
-                rng,
-                encryptor,
-                new CryptoPP::StringSink(ciphertext)));
-        outCiphertext->assign(ciphertext.begin(), ciphertext.end());
-        return !outCiphertext->empty();
-    } catch (const CryptoPP::Exception&) {
-        outCiphertext->clear();
-        return false;
-    }
-}
-
 bool BuildAuthChallengeResponsePacket(
     const std::vector<uint8_t>& encryptedChallengeBytes,
     const std::vector<uint8_t>& twofishKeyBytes,

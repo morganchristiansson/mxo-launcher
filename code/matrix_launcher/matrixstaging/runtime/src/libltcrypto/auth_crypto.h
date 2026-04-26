@@ -382,12 +382,6 @@ bool EncryptAuthRequestBlob(
     const std::vector<uint8_t>& plaintext,
     std::vector<uint8_t>* outCiphertext);
 
-bool EncryptAuthRequestBlobWithKeyMaterial(
-    const std::vector<uint8_t>& plaintext,
-    const std::vector<uint8_t>& modulusBytes,
-    const std::vector<uint8_t>& exponentBytes,
-    std::vector<uint8_t>* outCiphertext);
-
 // Raw 0x09 / AS_AuthChallenge parse anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
