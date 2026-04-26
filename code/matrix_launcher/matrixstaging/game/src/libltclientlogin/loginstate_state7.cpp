@@ -127,42 +127,27 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
 // anchor: launcher.exe:0x43bae0 (vtable 0x4b50b4 slot 6)
 uint32_t CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    if (!g_CurrentLoginMediator) {
-        return 0u;
-    }
+    CLTLoginMediator* originalMediator = g_CurrentLoginMediator;
+    uint16_t messageCode = CMessageConnectionMessageRef_DecodeMessageCode(workItem);
+    Packet_MsDeleteCharacterReply_0x4b5404 deleteReplyPacket(workItem, '\x01');
 
-    Packet_MsDeleteCharacterReply_0x4b5404 parsedReply(workItem, '\x01');
-    if (!parsedReply.Valid()) {
-        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
-        spdlog::info(
-            "CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage rejected incoming delete-character reply op=0x0e; mirrored original owner+0x80=0x12000005");
-        return 0u;
+    if (messageCode == 0xe) {
+        const uint32_t deleteReplyResult09 = *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(deleteReplyPacket.payloadAlias10) + 0x09u);
+        g_CurrentLoginMediator->worldListCountOrStatus80 = deleteReplyResult09;
+        if (deleteReplyResult09 < 1u) {
+            g_CurrentLoginMediator->SetCurrentState(3u);
+            g_CurrentLoginMediator->PostEvent(0x08u);
+        }
+        else {
+            g_CurrentLoginMediator->SetCurrentState(3u);
+            g_CurrentLoginMediator->PostError(0x09u);
+        }
+        const uint32_t sideEffectResult = g_CurrentLoginMediator->HandleState9Opcode11SuccessSideEffect();
+        (void)sideEffectResult;
+        return 1u;
     }
-
-    g_CurrentLoginMediator->worldListCountOrStatus80 = parsedReply.Result09();
-    (void)g_CurrentLoginMediator->SetCurrentState(3u);
-
-    // Tightened event-8 meaning from the real state7 reply body:
-    // - success/result `< 1` posts event `8`
-    // - failure/result `>= 1` posts error `9`
-    // - this same event `8` is what the launcher delete-character command `0x40ec70` waits on
-    // - negative result: that makes the concrete `0x40ec70 -> +0xf0 -> state7 -> event 8`
-    //   corridor removal-oriented, not the hidden success-side `+0xec / 0x41c1f0` producer
-    const uint32_t result09 = parsedReply.Result09();
-    if (result09 < 1u) {
-        g_CurrentLoginMediator->PostEvent(0x08u);
-        spdlog::info(
-            "CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage opcode-0x0e success result09=0x{:08x} -> switch helper state3 then PostEvent(0x08) currentState={}",
-            static_cast<unsigned>(result09),
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-    } else {
-        g_CurrentLoginMediator->PostError(0x09u);
-        spdlog::info(
-            "CLTLoginState_State7_0x4b50b4::Slot6_HandleSecondaryMessage opcode-0x0e failure result09=0x{:08x} -> switch helper state3 then PostError(0x09) currentState={}",
-            static_cast<unsigned>(result09),
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-    }
-    return 1u;
+    g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
+    return reinterpret_cast<uint32_t>(originalMediator) & 0xffffff00u;
 }
 
 // anchor: launcher.exe:0x438c80 (vtable 0x4b50b4 slot 7)

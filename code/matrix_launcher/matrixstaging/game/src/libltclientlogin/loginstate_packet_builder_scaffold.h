@@ -318,59 +318,52 @@ public:
 // anchor: launcher.exe:0x43aae0 = ctor / parse wrapper
 //
 // Object layout: inherits Packet_0x4af2a4 at +0x00, no additional raw fields.
+// Static-RE field mapping for the decompiler view:
+// - mbr_0x4  -> payloadPtr04
+// - mbr_0x8  -> messageRef08
+// - mbr_0xc  -> createRefParam0c
+// - mbr_0x10 -> payloadAlias10
 //
 // Margin opcode 0x0e = MS_DeleteCharacterReply (used by state7 for delete-character completion)
 class Packet_MsDeleteCharacterReply_0x4b5404 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43aae0
-    // Static-RE faithful wrapper around the incoming message-ref payload view.
-    // `initializeEmptyReply == 0` mirrors the original "build empty reply" path;
-    // any nonzero value keeps the incoming payload untouched and only resolves the
-    // logical payload pointer / opcode view.
     Packet_MsDeleteCharacterReply_0x4b5404(
-        mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
-        char initializeEmptyReply) {
-        if (messageRef08) {
-            messageRef08->Release();
-        }
-        messageRef08 = nullptr;
+        mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* param_1,
+        char param_2) {
         payloadPtr04 = 0u;
-        payloadAlias10 = nullptr;
-        debugString14 = nullptr;
-        payloadSize18 = 0u;
-        packetType1a = 0u;
-        createRefParam0c = static_cast<uint8_t>(initializeEmptyReply != 0);
-
-        messageRef08 = incomingMessageRef;
-        if (messageRef08 != nullptr) {
-            messageRef08->AddRef();
+        messageRef08 = param_1;
+        if (param_1 != nullptr) {
+            param_1->AddRef();
         }
 
-        if (messageRef08 != nullptr && messageRef08->messageStorage0c != nullptr) {
-            const uint8_t* const payloadBytes = messageRef08->messageStorage0c->PayloadBase();
-            if (payloadBytes != nullptr) {
-                if (messageRef08->headerless10 == 0u) {
-                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(const_cast<uint8_t*>(payloadBytes)));
-                    payloadAlias10 = const_cast<uint8_t*>(payloadBytes);
-                } else if (messageRef08->messageStorage0c->PayloadByteCount() >= 2u) {
-                    const uint8_t descriptorByte = payloadBytes[1];
-                    const uint32_t lookupHigh = ::g_MessageOffsetLookupTable[(descriptorByte >> 4u) & 7u];
-                    const uint32_t lookupLow = ::g_MessageOffsetLookupTable[descriptorByte & 7u];
-                    auto* const logicalPayload = const_cast<uint8_t*>(payloadBytes + lookupHigh + lookupLow + 0x12u);
-                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(logicalPayload));
-                    payloadAlias10 = logicalPayload;
-                    messageRef08->headerless10 = 1u;
+        if (param_1 != nullptr && param_1->messageStorage0c != nullptr) {
+            const uint8_t* const payloadBase = param_1->messageStorage0c->PayloadBase();
+            if (payloadBase != nullptr) {
+                if (param_1->headerless10 == 0u) {
+                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(const_cast<uint8_t*>(payloadBase)));
+                } else {
+                    const uint8_t headerByte = payloadBase[0x0du];
+                    const uint32_t payloadBaseAddress =
+                        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param_1->messageStorage0c->PayloadBase()));
+                    const uint32_t logicalPayloadAddress =
+                        ::g_MessageOffsetLookupTable[headerByte >> 4 & 7] +
+                        ::g_MessageOffsetLookupTable[headerByte & 7] + payloadBaseAddress + 0x1eu;
+                    payloadPtr04 = logicalPayloadAddress;
+                    param_1->headerless10 = 1u;
                 }
             }
         }
 
-        if (initializeEmptyReply == '\0') {
+        createRefParam0c = static_cast<uint8_t>(param_2);
+        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+        if (param_2 == '\0') {
+            if (messageRef08 != nullptr) {
+                messageRef08->GrowPayloadByteCount(0x0du);
+            }
             if (messageRef08 != nullptr && messageRef08->messageStorage0c != nullptr) {
-                messageRef08->messageStorage0c->GrowPayloadByteCount(0x0du);
-                if (messageRef08->messageStorage0c != nullptr) {
-                    payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
-                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadAlias10));
-                }
+                payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+                payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadAlias10));
             }
             uint8_t* const payload = static_cast<uint8_t*>(payloadAlias10);
             if (payload != nullptr) {
@@ -380,26 +373,6 @@ public:
                 *reinterpret_cast<uint32_t*>(payload + 0x09u) = 0u;
             }
         }
-    }
-
-    bool Valid() const {
-        if (messageRef08 == nullptr || messageRef08->messageStorage0c == nullptr ||
-            messageRef08->messageStorage0c->PayloadByteCount() < 0x0du) {
-            return false;
-        }
-        const uint8_t* const payload = static_cast<const uint8_t*>(payloadAlias10);
-        return payload != nullptr && payload[0] == 0x0eu;
-    }
-
-    uint32_t Result09() const {
-        const uint8_t* const payload = static_cast<const uint8_t*>(payloadAlias10);
-        if (!Valid()) {
-            return 0u;
-        }
-        return static_cast<uint32_t>(payload[0x09u]) |
-               (static_cast<uint32_t>(payload[0x0au]) << 8u) |
-               (static_cast<uint32_t>(payload[0x0bu]) << 16u) |
-               (static_cast<uint32_t>(payload[0x0cu]) << 24u);
     }
 };
 
