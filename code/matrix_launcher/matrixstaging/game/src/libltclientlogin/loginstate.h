@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -623,20 +624,25 @@ inline uint32_t ReadU32LE(const uint8_t* p) {
 }
 
 // anchor: launcher.exe:0x4b542c
-class LoadCharacterReplyEnvelope_0x4b542c {
+class Packet_MsLoadCharacterReply_0x4b542c : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
-    // More faithful constructor using CMessageConnectionMessageRef_0x4ba23c directly
+    // More faithful constructor using CMessageConnectionMessageRef_0x4ba23c directly.
+    // Static-RE now treats this as a Packet_0x4af2a4-derived 5-slot vtable surface:
+    // - slots 0/1/4 inherited from Packet_0x4af2a4
+    // - slot 2 overridden by 0x43cca0
+    // - slot 3 overridden by 0x43af20
     // anchor: launcher.exe:0x43ae50
-    LoadCharacterReplyEnvelope_0x4b542c(
+    Packet_MsLoadCharacterReply_0x4b542c(
         mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
         char initializeEmptyReply);
 
-    ~LoadCharacterReplyEnvelope_0x4b542c() {
-        // Release the message ref if we hold one
-        if (incomingMessageRef08_ != nullptr) {
-            incomingMessageRef08_->Release();
-        }
-    }
+    ~Packet_MsLoadCharacterReply_0x4b542c() override = default;
+
+    // anchor: launcher.exe:0x43cca0 / vtable +0x08
+    void DebugString(int formatType = 2) override;
+
+    // anchor: launcher.exe:0x43af20 / vtable +0x0c
+    void InitializePayloadSize() override;
 
     // anchor: launcher.exe:0x43ae00
     void RefreshDataSectionView(char initializeEmptyReply);
@@ -659,17 +665,37 @@ public:
     const uint8_t* sectionData = nullptr;
 
 private:
-    // vtable pointer - initially set to temp vtable, then swapped to real vtable
-    // anchor: launcher.exe:0x4b542c
-    void** vftptr_0x0 = nullptr;
-    uint8_t* messageBase04_ = nullptr;  // +0x04
-    mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef08_ = nullptr;  // +0x08
-    bool initializeEmptyReply0c_ = false;  // +0x0c
-    uint8_t* currentMessage10_ = nullptr;  // +0x10
-    const uint8_t* dataSectionBytes14_ = nullptr;  // +0x14
-    uint16_t dataSectionByteCount18_ = 0;  // +0x18
-    // +0x1c: defaultMessageStorage_ inline array
-    std::array<uint8_t, 0x10> defaultMessageStorage_{};
+    uint8_t* messageBase04() const {
+        return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(payloadPtr04));
+    }
+
+    void setMessageBase04(uint8_t* messageBase) {
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(messageBase));
+    }
+
+    uint8_t* currentMessage10() const {
+        return static_cast<uint8_t*>(payloadAlias10);
+    }
+
+    void setCurrentMessage10(uint8_t* currentMessage) {
+        payloadAlias10 = currentMessage;
+    }
+
+    const uint8_t* dataSectionBytes14() const {
+        return reinterpret_cast<const uint8_t*>(debugString14);
+    }
+
+    void setDataSectionBytes14(const uint8_t* dataSectionBytes) {
+        debugString14 = reinterpret_cast<const char*>(dataSectionBytes);
+    }
+
+    uint8_t* defaultMessageStorage1c() {
+        return reinterpret_cast<uint8_t*>(&characterIdLow1c);
+    }
+
+    // Extends the inherited +0x1c..+0x27 packet tail into the full 0x10-byte inline
+    // default reply buffer observed in the constructor/reset helper.
+    uint32_t defaultMessageStorageTail28_ = 0;
 };
 
 }  // namespace mxo::ltlogin

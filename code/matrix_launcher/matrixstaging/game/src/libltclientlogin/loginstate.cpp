@@ -203,115 +203,129 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot9_IsNetworkDriven() const {
     return 0;
 }
 
-// Implementation of LoadCharacterReplyEnvelope_0x4b542c
+// Implementation of Packet_MsLoadCharacterReply_0x4b542c
 
 // More faithful constructor using CMessageConnectionMessageRef_0x4ba23c directly
 // anchor: launcher.exe:0x43ae50
-LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
+Packet_MsLoadCharacterReply_0x4b542c::Packet_MsLoadCharacterReply_0x4b542c(
     mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
-    char initializeEmptyReply)
-    : initializeEmptyReply0c_(!!initializeEmptyReply) {
-    incomingMessageRef08_ = incomingMessageRef;
+    char initializeEmptyReply) {
+    createRefParam0c = static_cast<uint8_t>(initializeEmptyReply != 0);
+    messageRef08 = incomingMessageRef;
     if (incomingMessageRef != nullptr) {
         incomingMessageRef->AddRef();
     }
 
     if (incomingMessageRef != nullptr && incomingMessageRef->headerless10 == 0) {
-        messageBase04_ = incomingMessageRef->messageStorage0c
+        setMessageBase04(incomingMessageRef->messageStorage0c
             ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
-            : nullptr;
+            : nullptr);
     } else if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c != nullptr) {
         uint8_t* const payloadBase = incomingMessageRef->messageStorage0c->payloadBytes0c.data();
         const uint8_t encodedHeaderByte = payloadBase[0x01u];
         const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
         const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
-        messageBase04_ = payloadBase + lookupHigh + lookupLow + 0x12u;
+        setMessageBase04(payloadBase + lookupHigh + lookupLow + 0x12u);
         incomingMessageRef->headerless10 = 1;
     } else {
-        messageBase04_ = nullptr;
+        setMessageBase04(nullptr);
     }
 
     RefreshDataSectionView(initializeEmptyReply);
     if (initializeEmptyReply == '\0') {
-        if (currentMessage10_ == nullptr) {
-            defaultMessageStorage_.fill(0u);
-            messageBase04_ = defaultMessageStorage_.data();
-            currentMessage10_ = messageBase04_;
+        if (currentMessage10() == nullptr) {
+            std::memset(defaultMessageStorage1c(), 0, 0x10u);
+            setMessageBase04(defaultMessageStorage1c());
+            setCurrentMessage10(messageBase04());
         }
-        currentMessage10_[0x00] = 0x10u;
-        *reinterpret_cast<uint32_t*>(currentMessage10_ + 0x01u) = 0u;
-        *reinterpret_cast<uint32_t*>(currentMessage10_ + 0x05u) = 0u;
-        *reinterpret_cast<uint16_t*>(currentMessage10_ + 0x09u) = 0u;
-        currentMessage10_[0x0b] = 1u;
-        currentMessage10_[0x0c] = 0u;
-        currentMessage10_[0x0d] = 0u;
-        *reinterpret_cast<uint16_t*>(currentMessage10_ + 0x0eu) = 0u;
-        dataSectionBytes14_ = nullptr;
-        dataSectionByteCount18_ = 0u;
+        currentMessage10()[0x00] = 0x10u;
+        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x01u) = 0u;
+        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x05u) = 0u;
+        *reinterpret_cast<uint16_t*>(currentMessage10() + 0x09u) = 0u;
+        currentMessage10()[0x0b] = 1u;
+        currentMessage10()[0x0c] = 0u;
+        currentMessage10()[0x0d] = 0u;
+        *reinterpret_cast<uint16_t*>(currentMessage10() + 0x0eu) = 0u;
+        setDataSectionBytes14(nullptr);
+        payloadSize18 = 0u;
     }
 
-    valid = currentMessage10_ != nullptr;
+    valid = currentMessage10() != nullptr;
     if (!valid) {
         return;
     }
-    if (currentMessage10_[0] != 0x10u) {
+    if (currentMessage10()[0] != 0x10u) {
         valid = false;
-        spdlog::debug("LoadCharacterReplyEnvelope: expected msgType=0x10 but got 0x{:02x}, will fallback to callback84", currentMessage10_[0]);
+        spdlog::debug("Packet_MsLoadCharacterReply: expected msgType=0x10 but got 0x{:02x}, will fallback to callback84", currentMessage10()[0]);
         return;
     }
 
-    status = ReadU32LE(currentMessage10_ + 1u);
-    field05 = ReadU32LE(currentMessage10_ + 5u);
-    handoffWord09 = ReadU16LE(currentMessage10_ + 9u);
-    spdlog::debug("LoadCharacterReplyEnvelope parsed: msgType=0x{:02x} handoffWord=0x{:04x} bytes[8..15]=[0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}]",
-        currentMessage10_[0],
+    status = ReadU32LE(currentMessage10() + 1u);
+    field05 = ReadU32LE(currentMessage10() + 5u);
+    handoffWord09 = ReadU16LE(currentMessage10() + 9u);
+    spdlog::debug("Packet_MsLoadCharacterReply parsed: msgType=0x{:02x} handoffWord=0x{:04x} bytes[8..15]=[0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}]",
+        currentMessage10()[0],
         handoffWord09,
-        currentMessage10_[8], currentMessage10_[9], currentMessage10_[10], currentMessage10_[11],
-        currentMessage10_[12], currentMessage10_[13], currentMessage10_[14], currentMessage10_[15]);
-    expectedSectionCount0b = currentMessage10_[0x0b];
-    shouldSeedExpectedSectionCount = (currentMessage10_[0x0c] == 0x01u);
-    sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage10_[0x0d] - 2u);
-    sectionOffset0e = ReadU16LE(currentMessage10_ + 0x0eu);
-    sectionByteCount = dataSectionByteCount18_;
-    sectionData = dataSectionBytes14_;
+        currentMessage10()[8], currentMessage10()[9], currentMessage10()[10], currentMessage10()[11],
+        currentMessage10()[12], currentMessage10()[13], currentMessage10()[14], currentMessage10()[15]);
+    expectedSectionCount0b = currentMessage10()[0x0b];
+    shouldSeedExpectedSectionCount = (currentMessage10()[0x0c] == 0x01u);
+    sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage10()[0x0d] - 2u);
+    sectionOffset0e = ReadU16LE(currentMessage10() + 0x0eu);
+    sectionByteCount = payloadSize18;
+    sectionData = dataSectionBytes14();
+}
+
+// anchor: launcher.exe:0x43cca0 / vtable +0x08
+void Packet_MsLoadCharacterReply_0x4b542c::DebugString(int formatType) {
+    std::string out;
+    AppendDebugString(out, formatType);
+    if (!out.empty()) {
+        spdlog::debug("Packet_MsLoadCharacterReply: {}", out);
+    }
+}
+
+// anchor: launcher.exe:0x43af20 / vtable +0x0c
+void Packet_MsLoadCharacterReply_0x4b542c::InitializePayloadSize() {
+    ResetToDefaultMessage();
 }
 
 // anchor: launcher.exe:0x43ae00
-void LoadCharacterReplyEnvelope_0x4b542c::RefreshDataSectionView(char initializeEmptyReply) {
-    currentMessage10_ = messageBase04_;
+void Packet_MsLoadCharacterReply_0x4b542c::RefreshDataSectionView(char initializeEmptyReply) {
+    setCurrentMessage10(messageBase04());
     if (initializeEmptyReply == '\0') {
-        if (incomingMessageRef08_ != nullptr) {
-            incomingMessageRef08_->GrowPayloadByteCount(0x10u);
-            if (incomingMessageRef08_->messageStorage0c != nullptr) {
-                messageBase04_ = incomingMessageRef08_->messageStorage0c->payloadBytes0c.data();
-                currentMessage10_ = messageBase04_;
+        if (messageRef08 != nullptr) {
+            messageRef08->GrowPayloadByteCount(0x10u);
+            if (messageRef08->messageStorage0c != nullptr) {
+                setMessageBase04(messageRef08->messageStorage0c->payloadBytes0c.data());
+                setCurrentMessage10(messageBase04());
             }
         }
         return;
     }
 
-    if (currentMessage10_ != nullptr) {
-        const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10_ + 0x0eu);
+    if (currentMessage10() != nullptr) {
+        const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10() + 0x0eu);
         if (sectionOffset0eLocal != 0u) {
-            dataSectionByteCount18_ = ReadU16LE(currentMessage10_ + sectionOffset0eLocal);
-            dataSectionBytes14_ = currentMessage10_ + sectionOffset0eLocal + 2u;
+            payloadSize18 = ReadU16LE(currentMessage10() + sectionOffset0eLocal);
+            setDataSectionBytes14(currentMessage10() + sectionOffset0eLocal + 2u);
             return;
         }
     }
 
-    dataSectionByteCount18_ = 0u;
-    dataSectionBytes14_ = nullptr;
+    payloadSize18 = 0u;
+    setDataSectionBytes14(nullptr);
 }
 
 // anchor: launcher.exe:0x43af20
-void LoadCharacterReplyEnvelope_0x4b542c::ResetToDefaultMessage() {
-    defaultMessageStorage_.fill(0u);
-    messageBase04_ = defaultMessageStorage_.data();
-    currentMessage10_ = messageBase04_;
-    currentMessage10_[0x00] = 0x10u;
-    currentMessage10_[0x0b] = 1u;
-    dataSectionBytes14_ = nullptr;
-    dataSectionByteCount18_ = 0u;
+void Packet_MsLoadCharacterReply_0x4b542c::ResetToDefaultMessage() {
+    std::memset(defaultMessageStorage1c(), 0, 0x10u);
+    setMessageBase04(defaultMessageStorage1c());
+    setCurrentMessage10(messageBase04());
+    currentMessage10()[0x00] = 0x10u;
+    currentMessage10()[0x0b] = 1u;
+    setDataSectionBytes14(nullptr);
+    payloadSize18 = 0u;
 
     valid = true;
     status = 0u;
@@ -326,7 +340,7 @@ void LoadCharacterReplyEnvelope_0x4b542c::ResetToDefaultMessage() {
 }
 
 // anchor: launcher.exe:0x43cca0
-void LoadCharacterReplyEnvelope_0x4b542c::AppendDebugString(std::string& out, int verbosityLevel) const {
+void Packet_MsLoadCharacterReply_0x4b542c::AppendDebugString(std::string& out, int verbosityLevel) const {
     if (verbosityLevel == 2 || verbosityLevel == 3) {
         out += "Status:" + std::to_string(status);
         out += " CharacterID:" + std::to_string(field05);
