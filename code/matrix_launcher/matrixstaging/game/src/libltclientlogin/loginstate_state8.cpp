@@ -942,37 +942,29 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  static_cast<unsigned>(ownerState.state8Section10ChunkBitmap));
 
  // anchor: launcher.exe:0x4408ed - completion check
- // Based on static-RE: completion triggers when:
- // 1. Counter reached expected count (from packet field)
- // 2. OR key sections present (section 0 or chunked section)
- // Note: Original may check packet field directly, not seeded copy
+ // Exact `0x43f930` tail shape from Ghidra now tightened enough to keep literal here:
+ // - byte `this+5` / our `replySectionsExpected_` is only latched when packet byte `+0x0c == 1`
+ // - byte `this+4` / our `replySectionsSeen_` is then incremented for every accepted reply
+ // - completion is only `replySectionsExpected_ != 0 && replySectionsSeen_ >= replySectionsExpected_`
+ // - there is no alternate early-complete path on section-0 presence, chunk presence, or
+ //   zero-byte terminal markers in the original slot-6 tail
  const uint8_t packetExpectedCount = loadCharacterReplyEnvelope.expectedSectionCount0b;
  const uint8_t currentSection = loadCharacterReplyEnvelope.sectionSelectorMinus2;
  const uint16_t sectionBytes = loadCharacterReplyEnvelope.sectionByteCount;
- 
- const bool haveSection0 = (ownerState.section0Flag13f6 != 0u);
- const bool haveSection0a = (ownerState.flag145a != 0u);
- // Use packet's expected count if non-zero, else fall back to seeded counter
- const uint8_t effectiveExpected = (packetExpectedCount != 0u) ? packetExpectedCount : replySectionsExpected_;
- const bool countingComplete = (effectiveExpected != 0u) && (replySectionsSeen_ >= effectiveExpected);
- // Final section check: at/above expected OR section with 0 bytes (termination marker)
- const bool atFinalSection = (packetExpectedCount != 0u) && (currentSection + 1u >= packetExpectedCount);
- // Empty section indicator - server may send 0-byte section as "no more data" signal
- const bool emptySectionMarker = (sectionBytes == 0u) && (currentSection >= 13u);
- const bool completed = countingComplete || haveSection0 || atFinalSection || emptySectionMarker;
+ const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
 
  spdlog::info(
- "DIAGNOSTIC: CLTLoginState_State8 completion check: packetExpected={} seededExpected={} effectiveExpected={} currentSection={} atFinalSection={} emptySectionMarker={} haveSection0={} haveSection0a={} countingComplete={} completed={}",
+ "DIAGNOSTIC: CLTLoginState_State8 completion check: packetExpected={} seededExpected={} currentSection={} sectionBytes={} seen={} completed={} seedFlag={} section0Flag={} section0aFlag={} chunkBitmap=0x{:08x}",
  packetExpectedCount,
  replySectionsExpected_,
- effectiveExpected,
  currentSection,
- atFinalSection ? 1u : 0u,
- emptySectionMarker ? 1u : 0u,
- haveSection0 ? 1u : 0u,
- haveSection0a ? 1u : 0u,
- countingComplete ? 1u : 0u,
- completed ? 1u : 0u);
+ static_cast<unsigned>(sectionBytes),
+ replySectionsSeen_,
+ completed ? 1u : 0u,
+ loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
+ static_cast<unsigned>(ownerState.section0Flag13f6),
+ static_cast<unsigned>(ownerState.flag145a),
+ static_cast<unsigned>(ownerState.state8Section10ChunkBitmap));
 
  if (completed) {
         if (ownerState.allocatedBuffer1454 != nullptr) {
