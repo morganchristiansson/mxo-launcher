@@ -832,29 +832,39 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             LogState8PersistenceFamilySnapshot(ownerState, "section9_clcfg1452", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, false);
             break;
         case 10u:
+            // anchor: launcher.exe:0x43ffc6
+            // Exact current read from `0x43f930`:
+            // - section selector `0x0a` uses packet byte `+0x0b` as a 1-based chunk ordinal
+            // - allocate a fixed 0x7d00-byte backing buffer on first sight
+            // - copy chunk bytes to `buffer + ((ordinal * 1000) - 1000)`
+            // - mark that 1-based ordinal as seen in the helper-local bitset
+            // - accumulate total materialized byte count in owner `+0x1458`
             if (ownerState.allocatedBuffer1454 == nullptr) {
                 ownerState.allocatedBuffer1454 = std::malloc(0x7d00u);
                 ownerState.allocatedBufferLength1458 = 0u;
                 ownerState.state8Section10ChunkBitmap = 0u;
             }
-            if (ownerState.allocatedBuffer1454 != nullptr && loadCharacterReplyEnvelope.sectionData && loadCharacterReplyEnvelope.expectedSectionCount0b != 0u) {
-                const size_t chunkIndex = static_cast<size_t>(loadCharacterReplyEnvelope.expectedSectionCount0b - 1u);
-                const size_t chunkOffset = chunkIndex * 1000u;
-                if (chunkOffset + loadCharacterReplyEnvelope.sectionByteCount <= 0x7d00u) {
-                    std::memcpy(
-                        static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + chunkOffset,
-                        loadCharacterReplyEnvelope.sectionData,
-                        loadCharacterReplyEnvelope.sectionByteCount);
-                    if (chunkIndex < 32u) {
-                        StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).SetSeen(chunkIndex);
+            if (ownerState.allocatedBuffer1454 != nullptr && loadCharacterReplyEnvelope.sectionData != nullptr) {
+                if (loadCharacterReplyEnvelope.expectedSectionCount0b == 0u) {
+                    spdlog::info(
+                        "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage section0x0a invariant failed: packet byte +0x0b chunk ordinal is zero");
+                } else {
+                    const size_t chunkIndex = static_cast<size_t>(loadCharacterReplyEnvelope.expectedSectionCount0b - 1u);
+                    const size_t chunkOffset = chunkIndex * 1000u;
+                    if (chunkOffset + loadCharacterReplyEnvelope.sectionByteCount <= 0x7d00u) {
+                        std::memcpy(
+                            static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + chunkOffset,
+                            loadCharacterReplyEnvelope.sectionData,
+                            loadCharacterReplyEnvelope.sectionByteCount);
+                        StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).SetSeen(static_cast<uint32_t>(chunkIndex));
+                        ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
+                            ownerState.allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
                     }
-                    ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
-                        ownerState.allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.flag145a = 1u;
-                    persistence.section0aChunkedBuffer538 = ownerState.allocatedBuffer1454;
-                    persistence.section0aChunkedLength53c = ownerState.allocatedBufferLength1458;
-                    persistence.section0aPresentFlag53e = 1u;
                 }
+                ownerState.flag145a = 1u;
+                persistence.section0aChunkedBuffer538 = ownerState.allocatedBuffer1454;
+                persistence.section0aChunkedLength53c = ownerState.allocatedBufferLength1458;
+                persistence.section0aPresentFlag53e = 1u;
             }
             break;
         case 11u:
