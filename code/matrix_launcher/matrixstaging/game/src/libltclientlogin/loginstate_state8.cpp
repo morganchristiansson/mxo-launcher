@@ -551,42 +551,33 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
 
         const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
-        if (currentSlotRecord != nullptr) {
-            if (currentSlotRecord->debugString14) {
-                const size_t copyCount = std::min(
-                    std::strlen(currentSlotRecord->debugString14),
-                    sizeof(ownerState.characterNameBufferF1c) - 1u);
-                std::copy_n(
-                    currentSlotRecord->debugString14,
-                    copyCount,
-                    ownerState.characterNameBufferF1c);
-                ownerState.characterNameBufferF1c[copyCount] = '\0';
-                std::copy(
-                    ownerState.characterNameBufferF1c,
-                    ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
-                    ownerState.state8PersistenceDataF1c.characterName00.begin());
-            }
-            ownerState.characterReplyFieldF40 = currentSlotRecord->worldId3c;
-            ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId3c;
-            ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status3a;
-            ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId3c;
-            ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId3c;
-            ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status3a;
-            usedCurrentSlotRecord = true;
-        } else {
-            std::copy(
-                ownerState.createCharacterData108.characterName00.begin(),
-                ownerState.createCharacterData108.characterName00.end(),
-                ownerState.characterNameBufferF1c);
-            ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
-            std::copy(
-                ownerState.createCharacterData108.characterName00.begin(),
-                ownerState.createCharacterData108.characterName00.end(),
-                ownerState.state8PersistenceDataF1c.characterName00.begin());
-            ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
-            ownerState.state8PersistenceDataF1c.selectedWorldField24 =
-                ownerState.createCharacterData108.selectedWorldField24;
+        if (currentSlotRecord == nullptr) {
+            spdlog::info(
+                "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage first-fragment invariant failed: currentSlotRecord is null; original 0x43f930 dereferences owner vtable +0x44 result directly here");
+            return 0u;
         }
+
+        if (currentSlotRecord->debugString14) {
+            const size_t copyCount = std::min(
+                std::strlen(currentSlotRecord->debugString14),
+                sizeof(ownerState.characterNameBufferF1c) - 1u);
+            std::copy_n(
+                currentSlotRecord->debugString14,
+                copyCount,
+                ownerState.characterNameBufferF1c);
+            ownerState.characterNameBufferF1c[copyCount] = '\0';
+            std::copy(
+                ownerState.characterNameBufferF1c,
+                ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
+                ownerState.state8PersistenceDataF1c.characterName00.begin());
+        }
+        ownerState.characterReplyFieldF40 = currentSlotRecord->worldId3c;
+        ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId3c;
+        ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status3a;
+        ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId3c;
+        ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId3c;
+        ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status3a;
+        usedCurrentSlotRecord = true;
     }
 
     if (loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount) {
