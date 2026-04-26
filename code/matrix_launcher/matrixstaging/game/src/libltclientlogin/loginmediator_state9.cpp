@@ -41,6 +41,13 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
     //   param_1 = (int*)CONCAT22(extraout_var, uVar2);  // opcode in low word
     //   uVar3 = (**(code**)(*(int*)this->ownerCallback84 + 0xc))(&param_1, piVar1);
     if (!ownerCallback84_) {
+        auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
+        uint16_t decodedMessageCode = 0u;
+        mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*messageRef, &decodedMessageCode, nullptr);
+        spdlog::warn(
+            "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 ownerCallback84_ is NULL for decodedMessageCode=0x{:04x} currentState={}! Falling through to message connection dispatch.",
+            static_cast<unsigned>(decodedMessageCode),
+            currentState_ ? currentState_->DebugName() : "<null>");
         return 1u;
     }
 

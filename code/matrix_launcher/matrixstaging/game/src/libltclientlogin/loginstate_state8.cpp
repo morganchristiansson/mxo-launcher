@@ -241,10 +241,24 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     replySectionsExpected_ = 0;
     const SlotRecordState_0x4b5328* currentSlotRecord = g_CurrentLoginMediator->GetCurrentSlotRecord();
     
-    // anchor: launcher.exe:0x43bd6a = construct Packet_MsLoadCharacterRequest_0x4b5418 on stack
+    // anchor: launcher.exe:0x43bd6a = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
     // anchor: launcher.exe:0x43ac10 = ResetAndInitialize
     Packet_MsLoadCharacterRequest_0x4b5418 packetBuilder;
     packetBuilder.ResetAndInitialize();
+
+    // DIAGNOSTIC: Log raw payload header for trace
+uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    if (rawPayloadForDiag) {
+        spdlog::info(
+            "DIAGNOSTIC: State8 Slot3 raw payload after Reset: opcode=0x{:02x} charIdLow=0x{:08x} charIdHigh=0x{:08x} field0c=0x{:02x} field0d=0x{:02x} field0e=0x{:02x} field0f=0x{:02x}",
+            static_cast<unsigned>(rawPayloadForDiag[0]),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(rawPayloadForDiag + 1)),
+            static_cast<unsigned>(*reinterpret_cast<uint32_t*>(rawPayloadForDiag + 5)),
+            static_cast<unsigned>(rawPayloadForDiag[0xc]),
+            static_cast<unsigned>(rawPayloadForDiag[0xd]),
+            static_cast<unsigned>(rawPayloadForDiag[0xe]),
+            static_cast<unsigned>(rawPayloadForDiag[0xf]));
+    }
 
     // anchor: launcher.exe:0x43bd6f-0x43bd81 = write character ID pair directly to payload
     uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
