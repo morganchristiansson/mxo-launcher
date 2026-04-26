@@ -211,49 +211,55 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
     char initializeEmptyReply)
     : initializeEmptyReply0c_(!!initializeEmptyReply) {
-    // Store the incoming message ref and call AddRef
     incomingMessageRef08_ = incomingMessageRef;
     if (incomingMessageRef != nullptr) {
         incomingMessageRef->AddRef();
     }
 
-    // Compute messageBase04_ based on headerless flag
-    if (incomingMessageRef == nullptr || incomingMessageRef->headerless10 == 0) {
-        // Non-headerless path: messageBase points past the header
-        if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c) {
-            messageBase04_ = reinterpret_cast<uint8_t*>(incomingMessageRef->messageStorage0c) + 0xc;
-        } else {
-            messageBase04_ = nullptr;
-        }
+    if (incomingMessageRef != nullptr && incomingMessageRef->headerless10 == 0) {
+        messageBase04_ = incomingMessageRef->messageStorage0c
+            ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
+            : nullptr;
+    } else if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c != nullptr) {
+        uint8_t* const payloadBase = incomingMessageRef->messageStorage0c->payloadBytes0c.data();
+        const uint8_t encodedHeaderByte = payloadBase[0x01u];
+        const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
+        const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
+        messageBase04_ = payloadBase + lookupHigh + lookupLow + 0x12u;
+        incomingMessageRef->headerless10 = 1;
     } else {
-        // Headerless path: more complex offset calculation using lookup table
-        if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c) {
-            uint8_t* storageBase = reinterpret_cast<uint8_t*>(incomingMessageRef->messageStorage0c);
-            uint32_t iVar2 = reinterpret_cast<uint32_t>(storageBase + 0xc);
-            uint8_t bVar1 = *(storageBase + 0xc + 0xd);
-            uint32_t lookup1 = g_MessageOffsetLookupTable[(bVar1 >> 4) & 7];
-            uint32_t lookup2 = g_MessageOffsetLookupTable[bVar1 & 7];
-            messageBase04_ = reinterpret_cast<uint8_t*>(lookup1 + lookup2 + iVar2 + 0x1e);
-            // Mark as headerless
-            incomingMessageRef->headerless10 = 1;
-        } else {
-            messageBase04_ = nullptr;
-        }
+        messageBase04_ = nullptr;
     }
 
     RefreshDataSectionView(initializeEmptyReply);
-    if (!initializeEmptyReply) {
-        ResetToDefaultMessage();
+    if (initializeEmptyReply == '\0') {
+        if (currentMessage10_ == nullptr) {
+            defaultMessageStorage_.fill(0u);
+            messageBase04_ = defaultMessageStorage_.data();
+            currentMessage10_ = messageBase04_;
+        }
+        currentMessage10_[0x00] = 0x10u;
+        *reinterpret_cast<uint32_t*>(currentMessage10_ + 0x01u) = 0u;
+        *reinterpret_cast<uint32_t*>(currentMessage10_ + 0x05u) = 0u;
+        *reinterpret_cast<uint16_t*>(currentMessage10_ + 0x09u) = 0u;
+        currentMessage10_[0x0b] = 1u;
+        currentMessage10_[0x0c] = 0u;
+        currentMessage10_[0x0d] = 0u;
+        *reinterpret_cast<uint16_t*>(currentMessage10_ + 0x0eu) = 0u;
+        dataSectionBytes14_ = nullptr;
+        dataSectionByteCount18_ = 0u;
     }
 
     valid = currentMessage10_ != nullptr;
-    // Verify this is actually a LoadCharacterReply (0x10) before parsing
-    if (valid && currentMessage10_[0] != 0x10u) {
+    if (!valid) {
+        return;
+    }
+    if (currentMessage10_[0] != 0x10u) {
+        valid = false;
         spdlog::debug("LoadCharacterReplyEnvelope: expected msgType=0x10 but got 0x{:02x}, will fallback to callback84", currentMessage10_[0]);
         return;
     }
 
-    // Parse standard message envelope fields
     status = ReadU32LE(currentMessage10_ + 1u);
     field05 = ReadU32LE(currentMessage10_ + 5u);
     handoffWord09 = ReadU16LE(currentMessage10_ + 9u);
@@ -274,35 +280,23 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
 void LoadCharacterReplyEnvelope_0x4b542c::RefreshDataSectionView(char initializeEmptyReply) {
     currentMessage10_ = messageBase04_;
     if (initializeEmptyReply == '\0') {
-        dataSectionBytes14_ = nullptr;
-        dataSectionByteCount18_ = 0u;
-        return;
-    }
-    if (currentMessage10_ == nullptr || incomingMessageRef08_ == nullptr) {
-        dataSectionBytes14_ = nullptr;
-        dataSectionByteCount18_ = 0u;
-        return;
-    }
-
-    // Get payload info from the message ref's storage
-    const auto* storage = incomingMessageRef08_->messageStorage0c;
-    if (storage == nullptr) {
-        dataSectionBytes14_ = nullptr;
-        dataSectionByteCount18_ = 0u;
-        return;
-    }
-
-    const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10_ + 0x0eu);
-    const uint16_t payloadByteCount = storage->PayloadByteCount();
-    if (sectionOffset0eLocal != 0u &&
-        static_cast<size_t>(sectionOffset0eLocal) + 2u <= payloadByteCount) {
-        dataSectionByteCount18_ = ReadU16LE(currentMessage10_ + sectionOffset0eLocal);
-        dataSectionBytes14_ = currentMessage10_ + sectionOffset0eLocal + 2u;
-        const size_t remaining = payloadByteCount - (sectionOffset0eLocal + 2u);
-        if (dataSectionByteCount18_ > remaining) {
-            dataSectionByteCount18_ = static_cast<uint16_t>(remaining);
+        if (incomingMessageRef08_ != nullptr) {
+            incomingMessageRef08_->GrowPayloadByteCount(0x10u);
+            if (incomingMessageRef08_->messageStorage0c != nullptr) {
+                messageBase04_ = incomingMessageRef08_->messageStorage0c->payloadBytes0c.data();
+                currentMessage10_ = messageBase04_;
+            }
         }
         return;
+    }
+
+    if (currentMessage10_ != nullptr) {
+        const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10_ + 0x0eu);
+        if (sectionOffset0eLocal != 0u) {
+            dataSectionByteCount18_ = ReadU16LE(currentMessage10_ + sectionOffset0eLocal);
+            dataSectionBytes14_ = currentMessage10_ + sectionOffset0eLocal + 2u;
+            return;
+        }
     }
 
     dataSectionByteCount18_ = 0u;

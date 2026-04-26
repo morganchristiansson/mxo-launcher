@@ -274,17 +274,30 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
 
 // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
 uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    (void)workItem;
-    if (!g_CurrentLoginMediator) {
+    if (!g_CurrentLoginMediator || workItem == nullptr) {
         return 0u;
     }
+
+    // anchor: launcher.exe:0x440331 / 0x41bc20 then 0x440339 CMP AX,0x10
+    uint16_t messageCode = 0;
+    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
+        // Original just falls into the same reject path because opcode 0 != 0x10.
+    }
+    if (messageCode != 0x10u) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
+        spdlog::info(
+            "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage rejected messageCode=0x{:04x}; mirrored original owner+0x80=0x12000005 and returned false-like",
+            static_cast<unsigned>(messageCode));
+        return 0u;
+    }
+
     auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     // anchor: launcher.exe:0x43ae50
     LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
     if (!loadCharacterReplyEnvelope.valid) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage rejected message ref; mirrored original owner+0x80=0x12000005 and returned false-like");
+            "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage rejected decoded opcode-0x10 message layout; mirrored original owner+0x80=0x12000005 and returned false-like");
         return 0u;
     }
 

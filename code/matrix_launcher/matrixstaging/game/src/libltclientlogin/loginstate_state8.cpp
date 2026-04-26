@@ -438,8 +438,7 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
 
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
 uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
-    (void)workItem;
-    if (!g_CurrentLoginMediator) {
+    if (!g_CurrentLoginMediator || workItem == nullptr) {
         return 0u;
     }
 
@@ -450,28 +449,36 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
     // - only other decoded message codes fall through owner `+0x184 -> 0x41f260` and land here
     // - practical consequence: the raw state8 reply opcode `0x10` belongs on that fallback path,
     //   not on the base code-4 wrapper branch
-    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
-    // anchor: launcher.exe:0x43ae50
-    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
-    if (!loadCharacterReplyEnvelope.valid) {
-        // Log only if we got a message ref but it couldn't be parsed
-        if (messageRef != nullptr) {
-            spdlog::info(
-                "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage saw message ref but parse rejected currentState={} (expected MS_LoadCharacterReply layout)",
-                g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-        }
-        spdlog::debug("CLTLoginState_State8_Slot6: falling back to callback84 for message");
+    // anchor: launcher.exe:0x43f941 / 0x41bc20 then 0x43f949 CMP AX,0x10
+    uint16_t messageCode = 0;
+    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
+        // Original just observes opcode 0 here and takes the same non-0x10 fallback path.
+    }
+
+    if (messageCode != 0x10u) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
             spdlog::info(
-                "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x{:08x}",
+                "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 messageCode=0x{:04x} -> dispatchResult=0x{:08x}",
+                static_cast<unsigned>(messageCode),
                 fallbackResult);
             return 1u;
         }
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 messageCode=0x{:04x} returned 0x{:08x}; mirrored owner+0x80=0x12000005",
+            static_cast<unsigned>(messageCode),
             fallbackResult);
+        return 0u;
+    }
+
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
+    // anchor: launcher.exe:0x43ae50
+    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
+    if (!loadCharacterReplyEnvelope.valid) {
+        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
+        spdlog::info(
+            "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage rejected decoded opcode-0x10 message layout; mirrored owner+0x80=0x12000005");
         return 0u;
     }
 
