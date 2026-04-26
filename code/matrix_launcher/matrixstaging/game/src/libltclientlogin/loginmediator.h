@@ -1464,10 +1464,6 @@ private:
         uint8_t plainRawCode,
         const char* stepLabel,
         bool encryptedTransport);
-    uint32_t ContinueMarginBootstrapHandshake(
-        const uint8_t* payloadBytes,
-        size_t payloadSize,
-        bool transportEncrypted);
     // ABI-safety note:
     // - margin CERT/MS bootstrap/session storage is intentionally kept in a sidecar keyed by the
     //   mediator pointer in `loginmediator.cpp`

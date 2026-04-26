@@ -141,10 +141,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 *g_CurrentLoginMediator->authBootstrapChild680_,
                 *g_CurrentLoginMediator,
                 g_CurrentLoginMediator->lastAuthReply_);
-            // REMOVED for fidelity: original at 0x43f300 does NOT call ResetMarginBootstrapState or
-            // RecoverAuthReplyPrivateExponentIntoMarginBootstrapState in auth-reply success path.
-            // Original does inline recovery during margin CERT_Challenge (via margin +0xa0 bootstrap object).
-            // See ContinueMarginBootstrapHandshake for lazy inline recovery implementation.
 
             // SOURCE-ONLY: diagnostic logging; no binary counterpart.
             AuthBootstrap680LogParsedAuthReply(*g_CurrentLoginMediator, g_CurrentLoginMediator->lastAuthReply_);
