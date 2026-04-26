@@ -17,15 +17,31 @@ namespace {
 // State6Packet0x06FixedPayload is defined in loginstate_packet_builder_scaffold.h
 
 static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* mediator) {
-  (void)mediator;
-
   // anchor: launcher.exe:0x438e60 = GetGOBFileGUID
   // Original `0x43b8f0` reads a 16-byte LTGUID for packed GOB resource `0x3e000000` and falls
   // back to the baked-in dwords at `0x4ae6c0..0x4ae6cc` when that resource cannot be opened.
-  // Current replacement does not yet own that launcher resource-manager bridge, but the baked-in
-  // fallback bytes are now at least mirrored explicitly instead of leaving state6 slot3 on a
-  // synthetic packet shape.
-  return {0u, 0u, 0u, 0u};
+  // Current replacement still lacks that launcher resource-manager bridge, so the literal static-RE
+  // fallback is all-zero dwords.
+  std::array<uint32_t, 4> gobGuidWords = {0u, 0u, 0u, 0u};
+
+  // Bounded emulator-compatibility fallback guided by the live client.dll `0x62170f48` producer:
+  // - the later state8 `+0xec / 0x41c1f0` snapshot is built from nine 16-byte cfg-digest blocks
+  // - Reality stores the 16-byte `MS_ConnectRequest` weird-sequence bytes and then expects the
+  //   later state8 repeated blocks to compare equal against them
+  // - with the true packed-resource GUID bridge still missing, reuse the first repeated state8
+  //   block (`blockCf0`) when it is present so the state6/state8 pair remains coherent on the
+  //   active emulator path
+  if (mediator != nullptr) {
+    const auto& cfgDigestBlock = mediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0;
+    const bool haveCfgDigestBlock =
+        cfgDigestBlock[0] != 0u || cfgDigestBlock[1] != 0u || cfgDigestBlock[2] != 0u ||
+        cfgDigestBlock[3] != 0u;
+    if (haveCfgDigestBlock) {
+      gobGuidWords = cfgDigestBlock;
+    }
+  }
+
+  return gobGuidWords;
 }
 
 static const char* ResolveClientMetricFilenameById(uint16_t metricId) {
