@@ -849,38 +849,44 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                     spdlog::info(
                         "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage section0x0a invariant failed: packet byte +0x0b chunk ordinal is zero");
                 } else {
-                    const size_t chunkIndex = static_cast<size_t>(loadCharacterReplyEnvelope.expectedSectionCount0b - 1u);
-                    const size_t chunkOffset = chunkIndex * 1000u;
+                    const uint32_t chunkIndex = static_cast<uint32_t>(loadCharacterReplyEnvelope.expectedSectionCount0b - 1u);
+                    const size_t chunkOffset = static_cast<size_t>(chunkIndex) * 1000u;
                     if (chunkOffset + loadCharacterReplyEnvelope.sectionByteCount <= 0x7d00u) {
                         std::memcpy(
                             static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + chunkOffset,
                             loadCharacterReplyEnvelope.sectionData,
                             loadCharacterReplyEnvelope.sectionByteCount);
-                        StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).SetSeen(static_cast<uint32_t>(chunkIndex));
+                        StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).SetSeen(chunkIndex);
                         ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
                             ownerState.allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
                     }
                 }
-                ownerState.flag145a = 1u;
-                persistence.section0aChunkedBuffer538 = ownerState.allocatedBuffer1454;
-                persistence.section0aChunkedLength53c = ownerState.allocatedBufferLength1458;
-                persistence.section0aPresentFlag53e = 1u;
             }
+            ownerState.flag145a = 1u;
+            persistence.section0aChunkedBuffer538 = ownerState.allocatedBuffer1454;
+            persistence.section0aChunkedLength53c = ownerState.allocatedBufferLength1458;
+            persistence.section0aPresentFlag53e = 1u;
             break;
         case 11u:
-            // anchor: launcher.exe:0x43f8c0
-            // Current best read from disassembly:
-            // - if section byteCount > 4, copy the leading dword into owner `+0x145c`
-            // - then copy the remaining bytes into the small-string-like family at owner `+0x1460`
-            // - otherwise clear both fields
+            // anchor: launcher.exe:0x43f8c0 = CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect
+            // Exact helper behavior:
+            // - if byteCount > 4, store leading dword and assign range [data+4, data+byteCount)
+            // - else zero dword and, if the current string is non-empty, write a terminating NUL at
+            //   begin and collapse current back to begin
             ownerState.state8Section11Dword145c = 0u;
-            ownerState.state8Section11String1460.clear();
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount > 4u) {
                 ownerState.state8Section11Dword145c = ReadU32LE(loadCharacterReplyEnvelope.sectionData);
                 ownerState.state8Section11String1460.assign(
                     reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + 4u),
                     reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + loadCharacterReplyEnvelope.sectionByteCount));
-                persistence.section11Dword540 = ownerState.state8Section11Dword145c;
+            } else if (!ownerState.state8Section11String1460.empty()) {
+                ownerState.state8Section11String1460[0] = '\0';
+                ownerState.state8Section11String1460.resize(0u);
+            } else {
+                ownerState.state8Section11String1460.clear();
+            }
+            persistence.section11Dword540 = ownerState.state8Section11Dword145c;
+            {
                 char* const section11Begin = ownerState.state8Section11String1460.data();
                 persistence.section11StringBegin544 = section11Begin;
                 persistence.section11StringCurrent548 =
