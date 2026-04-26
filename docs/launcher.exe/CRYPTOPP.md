@@ -237,6 +237,50 @@ This is the preferred fidelity tradeoff:
 
 ---
 
+## 2.6 Are these classes actually Crypto++?
+
+Yes for several of them — and this should be stated explicitly.
+
+### Actually Crypto++ or best treated as actual Crypto++
+
+| Address / recovered name | Best interpretation | Status |
+|--------------------------|---------------------|--------|
+| `0x4b42b0` / `cls_0x4b42b0` | `CryptoPP::Algorithm` | **Actually Crypto++** |
+| `0x4b68a8` | old `CryptoPP::RandomPool` family (`CryptoPP::OldRandomPool` in modern tree) | **Actually Crypto++** |
+| `0x4b41e0` | `CryptoPP::BufferedTransformation` interface slice | **Actually Crypto++ interface/base** |
+| `0x4b659c` / `cls_0x4b659c` | `CryptoPP::InvertibleRSAFunction`-equivalent key state | **Actually Crypto++ semantics** |
+| `0x4b69b4` | `CryptoPP::RSAES_OAEP_SHA_Decryptor` | **Actually Crypto++** |
+| `0x4ba258` | SHA1 hash context/base | **Very likely actual Crypto++ SHA1-family code** |
+| `0x4ba7d8` | SHA1 init wrapper / specialization layer | **Very likely actual Crypto++ SHA1-family code** |
+
+### Not actually a pure Crypto++ class
+
+| Address / recovered name | Best interpretation | Status |
+|--------------------------|---------------------|--------|
+| `0x4b42bc` / `CryptoInitHelper_0x4b42bc` | launcher-owned wrapper around Crypto++ subobjects | **Launcher wrapper** |
+| `0x4b6a60` | MSVC MI construction-stage object for the decryptor family | **Construction scaffold** |
+| `0x4b6ae0` | final complete-object construction state around the decryptor family | **Construction scaffold** |
+
+### Heuristic note: MSVC MI construction is now a Crypto++ fingerprint in this binary
+
+At this point, repeated MSVC multiple-inheritance construction patterns are not random noise for
+this launcher. In practice they correlate strongly with Crypto++:
+
+- vbptr writes
+- temporary constructor-state vtables
+- adjustor thunks
+- complete-object ctor flags like `param_4 != 0`
+
+So for this binary, **“we hit crazy MSVC MI construction” is now positive evidence toward a
+Crypto++ identification**, especially when combined with method-level behavior like OAEP, SHA1,
+RandomPool, or AlgorithmName=`"unknown"`.
+
+### Documentation split note
+
+`CRYPTOPP.md` is still manageable as the canonical overview. If it grows further, the best split is
+likely per-vtable notes under `../../docs/launcher.exe/VTABLES/0x00*.md`, with `CRYPTOPP.md`
+remaining the top-level mapping/index.
+
 ## 3. Summary table
 
 | Launcher address / name | Crypto++ class (best match) | Confidence | Notes |
