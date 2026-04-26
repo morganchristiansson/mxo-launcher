@@ -51,8 +51,9 @@ class ClientChunkHashStorage {
   std::vector<ChunkHashResult> hashes_;
 };
 
-// Global storage accessed by client.dll via ABI
-// anchor: launcher.exe:DAT_004f79d8 / DAT_004f79dc pattern
+// Source-owned digest cache used by the replacement login flow.
+// Fidelity note: launcher.exe DAT_004f79d8 / DAT_004f79dc are the raw scratch-buffer globals
+// inside GenerateClientChunkHashes, while this container mirrors the growable output aggregate.
 extern ClientChunkHashStorage g_ClientChunkHashStorage;
 
 }  // namespace mxo::ltlogin

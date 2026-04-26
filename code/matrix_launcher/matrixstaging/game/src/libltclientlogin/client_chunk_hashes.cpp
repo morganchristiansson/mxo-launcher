@@ -19,13 +19,22 @@
 #include <spdlog/spdlog.h>
 #include <sha.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace mxo::ltlogin {
 
-// Global storage instance
-// anchor: launcher.exe static storage pattern (DAT_004f79d8 / DAT_004f79dc)
+// Source-owned digest cache used by the replacement login flow.
+// Fidelity note: this mirrors the growable output container passed as param_4 into
+// launcher.exe:0x43d800, not the raw scratch-buffer globals at DAT_004f79d8/DAT_004f79dc.
 ClientChunkHashStorage g_ClientChunkHashStorage;
+
+// launcher.exe raw hashing scratch-buffer globals used directly by 0x43d800.
+// Keep the original addresses in the source names so Ghidra/source can stay aligned.
+// anchor: launcher.exe:DAT_004f79d8
+static uint8_t* g_ClientChunkHashScratchBuffer_0x4f79d8 = nullptr;
+// anchor: launcher.exe:DAT_004f79dc
+static size_t g_ClientChunkHashScratchBufferSize_0x4f79dc = 0u;
 
 // anchor: launcher.exe:0x43d800
 bool GenerateClientChunkHashes(
@@ -36,9 +45,23 @@ bool GenerateClientChunkHashes(
       "GenerateClientChunkHashes(): Starting hash generation for {} files",
       filenames.size());
 
+  constexpr size_t kChunkSize = 0x100000U;
+  if (g_ClientChunkHashScratchBufferSize_0x4f79dc != kChunkSize) {
+    void* const resizedBuffer =
+        std::realloc(g_ClientChunkHashScratchBuffer_0x4f79d8, kChunkSize);
+    if (resizedBuffer == nullptr) {
+      spdlog::warn(
+          "GenerateClientChunkHashes(): Could not allocate 0x{:x}-byte scratch buffer",
+          static_cast<unsigned>(kChunkSize));
+      return false;
+    }
+    g_ClientChunkHashScratchBuffer_0x4f79d8 = static_cast<uint8_t*>(resizedBuffer);
+    g_ClientChunkHashScratchBufferSize_0x4f79dc = kChunkSize;
+  }
+
   // ORIGINAL 0x43d800: iterates over filename array, opens each file,
-  // reads in 1MB chunks, SHA1 hashes each chunk, stores in global.
-  // Matching that flow exactly now.
+  // reads in 1MB chunks through DAT_004f79d8, SHA1 hashes each chunk, and stores the
+  // first 16 digest bytes in the caller-provided output container.
   for (const auto& filename : filenames) {
     FILE* file = std::fopen(filename.c_str(), "rb");
     if (!file) {
@@ -59,8 +82,6 @@ bool GenerateClientChunkHashes(
 
     // Process in 1MB chunks (0x100000 bytes)
     // anchor: launcher.exe:0x43d800 chunk size
-    constexpr size_t kChunkSize = 0x100000U;
-    std::vector<uint8_t> buffer(kChunkSize);
 
     size_t totalBytesProcessed = 0;
     size_t chunkIndex = 0;
@@ -70,7 +91,8 @@ bool GenerateClientChunkHashes(
           kChunkSize,
           static_cast<size_t>(fileSize) - totalBytesProcessed);
 
-      const size_t bytesRead = std::fread(buffer.data(), 1, bytesToRead, file);
+      const size_t bytesRead =
+          std::fread(g_ClientChunkHashScratchBuffer_0x4f79d8, 1, bytesToRead, file);
       if (bytesRead != bytesToRead) {
         std::fclose(file);
         spdlog::warn(
@@ -82,7 +104,7 @@ bool GenerateClientChunkHashes(
       // Compute SHA1 of this chunk
       // anchor: launcher.exe:0x43d800 SHA1 hash computation
       CryptoPP::SHA1 sha1;
-      sha1.Update(buffer.data(), static_cast<uint32_t>(bytesRead));
+      sha1.Update(g_ClientChunkHashScratchBuffer_0x4f79d8, static_cast<uint32_t>(bytesRead));
 
       uint8_t digest[20] = {};
       sha1.Final(digest);
