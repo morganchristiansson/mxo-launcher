@@ -2354,46 +2354,6 @@ static uint32_t RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(size_t re
     return rounded;
 }
 
-static uint32_t CryptoPP_Integer_RoundWordCapacityForValue(
-    const CryptoPP::Integer& value) {
-    const size_t encodedByteCount = std::max<size_t>(
-        static_cast<size_t>(value.MinEncodedSize()),
-        1u);
-    const size_t requiredWordCount = (encodedByteCount + 3u) / 4u;
-    return RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(requiredWordCount);
-}
-
-static bool CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers(
-    CryptoPP::RSA::PrivateKey& outPrivateKey,
-    const CryptoPP::Integer& modulus,
-    const CryptoPP::Integer& publicExponent,
-    const CryptoPP::Integer& privateExponent) {
-    spdlog::debug(
-        "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers: "
-        "modulusBits={} publicExponentBits={} privateExponentBits={} modulusBytes={}",
-        modulus.BitCount(),
-        publicExponent.BitCount(),
-        privateExponent.BitCount(),
-        modulus.ByteCount());
-
-    if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
-        spdlog::warn(
-            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers: "
-            "zero CryptoPP::Integer component detected");
-        return false;
-    }
-
-    outPrivateKey.Initialize(modulus, publicExponent, privateExponent);
-
-    spdlog::debug(
-        "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers: "
-        "CRT derivation succeeded ciphertextBytes={} prime1Bits={} prime2Bits={}",
-        outPrivateKey.GetModulus().ByteCount(),
-        outPrivateKey.GetPrime1().BitCount(),
-        outPrivateKey.GetPrime2().BitCount());
-    return true;
-}
-
 }  // namespace
 
 // anchor: launcher.exe:0x465d70
@@ -2403,11 +2363,30 @@ static bool CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPriv
     const CryptoPP::Integer& publicExponent,
     const CryptoPP::Integer& privateExponent) {
     try {
-        return CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers(
-            outPrivateKey,
-            modulus,
-            publicExponent,
-            privateExponent);
+        spdlog::debug(
+            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
+            "modulusBits={} publicExponentBits={} privateExponentBits={} modulusBytes={}",
+            modulus.BitCount(),
+            publicExponent.BitCount(),
+            privateExponent.BitCount(),
+            modulus.ByteCount());
+
+        if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
+            spdlog::warn(
+                "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
+                "zero CryptoPP::Integer component detected");
+            return false;
+        }
+
+        outPrivateKey.Initialize(modulus, publicExponent, privateExponent);
+
+        spdlog::debug(
+            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
+            "CRT derivation succeeded ciphertextBytes={} prime1Bits={} prime2Bits={}",
+            outPrivateKey.GetModulus().ByteCount(),
+            outPrivateKey.GetPrime1().BitCount(),
+            outPrivateKey.GetPrime2().BitCount());
+        return true;
     } catch (const CryptoPP::Exception& exception) {
         spdlog::warn(
             "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey failed: {}",
@@ -2592,6 +2571,18 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
 
     const auto* prepState = connection_.bootstrapPrepStateA0_.get();
 
+    // anchor: launcher.exe:0x45d340
+    // Preserve the old `CryptoPP::Integer` rounded-capacity view used by the launcher-side
+    // `0x4ba50c` object family for logging/comparison. The constructor family at `0x45d340`
+    // rounds requested 32-bit word counts through `DAT_004ba310`, then 0x10/0x20/0x40, then the
+    // next power of two.
+    const uint32_t modulusCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+        static_cast<size_t>(modulus.WordCount()));
+    const uint32_t publicExponentCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+        static_cast<size_t>(publicExponent.WordCount()));
+    const uint32_t privateExponentCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+        static_cast<size_t>(privateExponent.WordCount()));
+
     uint32_t prime1Cap = 0u;
     uint32_t prime2Cap = 0u;
     uint32_t crtExp1Cap = 0u;
@@ -2599,25 +2590,25 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     uint32_t crtInverseCap = 0u;
     if (prepState->HasBootstrapPrivateKey()) {
         const auto& privateKey = prepState->BootstrapPrivateKey();
-        prime1Cap =
-            CryptoPP_Integer_RoundWordCapacityForValue(privateKey.GetPrime1());
-        prime2Cap =
-            CryptoPP_Integer_RoundWordCapacityForValue(privateKey.GetPrime2());
-        crtExp1Cap = CryptoPP_Integer_RoundWordCapacityForValue(
-            privateKey.GetModPrime1PrivateExponent());
-        crtExp2Cap = CryptoPP_Integer_RoundWordCapacityForValue(
-            privateKey.GetModPrime2PrivateExponent());
-        crtInverseCap = CryptoPP_Integer_RoundWordCapacityForValue(
-            privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
+        prime1Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+            static_cast<size_t>(privateKey.GetPrime1().WordCount()));
+        prime2Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+            static_cast<size_t>(privateKey.GetPrime2().WordCount()));
+        crtExp1Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+            static_cast<size_t>(privateKey.GetModPrime1PrivateExponent().WordCount()));
+        crtExp2Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+            static_cast<size_t>(privateKey.GetModPrime2PrivateExponent().WordCount()));
+        crtInverseCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
+            static_cast<size_t>(privateKey.GetMultiplicativeInverseOfPrime2ModPrime1().WordCount()));
     }
 
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored "
         "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapState_0x443220)),
-        static_cast<unsigned>(CryptoPP_Integer_RoundWordCapacityForValue(modulus)),
-        static_cast<unsigned>(CryptoPP_Integer_RoundWordCapacityForValue(publicExponent)),
-        static_cast<unsigned>(CryptoPP_Integer_RoundWordCapacityForValue(privateExponent)),
+        static_cast<unsigned>(modulusCap),
+        static_cast<unsigned>(publicExponentCap),
+        static_cast<unsigned>(privateExponentCap),
         static_cast<unsigned>(prime1Cap),
         static_cast<unsigned>(prime2Cap),
         static_cast<unsigned>(crtExp1Cap),
