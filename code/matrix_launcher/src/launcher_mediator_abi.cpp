@@ -1169,6 +1169,62 @@ static uint32_t __thiscall Mediator_RequestMarginConnectionCloseWaitEvent0f(Mini
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RequestMarginConnectionCloseWaitEvent0f() ? 1u : 0u;
 }
 
+// UNANCHORED: client.dll teardown/late-runtime may probe wrapper slots we have not RE'd yet.
+// Keep them non-null and noisy so `TermClientDLL` can progress far enough to show which slots
+// still matter, without fabricating owner-side behavior.
+static uint32_t Mediator_LogUnimplementedSlotReturnZero(const char* slotName, void* caller) {
+    spdlog::info(
+        "MediatorStub::{} unimplemented caller={} [{}] -> returnValue=0",
+        slotName,
+        caller,
+        DescribeLateMediatorAbiCaller(caller));
+    return 0;
+}
+
+#define DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(slotSuffix)                                 \
+    static uint32_t __thiscall Mediator_UnimplementedSlot##slotSuffix(                 \
+        MinimalLoginMediatorStub* self) {                                              \
+        (void)self;                                                                    \
+        return Mediator_LogUnimplementedSlotReturnZero(                                \
+            "slot +0x" #slotSuffix, __builtin_return_address(0));                    \
+    }
+
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(04)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(14)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(18)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(20)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(28)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(34)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(64)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(E8)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(F0)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(110)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(114)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(11c)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(128)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(130)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(134)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(138)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(140)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(144)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(14c)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(150)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(154)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(158)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(15c)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(160)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(168)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(17c)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(180)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(184)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(188)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(190)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(194)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(198)
+DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(19c)
+
+#undef DEFINE_MEDIATOR_UNIMPLEMENTED_STUB
+
 // UNANCHORED: seeds the replacement ILTLoginMediator_0x4af2b8.Default ABI vtable from recovered slot usage.
 static void InitializeMediatorStub() {
     static bool initialized = false;
@@ -1178,18 +1234,19 @@ static void InitializeMediatorStub() {
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
     // Forward to ILTLoginMediator_0x4af2b8::Default vtable slot 0 (original Mediator_GetName)
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
-    // +0x04
+    g_LoginMediatorVtable[1] = (void*)Mediator_UnimplementedSlot04; // +0x04
     g_LoginMediatorVtable[2] = (void*)Mediator_RegisterLauncherNetworkEngineObject08; // +0x08
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
-    // +0x14
-    // +0x18
+    g_LoginMediatorVtable[5] = (void*)Mediator_UnimplementedSlot14; // +0x14
+    g_LoginMediatorVtable[6] = (void*)Mediator_UnimplementedSlot18; // +0x18
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
-    // +0x20
+    g_LoginMediatorVtable[8] = (void*)Mediator_UnimplementedSlot20; // +0x20
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue2;        // +0x24
-    // +0x28
+    g_LoginMediatorVtable[10] = (void*)Mediator_UnimplementedSlot28; // +0x28
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[12] = (void*)Mediator_ProcessLoginRequest30; // +0x30
+    g_LoginMediatorVtable[13] = (void*)Mediator_UnimplementedSlot34; // +0x34
     g_LoginMediatorVtable[14] = (void*)Mediator_GetUsername38;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
@@ -1201,7 +1258,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[22] = (void*)Mediator_GetCrashReporterPromptForSecurId58; // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetCrashReporterUsername5c; // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetCrashReporterPassword60; // +0x60
-    // +0x64
+    g_LoginMediatorVtable[25] = (void*)Mediator_UnimplementedSlot64; // +0x64
     g_LoginMediatorVtable[26] = (void*)Mediator_HasLiveCorpus68; // +0x68
     g_LoginMediatorVtable[27] = (void*)Mediator_HasLiveCorpus6c; // +0x6c
     g_LoginMediatorVtable[28] = (void*)Mediator_HasLiveCorpus70; // +0x70
@@ -1234,7 +1291,9 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
     g_LoginMediatorVtable[56] = (void*)Mediator_GetVariantWorldName; // +0xe0
     g_LoginMediatorVtable[57] = (void*)Mediator_GetVariantState; // +0xe4
+    g_LoginMediatorVtable[58] = (void*)Mediator_UnimplementedSlotE8; // +0xe8
     g_LoginMediatorVtable[59] = (void*)Mediator_PersistSelectionContextForState8; // +0xec
+    g_LoginMediatorVtable[60] = (void*)Mediator_UnimplementedSlotF0; // +0xf0
     g_LoginMediatorVtable[61] = (void*)Mediator_GetState8PersistenceF1c; // +0xf4
     g_LoginMediatorVtable[62] = (void*)Mediator_GetWorldCount; // +0xf8
     g_LoginMediatorVtable[63] = (void*)Mediator_GetWorldNameByIndex; // +0xfc
@@ -1242,33 +1301,42 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldTypeByteByIndex; // +0x104
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldPopulationNibbleByIndex; // +0x108
     g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
-    // +0x110
-    // +0x114
+    g_LoginMediatorVtable[68] = (void*)Mediator_UnimplementedSlot110; // +0x110
+    g_LoginMediatorVtable[69] = (void*)Mediator_UnimplementedSlot114; // +0x114
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
-    // +0x11c
+    g_LoginMediatorVtable[71] = (void*)Mediator_UnimplementedSlot11c; // +0x11c
     g_LoginMediatorVtable[72] = (void*)Mediator_ProcessCreateCharacterInput120; // +0x120
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
-    // +0x128
+    g_LoginMediatorVtable[74] = (void*)Mediator_UnimplementedSlot128; // +0x128
     g_LoginMediatorVtable[75] = (void*)Mediator_GetStartupDistrObjExecutive8c; // +0x12c
-    // +0x130 GetSessionCallbackHelper65c
-    // +0x134 EnsureSessionCallbackHelper65c
-    // +0x138
+    g_LoginMediatorVtable[76] = (void*)Mediator_UnimplementedSlot130; // +0x130 GetSessionCallbackHelper65c
+    g_LoginMediatorVtable[77] = (void*)Mediator_UnimplementedSlot134; // +0x134 EnsureSessionCallbackHelper65c
+    g_LoginMediatorVtable[78] = (void*)Mediator_UnimplementedSlot138; // +0x138
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
-    // +0x140
-    // +0x144
+    g_LoginMediatorVtable[80] = (void*)Mediator_UnimplementedSlot140; // +0x140
+    g_LoginMediatorVtable[81] = (void*)Mediator_UnimplementedSlot144; // +0x144
     g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
-    // +0x14c SetSharedMarginPacketField660
-    // +0x150
-    // +0x154
-    // +0x158 SetState9OptionalField90AndSwitchToState13
-    // +0x15c
-    // +0x160
+    g_LoginMediatorVtable[83] = (void*)Mediator_UnimplementedSlot14c; // +0x14c SetSharedMarginPacketField660
+    g_LoginMediatorVtable[84] = (void*)Mediator_UnimplementedSlot150; // +0x150
+    g_LoginMediatorVtable[85] = (void*)Mediator_UnimplementedSlot154; // +0x154
+    g_LoginMediatorVtable[86] = (void*)Mediator_UnimplementedSlot158; // +0x158 SetState9OptionalField90AndSwitchToState13
+    g_LoginMediatorVtable[87] = (void*)Mediator_UnimplementedSlot15c; // +0x15c
+    g_LoginMediatorVtable[88] = (void*)Mediator_UnimplementedSlot160; // +0x160
     g_LoginMediatorVtable[89] = (void*)Mediator_RequestAuthConnectionCloseWaitEvent1;   // +0x164
+    g_LoginMediatorVtable[90] = (void*)Mediator_UnimplementedSlot168; // +0x168
     g_LoginMediatorVtable[91] = (void*)Mediator_RequestMarginConnectionCloseWaitEvent0f;   // +0x16c
     g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170
     g_LoginMediatorVtable[93] = (void*)Mediator_UnregisterLoginObserver174; // +0x174
     g_LoginMediatorVtable[94] = (void*)Mediator_GetLastLoginStatus; // +0x178
+    g_LoginMediatorVtable[95] = (void*)Mediator_UnimplementedSlot17c; // +0x17c
+    g_LoginMediatorVtable[96] = (void*)Mediator_UnimplementedSlot180; // +0x180
+    g_LoginMediatorVtable[97] = (void*)Mediator_UnimplementedSlot184; // +0x184
+    g_LoginMediatorVtable[98] = (void*)Mediator_UnimplementedSlot188; // +0x188
     g_LoginMediatorVtable[99] = (void*)Mediator_FillState9CallbackBlob18c; // +0x18c
+    g_LoginMediatorVtable[100] = (void*)Mediator_UnimplementedSlot190; // +0x190
+    g_LoginMediatorVtable[101] = (void*)Mediator_UnimplementedSlot194; // +0x194
+    g_LoginMediatorVtable[102] = (void*)Mediator_UnimplementedSlot198; // +0x198
+    g_LoginMediatorVtable[103] = (void*)Mediator_UnimplementedSlot19c; // +0x19c
 
     ResetMediatorObjectState();
 }
