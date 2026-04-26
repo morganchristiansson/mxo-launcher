@@ -314,6 +314,95 @@ public:
 // Note: keep the `_14_` suffix as the source-of-truth offset cue here.
 // `offsetof` on these virtual packet builders triggers noisy non-standard-layout warnings.
 
+// anchor: launcher.exe vtable 0x004b5404 / packet 0x0e reply parser
+// anchor: launcher.exe:0x43aae0 = ctor / parse wrapper
+//
+// Object layout: inherits Packet_0x4af2a4 at +0x00, no additional raw fields.
+//
+// Margin opcode 0x0e = MS_DeleteCharacterReply (used by state7 for delete-character completion)
+class Packet_MsDeleteCharacterReply_0x4b5404 : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+    // anchor: launcher.exe:0x43aae0
+    // Static-RE faithful wrapper around the incoming message-ref payload view.
+    // `initializeEmptyReply == 0` mirrors the original "build empty reply" path;
+    // any nonzero value keeps the incoming payload untouched and only resolves the
+    // logical payload pointer / opcode view.
+    Packet_MsDeleteCharacterReply_0x4b5404(
+        mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
+        char initializeEmptyReply) {
+        if (messageRef08) {
+            messageRef08->Release();
+        }
+        messageRef08 = nullptr;
+        payloadPtr04 = 0u;
+        payloadAlias10 = nullptr;
+        debugString14 = nullptr;
+        payloadSize18 = 0u;
+        packetType1a = 0u;
+        createRefParam0c = static_cast<uint8_t>(initializeEmptyReply != 0);
+
+        messageRef08 = incomingMessageRef;
+        if (messageRef08 != nullptr) {
+            messageRef08->AddRef();
+        }
+
+        if (messageRef08 != nullptr && messageRef08->messageStorage0c != nullptr) {
+            const uint8_t* const payloadBytes = messageRef08->messageStorage0c->PayloadBase();
+            if (payloadBytes != nullptr) {
+                if (messageRef08->headerless10 == 0u) {
+                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(const_cast<uint8_t*>(payloadBytes)));
+                    payloadAlias10 = const_cast<uint8_t*>(payloadBytes);
+                } else if (messageRef08->messageStorage0c->PayloadByteCount() >= 2u) {
+                    const uint8_t descriptorByte = payloadBytes[1];
+                    const uint32_t lookupHigh = ::g_MessageOffsetLookupTable[(descriptorByte >> 4u) & 7u];
+                    const uint32_t lookupLow = ::g_MessageOffsetLookupTable[descriptorByte & 7u];
+                    auto* const logicalPayload = const_cast<uint8_t*>(payloadBytes + lookupHigh + lookupLow + 0x12u);
+                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(logicalPayload));
+                    payloadAlias10 = logicalPayload;
+                    messageRef08->headerless10 = 1u;
+                }
+            }
+        }
+
+        if (initializeEmptyReply == '\0') {
+            if (messageRef08 != nullptr && messageRef08->messageStorage0c != nullptr) {
+                messageRef08->messageStorage0c->GrowPayloadByteCount(0x0du);
+                if (messageRef08->messageStorage0c != nullptr) {
+                    payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+                    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadAlias10));
+                }
+            }
+            uint8_t* const payload = static_cast<uint8_t*>(payloadAlias10);
+            if (payload != nullptr) {
+                payload[0] = 0x0eu;
+                *reinterpret_cast<uint32_t*>(payload + 0x01u) = 0u;
+                *reinterpret_cast<uint32_t*>(payload + 0x05u) = 0u;
+                *reinterpret_cast<uint32_t*>(payload + 0x09u) = 0u;
+            }
+        }
+    }
+
+    bool Valid() const {
+        if (messageRef08 == nullptr || messageRef08->messageStorage0c == nullptr ||
+            messageRef08->messageStorage0c->PayloadByteCount() < 0x0du) {
+            return false;
+        }
+        const uint8_t* const payload = static_cast<const uint8_t*>(payloadAlias10);
+        return payload != nullptr && payload[0] == 0x0eu;
+    }
+
+    uint32_t Result09() const {
+        const uint8_t* const payload = static_cast<const uint8_t*>(payloadAlias10);
+        if (!Valid()) {
+            return 0u;
+        }
+        return static_cast<uint32_t>(payload[0x09u]) |
+               (static_cast<uint32_t>(payload[0x0au]) << 8u) |
+               (static_cast<uint32_t>(payload[0x0bu]) << 16u) |
+               (static_cast<uint32_t>(payload[0x0cu]) << 24u);
+    }
+};
+
 struct State10Packet0x0aFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
     // raw margin opcode `0x0a` = `MS_ClaimCharacterNameRequest`
