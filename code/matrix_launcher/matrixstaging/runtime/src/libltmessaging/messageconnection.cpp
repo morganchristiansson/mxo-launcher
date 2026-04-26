@@ -3659,52 +3659,56 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode4ForBootstrap(
 
 // anchor: launcher.exe:0x442d00
 uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
-    // anchor: launcher.exe:0x442d00
-    // Original: decode message code and route by value 2/4/5 to internal handlers
-    // Any other code falls through with false-ish return for owner continuation
-    uint16_t decodedMessageCode = CMessageConnectionMessageRef_DecodeMessageCode(
-        static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef));
-    const uint32_t messageCodeValue = static_cast<uint32_t>(decodedMessageCode);
+    if (!messageRef) {
+        return 0u;
+    }
 
-    // Variables needed for code4/5 handling
+    // anchor: launcher.exe:0x442d0e
+    // Static-RE routes through the shared message-code decode helper before the
+    // compact subtract / branch ladder at 0x442d19-0x442d24.
     auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef);
+    uint16_t decodedMessageCode = 0u;
+    bool usedHeaderlessLocatorDecode = false;
+    const uint32_t handledByBaseRouter =
+        CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
+            copiedMessageRef,
+            &decodedMessageCode,
+            &usedHeaderlessLocatorDecode,
+            nullptr);
+
+    if (handledByBaseRouter == 0u) {
+        // anchor: launcher.exe:0x442d26..0x442d2d
+        // Original fallthrough is the subtract-ladder residue with AL zeroed; callers
+        // only treat this as false-ish and forward the message to the owner helper path.
+        return (static_cast<int>(decodedMessageCode) - 5) & 0xFFFFFF00;
+    }
+
     const CMessageConnectionMessageStorage_0x4ba208* messageStorage = copiedMessageRef.messageStorage0c;
     const uint8_t* payloadBytes = messageStorage ? messageStorage->PayloadBase() : nullptr;
     const size_t payloadByteCount = messageStorage ? messageStorage->PayloadByteCount() : 0u;
-    bool usedHeaderlessLocatorDecode = false;
 
-    // anchor: launcher.exe:0x442d30 / code2 handling begins at 0x442d2e
-    if (messageCodeValue == 2u) {
+    if (decodedMessageCode == 2u) {
         // anchor: launcher.exe:0x442d8d -> 0x441a30
-        // FIDELITY: Original constructs Packet_MarginChallenge_0x4b654c on stack with
-        // messageRef and isHeaderless=1, then passes it to HandleCode2ForBootstrap.
         Packet_MarginChallenge_0x4b654c code2ParseResultBuffer(
-            const_cast<CMessageConnectionMessageRef_0x4ba23c*>(&copiedMessageRef),
+            &copiedMessageRef,
             /*isHeaderless=*/true);
-        // anchor: launcher.exe:0x442d9e -> 0x4429b0 / HandleCode2ForBootstrap
-        const uint32_t handledCode2 = HandleCode2ForBootstrap(&code2ParseResultBuffer);
-        void* parseResultBuffer = &code2ParseResultBuffer;
-        // anchor: launcher.exe:0x442da6-0x442dac
-        // Original checks: if (parseResultBuffer != nullptr) call callback from vtable+0x8
-        void* callbackResultBytes = nullptr;
-        if (parseResultBuffer != nullptr) {
-            // Simulated callback extraction from parse result buffer at vtable+0x8
-            // Original: callback = *(code**)(*(int*)parseResultBuffer + 8); callback();
-            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
-                static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef),
-                &callbackResultBytes);
-        }
-        // anchor: launcher.exe:0x442daf / return (callbackResult << 8) | 1
-        return (reinterpret_cast<uint32_t>(callbackResultBytes) >> 8) | 1u;
+
+        // anchor: launcher.exe:0x442d9e -> 0x4429b0
+        HandleCode2ForBootstrap(&code2ParseResultBuffer);
+
+        // anchor: launcher.exe:0x442da3..0x442dac
+        // Original loads the parse-result callback slot from EBP-0x14 and, when non-null,
+        // calls vtable+0x08 before forcing AL=1 for the handled return.
+        void* code2CompletionCallbackSlot = &code2ParseResultBuffer;
+        CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
+            &copiedMessageRef,
+            &code2CompletionCallbackSlot);
+        return 1u;
     }
 
-    // anchor: launcher.exe:0x442d38 - similar to code2, parse result stored at EBP-0x14 with callback at +0
-    void* code4CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 4u) {
-        // anchor: launcher.exe:0x442d72 -> 0x441bc0 / OnMessageCode4
-        // Original: CBaseMarginConnection_OnMessageCode4 parses and returns a parse result buffer.
-        // The parse result buffer contains: [callback at +0, parsed data at +4].
-        CBaseMarginConnection_0x4b64a8_Code4MessageScaffold code4ParseResultBuffer;
+        // anchor: launcher.exe:0x442d72 -> 0x441bc0
+        CBaseMarginConnection_0x4b64a8_Code4MessageScaffold code4ParseResultBuffer{};
         const bool hasCode4ParseResult =
             CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
                 copiedMessageRef,
@@ -3726,7 +3730,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
             "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code4 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode4={} logicalPayloadBytes={} status=0x{:08x} handledCode4={} connectionByte84={} this={} ownerContext={} currentState={}",
             static_cast<unsigned>(rawCode),
             hasCode4ParseResult && code4ParseResultBuffer.parsedPayload00.headerless08 ? 1u : 0u,
-            hasCode4ParseResult && code4ParseResultBuffer.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
+            hasCode4ParseResult ? (code4ParseResultBuffer.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : 0u)
+                                : (usedHeaderlessLocatorDecode ? 1u : 0u),
             hasCode4ParseResult ? 1u : 0u,
             static_cast<unsigned>(logicalPayloadByteCount),
             static_cast<unsigned>(hasCode4ParseResult ? code4ParseResultBuffer.statusOrPayload0c : 0u),
@@ -3735,74 +3740,67 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
-        // anchor: 0x442da6-0x442dac - callback only fires if OnMessageCode4 result non-null
-        // In original: extracts callback from parse-result (EBP-0x14 + 0), calls vtable+0x8
-        // Here we simulate: callback fires if parsing/result object was non-null
+
         if (hasCode4ParseResult) {
-            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code4CompletionCallbackSlot);
+            // anchor: launcher.exe:0x442d88..0x442dac
+            void* code4CompletionCallbackSlot = &code4ParseResultBuffer;
+            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
+                &copiedMessageRef,
+                &code4CompletionCallbackSlot);
         }
         return 1u;
     }
 
-    // anchor: launcher.exe:0x442d42 / EBP-0xc contains parse result for code5 (different stack offset than 2/4)
-    void* code5CompletionCallbackSlot = nullptr;
-    if (decodedMessageCode == 5u) {
-        CBaseMarginConnection_0x4b64a8_Code5MessageScaffold code5Message = {};
-        const bool parsedCode5 =
-            CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
-                copiedMessageRef,
-                &code5Message,
-                /*parseIncomingMessage=*/true);
-        const uint8_t* const logicalPayloadBytes =
-            parsedCode5 ? code5Message.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
-        const size_t logicalPayloadByteCount =
-            parsedCode5 ? code5Message.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
-        const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
-        if (parsedCode5) {
-            // anchor: launcher.exe:0x442d42..0x442d5e / direct write to this+0x85..0x91
-            // Original writes directly from parse result buffer+1,+5,+9,+d to this+0x85,0x89,0x8d,0x91
-            // FIDELITY: No SetMessageCode5SeedBytes85 helper exists in static-RE.
-            messageCode5SeedBytes85_ = code5Message.seedBytes0c;
-            EnsureStreamPacketEncryptionModuleFromSeed85();
-            spdlog::info(
-                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={}",
-                static_cast<unsigned>(rawCode),
-                code5Message.parsedPayload00.headerless08 ? 1u : 0u,
-                code5Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : 0u,
-                static_cast<unsigned>(logicalPayloadByteCount),
-                static_cast<unsigned>(
-                    static_cast<uint32_t>(code5Message.seedBytes0c[0]) |
-                    (static_cast<uint32_t>(code5Message.seedBytes0c[1]) << 8u) |
-                    (static_cast<uint32_t>(code5Message.seedBytes0c[2]) << 16u) |
-                    (static_cast<uint32_t>(code5Message.seedBytes0c[3]) << 24u)),
-                fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
-            // Original callback for code5: after writing bytes, checks callback from parse result
-            // at [EBP-0xc], calls vtable+0x8 if non-null, THEN returns (callbackResult << 8) | 1
-            // Our callback simulation fires after write, before return.
-            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code5CompletionCallbackSlot);
-        } else {
-            spdlog::warn(
-                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={}",
-                static_cast<unsigned>(rawCode),
-                usedHeaderlessLocatorDecode ? 1u : 0u,
-                usedHeaderlessLocatorDecode ? 1u : 0u,
-                static_cast<unsigned>(logicalPayloadByteCount),
-                fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
-        }
-        // anchor: 0x442d59-0x442d65 - callback only fires if OnMessageCode5 result non-null
-        // Note: In original, the callback check and invocation happens BEFORE return for code5.
-        return 1u;
+    // anchor: launcher.exe:0x442d30..0x442d6f / decodedMessageCode == 5
+    CBaseMarginConnection_0x4b64a8_Code5MessageScaffold code5Message{};
+    const bool parsedCode5 =
+        CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
+            copiedMessageRef,
+            &code5Message,
+            /*parseIncomingMessage=*/true);
+    const uint8_t* const logicalPayloadBytes =
+        parsedCode5 ? code5Message.parsedPayload00.logicalPayloadBytes00 : payloadBytes;
+    const size_t logicalPayloadByteCount =
+        parsedCode5 ? code5Message.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
+    const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
+    if (parsedCode5) {
+        // anchor: launcher.exe:0x442d3e..0x442d5e
+        // Original copies four dwords from parse-result+1/+5/+9/+d straight into this+0x85.
+        messageCode5SeedBytes85_ = code5Message.seedBytes0c;
+        EnsureStreamPacketEncryptionModuleFromSeed85();
+        spdlog::info(
+            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={}",
+            static_cast<unsigned>(rawCode),
+            code5Message.parsedPayload00.headerless08 ? 1u : 0u,
+            code5Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : 0u,
+            static_cast<unsigned>(logicalPayloadByteCount),
+            static_cast<unsigned>(
+                static_cast<uint32_t>(code5Message.seedBytes0c[0]) |
+                (static_cast<uint32_t>(code5Message.seedBytes0c[1]) << 8u) |
+                (static_cast<uint32_t>(code5Message.seedBytes0c[2]) << 16u) |
+                (static_cast<uint32_t>(code5Message.seedBytes0c[3]) << 24u)),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
+
+        // anchor: launcher.exe:0x442d56..0x442d65
+        void* code5CompletionCallbackSlot = &code5Message;
+        CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
+            &copiedMessageRef,
+            &code5CompletionCallbackSlot);
+    } else {
+        spdlog::warn(
+            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={}",
+            static_cast<unsigned>(rawCode),
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            static_cast<unsigned>(logicalPayloadByteCount),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mxo::ltlogin::g_CurrentLoginMediator ? mxo::ltlogin::g_CurrentLoginMediator->currentState_ : nullptr));
     }
 
-    // anchor: launcher.exe:0x442d26..0x442d2d
-    // Original returns (code - 5) & 0xFFFFFF00 which is 0 for code 5, negative-ish for others
-    // This allows leaf CMarginConnection_0x4aff38::DispatchMessage to detect unconsumed codes
-    // and forward to CLTLoginMediator_DispatchCurrentHelperSlot6 (owner+0x184)
-    return (static_cast<int>(decodedMessageCode) - 5) & 0xFFFFFF00;
+    return 1u;
 }
 
 // anchor: launcher.exe:0x44af60
