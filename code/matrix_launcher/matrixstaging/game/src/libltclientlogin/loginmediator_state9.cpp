@@ -34,46 +34,13 @@ void* CLTLoginMediator::GetStartupDistrObjExecutive8c() const {
 // anchor: launcher.exe:0x41c5c0
 // anchor: launcher.exe:0x41bc20 -> CMessageConnectionMessageRef_DecodeMessageCode
 uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workItem) {
-    // Faithful read from `0x41c5c0`:
-    // - if owner `+0x84` is null, return `1`
-    // - otherwise cast workItem to CMessageConnectionMessageRef_0x4ba23c* and call
-    //   `CMessageConnectionMessageRef_DecodeMessageCode` at `0x41bc20` to get the message opcode
-    // - construct the opcodeStorage dword (low word = decoded message code)
-    // - call callback84 vtable `+0x0c(&opcodeStorage, workItem)`
-    //
-    // Original assembly:
-    //   uVar2 = CMessageConnectionMessageRef_DecodeMessageCode((CMessageConnectionMessageRef_0x4ba23c*)param_1);
-    //   param_1 = (int*)CONCAT22(extraout_var, uVar2);  // opcode in low word
-    //   uVar3 = (**(code**)(*(int*)this->ownerCallback84 + 0xc))(&param_1, piVar1);
     if (!ownerCallback84_) {
-        auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
-        uint16_t decodedMessageCode = 0u;
-        mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*messageRef, &decodedMessageCode, nullptr);
-        spdlog::warn(
-            "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 ownerCallback84_ is NULL for decodedMessageCode=0x{:04x} currentState={}! Falling through to message connection dispatch.",
-            static_cast<unsigned>(decodedMessageCode),
-            currentState_ ? currentState_->DebugName() : "<null>");
         return 1u;
     }
 
-    // Cast workItem to message-ref and decode the message code using the original helper
     auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
-    uint16_t decodedMessageCode = 0u;
-    bool usedHeaderless = false;
-    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(
-            *messageRef,
-            &decodedMessageCode,
-            &usedHeaderless)) {
-        spdlog::warn(
-            "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 failed to decode message code from messageRef this={}",
-            fmt::ptr(this));
-        return 1u;
-    }
+    uint32_t opcodeStorage = static_cast<uint32_t>(mxo::liblttcp::CMessageConnectionMessageRef_DecodeMessageCode(messageRef));
 
-    // Construct opcodeStorage dword: low 16 bits = decoded message code
-    uint32_t opcodeStorage = static_cast<uint32_t>(decodedMessageCode);
-
-    // Call callback84 vtable+0x0c with (&opcodeStorage, workItem)
     using OwnerCallback84DispatchSecondaryFn = uint32_t(__thiscall*)(void*, uint32_t*, void*);
     void** callbackVtable = *reinterpret_cast<void***>(ownerCallback84_);
     if (!callbackVtable || !callbackVtable[3]) {
@@ -81,15 +48,7 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
     }
 
     const auto dispatchFn = reinterpret_cast<OwnerCallback84DispatchSecondaryFn>(callbackVtable[3]);
-    const uint32_t dispatchResult = dispatchFn(ownerCallback84_, &opcodeStorage, workItem);
-    spdlog::info(
-        "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 callback84={} decodedMessageCode=0x{:04x} opcodeStorage=0x{:08x} workItem={} -> dispatchResult=0x{:08x}",
-        fmt::ptr(ownerCallback84_),
-        static_cast<unsigned>(decodedMessageCode),
-        static_cast<unsigned>(opcodeStorage),
-        fmt::ptr(workItem),
-        static_cast<unsigned>(dispatchResult));
-    return dispatchResult;
+    return dispatchFn(ownerCallback84_, &opcodeStorage, workItem);
 }
 
 // anchor: launcher.exe:0x41de40

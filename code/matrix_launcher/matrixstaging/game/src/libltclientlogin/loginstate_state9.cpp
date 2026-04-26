@@ -149,11 +149,42 @@ uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::libltt
         return 0u;
     }
 
-    uint16_t messageCode = 0u;
-    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
-        // Original still falls through to the non-0x11 owner callback84 bridge.
-    }
-    if (messageCode != 0x11u) {
+    const uint16_t messageCode = mxo::liblttcp::CMessageConnectionMessageRef_DecodeMessageCode(workItem);
+    uint32_t returnValue = 1u;
+
+    if (messageCode == 0x11u) {
+        Packet_MsEstablishUDPSessionReply_0x4b5440 replyView(workItem, /*initializeOpcodeByte=*/false);
+        const uint32_t parsedStatus = replyView.ParsedStatus();
+        g_CurrentLoginMediator->worldListCountOrStatus80 = parsedStatus;
+        if (parsedStatus < 1u) {
+            g_CurrentLoginMediator->HandleState9Opcode11SuccessSideEffect();
+            (void)g_CurrentLoginMediator->SetCurrentState(0x0cu);
+            spdlog::info(
+                "ROUTE CHECKPOINT: late-login state9 success -> state12 event=0x18 currentState={}",
+                g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+            // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
+            g_CurrentLoginMediator->PostEvent(0x18u);
+            spdlog::info(
+                "CLTLoginState_State9::Slot6_HandleSecondaryMessage decoded opcode-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
+                static_cast<unsigned>(parsedStatus),
+                g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
+            returnValue = 1u;
+        } else {
+            (void)g_CurrentLoginMediator->SetCurrentState(3u);
+            // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
+            g_CurrentLoginMediator->PostError(0x0du);
+            spdlog::info(
+                "CLTLoginState_State9::Slot6_HandleSecondaryMessage decoded opcode-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
+                static_cast<unsigned>(parsedStatus),
+                g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
+            returnValue = 1u;
+        }
+
+        if (replyView.messageRef08 != nullptr) {
+            replyView.messageRef08->Release();
+            replyView.messageRef08 = nullptr;
+        }
+    } else {
         const uint32_t fallbackResult = g_CurrentLoginMediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
             spdlog::info(
@@ -165,35 +196,10 @@ uint32_t CLTLoginState_State9_0x4b517c::Slot6_HandleSecondaryMessage(mxo::libltt
         spdlog::info(
             "CLTLoginState_State9::Slot6_HandleSecondaryMessage non-0x11 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
             static_cast<unsigned>(fallbackResult));
-        return 0u;
+        return reinterpret_cast<uintptr_t>(g_CurrentLoginMediator) & 0xffffff00u;
     }
 
-    Packet_MsEstablishUDPSessionReply_0x4b5440 replyView(workItem, /*initializeOpcodeByte=*/false);
-    const uint32_t parsedStatus = replyView.ParsedStatus();
-    g_CurrentLoginMediator->worldListCountOrStatus80 = parsedStatus;
-    if (parsedStatus < 1u) {
-        g_CurrentLoginMediator->HandleState9Opcode11SuccessSideEffect();
-        (void)g_CurrentLoginMediator->SetCurrentState(0x0cu);
-        spdlog::info(
-            "ROUTE CHECKPOINT: late-login state9 success -> state12 event=0x18 currentState={}",
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-        // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
-        g_CurrentLoginMediator->PostEvent(0x18u);
-        spdlog::info(
-            "CLTLoginState_State9::Slot6_HandleSecondaryMessage decoded opcode-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
-            static_cast<unsigned>(parsedStatus),
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
-        return 1u;
-    }
-
-    (void)g_CurrentLoginMediator->SetCurrentState(3u);
-    // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
-    g_CurrentLoginMediator->PostError(0x0du);
-    spdlog::info(
-        "CLTLoginState_State9::Slot6_HandleSecondaryMessage decoded opcode-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
-        static_cast<unsigned>(parsedStatus),
-        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
-    return 1u;
+    return returnValue;
 }
 
 // anchor: launcher.exe:0x438cc0 (vtable 0x4b517c slot 7)
