@@ -280,27 +280,6 @@ static constexpr uint32_t kAuthBootstrap680BigIntCapacityTable[9] = {
     2u, 2u, 2u, 4u, 4u, 8u, 8u, 8u, 8u,
 };
 
-static uint32_t RoundAuthBootstrap680BigIntCapacityWords(size_t requiredWordCount) {
-    if (requiredWordCount < std::size(kAuthBootstrap680BigIntCapacityTable)) {
-        return kAuthBootstrap680BigIntCapacityTable[requiredWordCount];
-    }
-    if (requiredWordCount < 0x11u) {
-        return 0x10u;
-    }
-    if (requiredWordCount < 0x21u) {
-        return 0x20u;
-    }
-    if (requiredWordCount < 0x41u) {
-        return 0x40u;
-    }
-
-    uint32_t rounded = 1u;
-    while (rounded < requiredWordCount && rounded < 0x80000000u) {
-        rounded <<= 1u;
-    }
-    return rounded;
-}
-
 static void ResetAuthBootstrap680BigIntObject(
     AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits) {
@@ -778,7 +757,25 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
     }
 
     const size_t requiredWordCount = (byteCount + 3u) / 4u;
-    const uint32_t capacityWords = RoundAuthBootstrap680BigIntCapacityWords(requiredWordCount);
+    uint32_t capacityWords = 0u;
+    // anchor: launcher.exe:0x45d340
+    // Preserve the old `CryptoPP::Integer` ctor capacity policy only where the launcher child
+    // still physically stores raw `0x4ba50c` objects. `0x45d340` rounds requested word counts
+    // through `DAT_004ba310`, then 0x10/0x20/0x40, then the next power of two.
+    if (requiredWordCount < std::size(kAuthBootstrap680BigIntCapacityTable)) {
+        capacityWords = kAuthBootstrap680BigIntCapacityTable[requiredWordCount];
+    } else if (requiredWordCount < 0x11u) {
+        capacityWords = 0x10u;
+    } else if (requiredWordCount < 0x21u) {
+        capacityWords = 0x20u;
+    } else if (requiredWordCount < 0x41u) {
+        capacityWords = 0x40u;
+    } else {
+        capacityWords = 1u;
+        while (capacityWords < requiredWordCount && capacityWords < 0x80000000u) {
+            capacityWords <<= 1u;
+        }
+    }
     ownedDigits->assign(static_cast<size_t>(capacityWords), 0u);
     for (size_t i = 0; i < byteCount; ++i) {
         const size_t reversedIndex = byteCount - 1u - i;

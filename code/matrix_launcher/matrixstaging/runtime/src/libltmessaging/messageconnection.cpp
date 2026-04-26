@@ -2324,36 +2324,6 @@ bool CBaseMarginConnection_0x4b64a8::StoreBootstrapReplyCopy98(const void* bytes
 
 namespace {
 
-static uint32_t RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(size_t requiredWordCount) {
-    if (requiredWordCount == 0u) {
-        return 2u;
-    }
-    if (requiredWordCount < 3u) {
-        return 2u;
-    }
-    if (requiredWordCount < 5u) {
-        return 4u;
-    }
-    if (requiredWordCount < 9u) {
-        return 8u;
-    }
-    if (requiredWordCount < 0x11u) {
-        return 0x10u;
-    }
-    if (requiredWordCount < 0x21u) {
-        return 0x20u;
-    }
-    if (requiredWordCount < 0x41u) {
-        return 0x40u;
-    }
-
-    uint32_t rounded = 1u;
-    while (rounded < requiredWordCount && rounded < 0x80000000u) {
-        rounded <<= 1u;
-    }
-    return rounded;
-}
-
 }  // namespace
 
 // anchor: launcher.exe:0x465d70
@@ -2571,49 +2541,36 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
 
     const auto* prepState = connection_.bootstrapPrepStateA0_.get();
 
-    // anchor: launcher.exe:0x45d340
-    // Preserve the old `CryptoPP::Integer` rounded-capacity view used by the launcher-side
-    // `0x4ba50c` object family for logging/comparison. The constructor family at `0x45d340`
-    // rounds requested 32-bit word counts through `DAT_004ba310`, then 0x10/0x20/0x40, then the
-    // next power of two.
-    const uint32_t modulusCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-        static_cast<size_t>(modulus.WordCount()));
-    const uint32_t publicExponentCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-        static_cast<size_t>(publicExponent.WordCount()));
-    const uint32_t privateExponentCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-        static_cast<size_t>(privateExponent.WordCount()));
+    const uint32_t modulusWords = modulus.WordCount();
+    const uint32_t publicExponentWords = publicExponent.WordCount();
+    const uint32_t privateExponentWords = privateExponent.WordCount();
 
-    uint32_t prime1Cap = 0u;
-    uint32_t prime2Cap = 0u;
-    uint32_t crtExp1Cap = 0u;
-    uint32_t crtExp2Cap = 0u;
-    uint32_t crtInverseCap = 0u;
+    uint32_t prime1Words = 0u;
+    uint32_t prime2Words = 0u;
+    uint32_t crtExp1Words = 0u;
+    uint32_t crtExp2Words = 0u;
+    uint32_t crtInverseWords = 0u;
     if (prepState->HasBootstrapPrivateKey()) {
         const auto& privateKey = prepState->BootstrapPrivateKey();
-        prime1Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-            static_cast<size_t>(privateKey.GetPrime1().WordCount()));
-        prime2Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-            static_cast<size_t>(privateKey.GetPrime2().WordCount()));
-        crtExp1Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-            static_cast<size_t>(privateKey.GetModPrime1PrivateExponent().WordCount()));
-        crtExp2Cap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-            static_cast<size_t>(privateKey.GetModPrime2PrivateExponent().WordCount()));
-        crtInverseCap = RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(
-            static_cast<size_t>(privateKey.GetMultiplicativeInverseOfPrime2ModPrime1().WordCount()));
+        prime1Words = privateKey.GetPrime1().WordCount();
+        prime2Words = privateKey.GetPrime2().WordCount();
+        crtExp1Words = privateKey.GetModPrime1PrivateExponent().WordCount();
+        crtExp2Words = privateKey.GetModPrime2PrivateExponent().WordCount();
+        crtInverseWords = privateKey.GetMultiplicativeInverseOfPrime2ModPrime1().WordCount();
     }
 
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored "
-        "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
+        "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusWords=0x{:02x} exponentWords=0x{:02x} privateExponentWords=0x{:02x} prime1Words=0x{:02x} prime2Words=0x{:02x} crtExp1Words=0x{:02x} crtExp2Words=0x{:02x} crtInverseWords=0x{:02x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapState_0x443220)),
-        static_cast<unsigned>(modulusCap),
-        static_cast<unsigned>(publicExponentCap),
-        static_cast<unsigned>(privateExponentCap),
-        static_cast<unsigned>(prime1Cap),
-        static_cast<unsigned>(prime2Cap),
-        static_cast<unsigned>(crtExp1Cap),
-        static_cast<unsigned>(crtExp2Cap),
-        static_cast<unsigned>(crtInverseCap),
+        static_cast<unsigned>(modulusWords),
+        static_cast<unsigned>(publicExponentWords),
+        static_cast<unsigned>(privateExponentWords),
+        static_cast<unsigned>(prime1Words),
+        static_cast<unsigned>(prime2Words),
+        static_cast<unsigned>(crtExp1Words),
+        static_cast<unsigned>(crtExp2Words),
+        static_cast<unsigned>(crtInverseWords),
         fmt::ptr(&connection_),
         fmt::ptr(connection_.OwnerContext()),
         connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
