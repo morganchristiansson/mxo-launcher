@@ -587,6 +587,13 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
     auto& persistence = ownerState.state8PersistenceDataF1c;
     switch (loadCharacterReplyEnvelope.sectionSelectorMinus2) {
         case 0u:
+            // anchor: launcher.exe:0x43fa6e
+            // Exact current case-0 read:
+            // - copy the first 0x20 bytes from section data into owner/persistence `+0x2c`
+            // - copy the next 0x465 bytes from section data + 0x20 into owner/persistence `+0x6c`
+            // - if byteCount > 0x485 and overflow buffer is still null, allocate byteCount-0x485
+            //   bytes and copy the tail from section data + 0x485 into owner `+0x4d4/+0x4d8`
+            // - set owner/persistence section-0 present flags unconditionally on this case path
             if (loadCharacterReplyEnvelope.sectionData != nullptr) {
                 const size_t fixedPrefixBytes = std::min<size_t>(
                     loadCharacterReplyEnvelope.sectionByteCount,
@@ -641,8 +648,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                 if (loadCharacterReplyEnvelope.sectionByteCount > 0x485u && ownerState.state8Section0OverflowBuffer13f0 == nullptr) {
                     const uint16_t overflowAppendLen =
                         static_cast<uint16_t>(loadCharacterReplyEnvelope.sectionByteCount - 0x485u);
-                    const size_t newLength = overflowAppendLen;
-                    void* newBuffer = std::malloc(newLength);
+                    void* const newBuffer = std::malloc(overflowAppendLen);
                     if (newBuffer != nullptr) {
                         std::memcpy(
                             newBuffer,
@@ -652,21 +658,21 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                         ownerState.state8Section0OverflowLength13f4 = overflowAppendLen;
                     }
                 }
-                persistence.section0OverflowBuffer4d4 = ownerState.state8Section0OverflowBuffer13f0;
-                persistence.section0OverflowLength4d8 = ownerState.state8Section0OverflowLength13f4;
-                ownerState.section0Flag13f6 = 1u;
-                persistence.section0PresentFlag4da = 1u;
-                spdlog::info(
-                    "CLTLoginState_State8_0x4b5104 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
-                    ownerState.characterNameBufferF1c[0] ? std::string(ownerState.characterNameBufferF1c) : std::string("<empty>"),
-                    ownerState.section0StringF8c[0] ? std::string(ownerState.section0StringF8c.data()) : std::string("<empty>"),
-                    ownerState.section0StringFac[0] ? std::string(ownerState.section0StringFac.data()) : std::string("<empty>"),
-                    ownerState.section0StringFcc[0] ? std::string(ownerState.section0StringFcc.data()) : std::string("<empty>"),
-                    static_cast<unsigned>(ownerState.characterRecordPointersF88[0]),
-                    static_cast<unsigned>(ownerState.replySectionData13cc),
-                    static_cast<unsigned>(ownerState.replySectionData13d0));
-                LogState8PersistenceFamilySnapshot(ownerState, "section0", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, false);
             }
+            persistence.section0OverflowBuffer4d4 = ownerState.state8Section0OverflowBuffer13f0;
+            persistence.section0OverflowLength4d8 = ownerState.state8Section0OverflowLength13f4;
+            ownerState.section0Flag13f6 = 1u;
+            persistence.section0PresentFlag4da = 1u;
+            spdlog::info(
+                "CLTLoginState_State8_0x4b5104 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
+                ownerState.characterNameBufferF1c[0] ? std::string(ownerState.characterNameBufferF1c) : std::string("<empty>"),
+                ownerState.section0StringF8c[0] ? std::string(ownerState.section0StringF8c.data()) : std::string("<empty>"),
+                ownerState.section0StringFac[0] ? std::string(ownerState.section0StringFac.data()) : std::string("<empty>"),
+                ownerState.section0StringFcc[0] ? std::string(ownerState.section0StringFcc.data()) : std::string("<empty>"),
+                static_cast<unsigned>(ownerState.characterRecordPointersF88[0]),
+                static_cast<unsigned>(ownerState.replySectionData13cc),
+                static_cast<unsigned>(ownerState.replySectionData13d0));
+            LogState8PersistenceFamilySnapshot(ownerState, "section0", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, false);
             break;
         case 1u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
