@@ -18,29 +18,31 @@ namespace {
 
 static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* mediator) {
   // anchor: launcher.exe:0x438e60 = GetGOBFileGUID
-  // Original `0x43b8f0` reads a 16-byte LTGUID for packed GOB resource `0x3e000000` and falls
-  // back to the baked-in dwords at `0x4ae6c0..0x4ae6cc` when that resource cannot be opened.
-  // Current replacement still lacks that launcher resource-manager bridge, so the literal static-RE
-  // fallback is all-zero dwords.
+  // Original resolution order:
+  // - call mediator vtable +0x12c / 0x41f210 to fetch owner +0x8c
+  // - if non-null, call that object's vtable +0x1c to get a 16-byte LTGUID pointer
+  // - otherwise fall back to the baked-in dwords at 0x4ae6c0..0x4ae6cc (all zeros in launcher.exe)
   std::array<uint32_t, 4> gobGuidWords = {0u, 0u, 0u, 0u};
-
-  // Bounded emulator-compatibility fallback guided by the live client.dll `0x62170f48` producer:
-  // - the later state8 `+0xec / 0x41c1f0` snapshot is built from nine 16-byte cfg-digest blocks
-  // - Reality stores the 16-byte `MS_ConnectRequest` weird-sequence bytes and then expects the
-  //   later state8 repeated blocks to compare equal against them
-  // - with the true packed-resource GUID bridge still missing, reuse the first repeated state8
-  //   block (`blockCf0`) when it is present so the state6/state8 pair remains coherent on the
-  //   active emulator path
-  if (mediator != nullptr) {
-    const auto& cfgDigestBlock = mediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0;
-    const bool haveCfgDigestBlock =
-        cfgDigestBlock[0] != 0u || cfgDigestBlock[1] != 0u || cfgDigestBlock[2] != 0u ||
-        cfgDigestBlock[3] != 0u;
-    if (haveCfgDigestBlock) {
-      gobGuidWords = cfgDigestBlock;
-    }
+  if (mediator == nullptr) {
+    return gobGuidWords;
   }
 
+  void* const ownerObject8c = mediator->GetOwnerObject8c();
+  if (ownerObject8c == nullptr) {
+    return gobGuidWords;
+  }
+
+  void** const vtable = *reinterpret_cast<void***>(ownerObject8c);
+  if (vtable == nullptr || vtable[7] == nullptr) {
+    return gobGuidWords;
+  }
+
+  using GetGuidWordsFn = const uint32_t*(__thiscall*)(void*);
+  const auto getGuidWords = reinterpret_cast<GetGuidWordsFn>(vtable[7]); // vtable +0x1c
+  const uint32_t* const guidWords = getGuidWords(ownerObject8c);
+  if (guidWords != nullptr) {
+    std::copy_n(guidWords, gobGuidWords.size(), gobGuidWords.begin());
+  }
   return gobGuidWords;
 }
 

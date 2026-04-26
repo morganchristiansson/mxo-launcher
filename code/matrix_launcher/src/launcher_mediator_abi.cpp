@@ -1051,6 +1051,14 @@ static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetGameSessionId();
 }
 
+// anchor: launcher.exe:0x41f210 / owner vtable +0x12c
+// Current bounded read from GetGOBFileGUID (0x438e60): this slot returns owner +0x8c.
+static void* __thiscall Mediator_GetOwnerObject8c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->GetOwnerObject8c() : nullptr;
+}
+
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
 // Wrapper now forwards to CLTLoginMediator::UnregisterLoginObserver; owner keeps the tree state
 // while the ABI shell logs exact client callsites so paired view ctor/dtor observer lifetimes stay
@@ -1239,7 +1247,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[72] = (void*)Mediator_ProcessCreateCharacterInput120; // +0x120
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
     // +0x128
-    // +0x12c
+    g_LoginMediatorVtable[75] = (void*)Mediator_GetOwnerObject8c; // +0x12c
     // +0x130 GetSessionCallbackHelper65c
     // +0x134 EnsureSessionCallbackHelper65c
     // +0x138

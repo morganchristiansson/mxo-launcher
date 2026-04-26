@@ -1022,6 +1022,8 @@ public:
     // Wrapper-facing `+0x124` capture remains separate from the owner-side triple mirror.
     void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) override;
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
+    // anchor: launcher.exe:0x41f210 / mediator vtable +0x12c
+    void* GetOwnerObject8c() const;
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);

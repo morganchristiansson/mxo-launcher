@@ -26,6 +26,11 @@ void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, v
         fmt::ptr(ownerObject8c_));
 }
 
+// anchor: launcher.exe:0x41f210 / owner vtable +0x12c
+void* CLTLoginMediator::GetOwnerObject8c() const {
+    return ownerObject8c_;
+}
+
 // anchor: launcher.exe:0x41c5c0
 // anchor: launcher.exe:0x41bc20 -> CMessageConnectionMessageRef_DecodeMessageCode
 uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workItem) {
