@@ -24,6 +24,8 @@
 #include <random>
 #include <unordered_map>
 
+#include <integer.h>
+
 #include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
@@ -810,6 +812,39 @@ static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
     outObject->digits0c = ownedDigits->data();
     outObject->sign10 = 0u;
     return true;
+}
+
+static CryptoPP::Integer AuthBootstrap680BigIntObjectToCryptoPPInteger(
+    const AuthBootstrap680BigIntObjects_0x4ba50c& object) {
+    const auto* digits = static_cast<const uint32_t*>(object.digits0c);
+    if (!digits || object.capacityWords08 == 0u) {
+        return CryptoPP::Integer::Zero();
+    }
+
+    size_t usedWordCount = object.capacityWords08;
+    while (usedWordCount != 0u && digits[usedWordCount - 1u] == 0u) {
+        --usedWordCount;
+    }
+    if (usedWordCount == 0u) {
+        return CryptoPP::Integer::Zero();
+    }
+
+    // anchor family: launcher.exe:0x45d000 / 0x45de10 / data type `0x4ba50c`
+    // The preserved child-side `0x14` object stores little-endian digit words. Modern
+    // `CryptoPP::Integer(byte*, size)` expects big-endian bytes, so convert here once and then
+    // keep direct `CryptoPP::Integer` semantics through the later `0x443340 -> 0x443220 -> 0x465d70`
+    // margin-bootstrap prep path.
+    std::vector<uint8_t> bigEndianBytes(usedWordCount * 4u);
+    for (size_t wordIdx = 0; wordIdx < usedWordCount; ++wordIdx) {
+        const uint32_t word = digits[wordIdx];
+        const size_t destBase = (usedWordCount - 1u - wordIdx) * 4u;
+        bigEndianBytes[destBase + 0] = static_cast<uint8_t>(word >> 24);
+        bigEndianBytes[destBase + 1] = static_cast<uint8_t>(word >> 16);
+        bigEndianBytes[destBase + 2] = static_cast<uint8_t>(word >> 8);
+        bigEndianBytes[destBase + 3] = static_cast<uint8_t>(word);
+    }
+
+    return CryptoPP::Integer(bigEndianBytes.data(), bigEndianBytes.size());
 }
 
 static bool BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(
@@ -2332,19 +2367,25 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
     const auto* blockB0 = &child.modulusBigIntB0;
     const auto* blockC4 = &child.publicExponentBigIntC4;
     const auto* blockD8 = &child.privateExponentBigIntD8;
+    const CryptoPP::Integer modulus = AuthBootstrap680BigIntObjectToCryptoPPInteger(*blockB0);
+    const CryptoPP::Integer publicExponent = AuthBootstrap680BigIntObjectToCryptoPPInteger(*blockC4);
+    const CryptoPP::Integer privateExponent = AuthBootstrap680BigIntObjectToCryptoPPInteger(*blockD8);
 
     const bool storedReplyCopy =
         marginConnection.StoreBootstrapReplyCopy98(copyShadow, sizeof(*copyShadow));
     mxo::liblttcp::CMarginConnectionBootstrapPrepStateOwner_0x443340(marginConnection)
-        .StoreBootstrapPrepStateA0(blockB0, blockC4, blockD8);
+        .StoreBootstrapPrepStateA0(modulus, publicExponent, privateExponent);
 
     spdlog::info(
-        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} childBlockB0Cap={} childBlockC4Cap={} childBlockD8Cap={}",
+        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} childBlockB0Cap={} childBlockC4Cap={} childBlockD8Cap={} modulusBits={} publicExponentBits={} privateExponentBits={}",
         fmt::ptr(copyShadow),
         storedReplyCopy ? 1u : 0u,
         blockB0->capacityWords08,
         blockC4->capacityWords08,
-        blockD8->capacityWords08);
+        blockD8->capacityWords08,
+        static_cast<unsigned>(modulus.BitCount()),
+        static_cast<unsigned>(publicExponent.BitCount()),
+        static_cast<unsigned>(privateExponent.BitCount()));
 }
 
 // Source-owned shared auth-reply materialization bridge for later child `+0xf4` consumers such as

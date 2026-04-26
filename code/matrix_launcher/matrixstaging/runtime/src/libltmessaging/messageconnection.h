@@ -1558,111 +1558,16 @@ public:
 
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
 
-class CBootstrapBigInt_0x4ba50c {
-public:
-    // anchor family: launcher.exe:0x45de10 / 0x45d000 / data type `cls_0x4ba50c`
-    // vtable is compiler-managed in the reimplementation; original vftable at 0x004ba50c
-    virtual ~CBootstrapBigInt_0x4ba50c();
-
-    // anchor: launcher.exe:0x45d000 / default ctor
-    CBootstrapBigInt_0x4ba50c();
-
-    // anchor: launcher.exe:0x45d090 / copy ctor
-    CBootstrapBigInt_0x4ba50c(const CBootstrapBigInt_0x4ba50c& other);
-
-    CBootstrapBigInt_0x4ba50c& operator=(
-        const CBootstrapBigInt_0x4ba50c& other);
-
-    // Move ctor/assignment (transfer digit ownership)
-    CBootstrapBigInt_0x4ba50c(
-        CBootstrapBigInt_0x4ba50c&& other) noexcept;
-    CBootstrapBigInt_0x4ba50c& operator=(
-        CBootstrapBigInt_0x4ba50c&& other) noexcept;
-
-    // Reimplementation helper: construct from CryptoPP::Integer (no original anchor)
-    explicit CBootstrapBigInt_0x4ba50c(const CryptoPP::Integer& value);
-
-    // anchor: launcher.exe:0x45de10 / DeepCopyFrom
-    void DeepCopyFrom(const CBootstrapBigInt_0x4ba50c& source);
-
-    // anchor: launcher.exe:0x45d000 tail / Release digits
-    void ReleaseDigits();
-
-    // anchor: launcher.exe:0x45a400
-    // Returns the logical byte count of the BigInt value (not capacity)
-    // Original iterates digit words from the top down; uses FUN_004531b0 to count
-    // significant bytes in the highest non-zero word.
-    uint32_t GetByteCount() const {
-        const auto* digits = static_cast<const uint32_t*>(digitPointer_0x0c);
-        uint32_t cap = digitCapacityWords_0x08;
-        if (cap == 0u || !digits) {
-            return 0u;
-        }
-        // Find highest non-zero word from capacity down
-        while (cap != 0u && digits[cap - 1u] == 0u) {
-            --cap;
-        }
-        if (cap == 0u) {
-            return 0u;
-        }
-        // Count bytes in highest non-zero word (GetSignificantByteCountInWord logic)
-        uint32_t word = digits[cap - 1u];
-        uint32_t bytes = 4u;
-        if ((word & 0xFF000000u) == 0u) { bytes--; }
-        if ((word & 0x00FF0000u) == 0u) { bytes--; }
-        if ((word & 0x0000FF00u) == 0u) { bytes--; }
-        if ((word & 0x000000FFu) == 0u) { bytes--; }
-        // Add 4 bytes for each fully-used word below the highest
-        bytes += (cap - 1u) * 4u;
-        return bytes;
-    }
-
-    // anchor: launcher.exe:0x45a440 / GetBitCount
-    // Returns the actual bit count of the BigInt value (not capacity)
-    // Original uses GetHighestSetBitPosition (FUN_004531e0) for the top word.
-    uint32_t GetBitCount() const {
-        const auto* digits = static_cast<const uint32_t*>(digitPointer_0x0c);
-        uint32_t cap = digitCapacityWords_0x08;
-        if (cap == 0u || !digits) {
-            return 0u;
-        }
-        // Find highest non-zero word from capacity down
-        while (cap != 0u && digits[cap - 1u] == 0u) {
-            --cap;
-        }
-        if (cap == 0u) {
-            return 0u;
-        }
-        // Count bits in highest non-zero word
-        uint32_t word = digits[cap - 1u];
-        uint32_t bits = 0u;
-        while (word != 0u) {
-            word >>= 1u;
-            ++bits;
-        }
-        // Add 32-bit words below the highest
-        bits += (cap - 1u) * 32u;
-        return bits;
-    }
-
-    uint32_t allocatorState_0x04 = 0u;
-    uint32_t digitCapacityWords_0x08 = 0u;
-    void* digitPointer_0x0c = nullptr;
-    uint32_t bigIntFlags_0x10 = 0u;
-
-};
-static_assert(sizeof(CBootstrapBigInt_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
-
 // anchor: launcher.exe:0x465d70 / original subobject at decryptor+0x0c
-// This helper converts the recovered `0x14` bootstrap big-int blocks into a real
-// CryptoPP::RSA::PrivateKey while preserving the original `0x465d70`
+// This helper converts the recovered old-Crypto++ `Integer` inputs into a real
+// `CryptoPP::RSA::PrivateKey` while preserving the original `0x465d70`
 // key-loader boundary.
 //
 // Static-RE interpretation:
-// - this is not just a source convenience wrapper
+// - the original `0x4ba50c` family is old `CryptoPP::Integer`
 // - the original `cls_0x4b659c` subobject really behaves like embedded
 //   `CryptoPP::RSA::PrivateKey` / `CryptoPP::InvertibleRSAFunction` state
-// So source now stores that as a direct Crypto++ object.
+// So source now uses direct Crypto++ types here instead of a launcher-local big-int stand-in.
 
 // anchor: launcher.exe:0x443220 / complete-object ctor reached from `0x443340`
 // This launcher wrapper owns the real Crypto++ objects that static-RE identifies under the
@@ -1673,9 +1578,9 @@ static_assert(sizeof(CBootstrapBigInt_0x4ba50c) == 0x14, "bootstrap prep big-int
 class CMarginConnectionAuthBootstrapState_0x443220 {
 public:
     CMarginConnectionAuthBootstrapState_0x443220(
-        const CBootstrapBigInt_0x4ba50c* modulusBlock,
-        const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
-        const CBootstrapBigInt_0x4ba50c* privateExponentBlock,
+        const CryptoPP::Integer& modulus,
+        const CryptoPP::Integer& publicExponent,
+        const CryptoPP::Integer& privateExponent,
         int constructVirtualBaseStateFlag);
 
     // anchor: launcher.exe:0x437810
@@ -1709,12 +1614,13 @@ public:
 
     // anchor: launcher.exe:0x443340
     // Original direct-call helper allocates a fresh `0xe0` prep object from three child-side
-    // `0x14` byte blocks and stores it at connection `+0xa0`. Source stores a wrapper around
-    // the identified real Crypto++ decryptor/key objects.
+    // old-Crypto++ `Integer` objects and stores it at connection `+0xa0`.
+    // Source converts those preserved child-side raw `0x14` objects before this seam and stores a
+    // wrapper around the identified real Crypto++ decryptor/key objects here.
     void StoreBootstrapPrepStateA0(
-        const void* blockB0,
-        const void* blockC4,
-        const void* blockD8);
+        const CryptoPP::Integer& modulus,
+        const CryptoPP::Integer& publicExponent,
+        const CryptoPP::Integer& privateExponent);
 
 private:
     CBaseMarginConnection_0x4b64a8& connection_;

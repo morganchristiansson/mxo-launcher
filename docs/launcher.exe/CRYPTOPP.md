@@ -222,12 +222,15 @@ Current source direction:
 
 - uses **`CryptoPP::RSAES_OAEP_SHA_Decryptor` directly** for the actual decryptor subobject
 - uses **`CryptoPP::RSA::PrivateKey` directly** for the loaded bootstrap key state
+- uses **`CryptoPP::Integer` directly** for big-int semantics
 - uses **`CryptoPP::OldRandomPool` directly** for the recovered RNG helper family
-- keeps a small launcher wrapper only for the preserved launcher entrypoints / boundaries:
+- keeps small launcher wrappers only for the preserved launcher entrypoints / boundaries:
   - `0x443220`
   - `0x437810`
   - `0x468130`
   - `0x465d70`
+- child-side raw `0x14` integer objects are preserved only where the launcher child layout still
+  really contains them before the margin-prep seam
 
 This is the preferred fidelity tradeoff:
 1. keep launcher.exe constructor / helper boundaries visible
@@ -262,12 +265,18 @@ Important vtable slots:
 
 Best current interpretation:
 - **static-RE**: this is an actual Crypto++ integer-family class, most likely old `CryptoPP::Integer`
-- **source**: it remains useful as a recovered boundary adapter because launcher.exe passes these
-  exact `0x14`-byte objects around at bootstrap seams
+- **source**: keep it only as a recovered **raw boundary object** where launcher.exe really passes
+  the exact `0x14`-byte shape around at bootstrap seams
 
-Current source has **not** replaced `CBootstrapBigInt_0x4ba50c` with direct `CryptoPP::Integer`
-throughout the messaging layer yet. That would be a larger seam rewrite than the earlier direct
-`CryptoPP::RSA::PrivateKey` replacement.
+Current source direction after the messaging-layer cleanup pass:
+- internal semantic work now uses **direct `CryptoPP::Integer`**
+- the old source-side stand-in **`CBootstrapBigInt_0x4ba50c` has been removed**
+- preserved child-layout/raw-copy code still keeps the launcher-owned `0x14` object bytes where
+  the original auth-bootstrap child really stores adjacent `0xb0/0xc4/0xd8` integer objects
+- the `0x443340 -> 0x443220 -> 0x465d70` margin-bootstrap-prep path now converts those raw child
+  objects once, then stays on direct `CryptoPP::Integer` / `CryptoPP::RSA::PrivateKey`
+- post-reconstruction capacity introspection now computes the original rounded word-capacity from
+  `CryptoPP::Integer` directly instead of materializing source-only fake big-int objects
 
 ---
 

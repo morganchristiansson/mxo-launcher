@@ -2354,192 +2354,60 @@ static uint32_t RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(size_t re
     return rounded;
 }
 
-static CryptoPP::Integer CMarginConnectionBootstrapPrepBigIntObjectToInteger(
-    const CBootstrapBigInt_0x4ba50c& object) {
-    const auto* digits = static_cast<const uint32_t*>(object.digitPointer_0x0c);
-    if (!digits || object.digitCapacityWords_0x08 == 0u) {
-        return CryptoPP::Integer::Zero();
+static uint32_t CryptoPP_Integer_RoundWordCapacityForValue(
+    const CryptoPP::Integer& value) {
+    const size_t encodedByteCount = std::max<size_t>(
+        static_cast<size_t>(value.MinEncodedSize()),
+        1u);
+    const size_t requiredWordCount = (encodedByteCount + 3u) / 4u;
+    return RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(requiredWordCount);
+}
+
+static bool CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers(
+    CryptoPP::RSA::PrivateKey& outPrivateKey,
+    const CryptoPP::Integer& modulus,
+    const CryptoPP::Integer& publicExponent,
+    const CryptoPP::Integer& privateExponent) {
+    spdlog::debug(
+        "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers: "
+        "modulusBits={} publicExponentBits={} privateExponentBits={} modulusBytes={}",
+        modulus.BitCount(),
+        publicExponent.BitCount(),
+        privateExponent.BitCount(),
+        modulus.ByteCount());
+
+    if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
+        spdlog::warn(
+            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers: "
+            "zero CryptoPP::Integer component detected");
+        return false;
     }
 
-    size_t usedWordCount = object.digitCapacityWords_0x08;
-    while (usedWordCount != 0u && digits[usedWordCount - 1u] == 0u) {
-        --usedWordCount;
-    }
+    outPrivateKey.Initialize(modulus, publicExponent, privateExponent);
 
-    if (usedWordCount == 0u) {
-        return CryptoPP::Integer::Zero();
-    }
-
-    // FIDELITY: Original stores digits in little-endian word order with little-endian
-    // bytes within each word. byte 0 = LSB, byte (usedWordCount*4 - 1) = MSB.
-    // CryptoPP::Integer(byte*, size) expects big-endian bytes.
-    std::vector<uint8_t> bigEndianBytes(usedWordCount * 4u);
-    for (size_t wordIdx = 0; wordIdx < usedWordCount; ++wordIdx) {
-        const uint32_t word = digits[wordIdx];
-        const size_t destBase = (usedWordCount - 1u - wordIdx) * 4u;
-        bigEndianBytes[destBase + 0] = static_cast<uint8_t>(word >> 24);
-        bigEndianBytes[destBase + 1] = static_cast<uint8_t>(word >> 16);
-        bigEndianBytes[destBase + 2] = static_cast<uint8_t>(word >> 8);
-        bigEndianBytes[destBase + 3] = static_cast<uint8_t>(word);
-    }
-
-    return CryptoPP::Integer(bigEndianBytes.data(), bigEndianBytes.size());
+    spdlog::debug(
+        "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers: "
+        "CRT derivation succeeded ciphertextBytes={} prime1Bits={} prime2Bits={}",
+        outPrivateKey.GetModulus().ByteCount(),
+        outPrivateKey.GetPrime1().BitCount(),
+        outPrivateKey.GetPrime2().BitCount());
+    return true;
 }
 
 }  // namespace
 
-// anchor: launcher.exe:0x45d000 tail / dtor
-CBootstrapBigInt_0x4ba50c::~CBootstrapBigInt_0x4ba50c() {
-    ReleaseDigits();
-}
-
-// anchor: launcher.exe:0x45d000 / default ctor
-CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c() {
-    allocatorState_0x04 = 0u;
-    digitCapacityWords_0x08 = 2u;
-    digitPointer_0x0c = new uint32_t[2]();
-    bigIntFlags_0x10 = 0u;
-}
-
-// anchor: launcher.exe:0x45d090 / copy ctor
-CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
-    const CBootstrapBigInt_0x4ba50c& other) {
-    allocatorState_0x04 = other.allocatorState_0x04;
-    bigIntFlags_0x10 = other.bigIntFlags_0x10;
-    const uint32_t cap = other.digitCapacityWords_0x08;
-    digitCapacityWords_0x08 = std::max(cap, 2u);
-    digitPointer_0x0c = new uint32_t[digitCapacityWords_0x08]();
-    if (cap != 0u && other.digitPointer_0x0c != nullptr) {
-        std::copy_n(static_cast<const uint32_t*>(other.digitPointer_0x0c), cap,
-                    static_cast<uint32_t*>(digitPointer_0x0c));
-    }
-}
-
-CBootstrapBigInt_0x4ba50c&
-CBootstrapBigInt_0x4ba50c::operator=(
-    const CBootstrapBigInt_0x4ba50c& other) {
-    if (this != &other) {
-        DeepCopyFrom(other);
-    }
-    return *this;
-}
-
-CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
-    CBootstrapBigInt_0x4ba50c&& other) noexcept {
-    allocatorState_0x04 = other.allocatorState_0x04;
-    digitCapacityWords_0x08 = other.digitCapacityWords_0x08;
-    digitPointer_0x0c = other.digitPointer_0x0c;
-    bigIntFlags_0x10 = other.bigIntFlags_0x10;
-    other.digitPointer_0x0c = nullptr;
-    other.digitCapacityWords_0x08 = 0u;
-}
-
-CBootstrapBigInt_0x4ba50c&
-CBootstrapBigInt_0x4ba50c::operator=(
-    CBootstrapBigInt_0x4ba50c&& other) noexcept {
-    if (this != &other) {
-        ReleaseDigits();
-        allocatorState_0x04 = other.allocatorState_0x04;
-        digitCapacityWords_0x08 = other.digitCapacityWords_0x08;
-        digitPointer_0x0c = other.digitPointer_0x0c;
-        bigIntFlags_0x10 = other.bigIntFlags_0x10;
-        other.digitPointer_0x0c = nullptr;
-        other.digitCapacityWords_0x08 = 0u;
-    }
-    return *this;
-}
-
-// anchor: launcher.exe:0x45de10 / DeepCopyFrom
-void CBootstrapBigInt_0x4ba50c::DeepCopyFrom(
-    const CBootstrapBigInt_0x4ba50c& source) {
-    if (this == &source) {
-        return;
-    }
-    ReleaseDigits();
-    allocatorState_0x04 = source.allocatorState_0x04;
-    bigIntFlags_0x10 = source.bigIntFlags_0x10;
-    const uint32_t cap = source.digitCapacityWords_0x08;
-    digitCapacityWords_0x08 = std::max(cap, 2u);
-    digitPointer_0x0c = new uint32_t[digitCapacityWords_0x08]();
-    if (cap != 0u && source.digitPointer_0x0c != nullptr) {
-        std::copy_n(static_cast<const uint32_t*>(source.digitPointer_0x0c), cap,
-                    static_cast<uint32_t*>(digitPointer_0x0c));
-    }
-}
-
-// anchor: launcher.exe:0x45d000 tail / Release digits
-void CBootstrapBigInt_0x4ba50c::ReleaseDigits() {
-    delete[] static_cast<uint32_t*>(digitPointer_0x0c);
-    digitPointer_0x0c = nullptr;
-    digitCapacityWords_0x08 = 0u;
-}
-
-// Reimplementation helper: construct from CryptoPP::Integer (no original anchor)
-CBootstrapBigInt_0x4ba50c::CBootstrapBigInt_0x4ba50c(
-    const CryptoPP::Integer& value) {
-    const size_t encodedByteCount = static_cast<size_t>(value.MinEncodedSize());
-    std::vector<uint8_t> encodedBytes(std::max<size_t>(encodedByteCount, 1u), 0u);
-    value.Encode(encodedBytes.data(), encodedBytes.size());
-
-    const size_t requiredWordCount = (encodedBytes.size() + 3u) / 4u;
-    const uint32_t roundedWordCapacity =
-        RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(requiredWordCount);
-
-    digitCapacityWords_0x08 = roundedWordCapacity;
-    digitPointer_0x0c = roundedWordCapacity == 0u ? nullptr : new uint32_t[roundedWordCapacity]();
-    allocatorState_0x04 = 0u;
-    bigIntFlags_0x10 = 0u;
-
-    for (size_t i = 0; i < encodedBytes.size(); ++i) {
-        const size_t reversedIndex = encodedBytes.size() - 1u - i;
-        const size_t wordIndex = reversedIndex / 4u;
-        const size_t byteShift = (reversedIndex & 3u) * 8u;
-        static_cast<uint32_t*>(digitPointer_0x0c)[wordIndex] |=
-            static_cast<uint32_t>(encodedBytes[i]) << byteShift;
-    }
-}
-
 // anchor: launcher.exe:0x465d70
 static bool CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey(
     CryptoPP::RSA::PrivateKey& outPrivateKey,
-    const CBootstrapBigInt_0x4ba50c* modulusBlock,
-    const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
-    const CBootstrapBigInt_0x4ba50c* privateExponentBlock) {
-    if (!modulusBlock || !publicExponentBlock || !privateExponentBlock) {
-        return false;
-    }
-
+    const CryptoPP::Integer& modulus,
+    const CryptoPP::Integer& publicExponent,
+    const CryptoPP::Integer& privateExponent) {
     try {
-        const CryptoPP::Integer modulus =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(*modulusBlock);
-        const CryptoPP::Integer publicExponent =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(*publicExponentBlock);
-        const CryptoPP::Integer privateExponent =
-            CMarginConnectionBootstrapPrepBigIntObjectToInteger(*privateExponentBlock);
-
-        spdlog::debug(
-            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
-            "modulusBits={} publicExponentBits={} privateExponentBits={}",
-            modulus.BitCount(),
-            publicExponent.BitCount(),
-            privateExponent.BitCount());
-
-        if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
-            spdlog::warn(
-                "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
-                "zero BigInt component detected");
-            return false;
-        }
-
-        outPrivateKey.Initialize(modulus, publicExponent, privateExponent);
-
-        spdlog::debug(
-            "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey: "
-            "CRT derivation succeeded ciphertextBytes={} prime1Bits={} prime2Bits={}",
-            outPrivateKey.GetModulus().ByteCount(),
-            outPrivateKey.GetPrime1().BitCount(),
-            outPrivateKey.GetPrime2().BitCount());
-        return true;
+        return CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKeyFromIntegers(
+            outPrivateKey,
+            modulus,
+            publicExponent,
+            privateExponent);
     } catch (const CryptoPP::Exception& exception) {
         spdlog::warn(
             "CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey failed: {}",
@@ -2556,21 +2424,21 @@ static uint32_t CMarginConnectionAuthBootstrapState_0x443220_CiphertextByteCount
 
 // anchor: launcher.exe:0x443220 / complete-object ctor reached from `0x443340`
 CMarginConnectionAuthBootstrapState_0x443220::CMarginConnectionAuthBootstrapState_0x443220(
-    const CBootstrapBigInt_0x4ba50c* modulusBlock,
-    const CBootstrapBigInt_0x4ba50c* publicExponentBlock,
-    const CBootstrapBigInt_0x4ba50c* privateExponentBlock,
+    const CryptoPP::Integer& modulus,
+    const CryptoPP::Integer& publicExponent,
+    const CryptoPP::Integer& privateExponent,
     [[maybe_unused]] int constructVirtualBaseStateFlag) {
     // Fidelity notes for launcher.exe:0x443220:
     // - the original complete-object ctor walks MSVC MI/vbptr state before calling 0x465d70
-    // - static-RE indicates the embedded key state is genuinely CryptoPP::RSA::PrivateKey /
-    //   CryptoPP::InvertibleRSAFunction semantics, so source stores that directly now
-    // - we still preserve the 0x443220 entry point and the 0x465d70 helper boundary explicitly
+    // - the original caller hands old-Crypto++ `Integer` objects into that boundary
+    // - source keeps the ctor/helper boundaries but uses direct `CryptoPP::Integer` semantics
+    //   rather than a launcher-local stand-in for that third-party type
     bootstrapPrivateKeyInitialized_ =
         CMarginConnectionAuthBootstrapState_0x443220_InitializeBootstrapPrivateKey(
             bootstrapPrivateKey_0x0c,
-            modulusBlock,
-            publicExponentBlock,
-            privateExponentBlock);
+            modulus,
+            publicExponent,
+            privateExponent);
 
     if (!bootstrapPrivateKeyInitialized_) {
         return;
@@ -2707,16 +2575,12 @@ void* CMarginConnectionAuthBootstrapState_0x443220::DecryptChallenge(
 // State5 only constructs/stores this object. The first later original consumer is
 // `0x4429b0`, which loads connection `+0xa0` and calls prep-object `0x437810`.
 void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0(
-    const void* blockB0,
-    const void* blockC4,
-    const void* blockD8) {
-    const auto* modulusBlock = static_cast<const CBootstrapBigInt_0x4ba50c*>(blockB0);
-    const auto* publicExponentBlock = static_cast<const CBootstrapBigInt_0x4ba50c*>(blockC4);
-    const auto* privateExponentBlock = static_cast<const CBootstrapBigInt_0x4ba50c*>(blockD8);
-
+    const CryptoPP::Integer& modulus,
+    const CryptoPP::Integer& publicExponent,
+    const CryptoPP::Integer& privateExponent) {
     connection_.bootstrapPrepStateA0_.reset(new (std::nothrow)
         CMarginConnectionAuthBootstrapState_0x443220(
-            modulusBlock, publicExponentBlock, privateExponentBlock, 1));
+            modulus, publicExponent, privateExponent, 1));
     if (!connection_.bootstrapPrepStateA0_) {
         spdlog::warn(
             "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={} remoteHost='{}'",
@@ -2735,20 +2599,25 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     uint32_t crtInverseCap = 0u;
     if (prepState->HasBootstrapPrivateKey()) {
         const auto& privateKey = prepState->BootstrapPrivateKey();
-        prime1Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetPrime1()).digitCapacityWords_0x08;
-        prime2Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetPrime2()).digitCapacityWords_0x08;
-        crtExp1Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetModPrime1PrivateExponent()).digitCapacityWords_0x08;
-        crtExp2Cap = CBootstrapBigInt_0x4ba50c(privateKey.GetModPrime2PrivateExponent()).digitCapacityWords_0x08;
-        crtInverseCap = CBootstrapBigInt_0x4ba50c(privateKey.GetMultiplicativeInverseOfPrime2ModPrime1()).digitCapacityWords_0x08;
+        prime1Cap =
+            CryptoPP_Integer_RoundWordCapacityForValue(privateKey.GetPrime1());
+        prime2Cap =
+            CryptoPP_Integer_RoundWordCapacityForValue(privateKey.GetPrime2());
+        crtExp1Cap = CryptoPP_Integer_RoundWordCapacityForValue(
+            privateKey.GetModPrime1PrivateExponent());
+        crtExp2Cap = CryptoPP_Integer_RoundWordCapacityForValue(
+            privateKey.GetModPrime2PrivateExponent());
+        crtInverseCap = CryptoPP_Integer_RoundWordCapacityForValue(
+            privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
     }
 
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored "
         "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapState_0x443220)),
-        static_cast<unsigned>(modulusBlock ? modulusBlock->digitCapacityWords_0x08 : 0u),
-        static_cast<unsigned>(publicExponentBlock ? publicExponentBlock->digitCapacityWords_0x08 : 0u),
-        static_cast<unsigned>(privateExponentBlock ? privateExponentBlock->digitCapacityWords_0x08 : 0u),
+        static_cast<unsigned>(CryptoPP_Integer_RoundWordCapacityForValue(modulus)),
+        static_cast<unsigned>(CryptoPP_Integer_RoundWordCapacityForValue(publicExponent)),
+        static_cast<unsigned>(CryptoPP_Integer_RoundWordCapacityForValue(privateExponent)),
         static_cast<unsigned>(prime1Cap),
         static_cast<unsigned>(prime2Cap),
         static_cast<unsigned>(crtExp1Cap),
