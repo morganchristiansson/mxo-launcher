@@ -1066,6 +1066,15 @@ public:
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForOwner(CStreamPacketEncryptionModule_0x4b8704* owner);
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
+
+    // Non-virtual auth-bootstrap helper family currently recovered by Ghidra on this receiver.
+    // Source still bridges these bodies into the owner `+0x680` auth child layout while we grind
+    // toward a tighter unified class model.
+    uint32_t SendGetPublicKeyRequest(mxo::ltlogin::CLTLoginMediator& owner);
+    uint32_t SendAuthRequest(mxo::ltlogin::CLTLoginMediator& owner);
+    uint32_t HandleGetPublicKeyReply(
+        mxo::ltlogin::CLTLoginMediator& owner,
+        const mxo::auth::GetPublicKeyReply& reply);
 };
 
 class PacketProcessingAgenda_0x4baf48 : public CStreamPacketEncryptionHelperBase_0x4b81c8 {

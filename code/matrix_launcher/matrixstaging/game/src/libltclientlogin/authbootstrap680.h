@@ -574,12 +574,14 @@ public:
     // anchor: launcher.exe:0x447780
     uint32_t RebuildReplyPublicKeyWorkers_SOURCEOWNED(
         const mxo::auth::GetPublicKeyReply& reply);
-    // anchor: launcher.exe:0x447eb0
-    uint32_t SendGetPublicKeyRequest(CLTLoginMediator& owner);
-    // anchor: launcher.exe:0x4474f0
-    uint32_t SendAuthRequest(CLTLoginMediator& owner);
-    // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
-    uint32_t HandleGetPublicKeyReply(CLTLoginMediator& owner, const mxo::auth::GetPublicKeyReply& reply);
+    // Source-owned bridge implementations called by
+    // `mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690` methods while source
+    // still stores the auth-bootstrap state in the owner `+0x680` child layout.
+    uint32_t SendGetPublicKeyRequest_SOURCEOWNED(CLTLoginMediator& owner);
+    uint32_t SendAuthRequest_SOURCEOWNED(CLTLoginMediator& owner);
+    uint32_t HandleGetPublicKeyReply_SOURCEOWNED(
+        CLTLoginMediator& owner,
+        const mxo::auth::GetPublicKeyReply& reply);
     // Source-owned (NOT static-RE): inlined into HandleInboundAuthMessage case 0x09u at 0x44831c..0x448467
  uint32_t SendAuthChallengeResponse_SOURCEOWNED_NO_RE(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 };

@@ -1593,11 +1593,13 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 
     if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-        return SendAuthRequest(mediator);
+        return reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
+            .SendAuthRequest(mediator);
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-    return SendGetPublicKeyRequest(mediator);
+    return reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
+        .SendGetPublicKeyRequest(mediator);
 }
 
 // anchor: launcher.exe:0x448140
@@ -1646,7 +1648,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             child.authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
             const uint32_t workerResult =
-                HandleGetPublicKeyReply(mediator, reply);
+                reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
+                    .HandleGetPublicKeyReply(mediator, reply);
             if (workerResult != 0u) {
                 child.inboundAuthStatusEc = workerResult;
             }
@@ -1686,7 +1689,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundGetPublicKeyWorkerError;
             }
 
-            return SendAuthRequest(mediator) != 0u
+            return reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
+                       .SendAuthRequest(mediator) != 0u
                 ? kAuthBootstrap680InboundHandledContinueWaiting
                 : kAuthBootstrap680InboundGetPublicKeyWorkerError;
         }
@@ -1998,8 +2002,7 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
         authSignature00.size());
 }
 
-// anchor: launcher.exe:0x447eb0
-uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(CLTLoginMediator& mediator) {
+uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest_SOURCEOWNED(CLTLoginMediator& mediator) {
     const AuthBootstrap680Child_0x441290& child = *this;
     const bool ensuredLazyPubkeyDatValidatorA4 =
         EnsureLazyPubkeyDatValidatorA4_SOURCEOWNED(mediator);
@@ -2042,8 +2045,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(CLTLoginMediato
     return sendResult;
 }
 
-// anchor: launcher.exe:0x4474f0
-uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest(
+uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest_SOURCEOWNED(
     CLTLoginMediator& mediator) {
     AuthBootstrap680Child_0x441290& child = *this;
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
@@ -2315,8 +2317,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthChallengeResponse_SOURCEOWNED_N
 }
 
 
-// anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
-uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
+uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply_SOURCEOWNED(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {
     AuthBootstrap680Child_0x441290& child = *this;
@@ -2523,3 +2524,43 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
 
 
 }  // namespace mxo::ltlogin
+
+namespace {
+
+mxo::ltlogin::AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelperBridge(
+    mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690& helper) {
+    // Source bridge: the auth/bootstrap owner `+0x680` object is still modeled as
+    // `AuthBootstrap680Child_0x441290`, but Ghidra recovers several non-virtual auth helpers on
+    // the same receiver shape under `CStreamPacketEncryptionModuleWriteHelper_0x4b8690`.
+    // While we grind toward a tighter unified class model, route those methods through the current
+    // child storage by reinterpreting the shared prefix layout.
+    return reinterpret_cast<mxo::ltlogin::AuthBootstrap680Child_0x441290&>(helper);
+}
+
+}  // namespace
+
+namespace mxo::liblttcp {
+
+// anchor: launcher.exe:0x447eb0
+uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendGetPublicKeyRequest(
+    mxo::ltlogin::CLTLoginMediator& owner) {
+    return AuthBootstrapChildFromWriteHelperBridge(*this)
+        .SendGetPublicKeyRequest_SOURCEOWNED(owner);
+}
+
+// anchor: launcher.exe:0x4474f0
+uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(
+    mxo::ltlogin::CLTLoginMediator& owner) {
+    return AuthBootstrapChildFromWriteHelperBridge(*this)
+        .SendAuthRequest_SOURCEOWNED(owner);
+}
+
+// anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
+uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply(
+    mxo::ltlogin::CLTLoginMediator& owner,
+    const mxo::auth::GetPublicKeyReply& reply) {
+    return AuthBootstrapChildFromWriteHelperBridge(*this)
+        .HandleGetPublicKeyReply_SOURCEOWNED(owner, reply);
+}
+
+}  // namespace mxo::liblttcp
