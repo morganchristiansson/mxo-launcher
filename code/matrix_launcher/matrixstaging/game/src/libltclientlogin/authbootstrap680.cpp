@@ -2495,46 +2495,43 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
         fmt::ptr(parseObject));
 }
 
-// UNANCHORED: source-owned narrower mirror of the pre-gate `0x43f300` neighboring helper call
-// `0x441330`, plus the direct child `+0x110` write that occurs immediately before it.
-// Current source keeps only the parts now tight enough to model confidently:
-// - copy owner `+0x94 + 0x20` into child `+0xf8`
-// - set child `+0x104` from the original slash+6-digit SecurID-tail test and strip that tail
-//   from child `+0xf8` when present
-// - mirror child `+0x110` from the parsed success-header dword at payload offset `0x07`
-void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
+// anchor: launcher.exe:0x441330
+// Narrow mirror of the original child-side prompt-password/string update.
+// Caller is responsible for the neighboring `+0x110` write that happens separately in `0x43f300`.
+void AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag(
     AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& mediator,
-    const mxo::auth::AuthReply& reply) {
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
-
-    std::string promptPassword = mediator.ownerAuthBootstrapSource94_.password20.data();
+    const char* passwordText) {
+    std::string promptPassword = passwordText != nullptr ? passwordText : "";
     const bool promptForSecurId = HasTrailingSlashSixDigitSuffix(promptPassword);
     if (promptForSecurId && promptPassword.size() >= 7u) {
         promptPassword.resize(promptPassword.size() - 7u);
     }
     AssignSmallStringMirror(child.stringF8, promptPassword.c_str());
     child.crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
-    child.authReplySuccessHeaderDword07_110 =
-        parseObject != nullptr
-            ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x07u)
-            : reply.successHeaderUnknownDword07;
 
     spdlog::info(
-        "AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold childStringF8Len={} promptForSecurId={} childField110=0x{:08x} parseObjectF0={}",
+        "AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag childStringF8Len={} promptForSecurId={}",
         static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)),
-        static_cast<unsigned>(child.crashReporterPromptForSecurId104),
-        static_cast<unsigned>(child.authReplySuccessHeaderDword07_110),
-        fmt::ptr(parseObject));
+        static_cast<unsigned>(child.crashReporterPromptForSecurId104));
+}
+
+uint32_t AuthBootstrap680ReadAuthReplySuccessHeaderDword07(
+    const AuthBootstrap680Child_0x441290& child,
+    const mxo::auth::AuthReply& reply) {
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
+    return parseObject != nullptr
+               ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x07u)
+               : reply.successHeaderUnknownDword07;
 }
 
 // anchor: launcher.exe:DAT_004f79e0 / 0x43f300 success-side global one-time gate
-bool AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold() {
-    if (g_authBootstrap680State2AuthReplySuccessOneTimeGate) {
-        return false;
-    }
+bool AuthBootstrap680State2AuthReplySuccessOneTimeGateIsSet() {
+    return g_authBootstrap680State2AuthReplySuccessOneTimeGate;
+}
+
+// anchor: launcher.exe:DAT_004f79e0 / 0x43f300 success-side global one-time gate
+void AuthBootstrap680State2AuthReplySuccessOneTimeGateSet() {
     g_authBootstrap680State2AuthReplySuccessOneTimeGate = true;
-    return true;
 }
 
 // UNANCHORED: source-owned narrower mirror of the gated neighboring `0x43f300` success-side

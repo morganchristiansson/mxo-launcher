@@ -126,20 +126,25 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
     switch (childResult) {
         case kAuthBootstrap680InboundAuthReplySuccess: {
             // anchor: launcher.exe:0x43f300 case 2 — pre-gate setup
-            // Binary order: PregateScaffold (field110+stringF8), then one-time gate body,
-            // then phase-code dispatch + PostEvent(5).
-            AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
-                *g_CurrentLoginMediator->authBootstrapChild680_,
-                *g_CurrentLoginMediator,
-                g_CurrentLoginMediator->lastAuthReply_);
+            // Binary order at the top of case 2:
+            // 1. child `+0x110` = parsed success-header dword at header offset `0x07`
+            // 2. `0x441330 = AuthBootstrap680_SetPromptPasswordF8AndSecurIdFlag`
+            // 3. test global `DAT_004f79e0`
+            // 4. if clear, set `DAT_004f79e0 = 1` and run the once-only writeback body
+            auto& authBootstrapChild = *g_CurrentLoginMediator->authBootstrapChild680_;
+            authBootstrapChild.authReplySuccessHeaderDword07_110 =
+                AuthBootstrap680ReadAuthReplySuccessHeaderDword07(
+                    authBootstrapChild,
+                    g_CurrentLoginMediator->lastAuthReply_);
+            AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag(
+                authBootstrapChild,
+                g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data());
 
             // SOURCE-ONLY: diagnostic logging; no binary counterpart.
             AuthBootstrap680LogParsedAuthReply(*g_CurrentLoginMediator, g_CurrentLoginMediator->lastAuthReply_);
 
-            // Binary gates the heavy success-side writeback through global `DAT_004f79e0`.
-            // Source currently reaches that same once-only branch via the scaffold helper
-            // instead of pretending this TU owns a local `g_AuthBootstrap680...` global.
-            if (AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold()) {
+            if (!AuthBootstrap680State2AuthReplySuccessOneTimeGateIsSet()) {
+                AuthBootstrap680State2AuthReplySuccessOneTimeGateSet();
                 // anchor: launcher.exe:0x43f300 one-time gate body
                 //
                 // Binary ordering (verified against Ghidra decompilation of 0x43f300):
@@ -170,6 +175,12 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     const size_t worldCount = std::min(
                         g_CurrentLoginMediator->worldDescriptorsD84_.size(),
                         g_CurrentLoginMediator->lastAuthReply_.worlds.size());
+                    // Fidelity boundary note:
+                    // - binary walks the child `+0xf0` parse-object world temp records, not the
+                    //   replacement-owned `lastAuthReply_.worlds` vector directly
+                    // - `worldDescriptorCountD80_` is a faithful owner `+0xd80` mirror
+                    // - `worldDescriptorValidD84_` is source-owned sidecar state, not a proven
+                    //   launcher field despite the suffix-styled naming
                     for (size_t i = 0; i < worldCount; ++i) {
                         g_CurrentLoginMediator->SeedRecoveredWorldDescriptorFromAuthReply(
                             static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
@@ -177,7 +188,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     }
                 }
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
-                    *g_CurrentLoginMediator->authBootstrapChild680_,
+                    authBootstrapChild,
                     g_CurrentLoginMediator->lastAuthReply_);
                 // anchor: launcher.exe:0x43f300 character-slot loop + route-host string copy (inline, no function call)
                 // Binary shape:
@@ -220,7 +231,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 g_CurrentLoginMediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
                 g_CurrentLoginMediator->PostEvent(6u);
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
-                    *g_CurrentLoginMediator->authBootstrapChild680_,
+                    authBootstrapChild,
                     *g_CurrentLoginMediator,
                     g_CurrentLoginMediator->lastAuthReply_);
             }

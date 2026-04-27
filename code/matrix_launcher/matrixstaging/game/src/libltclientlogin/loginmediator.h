@@ -109,10 +109,6 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
         AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
-    friend void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
-        AuthBootstrap680Child_0x441290& child,
-        CLTLoginMediator& owner,
-        const mxo::auth::AuthReply& reply);
     friend void AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
         AuthBootstrap680Child_0x441290& child,
         const mxo::auth::AuthReply& reply);
