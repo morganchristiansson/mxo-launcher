@@ -407,34 +407,9 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         nopatchLauncherVersionValue,
         nopatchClientVersionValue);
 
-    {
-        uint32_t resolvedA8 = m_FieldA8;
-        uint32_t resolvedAC = m_FieldAC;
-        char resolvedSelectionName[sizeof(g_LastWorldName)] = {0};
-        if (DiagnosticResolveLauncherSelectionFromMediator(
-                &g_LoginMediatorStub,
-                m_FieldAC,
-                m_FieldA8,
-                &resolvedA8,
-                &resolvedAC,
-                resolvedSelectionName,
-                sizeof(resolvedSelectionName))) {
-            m_FieldA8 = resolvedA8;
-            m_FieldAC = resolvedAC;
-            const uint32_t packedArg7Selection2 = BuildPackedArg7Selection();
-            if (resolvedSelectionName[0]) {
-                std::strncpy(g_LastWorldName, resolvedSelectionName, sizeof(g_LastWorldName) - 1);
-                g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
-                StoreLastWorldNameInRegistry(g_LastWorldName);
-            }
-            spdlog::info(
-                "DIAGNOSTIC: arg7 rebuilt through ILTLoginMediator_0x4af2b8.Default selection path -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
-                m_FieldA8,
-                m_FieldAC,
-                packedArg7Selection2,
-                g_LastWorldName[0] ? g_LastWorldName : bootSelectionName);
-        }
-    }
+    // The text-mode launcher flow is the replacement's loose static-RE-based selection model.
+    // Do not re-run a second `0x40d6f0` facsimile here; this pre-client boot path only seeds the
+    // mediator ABI shell with the already-selected arg7/world defaults.
 
     // Read auth server config from mediator globals (set by ApplySelectedServerConfigToMediator)
     // anchor: launcher.exe:0x4f7b14 / 0x4f7a50

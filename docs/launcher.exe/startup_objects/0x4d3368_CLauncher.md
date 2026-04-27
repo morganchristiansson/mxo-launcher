@@ -431,6 +431,9 @@ Implication for the replacement source:
   - launcher-side success path now closes concretely through
     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
   - that helper writes `CLauncher+0xa8/+0xac` (`0x4d3410/0x4d3414`) and persists `Last_WorldName`
+    - replacement negative result from pruning the diagnostic shim:
+      - do not keep a second `0x40d6f0` facsimile in `launcher_mediator_abi.cpp`; `textmode_launcher_flow.cpp` is the replacement's loose static-RE-based selection model
+      - `0x40d6f0` still matters as documentation/field-layout evidence, but pre-client boot should only seed the mediator ABI shell with the already-selected arg7/world defaults
     - tighter create-row consequence from `0x40e480/0x40d530/0x40d6f0`:
       - the placeholder `"- - -"` row still resolves through the same writeback helper
       - it writes `0x4d3410 = 0xffffffff` / selected slot-record index `-1`

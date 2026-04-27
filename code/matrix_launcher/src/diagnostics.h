@@ -16,14 +16,6 @@ void DiagnosticConfigureMediatorSelection(
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
     uint32_t selectedVariantState);
-bool DiagnosticResolveLauncherSelectionFromMediator(
-    void* mediatorPtr,
-    uint32_t requestedWorldIndexLow24,
-    uint32_t requestedSelectionIndexHighWord,
-    uint32_t* outFieldA8,
-    uint32_t* outFieldAC,
-    char* outWorldName,
-    uint32_t outWorldNameCapacity);
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr, uint32_t parsedNoPatchValue, uint32_t clientVersionValue);
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
