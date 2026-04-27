@@ -843,32 +843,35 @@ uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
 // crash-reporter seed directly from the auth bootstrap child.
 // anchor: launcher.exe:0x41f3a0 / vtable +0x5c
 const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValueToken) {
-    const auto* copyShadow = authBootstrapChild680_
-                                ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
-                                      .authReplyCopyShadowF4
-                                : nullptr;
+    // Original body ignores caller state and returns:
+    //   owner+0x680->authReplyCopyShadowF4(+0xf4)->field_0x85 when +0xf4 is non-null,
+    //   otherwise static fallback descriptor `this_004aafbb`.
+    // The public ABI wrapper may still pass a caller-clean chained token on the client path; keep
+    // it only for diagnostics because launcher.exe:0x41f3a0 does not read a stack argument.
+    static constexpr uintptr_t kLauncherStaticFallback4aafbb = 0x004aafbb;
+    const auto* copyShadow = authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr;
     const char* usernameSeed = copyShadow
                                    ? reinterpret_cast<const char*>(copyShadow->signedData80.data() + 0x5u)
-                                   : nullptr;
+                                   : reinterpret_cast<const char*>(kLauncherStaticFallback4aafbb);
     spdlog::info(
         "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
         fmt::ptr(usernameSeed),
-        copyShadow ? "owner+0x680+0xf4+0x85" : "<null>");
+        copyShadow ? "owner+0x680+0xf4+0x85" : "launcher.exe:this_004aafbb");
     return usernameSeed;
 }
 
 // anchor: launcher.exe:0x41f3c0 / vtable +0x60
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
-    const char* passwordSeed = authBootstrapChild680_
-                                   ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
-                                         .stringF8.begin
-                                   : nullptr;
+    // Original body ignores caller state and returns the child small-string begin pointer at
+    // owner+0x680+0xf8. Source keeps the null guard only because replacement mediator lifetime can
+    // be entered from wrappers before the static launcher would have initialized owner+0x680.
+    const char* passwordSeed = authBootstrapChild680_ ? authBootstrapChild680_->stringF8.begin : nullptr;
     spdlog::info(
         "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
         MaskedSensitiveValue(passwordSeed),
-        authBootstrapChild680_ ? "owner+0x680+0xf8.begin" : "<null>");
+        authBootstrapChild680_ ? "owner+0x680+0xf8.begin" : "<null-child> (source guard)");
     return passwordSeed;
 }
 
