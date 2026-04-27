@@ -11,6 +11,13 @@ CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 CRYPTOPP_DIR = third_party/cryptopp890
 SPDLOG_DIR = third_party/spdlog-1.17.0
 
+BUILD_ROOT = build
+BUILD_PROFILE ?= debug
+# `slim` keeps line tables for convenient backtraces without carrying full DWARF.
+DEBUG_LEVEL ?= slim
+BUILD_DIR = $(BUILD_ROOT)/$(BUILD_PROFILE)
+BUILD_OUTPUT = $(BUILD_DIR)/resurrections.exe
+
 # Transitional note:
 # - canonical public auth declarations now live under:
 #   matrixstaging/runtime/src/libltcrypto/auth_crypto.h
@@ -80,7 +87,6 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/filters.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.o
 
-BUILD_DIR = build
 CRYPTOPP_LIB = $(BUILD_DIR)/libcryptopp.a
 SPDLOG_LIB = $(BUILD_DIR)/libspdlog.a
 
@@ -91,10 +97,20 @@ LAUNCHER_ARGS = -nopatch -noeula $(if $(MXO_SERVER),-server $(MXO_SERVER)) $(if 
 all: $(TARGET)
 
 CPPFLAGS = -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include
-# Keep line tables for debugging, but avoid full DWARF debug info in every object.
-# That materially reduces .o size and shortens the final link step.
-CXXFLAGS = -Wall -Wextra -O0 -g1 -fno-omit-frame-pointer -pipe -pthread
+BASE_CXXFLAGS = -Wall -Wextra -pipe -pthread -MMD -MP
+DEBUG_CXXFLAGS = -O0 -fno-omit-frame-pointer
+RELEASE_CXXFLAGS = -Os -DNDEBUG -ffunction-sections -fdata-sections
+DEBUG_LEVEL_full = -g
+DEBUG_LEVEL_slim = -g1
+DEBUG_LEVEL_none =
+DEBUG_FLAGS = $(DEBUG_LEVEL_$(DEBUG_LEVEL))
+ifeq ($(BUILD_PROFILE),release)
+CXXFLAGS = $(BASE_CXXFLAGS) $(RELEASE_CXXFLAGS) $(DEBUG_FLAGS)
+LDFLAGS = -L$(BUILD_DIR) -pthread -Wl,--gc-sections -Wl,-s
+else
+CXXFLAGS = $(BASE_CXXFLAGS) $(DEBUG_CXXFLAGS) $(DEBUG_FLAGS)
 LDFLAGS = -L$(BUILD_DIR) -pthread
+endif
 LDLIBS = -lversion -lws2_32 -lcryptopp
 
 # MinGW arg5 native-vptr mode:
@@ -104,7 +120,6 @@ ifeq ($(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR),1)
 CPPFLAGS += -DMXO_DISABLE_MINGW_NATIVE_ARG5_VPTR
 endif
 
-CXXFLAGS += -MMD -MP
 -include $(LAUNCHER_OBJS:.o=.d)
 
 # Object file for each source
@@ -118,8 +133,13 @@ $(BUILD_DIR)/matrixstaging/%.o: matrixstaging/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
+# Build the selected profile output, then copy it into the final game directory.
+$(TARGET): $(BUILD_OUTPUT)
+	@mkdir -p $(dir $@)
+	cp $< $@
+
 # Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
-$(TARGET): $(LAUNCHER_OBJS) | $(SPDLOG_DIR) $(CRYPTOPP_LIB)
+$(BUILD_OUTPUT): $(LAUNCHER_OBJS) | $(SPDLOG_DIR) $(CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
@@ -140,7 +160,7 @@ $(SPDLOG_DIR):
 
 $(CRYPTOPP_LIB): $(CRYPTOPP_DIR)
 	@mkdir -p $(dir $@)
-	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" static
+	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(filter-out -MMD -MP,$(CXXFLAGS))" AR="$(AR)" RANLIB="$(RANLIB)" static
 	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
 
 # spdlog is header-only, included via CPPFLAGS. No build step needed.
@@ -173,8 +193,14 @@ restore_crashreporter:
 		if [ -f crashreporter.exe.original ]; then mv -f crashreporter.exe.original crashreporter.exe; fi && \
 		rm -f crashreporter.stub.exe
 
+release:
+	@$(MAKE) BUILD_PROFILE=release DEBUG_LEVEL=none all
+
+full_debug:
+	@$(MAKE) BUILD_PROFILE=debug DEBUG_LEVEL=full all
+
 clean:
 	rm -f $(TARGET)
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_ROOT)
 
-.PHONY: all run crashdump install_crashreporter_stub restore_crashreporter clean
+.PHONY: all release full_debug run crashdump install_crashreporter_stub restore_crashreporter clean

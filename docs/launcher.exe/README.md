@@ -22,6 +22,11 @@ Canonical launcher-side documentation lives in component folders.
 - `SetMasterDatabase/`
   - Launcher-side `SetMasterDatabase` export and related notes.
 
+- `build/BUILD_PERFORMANCE.md`
+  - Notes on keeping the launcher build leaner and faster.
+  - Documents the default debug-slim profile and the release target.
+  - Captures the measured release-size reduction to about 3.06 MB.
+
 ## Current high-confidence facts
 
 1. The original launcher loads **`cres.dll` before `client.dll` initialization**.
