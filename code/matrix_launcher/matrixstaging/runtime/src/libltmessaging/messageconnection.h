@@ -10,6 +10,8 @@
 
 #include <rsa.h>
 
+#include "../../../game/src/libltclientlogin/authbootstrap680_shared.h"
+
 // Forward declare CLTLoginMediator to avoid circular include
 namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 #include "../libltcrypto/auth_internal.h"
@@ -1062,6 +1064,35 @@ public:
     CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8 transformWorker;
     bool hasTransformWorker = false;
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
+
+    // Auth-bootstrap receiver-backed field family migrated from the earlier auth child base.
+    // These fields are consumed by the non-virtual helper methods rooted at `0x4474f0`, `0x447eb0`,
+    // `0x447f50`, `0x448050`, and `0x448140`.
+    mxo::ltlogin::AuthBootstrap680SmallStringMirror string04;
+    mxo::ltlogin::AuthBootstrap680SmallStringMirror string10;
+    mxo::ltlogin::AuthBootstrap680SmallStringMirror string1C;
+    uint32_t loginType28 = 0;
+    uint32_t launcherVersion2C = 0;
+    std::array<uint8_t, 16> block30{};
+    std::array<uint8_t, 16> block40{};
+    void* sendTarget50 = nullptr;
+    mxo::ltlogin::AuthBootstrap680Field54HelperSketch feedbackSeedHelper54{};
+    uint32_t authServerTimeBias80 = 0;
+    std::array<uint8_t, 16> feedbackSeed84{};
+    mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr;
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr;
+    uint32_t currentPublicKeyId9C = 0;
+    uint8_t authRequestReadyA0 = 0;
+    std::array<uint8_t, 3> paddingA1ToA3{};
+    mxo::ltlogin::AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr;
+    mxo::ltlogin::AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr;
+    mxo::ltlogin::AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr;
+    mxo::ltlogin::AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{};
+    mxo::ltlogin::AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{};
+    mxo::ltlogin::AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{};
+    uint32_t inboundAuthStatusEc = 1;
+    mxo::ltlogin::AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr;
+    mxo::ltlogin::AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForOwner(CStreamPacketEncryptionModule_0x4b8704* owner);
