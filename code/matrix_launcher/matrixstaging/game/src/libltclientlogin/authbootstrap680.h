@@ -166,13 +166,6 @@ public:
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;
-
-    // anchor: launcher.exe:0x468f80
-    bool VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
-        CLTLoginMediator& owner,
-        const mxo::auth::GetPublicKeyReply& reply);
-    // Source-owned (NOT static-RE): inlined into HandleInboundAuthMessage case 0x09u at 0x44831c..0x448467
- uint32_t SendAuthChallengeResponse_SOURCEOWNED_NO_RE(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 };
 
 inline AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelper(
