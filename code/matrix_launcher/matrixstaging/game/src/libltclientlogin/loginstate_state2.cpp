@@ -75,7 +75,9 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
-    const uint32_t sendResult = child->PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
+    const uint32_t sendResult =
+        reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(*child)
+            .PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
     spdlog::info(
         "CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
         fmt::ptr(upstreamOrArg),
@@ -104,7 +106,9 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
     // - this state2 body only switches on that helper's return code to drive owner `+0x80`,
     //   helper-switch, and event/error flow
     const uint32_t childResult =
-        g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(workItem, *g_CurrentLoginMediator);
+        reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(
+            *g_CurrentLoginMediator->authBootstrapChild680_)
+            .HandleInboundAuthMessage(workItem, *g_CurrentLoginMediator);
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(

@@ -1525,7 +1525,7 @@ void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
 //       undefined4 pSendTarget, char *pszStationOrFallback)
 // The original extracts strings via owner+0x94 direct field offsets and copies them
 // using the small-string triple helper. Source now mirrors that exact call shape.
-uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
+uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch_SOURCEOWNED(
     CLTLoginMediator& mediator,
     void* sendTarget,
     const char* sessionTokenBegin) {
@@ -1603,7 +1603,7 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 }
 
 // anchor: launcher.exe:0x448140
-uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
+uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage_SOURCEOWNED(
     void* incomingAuthMessage,
     CLTLoginMediator& mediator) {
     IncomingAuthPayloadViewScaffold incomingPayload = {};
@@ -2540,6 +2540,23 @@ mxo::ltlogin::AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelperB
 }  // namespace
 
 namespace mxo::liblttcp {
+
+// anchor: launcher.exe:0x448050
+uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch(
+    mxo::ltlogin::CLTLoginMediator& owner,
+    void* sendTarget,
+    const char* sessionTokenBegin) {
+    return AuthBootstrapChildFromWriteHelperBridge(*this)
+        .PrepareAndDispatch_SOURCEOWNED(owner, sendTarget, sessionTokenBegin);
+}
+
+// anchor: launcher.exe:0x448140
+uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage(
+    void* incomingAuthMessage,
+    mxo::ltlogin::CLTLoginMediator& owner) {
+    return AuthBootstrapChildFromWriteHelperBridge(*this)
+        .HandleInboundAuthMessage_SOURCEOWNED(incomingAuthMessage, owner);
+}
 
 // anchor: launcher.exe:0x447eb0
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendGetPublicKeyRequest(

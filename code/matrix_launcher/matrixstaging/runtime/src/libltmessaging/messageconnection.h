@@ -1070,6 +1070,13 @@ public:
     // Non-virtual auth-bootstrap helper family currently recovered by Ghidra on this receiver.
     // Source still bridges these bodies into the owner `+0x680` auth child layout while we grind
     // toward a tighter unified class model.
+    uint32_t PrepareAndDispatch(
+        mxo::ltlogin::CLTLoginMediator& owner,
+        void* sendTarget,
+        const char* sessionTokenBegin);
+    uint32_t HandleInboundAuthMessage(
+        void* incomingAuthMessage,
+        mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t SendGetPublicKeyRequest(mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t SendAuthRequest(mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t HandleGetPublicKeyReply(

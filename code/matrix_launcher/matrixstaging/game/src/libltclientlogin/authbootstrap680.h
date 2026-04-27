@@ -537,14 +537,14 @@ public:
     //       undefined4 *pKeyConfigMd5, undefined4 *pUiConfigMd5,
     //       undefined4 pSendTarget, char *pszStationOrFallback)
     // But source consolidates args to mirror caller-gathered call shape:
-    //   PrepareAndDispatch(CLTLoginMediator& owner, void* sendTarget, const char* sessionTokenBegin)
-    uint32_t PrepareAndDispatch(CLTLoginMediator& owner, void* sendTarget, const char* sessionTokenBegin);
-    // anchor: launcher.exe:0x448140
-    // Original call shape consumes the incoming auth-message object directly.
-    // Ghidra currently recovers this method under namespace
-    // `CStreamPacketEncryptionModuleWriteHelper_0x4b8690`; source still keeps the
-    // concrete owner+0x680 implementation grouped under this child mirror.
-    uint32_t HandleInboundAuthMessage(void* incomingAuthMessage, CLTLoginMediator& owner);
+    // Source-owned bridge implementations called by
+    // `mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690` methods while source
+    // still stores the auth-bootstrap state in the owner `+0x680` child layout.
+    uint32_t PrepareAndDispatch_SOURCEOWNED(
+        CLTLoginMediator& owner,
+        void* sendTarget,
+        const char* sessionTokenBegin);
+    uint32_t HandleInboundAuthMessage_SOURCEOWNED(void* incomingAuthMessage, CLTLoginMediator& owner);
 
     // anchor: launcher.exe:0x441330
     void SetPromptPasswordF8AndSecurIdFlag(const char* promptPasswordWithOptionalSecurId);
@@ -574,9 +574,6 @@ public:
     // anchor: launcher.exe:0x447780
     uint32_t RebuildReplyPublicKeyWorkers_SOURCEOWNED(
         const mxo::auth::GetPublicKeyReply& reply);
-    // Source-owned bridge implementations called by
-    // `mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690` methods while source
-    // still stores the auth-bootstrap state in the owner `+0x680` child layout.
     uint32_t SendGetPublicKeyRequest_SOURCEOWNED(CLTLoginMediator& owner);
     uint32_t SendAuthRequest_SOURCEOWNED(CLTLoginMediator& owner);
     uint32_t HandleGetPublicKeyReply_SOURCEOWNED(
