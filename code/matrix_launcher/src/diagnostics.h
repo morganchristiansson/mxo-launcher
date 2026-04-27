@@ -8,8 +8,6 @@ namespace mxo::ltlogin {
 struct ProcessLoginRequestInputSketch;
 }
 
-void DiagnosticStartWindowTrace();
-void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
 
 // Diagnostic-only runtime detour for client.dll loading/status text updates.
@@ -18,4 +16,3 @@ void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
 // Opt out with:
 // - MXO_DISABLE_DIAGNOSTIC_CLIENT_LOADING_TEXT_HOOK=1
 bool DiagnosticMaybeInstallClientLoadingTextHook(HMODULE clientModule);
-void DiagnosticRemoveClientLoadingTextHook();

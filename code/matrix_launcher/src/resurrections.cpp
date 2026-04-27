@@ -139,7 +139,6 @@ void DiagnosticShutdownPreclientEnvironment() {
 }
 
 static int FinishAndReturn(int code) {
-    DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();
     return code;
 }

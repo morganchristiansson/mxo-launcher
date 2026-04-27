@@ -276,7 +276,6 @@ bool CLauncher::LoadClientDLL() const {
 
 // anchor: launcher.exe:0x40a760
 void CLauncher::UnloadClientDLL() const {
-    DiagnosticRemoveClientLoadingTextHook();
     if (g_hClient) {
         FreeLibrary(g_hClient);
         g_hClient = NULL;
@@ -467,7 +466,6 @@ bool CLauncher::RunRecoveredPreClientBringupStage() const {
         spdlog::info("WARNING: pre-client environment bringup failed to initialize");
     }
 
-    DiagnosticStartWindowTrace();
     if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
         if (!RunAutodetectDialogWithoutGui()) {
             spdlog::error("ERROR: autodetect dialog/helper path failed");
