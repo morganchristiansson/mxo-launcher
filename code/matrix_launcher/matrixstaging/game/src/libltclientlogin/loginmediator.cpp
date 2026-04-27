@@ -839,33 +839,37 @@ uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
 // - client `InitClientDLL` uses caller-clean wrappers and threads the previous return value
 //   through the next call
 // Keep the incoming value opaque here instead of forcing a false `const char*` semantic.
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-// +0x5c
+// The recovered launcher implementation does not actually consume that token; it reads the
+// crash-reporter seed directly from the auth bootstrap child.
+// anchor: launcher.exe:0x41f3a0 / vtable +0x5c
 const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValueToken) {
-    const char* authName = Arg6AuthName();
+    const auto* copyShadow = authBootstrapChild680_
+                                ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
+                                      .authReplyCopyShadowF4
+                                : nullptr;
+    const char* usernameSeed = copyShadow
+                                   ? reinterpret_cast<const char*>(copyShadow->signedData80.data() + 0x5u)
+                                   : nullptr;
     spdlog::info(
-        "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c chainedValueToken={}) -> '{}'",
+        "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
-        NonEmptyTextOrPlaceholder(authName));
-    return authName;
+        fmt::ptr(usernameSeed),
+        copyShadow ? "owner+0x680+0xf4+0x85" : "<null>");
+    return usernameSeed;
 }
 
-// +0x60
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f3c0 / vtable +0x60
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
-    const char* authPassword = Arg6AuthPassword();
-    const char* bootstrapPassword = authBootstrapChild680_
-                                        ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
-                                              .stringF8.begin
-                                        : nullptr;
-    const char* effectivePassword =
-        (bootstrapPassword && bootstrapPassword[0] != '\0') ? bootstrapPassword : authPassword;
+    const char* passwordSeed = authBootstrapChild680_
+                                   ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
+                                         .stringF8.begin
+                                   : nullptr;
     spdlog::info(
         "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
-        MaskedSensitiveValue(effectivePassword),
-        (bootstrapPassword && bootstrapPassword[0] != '\0') ? "owner+0x680+0xf8" : "arg6-auth-password");
-    return effectivePassword;
+        MaskedSensitiveValue(passwordSeed),
+        authBootstrapChild680_ ? "owner+0x680+0xf8.begin" : "<null>");
+    return passwordSeed;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
