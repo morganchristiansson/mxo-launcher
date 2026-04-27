@@ -76,10 +76,6 @@ public:
     // anchor: launcher.exe:0x40a7a0
     void UnloadCresDLL() const;
 
-    // UNANCHORED: replacement-only synthesis inside launcher.exe:0x40b430 that seeds the
-    // launcher-owned selection / nopatch inputs consumed later by the active nopatch path.
-    bool BuildRecoveredSelectionNameAndState(char* selectionName, size_t selectionNameCapacity);
-
     // UNANCHORED: replacement-only synthesis that materializes arg6/arg7-owned InitClientDLL
     // state before the later 0x40a380 / 0x40b74d..0x40b7af pre-client continuation corridor.
     bool MaterializeRecoveredInitClientStateFromSelectionName(const char* selectionName);

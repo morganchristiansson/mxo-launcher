@@ -297,100 +297,6 @@ void CLauncher::UnloadCresDLL() const {
     }
 }
 
-// UNANCHORED: replacement-only synthesis inside launcher.exe:0x40b430 before the later
-// 0x40b739..0x40b7af continuation corridor. This groups state that the replacement must recover
-// in order to feed arg5/arg6/arg7 on the active nopatch path, without claiming a real original
-// helper boundary.
-bool CLauncher::BuildRecoveredSelectionNameAndState(char* selectionName, size_t selectionNameCapacity) {
-    if (!selectionName || selectionNameCapacity == 0u) {
-        return false;
-    }
-
-    std::memset(selectionName, 0, selectionNameCapacity);
-
-    // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
-    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
-    // the later pre-client character-selection stage after the character index is read.
-    if (const RecoveredLauncherSelectionRecord* defaultSelection =
-            DefaultRecoveredLauncherSelectionRecord();
-        defaultSelection != nullptr && defaultSelection->selectionName != nullptr) {
-        std::strncpy(selectionName, defaultSelection->selectionName, selectionNameCapacity - 1);
-        selectionName[selectionNameCapacity - 1] = '\0';
-        spdlog::info(
-            "DIAGNOSTIC: defaulting launcher selection name to first recovered world '{}'",
-            selectionName);
-    } else {
-        std::strcpy(selectionName, "standalone");
-        spdlog::warn(
-            "DIAGNOSTIC: no recovered launcher selection records are available; falling back to '{}'",
-            selectionName);
-    }
-
-    const RecoveredLauncherSelectionRecord* recoveredSelection =
-        FindRecoveredLauncherSelectionRecord(selectionName);
-    if (recoveredSelection) {
-        std::strncpy(selectionName, recoveredSelection->selectionName, selectionNameCapacity - 1);
-        selectionName[selectionNameCapacity - 1] = '\0';
-        m_FieldA8 = 0u;
-        m_FieldAC = RecoveredSelectionWorldIndexLow24();
-        const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-        spdlog::info(
-            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
-            recoveredSelection->selectionName,
-            m_FieldA8,
-            m_FieldAC,
-            packedArg7Selection,
-            (unsigned)recoveredSelection->selectionGateByte100,
-            (unsigned)recoveredSelection->variantState,
-            recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
-    } else if (selectionName[0] && lstrcmpiA(selectionName, "standalone") != 0) {
-        spdlog::warn(
-            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields until that world has a recovered launcher-owned selection record",
-            selectionName);
-    }
-
-    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-    if ((m_FieldA8 | m_FieldAC) != 0) {
-        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
-    }
-
-    // Replacement-only nopatch bookkeeping now stays local to this stage instead of crossing the
-    // selection-name handoff.
-    const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
-    const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
-
-    if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
-        spdlog::info(
-            "DIAGNOSTIC: explicit -nopatch rebuilt packed launcher-version dword from launcher.exe version info = '{}' (0x{:08x})",
-            g_LauncherCommandLine.NoPatchLauncherVersionString(),
-            nopatchLauncherVersionValue);
-    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
-        spdlog::info(
-            "UNANCHORED: replacement default nopatch policy is using fallback packed launcher-version dword 0.1 (0x{:08x})",
-            nopatchLauncherVersionValue);
-    } else {
-        spdlog::info(
-            "DIAGNOSTIC: nopatch launcher-version dword is using fallback 0.1 (0x{:08x})",
-            nopatchLauncherVersionValue);
-    }
-    if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
-        spdlog::info(
-            "DIAGNOSTIC: explicit -nopatch rebuilt packed client-version dword from client.dll version info = '{}' (0x{:08x})",
-            g_LauncherCommandLine.NoPatchClientVersionString(),
-            nopatchClientVersionValue);
-    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
-        spdlog::info(
-            "UNANCHORED: replacement default nopatch policy is using fallback packed client-version dword 0.1 (0x{:08x})",
-            nopatchClientVersionValue);
-    } else {
-        spdlog::info(
-            "DIAGNOSTIC: nopatch client-version dword is using fallback 0.1 (0x{:08x})",
-            nopatchClientVersionValue);
-    }
-
-    return true;
-}
-
 // UNANCHORED: replacement-only synthesis that feeds the later 0x40a380 / 0x40b74d..0x40b7af
 // corridor by materializing current arg6/arg7 startup state. This is more honest than treating the
 // entire pre-client stretch as one faux method, but it still does not claim an exact original
@@ -634,6 +540,10 @@ bool CLauncher::RunClientDllLifecycle() const {
 bool CLauncher::InitInstance() {
     bool operationSucceeded = false;
     char selectionName[64] = {};
+    const RecoveredLauncherSelectionRecord* recoveredSelection = nullptr;
+    uint32_t packedArg7Selection = 0u;
+    uint32_t nopatchLauncherVersionValue = 0u;
+    uint32_t nopatchClientVersionValue = 0u;
 
     if (!ParseCommandLineStage()) {
         goto cleanup;
@@ -641,8 +551,83 @@ bool CLauncher::InitInstance() {
 
     // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
     // and nopatch state before the later pre-client continuation corridor.
-    if (!BuildRecoveredSelectionNameAndState(selectionName, sizeof(selectionName))) {
-        goto cleanup;
+    std::memset(selectionName, 0, sizeof(selectionName));
+
+    // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
+    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
+    // the later pre-client character-selection stage after the character index is read.
+    if (const RecoveredLauncherSelectionRecord* defaultSelection =
+            DefaultRecoveredLauncherSelectionRecord();
+        defaultSelection != nullptr && defaultSelection->selectionName != nullptr) {
+        std::strncpy(selectionName, defaultSelection->selectionName, sizeof(selectionName) - 1);
+        selectionName[sizeof(selectionName) - 1] = '\0';
+        spdlog::info(
+            "DIAGNOSTIC: defaulting launcher selection name to first recovered world '{}'",
+            selectionName);
+    } else {
+        std::strcpy(selectionName, "standalone");
+        spdlog::warn(
+            "DIAGNOSTIC: no recovered launcher selection records are available; falling back to '{}'",
+            selectionName);
+    }
+
+    recoveredSelection = FindRecoveredLauncherSelectionRecord(selectionName);
+    if (recoveredSelection) {
+        std::strncpy(selectionName, recoveredSelection->selectionName, sizeof(selectionName) - 1);
+        selectionName[sizeof(selectionName) - 1] = '\0';
+        m_FieldA8 = 0u;
+        m_FieldAC = RecoveredSelectionWorldIndexLow24();
+        packedArg7Selection = BuildPackedArg7Selection();
+        spdlog::info(
+            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
+            recoveredSelection->selectionName,
+            m_FieldA8,
+            m_FieldAC,
+            packedArg7Selection,
+            (unsigned)recoveredSelection->selectionGateByte100,
+            (unsigned)recoveredSelection->variantState,
+            recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
+    } else if (selectionName[0] && lstrcmpiA(selectionName, "standalone") != 0) {
+        spdlog::warn(
+            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields until that world has a recovered launcher-owned selection record",
+            selectionName);
+    }
+
+    packedArg7Selection = BuildPackedArg7Selection();
+    if ((m_FieldA8 | m_FieldAC) != 0) {
+        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
+    }
+
+    nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
+    nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
+
+    if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
+        spdlog::info(
+            "DIAGNOSTIC: explicit -nopatch rebuilt packed launcher-version dword from launcher.exe version info = '{}' (0x{:08x})",
+            g_LauncherCommandLine.NoPatchLauncherVersionString(),
+            nopatchLauncherVersionValue);
+    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
+        spdlog::info(
+            "UNANCHORED: replacement default nopatch policy is using fallback packed launcher-version dword 0.1 (0x{:08x})",
+            nopatchLauncherVersionValue);
+    } else {
+        spdlog::info(
+            "DIAGNOSTIC: nopatch launcher-version dword is using fallback 0.1 (0x{:08x})",
+            nopatchLauncherVersionValue);
+    }
+    if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
+        spdlog::info(
+            "DIAGNOSTIC: explicit -nopatch rebuilt packed client-version dword from client.dll version info = '{}' (0x{:08x})",
+            g_LauncherCommandLine.NoPatchClientVersionString(),
+            nopatchClientVersionValue);
+    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
+        spdlog::info(
+            "UNANCHORED: replacement default nopatch policy is using fallback packed client-version dword 0.1 (0x{:08x})",
+            nopatchClientVersionValue);
+    } else {
+        spdlog::info(
+            "DIAGNOSTIC: nopatch client-version dword is using fallback 0.1 (0x{:08x})",
+            nopatchClientVersionValue);
     }
 
     // UNANCHORED within 0x40b430: replacement-only arg6/arg7 startup-state materialization that
