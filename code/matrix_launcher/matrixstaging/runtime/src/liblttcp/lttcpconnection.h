@@ -406,8 +406,6 @@ public:
     // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
     LTTCPEngineConnectionState State() const;
 
-    // UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
-    void SetRemoteHostName(const char* hostName);
     // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
     const std::string& RemoteHostName() const;
 

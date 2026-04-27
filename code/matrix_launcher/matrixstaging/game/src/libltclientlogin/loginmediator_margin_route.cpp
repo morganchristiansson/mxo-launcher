@@ -102,20 +102,23 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner++0x6c)`
 
-    // Fidelity: ALWAYS read from globals - original uses globals at 0x4f7b14 directly.
-    // This ensures reconnection works even after initial login.
-    // Use global as fallback if caller doesn't provide route host.
-    if (!routeHostText || routeHostText[0] == '\0') {
-        routeHostText = g_marginServerDNSName;
-    }
+    // Fidelity: the original path consumes the caller-supplied route-host text directly.
+    // The callsite is responsible for feeding the margin-server suffix/global-backed value.
     // Use global port for endpoint construction.
     const uint16_t portHostOrder = g_marginServerPort != 0u ? g_marginServerPort : marginServerPortHostOrder_;
 
-    mxo::liblttcp::CMessageConnection_0x4b7928* connection = EnsureMarginConnectionObject();
+    // anchor: launcher.exe:0x41e500 / margin connection allocation and initialization
+    auto* connection = new mxo::liblttcp::CMarginConnection_0x4aff38(engine_);
     if (!connection) {
+        marginConnection_ = nullptr;
         spdlog::warn("CLTLoginMediator::BeginMarginConnection failed to allocate margin connection");
         return 0u;
     }
+    connection->SetOwnerContext(this);
+    connection->ConfigurePacketNameFamily(
+        mxo::liblttcp::CMessageConnectionPacketNameFamily::kMargin,
+        /*packetizedMessagesEnabled=*/true);
+    marginConnection_ = connection;
 
     marginConnectionFlag2d_ = 0;
 
@@ -123,13 +126,6 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     const bool needsBoundedNonZeroSelectorMaterialization =
         (cachedRouteSelector != 0u) && (marginEndpoint_.ipv4NetworkOrder == 0u);
     if (shouldRefreshRouteState || needsBoundedNonZeroSelectorMaterialization) {
-        if (!routeHostText || routeHostText[0] == '\0') {
-            spdlog::debug(
-                "CLTLoginMediator::BeginMarginConnection selector=0x{:02x} requires routeHostText but received <empty>",
-                cachedRouteSelector);
-            return 0u;
-        }
-
         // `0x41e500` only refreshes owner `+0x30/+0x3c/+0x6c` on the exact `arg2 == 0` path.
         // The extra `selector != 0 && endpoint still zero` branch below is a bounded source-owned
         // stand-in for the still-unrecovered earlier producer that should already have

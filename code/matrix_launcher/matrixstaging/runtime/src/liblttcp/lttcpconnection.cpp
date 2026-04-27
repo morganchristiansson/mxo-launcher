@@ -501,11 +501,6 @@ LTTCPEngineConnectionState CLTTCPConnection::State() const {
 }
 
 
-// UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
-void CLTTCPConnection::SetRemoteHostName(const char* hostName) {
-    remoteHostName_ = hostName ? hostName : "";
-}
-
 // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
 const std::string& CLTTCPConnection::RemoteHostName() const {
     return remoteHostName_;
@@ -633,12 +628,11 @@ bool CLTTCPConnection::QueueSendBuffer(
     }
 
     spdlog::debug(
-        "CLTTCPConnection::QueueSendBuffer queued copied send bytes ownershipMode={} this={} worker={} byteCount={} remoteHost='{}'",
+        "CLTTCPConnection::QueueSendBuffer queued copied send bytes ownershipMode={} this={} worker={} byteCount={}",
         static_cast<unsigned>(ownershipMode),
         fmt::ptr(this),
         fmt::ptr(workerThread08_),
-        byteCount,
-        remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+        byteCount);
     return true;
 }
 
@@ -686,9 +680,9 @@ int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
         new (std::nothrow) CLTTCPReadOperation;
     if (!readOperationFragment) {
         spdlog::warn(
-            "CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold failed fragment allocation this={} remoteHost='{}'",
-            fmt::ptr(this),
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+            "CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold failed fragment allocation this={}",
+            fmt::ptr(this)
+            );
         return 0;
     }
 
@@ -755,9 +749,8 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     if (ready == SOCKET_ERROR) {
         const int wsaError = WSAGetLastError();
         spdlog::debug(
-            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold select failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold select failed socket=0x{:08x} wsaError={} -> closing",
             socketHandle_,
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             wsaError);
         (void)CloseSocketTransportScaffold(/*graceful=*/false);
         return -1;
@@ -775,14 +768,13 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
 
     if (peerClosed) {
         spdlog::info(
-            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
-            socketHandle_,
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv returned EOF socket=0x{:08x}",
+            socketHandle_
+            );
     } else {
         spdlog::warn(
-            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv failed socket=0x{:08x} wsaError={} -> closing",
             socketHandle_,
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             wsaError);
     }
 
@@ -925,18 +917,16 @@ uint32_t CLTTCPConnection::CloseSocketTransportScaffold(bool /*graceful*/) {
             const int wsaError = WSAGetLastError();
             if (wsaError != WSAENOTCONN) {
                 spdlog::debug(
-                    "CLTTCPConnection::CloseSocketTransportScaffold shutdown failed socket=0x{:08x} remoteHost='{}' wsaError={}",
+                    "CLTTCPConnection::CloseSocketTransportScaffold shutdown failed socket=0x{:08x} wsaError={}",
                     socketHandle_,
-                    remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
                     wsaError);
             }
         }
         const int closeResult = closesocket(socket);
         if (closeResult == SOCKET_ERROR) {
             spdlog::debug(
-                "CLTTCPConnection::CloseSocketTransportScaffold closesocket failed socket=0x{:08x} remoteHost='{}' wsaError={}",
+                "CLTTCPConnection::CloseSocketTransportScaffold closesocket failed socket=0x{:08x} wsaError={}",
                 socketHandle_,
-                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
                 WSAGetLastError());
         }
     }
@@ -956,19 +946,17 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
     if (state_ != LTTCPEngineConnectionState::kConnectActive &&
         state_ != LTTCPEngineConnectionState::kUdpMonitorActive) {
         spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because state={} socket=0x{:08x} remoteHost='{}' byteCount={}",
+            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because state={} socket=0x{:08x} byteCount={}",
             static_cast<uint32_t>(state_),
             socketHandle_,
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             byteCount);
         return 0u;
     }
 
     if (socketHandle_ == kInvalidSocketHandle) {
         spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because socket is invalid state={} remoteHost='{}' byteCount={}",
+            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because socket is invalid state={} byteCount={}",
             static_cast<uint32_t>(state_),
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             byteCount);
         return 0u;
     }
@@ -981,9 +969,8 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
     if (sent == SOCKET_ERROR) {
         const int wsaError = WSAGetLastError();
         spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold send failed socket=0x{:08x} remoteHost='{}' byteCount={} wsaError={}",
+            "CLTTCPConnection::SendRawSocketBufferScaffold send failed socket=0x{:08x} byteCount={} wsaError={}",
             socketHandle_,
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             byteCount,
             wsaError);
         if (wsaError != WSAEWOULDBLOCK) {
@@ -993,9 +980,8 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
     }
     if (sent != static_cast<int>(byteCount)) {
         spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold short send socket=0x{:08x} remoteHost='{}' requested={} sent={}",
+            "CLTTCPConnection::SendRawSocketBufferScaffold short send socket=0x{:08x} requested={} sent={}",
             socketHandle_,
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             byteCount,
             sent);
         return 0u;

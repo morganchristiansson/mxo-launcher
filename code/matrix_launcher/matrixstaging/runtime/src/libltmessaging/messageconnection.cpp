@@ -1074,14 +1074,13 @@ uint32_t CMessageConnection_0x4b7928::SubmitMessageRefBytes(
     const uint8_t* const submittedBytes = payloadBase - 2u + pointerOffsetFrom0a;
 
     spdlog::info(
-        "CMessageConnection::SubmitMessageRefBytes reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SubmitMessageRefBytes reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={}",
         static_cast<unsigned>(messageStorage.reservedBytes08),
         static_cast<unsigned>(payloadByteCount),
         static_cast<unsigned>(submittedByteCount),
         static_cast<unsigned>(pointerOffsetFrom0a),
         fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        fmt::ptr(OwnerContext()));
     return CLTTCPConnection::SendBuffer(
         submittedBytes,
         submittedByteCount,
@@ -1834,11 +1833,10 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
         static_cast<CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08*>(workItem);
     if (parsedPacketWorkItem->assembledByteCount28 > 0x1000u) {
         spdlog::info(
-            "CMessageConnection::OnOperationCompleted received illegally large packet payloadBytes={} this={} ownerContext={} remoteHost='{}' -> closing",
+            "CMessageConnection::OnOperationCompleted received illegally large packet payloadBytes={} this={} ownerContext={} -> closing",
             static_cast<unsigned>(parsedPacketWorkItem->assembledByteCount28),
             fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            fmt::ptr(OwnerContext()));
         (void)Close(false);
         lastReceivedPacketBodyBytesScaffold_.clear();
         lastReceivedPacketHeaderlessScaffold_ = !packetizedMessagesEnabled_;
@@ -1856,25 +1854,25 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
         &hadUnusedBuffers);
     if (!copied) {
         spdlog::info(
-            "CMessageConnection::OnOperationCompleted unresolved parsed-packet receive/message-ref copy this={} ownerContext={} payloadBytes={} retainedFragmentCount={} currentCursor={} remoteHost='{}'",
+            "CMessageConnection::OnOperationCompleted unresolved parsed-packet receive/message-ref copy this={} ownerContext={} payloadBytes={} retainedFragmentCount={} currentCursor={}",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             static_cast<unsigned>(parsedPacketWorkItem->assembledByteCount28),
             static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
-            fmt::ptr(parsedPacketWorkItem->currentCursor24),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            fmt::ptr(parsedPacketWorkItem->currentCursor24)
+            );
         CMessageConnection_0x4b7928_LogUnhandledOperation(workItem);
         return 1u;
     }
 
     if (hadUnusedBuffers) {
         spdlog::info(
-            "CMessageConnection::OnOperationCompleted unused retained buffers remained after receive/message-ref copy this={} ownerContext={} payloadBytes={} retainedFragmentCount={} remoteHost='{}'",
+            "CMessageConnection::OnOperationCompleted unused retained buffers remained after receive/message-ref copy this={} ownerContext={} payloadBytes={} retainedFragmentCount={}",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             static_cast<unsigned>(parsedPacketWorkItem->assembledByteCount28),
-            static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C)
+            );
     }
 
     lastReceivedPacketBodyBytesScaffold_.clear();
@@ -1902,13 +1900,13 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
                 &senderLocatorType,
                 /*outUsedHeaderlessLocatorDecode=*/nullptr)) {
             spdlog::info(
-                "CMessageConnection::OnOperationCompleted discarded copied headerless receive/message-ref because locator ids were invalid payloadBytes={} targetLocatorType={} senderLocatorType={} this={} ownerContext={} remoteHost='{}'",
+                "CMessageConnection::OnOperationCompleted discarded copied headerless receive/message-ref because locator ids were invalid payloadBytes={} targetLocatorType={} senderLocatorType={} this={} ownerContext={}",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
                 static_cast<unsigned>(targetLocatorType),
                 static_cast<unsigned>(senderLocatorType),
                 fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+                fmt::ptr(OwnerContext())
+                );
             return 1u;
         }
     }
@@ -1920,12 +1918,12 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
             &agendaTouched);
         if (!messageRefForDispatch) {
             spdlog::info(
-                "CMessageConnection::OnOperationCompleted discarded receive/message-ref through packet-agenda read handoff payloadBytes={} headerless={} this={} ownerContext={} remoteHost='{}'",
+                "CMessageConnection::OnOperationCompleted discarded receive/message-ref through packet-agenda read handoff payloadBytes={} headerless={} this={} ownerContext={}",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
                 lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
                 fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+                fmt::ptr(OwnerContext())
+                );
             return 1u;
         }
         if (agendaTouched) {
@@ -1941,7 +1939,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
             }
             lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
             spdlog::debug(
-                "CMessageConnection::OnOperationCompleted preserved raw packet-agenda read handoff via agenda+0x08 message-ref pointer payloadBytes={} agendaModuleCount={} readHeadIsEmbedded={} this={} ownerContext={} remoteHost='{}'",
+                "CMessageConnection::OnOperationCompleted preserved raw packet-agenda read handoff via agenda+0x08 message-ref pointer payloadBytes={} agendaModuleCount={} readHeadIsEmbedded={} this={} ownerContext={}",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
                 static_cast<unsigned>(agenda->configuredModuleCount4c),
                 (agenda->readHelperChainHead40 ==
@@ -1949,8 +1947,8 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
                     ? 1u
                     : 0u,
                 fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+                fmt::ptr(OwnerContext())
+                );
         }
     }
 
@@ -1981,19 +1979,18 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
 
     if (postCopyDispatchResult == 0u) {
         spdlog::debug(
-            "CMessageConnection::OnOperationCompleted mirrored original local type-3 consume after dispatchSlot={} returned false-ish payloadBytes={} headerless={} headerlessProtocolValid={} headerlessProtocol={} this={} ownerContext={} remoteHost='{}'",
+            "CMessageConnection::OnOperationCompleted mirrored original local type-3 consume after dispatchSlot={} returned false-ish payloadBytes={} headerless={} headerlessProtocolValid={} headerlessProtocol={} this={} ownerContext={}",
             dispatchSlotLabel,
             static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
             headerlessForDispatch ? 1u : 0u,
             hasHeaderlessProtocolId ? 1u : 0u,
             static_cast<unsigned>(headerlessProtocolId),
             fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            fmt::ptr(OwnerContext()));
     }
 
     spdlog::info(
-        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} headerlessProtocolValid={} headerlessProtocol={} dispatchSlot={} and handled it on the in-callback post-copy tail this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} headerlessProtocolValid={} headerlessProtocol={} dispatchSlot={} and handled it on the in-callback post-copy tail this={} ownerContext={}",
         static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
         headerlessForDispatch ? 1u : 0u,
         static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
@@ -2001,8 +1998,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
         static_cast<unsigned>(headerlessProtocolId),
         dispatchSlotLabel,
         fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        fmt::ptr(OwnerContext()));
     return 1u;
 }
 
@@ -2187,13 +2183,12 @@ uint32_t CAuthStartupConnection_0x4afef0::DispatchMessage(void* messageRef) {
 
     const uint32_t handled = mediator->DispatchCurrentHelperAuthMessage(messageRef);
     spdlog::info(
-        "CAuthStartupConnection_0x4afef0::DispatchMessage forwarded unconsumed messageRef={} to owner+0x180 currentState={} handled={} this={} ownerContext={} remoteHost='{}'",
+        "CAuthStartupConnection_0x4afef0::DispatchMessage forwarded unconsumed messageRef={} to owner+0x180 currentState={} handled={} this={} ownerContext={}",
         fmt::ptr(messageRef),
         fmt::ptr(mediator->currentState_),
         handled,
         fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        fmt::ptr(OwnerContext()));
     return handled;
 }
 
@@ -2290,15 +2285,14 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWork
     CMessageConnection_0x4b7928* selfAsMessageConnection = this;
     const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={}",
         workPayloadStatus,
         handled,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         fmt::ptr(CMessageConnection_0x4b7928_LoginMediatorOwner(this)
                      ? CMessageConnection_0x4b7928_LoginMediatorOwner(this)->currentState_
-                     : nullptr),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+                     : nullptr));
     return handled;
 }
 
@@ -2314,11 +2308,10 @@ bool CBaseMarginConnection_0x4b64a8::StoreBootstrapReplyCopy98(const void* bytes
         bootstrapReplyCopy98_.begin());
     hasBootstrapReplyCopy98_ = true;
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::StoreBootstrapReplyCopy98 stored reply-copy block bytes=0x{:03x} this={} ownerContext={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::StoreBootstrapReplyCopy98 stored reply-copy block bytes=0x{:03x} this={} ownerContext={}",
         static_cast<unsigned>(bootstrapReplyCopy98_.size()),
         fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        fmt::ptr(OwnerContext()));
     return true;
 }
 
@@ -2532,10 +2525,9 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
             modulus, publicExponent, privateExponent, 1));
     if (!connection_.bootstrapPrepStateA0_) {
         spdlog::warn(
-            "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={} remoteHost='{}'",
+            "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={}",
             fmt::ptr(&connection_),
-            fmt::ptr(connection_.OwnerContext()),
-            connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
+            fmt::ptr(connection_.OwnerContext()));
         return;
     }
 
@@ -2561,7 +2553,7 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
 
     spdlog::info(
         "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored "
-        "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusWords=0x{:02x} exponentWords=0x{:02x} privateExponentWords=0x{:02x} prime1Words=0x{:02x} prime2Words=0x{:02x} crtExp1Words=0x{:02x} crtExp2Words=0x{:02x} crtInverseWords=0x{:02x} this={} ownerContext={} remoteHost='{}'",
+        "CryptoPP-backed auth bootstrap state sourceSize=0x{:02x} originalCompleteObjectSize=0xe0 modulusWords=0x{:02x} exponentWords=0x{:02x} privateExponentWords=0x{:02x} prime1Words=0x{:02x} prime2Words=0x{:02x} crtExp1Words=0x{:02x} crtExp2Words=0x{:02x} crtInverseWords=0x{:02x} this={} ownerContext={}",
         static_cast<unsigned>(sizeof(CMarginConnectionAuthBootstrapState_0x443220)),
         static_cast<unsigned>(modulusWords),
         static_cast<unsigned>(publicExponentWords),
@@ -2572,8 +2564,8 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
         static_cast<unsigned>(crtExp2Words),
         static_cast<unsigned>(crtInverseWords),
         fmt::ptr(&connection_),
-        fmt::ptr(connection_.OwnerContext()),
-        connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
+        fmt::ptr(connection_.OwnerContext())
+        );
 }
 
 // anchor: launcher.exe:0x441f30
@@ -2634,12 +2626,11 @@ void CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent CERT_ConnectRequest "
         "opcode=0x01 payloadBase10={} reservedReplyCopyBytes=0x{:03x} "
-        "this={} ownerContext={} remoteHost='{}'",
+        "this={} ownerContext={}",
         builderEnvelope.payloadPtr04,
         static_cast<unsigned>(builderEnvelope.payloadSize18),
         fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        fmt::ptr(OwnerContext()));
 }
 
 // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
@@ -2665,7 +2656,7 @@ void CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed8
     }
 
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed85 {} connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed85 {} connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={}",
         needsInitialInstall ? "installed" : "refreshed",
         fmt::ptr(streamPacketEncryptionModule9c_.get()),
         fmt::ptr(PacketAgenda()),
@@ -2675,8 +2666,7 @@ void CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed8
             (static_cast<uint32_t>(messageCode5SeedBytes85_[2]) << 16u) |
             (static_cast<uint32_t>(messageCode5SeedBytes85_[3]) << 24u)),
         fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        fmt::ptr(OwnerContext()));
 }
 
 

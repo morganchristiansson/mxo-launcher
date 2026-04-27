@@ -1578,16 +1578,13 @@ void DiagnosticConfigureLoginControllerNetwork(
     // Set route state fields directly - no infidel methods
     mediator->marginRouteState_.routeHostPrefix = marginRouteHostPrefix ? marginRouteHostPrefix : "";
     mediator->marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
-    spdlog::info(
-        "DIAGNOSTIC: login controller network configured auth='{}' port={} marginSuffix='{}' marginPort={} marginRoutePrefix='{}' exactMarginHost='{}' ignoreAuthHosts={} ignoreMarginHosts={}",
-        authDnsName && authDnsName[0] ? authDnsName : "<empty>",
-        (unsigned)authPortHostOrder,
-        marginDnsSuffix && marginDnsSuffix[0] ? marginDnsSuffix : "<empty>",
-        (unsigned)marginPortHostOrder,
-        marginRouteHostPrefix && marginRouteHostPrefix[0] ? marginRouteHostPrefix : "<empty>",
-        exactMarginHostName && exactMarginHostName[0] ? exactMarginHostName : "<empty>",
-        ignoreHostsFileForAuth ? 1u : 0u,
-        ignoreHostsFileForMargin ? 1u : 0u);
+    (void)authDnsName;
+    (void)marginDnsSuffix;
+    (void)marginRouteHostPrefix;
+    (void)authPortHostOrder;
+    (void)marginPortHostOrder;
+    (void)ignoreHostsFileForAuth;
+    (void)ignoreHostsFileForMargin;
 }
 
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures ILTLoginMediator_0x4af2b8.Default before InitClientDLL

@@ -95,7 +95,6 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
   mxo::ltlogin::TryCallback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
 
   std::string submitTargetText;
-  std::string remoteHostName = "<empty>";
   bool submitTargetReady = false;
   uint32_t submitTargetIpv4NetworkOrder = 0u;
 
@@ -103,10 +102,6 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
     // Copy endpoint from marginConnection+0x24 (matches 0x41de6a pattern)
     // anchor: launcher.exe:0x41de6a
     // Original copies 16 bytes: family, port, ipv4, reserved
-    if (!marginConnection_->RemoteHostName().empty()) {
-      remoteHostName = marginConnection_->RemoteHostName();
-    }
-
     // Build submit address block from margin connection endpoint
     // anchor: launcher.exe:0x41de6a-0x41de84
     mxo::ltlogin::SubmitAddressBlock localBlock{};
@@ -201,7 +196,7 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
   }
 
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} startupDistrObjExecutive8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x}",
+        "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} startupDistrObjExecutive8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' executedSubmit={} submitResult=0x{:08x}",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
         static_cast<unsigned>(state6UdpSessionSecretF18_),
@@ -217,7 +212,6 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
         submitTargetReady ? 1u : 0u,
         static_cast<unsigned>(submitTargetIpv4NetworkOrder),
         submitTargetText,
-        remoteHostName,
         (modeQueryReady && callbackPairReady && submitTargetReady) ? 1u : 0u,
         static_cast<unsigned>(submitResult));
 

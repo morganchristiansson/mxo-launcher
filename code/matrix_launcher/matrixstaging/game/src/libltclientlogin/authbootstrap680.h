@@ -546,6 +546,12 @@ public:
     // concrete owner+0x680 implementation grouped under this child mirror.
     uint32_t HandleInboundAuthMessage(void* incomingAuthMessage, CLTLoginMediator& owner);
 
+    // Source-owned compatibility accessors for code that still needs recovered auth payloads
+    // after `0x448140` finishes. Keep these out of the mirrored child layout.
+    const mxo::auth::GetPublicKeyReply& CachedGetPublicKeyReply_SOURCEOWNED() const;
+    const mxo::auth::AuthChallenge& CachedAuthChallenge_SOURCEOWNED() const;
+    const mxo::auth::AuthReply& CachedAuthReply_SOURCEOWNED() const;
+
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;

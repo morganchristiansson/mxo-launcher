@@ -1458,9 +1458,6 @@ private:
     // - do not add those transient fields into the middle of `CLTLoginMediator`
     void FreeLateEntryList1470StorageScaffold();
 
-    // Direct field access - no infidel methods
-    mxo::liblttcp::CMessageConnection_0x4b7928* EnsureMarginConnectionObject();
-
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object
     //   - newer receive-side tightening now also makes two mediator wrappers around that field

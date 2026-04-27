@@ -118,9 +118,10 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     switch (upstreamPhaseCode) {
         case 6: {
+            const auto* routeDescriptor30 = g_CurrentLoginMediator->GetRouteDescriptor30();
             BeginMarginConnectionForState4Case(
                 g_CurrentLoginMediator,
-                g_CurrentLoginMediator->ResolveMarginRouteDescriptor(),
+                routeDescriptor30 ? routeDescriptor30->begin : nullptr,
                 0u);
             return;
         }

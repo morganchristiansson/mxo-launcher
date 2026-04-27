@@ -1518,14 +1518,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
     const char* closeStatusLabel =
         isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed";
     spdlog::debug(
-        "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread Run connection={} ownerContext={} isMargin={} wakeupSocket=0x{:08x} initialState={} connectCompletionPending={} remoteHost='{}'",
+        "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread Run connection={} ownerContext={} isMargin={} wakeupSocket=0x{:08x} initialState={} connectCompletionPending={}",
         fmt::ptr(connection),
         fmt::ptr(connection->OwnerContext()),
         isMarginConnection ? 1u : 0u,
         wakeupSocketHandle_,
         static_cast<unsigned>(connection->State()),
-        !datagramMode_ ? 1u : 0u,
-        connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName());
+        !datagramMode_ ? 1u : 0u);
 
     // Tightened `0x42fe50` read/write/except/wakeup state:
     // - blocking select with no timeout
@@ -1682,12 +1681,10 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             }
 
             spdlog::debug(
-                "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread select failed connection={} socket=0x{:08x} wsaError={} remoteHost='{}'",
+                "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread select failed connection={} socket=0x{:08x} wsaError={}",
                 fmt::ptr(connection),
                 socketHandle,
-                wsaError,
-                connection->RemoteHostName().empty() ? std::string("<empty>")
-                                                     : connection->RemoteHostName());
+                wsaError);
             continue;
         }
 
@@ -1721,13 +1718,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                 }
 
                 spdlog::debug(
-                    "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread terminal recv connection={} socket=0x{:08x} peerClosed={} wsaError={} remoteHost='{}'",
+                    "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread terminal recv connection={} socket=0x{:08x} peerClosed={} wsaError={}",
                     fmt::ptr(connection),
                     socketHandle,
                     peerClosed ? 1u : 0u,
-                    wsaError,
-                    connection->RemoteHostName().empty() ? std::string("<empty>")
-                                                         : connection->RemoteHostName());
+                    wsaError);
                 closeAndInvalidateSocket();
                 connection->SetState(LTTCPEngineConnectionState::kClosed);
                 queueClose();
@@ -1778,13 +1773,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                     const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
                     if (wsaError != WSAEWOULDBLOCK) {
                         spdlog::debug(
-                            "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread send failed connection={} socket=0x{:08x} wsaError={} remaining={} remoteHost='{}'",
+                            "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread send failed connection={} socket=0x{:08x} wsaError={} remaining={}",
                             fmt::ptr(connection),
                             socketHandle,
                             wsaError,
-                            remainingByteCount,
-                            connection->RemoteHostName().empty() ? std::string("<empty>")
-                                                                 : connection->RemoteHostName());
+                            remainingByteCount);
                     }
                 }
             }
@@ -2391,10 +2384,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
-            "CLTThreadPerClientTCPEngine_0x4b2768::Connect rejected connection={} state={} remoteHost='{}' port={} ip=0x{:08x}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::Connect rejected connection={} state={} port={} ip=0x{:08x}",
             fmt::ptr(connection),
             static_cast<unsigned>(connection->State()),
-            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder));
 
@@ -2419,9 +2411,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     if (socketHandle == kInvalidSocketHandle) {
         const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
         spdlog::info(
-            "CLTThreadPerClientTCPEngine_0x4b2768::Connect socket allocation failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={} ({})",
+            "CLTThreadPerClientTCPEngine_0x4b2768::Connect socket allocation failed connection={} port={} ip=0x{:08x} wsaError={} ({})",
             fmt::ptr(connection),
-            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
             static_cast<unsigned>(wsaError),
@@ -2451,9 +2442,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         CloseSocketHandle(&socketHandle);
         connection->SetSocketHandle(socketHandle);
         spdlog::info(
-            "CLTThreadPerClientTCPEngine_0x4b2768::Connect bind failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={} ({})",
+            "CLTThreadPerClientTCPEngine_0x4b2768::Connect bind failed connection={} port={} ip=0x{:08x} wsaError={} ({})",
             fmt::ptr(connection),
-            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
             static_cast<unsigned>(wsaError),
@@ -2485,9 +2475,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             CloseSocketHandle(&socketHandle);
             connection->SetSocketHandle(socketHandle);
             spdlog::info(
-                "CLTThreadPerClientTCPEngine_0x4b2768::Connect connect failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={} ({})",
+                "CLTThreadPerClientTCPEngine_0x4b2768::Connect connect failed connection={} port={} ip=0x{:08x} wsaError={} ({})",
                 fmt::ptr(connection),
-                connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
                 static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
                 static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
                 static_cast<unsigned>(wsaError),
@@ -2527,9 +2516,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         CloseSocketHandle(&socketHandle);
         connection->SetSocketHandle(socketHandle);
         spdlog::info(
-            "CLTThreadPerClientTCPEngine_0x4b2768::Connect worker creation failed connection={} remoteHost='{}' port={} ip=0x{:08x}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::Connect worker creation failed connection={} port={} ip=0x{:08x}",
             fmt::ptr(connection),
-            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder));
         return 0u;
@@ -2538,10 +2526,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     connection->SetState(LTTCPEngineConnectionState::kConnectActive);
     (void)workerThread->Start(/*startPriority=*/3);
     spdlog::info(
-        "CLTThreadPerClientTCPEngine_0x4b2768::Connect started worker connection={} worker={} remoteHost='{}' port={} ip=0x{:08x} state={} ownerContext={}",
+        "CLTThreadPerClientTCPEngine_0x4b2768::Connect started worker connection={} worker={} port={} ip=0x{:08x} state={} ownerContext={}",
         fmt::ptr(connection),
         fmt::ptr(workerThread),
-        connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
         static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
         static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
         static_cast<unsigned>(connection->State()),

@@ -1638,9 +1638,11 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
 // anchor: launcher.exe:0x41f2c0 slot +0x10c
 RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30() {
     // Keep the wrapper-facing arg6 `+0x10c` small-string object explicit.
-    // The owner-side route-text resolution still lives in `ResolveMarginRouteDescriptor()`.
-    const char* routeDescriptor = ResolveMarginRouteDescriptor();
-    routeDescriptor30Owned_ = routeDescriptor ? routeDescriptor : "";
+    // Feed the callsite from the global-backed resolved margin host so the launcher config
+    // suffix (`g_marginServerDNSName`) is carried through the same route-text surface the
+    // original branch consumes.
+    const std::string routeDescriptor = ResolvedMarginHostName();
+    routeDescriptor30Owned_ = routeDescriptor;
     routeDescriptor30_.begin = routeDescriptor30Owned_.c_str();
     routeDescriptor30_.current = routeDescriptor30_.begin + routeDescriptor30Owned_.size();
     routeDescriptor30_.capacity = routeDescriptor30_.current;
@@ -2973,31 +2975,6 @@ const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() 
 //     marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
 //     return marginSelectedIpv4_7c_ != 0u;
 // }
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::EnsureMarginConnectionObject() {
-    mxo::liblttcp::CMarginConnection_0x4aff38* marginConnection =
-        dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
-    if (!marginConnection) {
-        marginConnection = new mxo::liblttcp::CMarginConnection_0x4aff38(engine_);
-        if (!marginConnection) {
-            marginConnection_ = nullptr;
-            return nullptr;
-        }
-
-        marginConnection->SetEngine(engine_);
-        marginConnection->SetEngine(engine_);
-        marginConnection_ = marginConnection;
-    }
-
-    marginConnection->SetEngine(engine_);
-    marginConnection->SetEngine(engine_);
-    marginConnection->ConfigurePacketNameFamily(
-        mxo::liblttcp::CMessageConnectionPacketNameFamily::kMargin,
-        /*packetizedMessagesEnabled=*/true);
-    marginConnection->SetOwnerContext(this);
-    return marginConnection_;
-}
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // ILTLoginMediator_0x4af2b8::Default - static member initialization (original: launcher.exe:0x4d2c58)
