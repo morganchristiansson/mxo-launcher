@@ -119,27 +119,27 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
-// Wrapper-facing arg6 `+0x40` outer object currently only needs the common 5-slot virtual
+// Wrapper-facing selection `+0x40` outer object currently only needs the common 5-slot virtual
 // surface shape shared by the launcher descriptor/slot-record families.
 // Current fidelity tightening from Ghidra:
 // - slot `+0x04` is the shared tiny getter at `0x437b50` and returns `0`
 // - slot `+0x10` is the shared tiny getter at `0x481760` and returns the `+0x10` payload pointer
 // - keep `+0x08/+0x0c` conservative until the concrete wrapper object class is recovered
-static uint32_t __thiscall Arg6SelectionDescriptor40_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
+static uint32_t __thiscall SelectionDescriptor40_Destroy(CurrentSlotRecord44ObjectSketch* self) {
     return self ? 1u : 0u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_GetStateId(Arg6CurrentSlotRecord44ObjectSketch* self) {
+static uint32_t __thiscall SelectionDescriptor40_GetStateId(CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 0u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_AppendDebugString(Arg6CurrentSlotRecord44ObjectSketch* self) {
+static uint32_t __thiscall SelectionDescriptor40_AppendDebugString(CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor(Arg6CurrentSlotRecord44ObjectSketch* self) {
+static uint32_t __thiscall SelectionDescriptor40_ResetPayloadForSourceDescriptor(CurrentSlotRecord44ObjectSketch* self) {
     if (!self) {
         return 0u;
     }
@@ -148,17 +148,17 @@ static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescri
     return 1u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_GetPayload10(Arg6CurrentSlotRecord44ObjectSketch* self) {
+static uint32_t __thiscall SelectionDescriptor40_GetPayload10(CurrentSlotRecord44ObjectSketch* self) {
     return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
 }
 
-static void** Arg6CurrentSlotRecord44Vtable() {
+static void** CurrentSlotRecord44Vtable() {
     static void* vtable[5] = {
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_Destroy),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetStateId),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_AppendDebugString),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetPayload10),
+        reinterpret_cast<void*>(SelectionDescriptor40_Destroy),
+        reinterpret_cast<void*>(SelectionDescriptor40_GetStateId),
+        reinterpret_cast<void*>(SelectionDescriptor40_AppendDebugString),
+        reinterpret_cast<void*>(SelectionDescriptor40_ResetPayloadForSourceDescriptor),
+        reinterpret_cast<void*>(SelectionDescriptor40_GetPayload10),
     };
     return vtable;
 }
@@ -362,7 +362,7 @@ const char* CLTLoginMediator::GetName() {
 }
 
 // +0x08
-// Wrapper-facing arg6 startup handoff helper used by the current `0x4d2c58` scaffold.
+// Wrapper-facing selection startup handoff helper used by the current `0x4d2c58` scaffold.
 // Do not sync this directly to owner vtable `0x004b01c8 +0x0c`; current Ghidra now assigns that
 // owner slot to `launcher.exe:0x41f510`, which looks like reset/clear logic instead.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -380,7 +380,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 }
 
 // anchor: launcher.exe:0x41f510 vtable offset +0x0c
-// Wrapper-facing arg6 clear helper reached from launcher teardown after arg5 release.
+// Wrapper-facing selection clear helper reached from launcher teardown after arg5 release.
 // Current fidelity direction:
 // - owner vtable `0x004b01c8 +0x0c / 0x41f510` now reads as reset/clear-owned-runtime-state logic
 // - keep this wrapper slot distinct from the owner vtable numbering, but mirror the highest-
@@ -641,18 +641,18 @@ const char* CLTLoginMediator::GetUsername() const {
     return ownerAuthBootstrapSource94_.username00.data();
 }
 
-// Wrapper-facing arg6 `+0x40` selection-descriptor object builder.
+// Wrapper-facing selection `+0x40` selection-descriptor object builder.
 // Keep this naming split explicit from owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex`.
 // Fidelity tightening:
-// - keep the wrapper-facing object because client arg6 `+0x40` really returns a distinct ABI shape
+// - keep the wrapper-facing object because client selection `+0x40` really returns a distinct ABI shape
 // - but source its payload directly from the anchored owner-side current-slot family instead of
 //   carrying a second synthetic arg6-side source picker/fallback tree
-Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
+CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetSelectionDescriptorObject40(
     uint32_t selectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
-    const uint32_t expectedScratchRequest = Arg6ExpectedSelectionDescriptorScratchRequest();
-    const bool matchedConfiguredRequest = Arg6SelectionDescriptorMatchesRequest(selectionIndex);
+    const uint32_t expectedScratchRequest = ExpectedSelectionDescriptorScratchRequest();
+    const bool matchedConfiguredRequest = SelectionDescriptorMatchesRequest(selectionIndex);
     const uint8_t currentSlotIndex = this->CurrentCharacterRouteIndexCc8Scaffold();
     const bool matchedCurrentSlotIndexRequest =
         CurrentHelperStateCodeOrZero(this) >= 3u &&
@@ -666,7 +666,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
 
     if (!currentSlotRecord) {
         spdlog::debug(
-            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={})",
+            "CLTLoginMediator::GetSelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={})",
             static_cast<unsigned>(selectionIndex),
             static_cast<unsigned>(low24),
             static_cast<unsigned>(high8),
@@ -677,74 +677,74 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
         return nullptr;
     }
 
-    arg6SelectionDescriptor40_ = {};
+    selectionDescriptor40_ = {};
     // Set payload10 to point to currentSlotRecord's fields directly
     // The client accesses fields at offset +0x03/+0x07 relative to this pointer
-    arg6SelectionDescriptor40_.vtable = Arg6CurrentSlotRecord44Vtable();
-    arg6SelectionDescriptor40_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
-    arg6SelectionDescriptor40_.flag0c = 1u;
+    selectionDescriptor40_.vtable = CurrentSlotRecord44Vtable();
+    selectionDescriptor40_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
+    selectionDescriptor40_.flag0c = 1u;
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         (matchedCurrentSlotIndexRequest ? "current-slot-index" : "configured-request");
     spdlog::debug(
-        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} currentSlotIndex=0x{:02x} slotName='{}' vtable={} field03=0x{:08x} field07=0x{:08x})",
+        "CLTLoginMediator::GetSelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} currentSlotIndex=0x{:02x} slotName='{}' vtable={} field03=0x{:08x} field07=0x{:08x})",
         static_cast<unsigned>(selectionIndex),
         static_cast<unsigned>(low24),
         static_cast<unsigned>(high8),
-        fmt::ptr(&arg6SelectionDescriptor40_),
+        fmt::ptr(&selectionDescriptor40_),
         matchMode,
         static_cast<unsigned>(currentSlotIndex),
         currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
-        fmt::ptr(arg6SelectionDescriptor40_.vtable),
+        fmt::ptr(selectionDescriptor40_.vtable),
         static_cast<unsigned>(currentSlotRecord->characterIdLow32),
         static_cast<unsigned>(currentSlotRecord->characterIdHigh36));
-    return &arg6SelectionDescriptor40_;
+    return &selectionDescriptor40_;
 }
 
-// Wrapper-facing arg6 `+0x44` current-slot-record wrapper builder.
+// Wrapper-facing selection `+0x44` current-slot-record wrapper builder.
 // Keep this naming split explicit from owner `+0x44 = GetCurrentSlotRecord`.
 // Fidelity tightening:
-// - keep the wrapper-facing object because client arg6 `+0x44` expects the `0x004b5328`-like ABI
+// - keep the wrapper-facing object because client selection `+0x44` expects the `0x004b5328`-like ABI
 //   shape
 // - but source it directly from the anchored owner-side current-slot accessor instead of a second
 //   synthetic arg6-side source/fallback path
-Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
+CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetCurrentSlotRecordObject44() {
     const SlotRecordState_0x4b5328* const currentSlotRecord = this->GetCurrentSlotRecord();
 
-    arg6CurrentSlotRecord44_ = {};
-    arg6CurrentSlotRecord44NameOwned_.clear();
+    currentSlotRecord44_ = {};
+    currentSlotRecord44NameOwned_.clear();
 
     if (!currentSlotRecord) {
         spdlog::info(
-            "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
+            "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
             static_cast<unsigned>(this->CurrentCharacterRouteIndexCc8Scaffold()));
         return nullptr;
     }
 
     // Set payload10 to point to currentSlotRecord's fields directly
     // The client accesses fields at offset +0x03/+0x07/+0x0b/+0x0c relative to this pointer
-    arg6CurrentSlotRecord44_.vtable = Arg6CurrentSlotRecord44Vtable();
-    arg6CurrentSlotRecord44_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
-    arg6CurrentSlotRecord44_.flag0c = 1u;
-    arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->debugString14;
+    currentSlotRecord44_.vtable = CurrentSlotRecord44Vtable();
+    currentSlotRecord44_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
+    currentSlotRecord44_.flag0c = 1u;
+    currentSlotRecord44NameOwned_ = currentSlotRecord->debugString14;
 
-    if (!arg6CurrentSlotRecord44NameOwned_.empty()) {
-        arg6CurrentSlotRecord44_.debugString14 = arg6CurrentSlotRecord44NameOwned_.c_str();
-        const size_t nameLength = arg6CurrentSlotRecord44NameOwned_.size();
-        arg6CurrentSlotRecord44_.debugStringLen18 =
+    if (!currentSlotRecord44NameOwned_.empty()) {
+        currentSlotRecord44_.debugString14 = currentSlotRecord44NameOwned_.c_str();
+        const size_t nameLength = currentSlotRecord44NameOwned_.size();
+        currentSlotRecord44_.debugStringLen18 =
             static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
     }
 
     spdlog::info(
-        "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
-        fmt::ptr(&arg6CurrentSlotRecord44_),
-        arg6CurrentSlotRecord44_.debugString14 ? arg6CurrentSlotRecord44_.debugString14 : "<empty>",
+        "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
+        fmt::ptr(&currentSlotRecord44_),
+        currentSlotRecord44_.debugString14 ? currentSlotRecord44_.debugString14 : "<empty>",
         static_cast<unsigned>(currentSlotRecord->characterIdLow32),
         static_cast<unsigned>(currentSlotRecord->characterIdHigh36),
         static_cast<unsigned>(currentSlotRecord->status3a),
         static_cast<unsigned>(currentSlotRecord->worldId3c));
-    return &arg6CurrentSlotRecord44_;
+    return &currentSlotRecord44_;
 }
 
 // +0x48
@@ -757,7 +757,7 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
 
     const auto& ownerState = postAuthMarginLoadingState_0xf14;
     const ActiveCharacterStateViewScaffold characterState = DescribeActiveCharacterStateScaffold();
-    const char* worldOrSelectionName = Arg6MappedSelectionName();
+    const char* worldOrSelectionName = MappedSelectionName();
     const char* source = "arg6-selection";
 
     if (slotRecord && slotRecord->debugString14) {
@@ -781,15 +781,15 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
         (slotRecord && slotRecord->debugString14)
             ? slotRecord->debugString14
             : "<empty>",
-        NonEmptyTextOrPlaceholder(Arg6ProfileName()),
-        NonEmptyTextOrPlaceholder(Arg6MappedSelectionName()));
+        NonEmptyTextOrPlaceholder(ownerAuthBootstrapSource94_.username00.data()),
+        NonEmptyTextOrPlaceholder(MappedSelectionName()));
     return worldOrSelectionName;
 }
 
 // +0x4c
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetProfileOrSessionName() const {
-    const char* profileOrSessionName = Arg6ProfileName();
+    const char* profileOrSessionName = ownerAuthBootstrapSource94_.username00.data();
     spdlog::debug(
         "CLTLoginMediator::GetProfileOrSessionName(+0x4c) -> '{}'",
         NonEmptyTextOrPlaceholder(profileOrSessionName));
@@ -1391,9 +1391,9 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
         }
     } else if (variantIndex >= 0) {
         const uint32_t unsignedVariantIndex = static_cast<uint32_t>(variantIndex);
-        if (unsignedVariantIndex < this->Arg6VariantUpperBoundExclusive() &&
-            this->Arg6VariantIndexMatchesSelection(unsignedVariantIndex)) {
-            state = this->Arg6SelectedVariantState();
+        if (unsignedVariantIndex < this->SelectionVariantUpperBoundExclusive() &&
+            this->VariantIndexMatchesSelection(unsignedVariantIndex)) {
+            state = this->SelectedVariantState();
             source = "arg6-selected-active-entry-state";
         } else {
             source = "arg6-selection-fallback.<not-selected>";
@@ -1406,8 +1406,8 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
         variantIndex,
         state,
         source,
-        this->Arg6SelectedVariantIndexHigh8(),
-        this->Arg6SelectedVariantState());
+        this->SelectedVariantIndexHigh8(),
+        this->SelectedVariantState());
     return state;
 }
 
@@ -2164,18 +2164,18 @@ void CLTLoginMediator::MirrorCreateCharacterInput120SourceBlock(const ProcessCre
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(
+uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
     const void* input120,
     void* returnAddress,
     bool applyOwnerSemantics) {
-    arg6CreateCharacterInput120_ = input120;
-    ++arg6CreateCharacterInputCount120_;
+    createCharacterInput120_ = input120;
+    ++createCharacterInputCount120_;
 
     if (!input120) {
         spdlog::info(
-            "CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(+0x120) input=<null> caller={} [count={}] applyOwnerSemantics={}",
+            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120) input=<null> caller={} [count={}] applyOwnerSemantics={}",
             fmt::ptr(returnAddress),
-            arg6CreateCharacterInputCount120_,
+            createCharacterInputCount120_,
             applyOwnerSemantics ? 1u : 0u);
         return 1u;
     }
@@ -2184,10 +2184,10 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(
     if (!applyOwnerSemantics) {
         MirrorCreateCharacterInput120SourceBlock(input);
         spdlog::info(
-            "CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(+0x120 mirror-only input={} caller={} [count={}] field12c=0x{:08x} name='{}')",
+            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 mirror-only input={} caller={} [count={}] field12c=0x{:08x} name='{}')",
             fmt::ptr(input120),
             fmt::ptr(returnAddress),
-            arg6CreateCharacterInputCount120_,
+            createCharacterInputCount120_,
             static_cast<unsigned>(postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24),
             postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00[0]
                 ? postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data()
@@ -2196,10 +2196,10 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(
     }
 
     spdlog::debug(
-        "CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(+0x120 owner-dispatch input={} caller={} [count={}])",
+        "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 owner-dispatch input={} caller={} [count={}])",
         fmt::ptr(input120),
         fmt::ptr(returnAddress),
-        arg6CreateCharacterInputCount120_);
+        createCharacterInputCount120_);
     return ProcessCreateCharacterInput120(input);
 }
 
@@ -2631,7 +2631,7 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::ConfigureArg6Selection(
+void CLTLoginMediator::ConfigureSelectionSeed(
     uint32_t worldUpperBoundExclusive,
     uint32_t variantUpperBoundExclusive,
     const char* mappedSelectionName,
@@ -2639,112 +2639,94 @@ void CLTLoginMediator::ConfigureArg6Selection(
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
     uint32_t selectedVariantState) {
-    arg6Selection_.worldUpperBoundExclusive_ = worldUpperBoundExclusive ? worldUpperBoundExclusive : 1u;
-    arg6Selection_.variantUpperBoundExclusive_ = variantUpperBoundExclusive ? variantUpperBoundExclusive : 1u;
-    arg6Selection_.selectedWorldIndexLow24_ = selectedWorldIndexLow24 & 0x00ffffffu;
-    arg6Selection_.selectedVariantIndexHigh8_ = selectedVariantIndexHigh8 & 0xffu;
-    arg6Selection_.selectedVariantState_ = selectedVariantState;
-    arg6Selection_.mappedSelectionId_ = arg6Selection_.selectedWorldIndexLow24_;
-    arg6Selection_.mappedSelectionName_ =
+    selectionSeed_.worldUpperBoundExclusive_ = worldUpperBoundExclusive ? worldUpperBoundExclusive : 1u;
+    selectionSeed_.variantUpperBoundExclusive_ = variantUpperBoundExclusive ? variantUpperBoundExclusive : 1u;
+    selectionSeed_.selectedWorldIndexLow24_ = selectedWorldIndexLow24 & 0x00ffffffu;
+    selectionSeed_.selectedVariantIndexHigh8_ = selectedVariantIndexHigh8 & 0xffu;
+    selectionSeed_.selectedVariantState_ = selectedVariantState;
+    selectionSeed_.mappedSelectionId_ = selectionSeed_.selectedWorldIndexLow24_;
+    selectionSeed_.mappedSelectionName_ =
         (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : "standalone";
-    arg6Selection_.mappedVariantName_ =
-        (mappedVariantName && mappedVariantName[0]) ? mappedVariantName : arg6Selection_.mappedSelectionName_;
+    selectionSeed_.mappedVariantName_ =
+        (mappedVariantName && mappedVariantName[0]) ? mappedVariantName : selectionSeed_.mappedSelectionName_;
 }
 
-// Source-owned arg6 bootstrap-selection seed helpers.
+// Source-owned selection-seed helpers.
 // These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They seed the
-// startup-side arg6/arg7 bridge while the anchored wrapper-facing readers below stay tied to the
+// startup-side selection/route bridge while the anchored wrapper-facing readers below stay tied to the
 // recovered owner fields.
-uint32_t CLTLoginMediator::Arg6WorldUpperBoundExclusive() const {
+uint32_t CLTLoginMediator::SelectionWorldUpperBoundExclusive() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
     if (stateCode >= 3u && worldDescriptorCountD80_ != 0u) {
         return static_cast<uint32_t>(worldDescriptorCountD80_);
     }
-    return arg6Selection_.worldUpperBoundExclusive_;
+    return selectionSeed_.worldUpperBoundExclusive_;
 }
 
-uint32_t CLTLoginMediator::Arg6VariantUpperBoundExclusive() const {
+uint32_t CLTLoginMediator::SelectionVariantUpperBoundExclusive() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
     if (stateCode >= 3u) {
         return static_cast<uint32_t>(selectionRouteState684_.slotRecordCount00_);
     }
-    return arg6Selection_.variantUpperBoundExclusive_;
+    return selectionSeed_.variantUpperBoundExclusive_;
 }
 
-uint32_t CLTLoginMediator::Arg6SelectedWorldIndexLow24() const {
-    return arg6Selection_.selectedWorldIndexLow24_;
+uint32_t CLTLoginMediator::SelectedWorldIndexLow24() const {
+    return selectionSeed_.selectedWorldIndexLow24_;
 }
 
-uint32_t CLTLoginMediator::Arg6SelectedVariantIndexHigh8() const {
-    return arg6Selection_.selectedVariantIndexHigh8_;
+uint32_t CLTLoginMediator::SelectedVariantIndexHigh8() const {
+    return selectionSeed_.selectedVariantIndexHigh8_;
 }
 
-uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
+uint32_t CLTLoginMediator::SelectedVariantState() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t variantIndex = arg6Selection_.selectedVariantIndexHigh8_;
+    const uint32_t variantIndex = selectionSeed_.selectedVariantIndexHigh8_;
     if (stateCode >= 3u && variantIndex < 100u) {
         return static_cast<uint32_t>(GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex)));
     }
-    return arg6Selection_.selectedVariantState_;
+    return selectionSeed_.selectedVariantState_;
 }
 
-const char* CLTLoginMediator::Arg6MappedSelectionName() const {
+const char* CLTLoginMediator::MappedSelectionName() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t variantIndex = arg6Selection_.selectedVariantIndexHigh8_;
+    const uint32_t variantIndex = selectionSeed_.selectedVariantIndexHigh8_;
     if (stateCode >= 3u && variantIndex < 100u) {
         if (const char* worldName = LookupRouteHostPrefixBySlot(static_cast<uint8_t>(variantIndex))) {
             return worldName;
         }
     }
-    return arg6Selection_.mappedSelectionName_.c_str();
+    return selectionSeed_.mappedSelectionName_.c_str();
 }
 
-const char* CLTLoginMediator::Arg6MappedVariantName() const {
+const char* CLTLoginMediator::MappedVariantName() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t variantIndex = arg6Selection_.selectedVariantIndexHigh8_;
+    const uint32_t variantIndex = selectionSeed_.selectedVariantIndexHigh8_;
     if (stateCode >= 3u && variantIndex < 100u) {
         if (const char* selectionName = LookupSlotRecordHeapStringByIndex(static_cast<uint8_t>(variantIndex))) {
             return selectionName;
         }
     }
-    return arg6Selection_.mappedVariantName_.c_str();
+    return selectionSeed_.mappedVariantName_.c_str();
 }
 
-const char* CLTLoginMediator::Arg6ProfileName() const {
-    // Fidelity: read from owner+0x94 block
-    const char* profileName = ownerAuthBootstrapSource94_.username00.data();
-    return (profileName && profileName[0] != '\0') ? profileName : arg6Selection_.profileName_.c_str();
+bool CLTLoginMediator::VariantIndexMatchesSelection(uint32_t variantIndex) const {
+    return variantIndex == selectionSeed_.selectedVariantIndexHigh8_;
 }
 
-const char* CLTLoginMediator::Arg6AuthName() const {
-    // Fidelity: read from owner+0x94 block
-    const char* authName = ownerAuthBootstrapSource94_.username00.data();
-    return (authName && authName[0] != '\0') ? authName : arg6Selection_.authName_.c_str();
-}
-
-const char* CLTLoginMediator::Arg6AuthPassword() const {
-    // Fidelity: read from owner+0x94 block
-    const char* authPassword = ownerAuthBootstrapSource94_.password20.data();
-    return (authPassword && authPassword[0] != '\0') ? authPassword : arg6Selection_.authPassword_.c_str();
-}
-
-bool CLTLoginMediator::Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const {
-    return variantIndex == arg6Selection_.selectedVariantIndexHigh8_;
-}
-
-uint32_t CLTLoginMediator::Arg6ExpectedSelectionDescriptorScratchRequest() const {
-    const uint32_t variantHigh8 = (arg6Selection_.selectedVariantIndexHigh8_ & 0xffu) << 24;
-    const uint32_t preservedMiddle16 = arg6Selection_.selectedWorldIndexLow24_ & 0x00ffff00u;
-    const uint32_t lowByteOverwrittenWithVariant = arg6Selection_.selectedVariantIndexHigh8_ & 0xffu;
+uint32_t CLTLoginMediator::ExpectedSelectionDescriptorScratchRequest() const {
+    const uint32_t variantHigh8 = (selectionSeed_.selectedVariantIndexHigh8_ & 0xffu) << 24;
+    const uint32_t preservedMiddle16 = selectionSeed_.selectedWorldIndexLow24_ & 0x00ffff00u;
+    const uint32_t lowByteOverwrittenWithVariant = selectionSeed_.selectedVariantIndexHigh8_ & 0xffu;
     return variantHigh8 | preservedMiddle16 | lowByteOverwrittenWithVariant;
 }
 
-bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const {
+bool CLTLoginMediator::SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const {
     const uint32_t normalizedSelectionIndex = selectionIndex & 0xffffffffu;
-    if ((normalizedSelectionIndex & 0x00ffffffu) == arg6Selection_.selectedWorldIndexLow24_) {
+    if ((normalizedSelectionIndex & 0x00ffffffu) == selectionSeed_.selectedWorldIndexLow24_) {
         return true;
     }
-    return normalizedSelectionIndex == Arg6ExpectedSelectionDescriptorScratchRequest();
+    return normalizedSelectionIndex == ExpectedSelectionDescriptorScratchRequest();
 }
 
 // anchor: launcher.exe:0x41f2d0 / owner vtable +0x3c
@@ -2816,7 +2798,7 @@ int CLTLoginMediator::FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldI
 
 // anchor: launcher.exe:0x41e760
 void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() const {
-    const char* profileName = Arg6AuthName();
+    const char* profileName = ownerAuthBootstrapSource94_.username00.data();
     if (!profileName || profileName[0] == '\0') {
         spdlog::info(
             "CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold skipped (no auth/profile name available for Profiles/<name>/characters.ini)");

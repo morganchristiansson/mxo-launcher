@@ -1063,7 +1063,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - selection now runs after auth success and consumes the recovered owner tables directly
     // - the narrower configured arg6 selection scratch below remains only for wrapper-facing
     //   descriptor/profile bridges still reached from launcher/client scaffolding
-    void ConfigureArg6Selection(
+    void ConfigureSelectionSeed(
         uint32_t worldUpperBoundExclusive,
         uint32_t variantUpperBoundExclusive,
         const char* mappedSelectionName,
@@ -1073,19 +1073,16 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
         uint32_t selectedVariantState);
     // Source-owned arg6 bootstrap seed helpers.
     // These are replacement-side setup helpers, not recovered launcher.exe vtable slots.
-    uint32_t Arg6WorldUpperBoundExclusive() const;
-    uint32_t Arg6VariantUpperBoundExclusive() const;
-    uint32_t Arg6SelectedWorldIndexLow24() const;
-    uint32_t Arg6SelectedVariantIndexHigh8() const;
-    uint32_t Arg6SelectedVariantState() const;
-    const char* Arg6MappedSelectionName() const;
-    const char* Arg6MappedVariantName() const;
-    const char* Arg6ProfileName() const;
-    const char* Arg6AuthName() const;
-    const char* Arg6AuthPassword() const;
-    bool Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const;
-    uint32_t Arg6ExpectedSelectionDescriptorScratchRequest() const;
-    bool Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
+    uint32_t SelectionWorldUpperBoundExclusive() const;
+    uint32_t SelectionVariantUpperBoundExclusive() const;
+    uint32_t SelectedWorldIndexLow24() const;
+    uint32_t SelectedVariantIndexHigh8() const;
+    uint32_t SelectedVariantState() const;
+    const char* MappedSelectionName() const;
+    const char* MappedVariantName() const;
+    bool VariantIndexMatchesSelection(uint32_t variantIndex) const;
+    uint32_t ExpectedSelectionDescriptorScratchRequest() const;
+    bool SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
 
     // Wrapper-facing world-descriptor family (`+0xf8 .. +0x108`).
     // Keep the wrapper/owner split explicit:
@@ -1196,16 +1193,16 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Keep this wrapper tiny like the original: it forwards owner `+0x1470` into the lower-level
     // string-triple array append helper.
     void AppendLateEntryStringTriple1470Scaffold(const LateEntryList1470EntrySketch* sourceEntry);
-    // Wrapper-facing arg6 profile-path/current-slot ABI objects.
+    // Wrapper-facing selection profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator_0x4af2b8.Default +0x40/+0x44` object
     // shapes.
-    // - arg6 `+0x40` = selection-descriptor object family
-    // - arg6 `+0x44` = current-slot-record object family
+    // - selection `+0x40` = selection-descriptor object family
+    // - selection `+0x44` = current-slot-record object family
     // - owner `+0x40 = 0x41f2e0` remains the separate `GetSlotRecordByIndex` accessor
-    Arg6CurrentSlotRecord44ObjectSketch* GetArg6SelectionDescriptorObject40(
+    CurrentSlotRecord44ObjectSketch* GetSelectionDescriptorObject40(
         uint32_t selectionIndex) override;
-    Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() override;
+    CurrentSlotRecord44ObjectSketch* GetCurrentSlotRecordObject44() override;
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).
@@ -1314,7 +1311,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   when it is not the live owner/controller instance
     // - the live owner/controller still applies the real `0x41c3c0` state gate and helper-state
     //   transition to `10`
-    uint32_t CaptureCreateCharacterInputArg6Slot120(
+    uint32_t CaptureCreateCharacterInputSlot120(
         const void* input120,
         void* returnAddress,
         bool applyOwnerSemantics);
@@ -1517,15 +1514,15 @@ public:
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
 public:
     std::string gameSessionId664_;             // owner `+0x664` (public for direct access)
-    // Wrapper-facing arg6 object mirrors:
+    // Wrapper-facing selection object mirrors:
     // - `+0x40`  = selection-descriptor object for profile-path / arg7-derived selection work
     // - `+0x44`  = current-slot record object for later save/profile work
     // - `+0xd0`  = owner `+0x1460` small-string-like state8 section-11 view
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
-    Arg6CurrentSlotRecord44ObjectSketch arg6SelectionDescriptor40_{};
-    Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};
-    std::string arg6CurrentSlotRecord44NameOwned_;
+    CurrentSlotRecord44ObjectSketch selectionDescriptor40_{};
+    CurrentSlotRecord44ObjectSketch currentSlotRecord44_{};
+    std::string currentSlotRecord44NameOwned_;
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
@@ -1548,8 +1545,8 @@ public:
     void* provideStartupTripleNetMgr_ = nullptr;           // +0x124 netMgr
     void* provideStartupTripleDistrObjExecutive_ = nullptr; // +0x124 distrObjExecutive
     uint32_t provideStartupTripleCount_ = 0u;              // +0x124 call count
-    const void* arg6CreateCharacterInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
-    uint32_t arg6CreateCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
+    const void* createCharacterInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
+    uint32_t createCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     // launcher.exe:0x41f0a0 / owner vtable +0x38: returns pointer to this block at +0x94
     // anchor: launcher.exe:0x41eb80 copies from submit input into this block
@@ -1634,7 +1631,7 @@ public:
     // and consumes the recovered owner tables (`+0xd84/+0x688/+0x818`) directly.
     // Keep only the narrower configured arg6 selection scratch that is still used by the
     // wrapper-facing descriptor/profile bridges.
-    struct Arg6SelectionConfig {
+    struct SelectionSeedConfig {
         uint32_t worldUpperBoundExclusive_ = 1;
         uint32_t variantUpperBoundExclusive_ = 1;
         uint32_t selectedWorldIndexLow24_ = 0;
@@ -1651,7 +1648,7 @@ public:
         std::string authPassword_;
     };
 
-    Arg6SelectionConfig arg6Selection_;
+    SelectionSeedConfig selectionSeed_;
     uint32_t arg6VariantWorldNameQueryCountE0_ = 0u; // wrapper-facing arg6 `+0xe0` query count
 };
 

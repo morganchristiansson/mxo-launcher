@@ -233,7 +233,7 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     void* returnAddress) {
     (void)self;
     (void)returnAddress;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetArg6SelectionDescriptorObject40(
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetSelectionDescriptorObject40(
         selectionIndex);
 }
 
@@ -260,7 +260,7 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
 // UNANCHORED: C helper behind the recovered +0x44 ABI wrapper.
 extern "C" void* Mediator_GetCurrentSlotRecordObject44_Impl(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetArg6CurrentSlotRecordObject44();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCurrentSlotRecordObject44();
 }
 
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x44
@@ -868,14 +868,14 @@ extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
 
     if (mediator) {
         const bool applyOwnerSemantics = (activeStateSource == nullptr || activeStateSource == mediator);
-        result = mediator->CaptureCreateCharacterInputArg6Slot120(
+        result = mediator->CaptureCreateCharacterInputSlot120(
             input120,
             returnAddress,
             applyOwnerSemantics);
     }
 
     if (activeStateSource && activeStateSource != mediator) {
-        result = activeStateSource->CaptureCreateCharacterInputArg6Slot120(
+        result = activeStateSource->CaptureCreateCharacterInputSlot120(
             input120,
             returnAddress,
             true);
@@ -1324,7 +1324,7 @@ void DiagnosticConfigureMediatorSelection(
         return;
     }
 
-    mediator->ConfigureArg6Selection(
+    mediator->ConfigureSelectionSeed(
         worldUpperBoundExclusive,
         variantUpperBoundExclusive,
         mappedSelectionName,
@@ -1335,13 +1335,13 @@ void DiagnosticConfigureMediatorSelection(
 
     spdlog::info(
         "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedVariantState={}",
-        mediator->Arg6WorldUpperBoundExclusive(),
-        mediator->Arg6VariantUpperBoundExclusive(),
-        mediator->Arg6MappedSelectionName(),
-        mediator->Arg6MappedVariantName(),
-        mediator->Arg6SelectedWorldIndexLow24(),
-        mediator->Arg6SelectedVariantIndexHigh8(),
-        mediator->Arg6SelectedVariantState());
+        mediator->SelectionWorldUpperBoundExclusive(),
+        mediator->SelectionVariantUpperBoundExclusive(),
+        mediator->MappedSelectionName(),
+        mediator->MappedVariantName(),
+        mediator->SelectedWorldIndexLow24(),
+        mediator->SelectedVariantIndexHigh8(),
+        mediator->SelectedVariantState());
 }
 
 // UNANCHORED: launcher-style selection resolver used to model the current arg7 reconstruction path.

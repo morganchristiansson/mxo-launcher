@@ -19,7 +19,7 @@ class CMessageConnectionMessageRef_0x4ba23c;
 }
 
 // Type definitions used in pure virtual methods
-struct Arg6SelectionConfig;
+struct SelectionSeedConfig;
 
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
@@ -94,10 +94,10 @@ public:
 // - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
 // - wrapper `+0x44` returns a current-slot record object consumed by later save/profile code
 // Those are not the same thing as the owner-side `+0x40/+0x44` slot-record table accessors.
-// Note: Arg6CurrentSlotRecord44PayloadSketch removed - payload10 now points directly to SlotRecordState_0x4b5328
+// Note: SelectionCurrentSlotRecord44PayloadSketch removed - payload10 now points directly to SlotRecordState_0x4b5328
 
-struct Arg6CurrentSlotRecord44ObjectSketch {
-    // Wrapper-facing arg6 `+0x44` current-slot object.
+struct CurrentSlotRecord44ObjectSketch {
+    // Wrapper-facing selection `+0x44` current-slot object.
     // Current Ghidra tightening:
     // - this outer `0x1c` layout matches the concrete `0x004b5328` slot-record class layout
     //   closely (`+0x10 payload`, `+0x14 heapString`, `+0x18 heapStringLen`)
@@ -118,10 +118,10 @@ struct Arg6CurrentSlotRecord44ObjectSketch {
 // - characterIdHigh07 at +0x20 (client accesses as payload+0x07)
 // - status3a at +0x18 (client accesses as payload+0x0b)
 // - worldId3c at +0x24 (client accesses as payload+0x0c)
-static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
-static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, debugString14) == 0x14);
-static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, debugStringLen18) == 0x18);
-static_assert(sizeof(Arg6CurrentSlotRecord44ObjectSketch) == 0x1c);
+static_assert(offsetof(CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
+static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugString14) == 0x14);
+static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugStringLen18) == 0x18);
+static_assert(sizeof(CurrentSlotRecord44ObjectSketch) == 0x1c);
 
 struct RouteDescriptor30SmallStringLikeSketch {
     // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
@@ -360,7 +360,7 @@ public:
     // - do not project owner-only `CLTLoginMediator` slots back onto this interface just because
     //   nearby concrete rows share related data
     // - in particular, owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex` is **not** the abstract
-    //   arg6 `+0x40` row; the wrapper-facing arg6 `+0x40` slot remains the separate
+    //   selection `+0x40` row; the wrapper-facing selection `+0x40` slot remains the separate
     //   selection-descriptor object family consumed by the client profile-path builder
 
     // +0x00
@@ -398,9 +398,9 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
-    virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6SelectionDescriptorObject40(uint32_t selectionIndex) = 0;
+    virtual CurrentSlotRecord44ObjectSketch* GetSelectionDescriptorObject40(uint32_t selectionIndex) = 0;
     // +0x44
-    virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() = 0;
+    virtual CurrentSlotRecord44ObjectSketch* GetCurrentSlotRecordObject44() = 0;
     // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c
