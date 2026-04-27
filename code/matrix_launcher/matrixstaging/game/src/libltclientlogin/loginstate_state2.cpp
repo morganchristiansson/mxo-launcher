@@ -132,10 +132,15 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             // 3. test global `DAT_004f79e0`
             // 4. if clear, set `DAT_004f79e0 = 1` and run the once-only writeback body
             auto& authBootstrapChild = *g_CurrentLoginMediator->authBootstrapChild680_;
+            const mxo::auth::AuthReply& cachedAuthReply =
+                authBootstrapChild.CachedAuthReply_SOURCEOWNED();
+            // `0x448140` itself no longer writes mediator-side world/character mirrors.
+            // The owner tables at `+0x688/+0x818/+0xd84/+0xd80` are populated below by the
+            // once-only state2 success body, which is the launcher-faithful source of truth.
             authBootstrapChild.authReplySuccessHeaderDword07_110 =
                 AuthBootstrap680ReadAuthReplySuccessHeaderDword07(
                     authBootstrapChild,
-                    g_CurrentLoginMediator->lastAuthReply_);
+                    cachedAuthReply);
             AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag(
                 authBootstrapChild,
                 g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data());
@@ -171,22 +176,22 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 {
                     const size_t worldCount = std::min(
                         g_CurrentLoginMediator->worldDescriptorsD84_.size(),
-                        g_CurrentLoginMediator->lastAuthReply_.worlds.size());
+                        cachedAuthReply.worlds.size());
                     // Fidelity boundary note:
                     // - binary walks the child `+0xf0` parse-object world temp records, not the
-                    //   replacement-owned `lastAuthReply_.worlds` vector directly
+                    //   replacement-owned cached auth-reply vector directly
                     // - `worldDescriptorCountD80_` is a faithful owner `+0xd80` mirror
                     // - `worldDescriptorValidD84_` is source-owned sidecar state, not a proven
                     //   launcher field despite the suffix-styled naming
                     for (size_t i = 0; i < worldCount; ++i) {
                         g_CurrentLoginMediator->SeedRecoveredWorldDescriptorFromAuthReply(
-                            static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
+                            static_cast<uint8_t>(i), cachedAuthReply.worlds[i]);
                         ++g_CurrentLoginMediator->worldDescriptorCountD80_;
                     }
                 }
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
                     authBootstrapChild,
-                    g_CurrentLoginMediator->lastAuthReply_);
+                    cachedAuthReply);
                 // anchor: launcher.exe:0x43f300 character-slot loop + route-host string copy (inline, no function call)
                 // Binary shape:
                 // - ResetSelectionRouteState
@@ -205,12 +210,12 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
                     const size_t characterCount = std::min(
                         g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size(),
-                        g_CurrentLoginMediator->lastAuthReply_.characters.size());
+                        cachedAuthReply.characters.size());
                     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ =
                         static_cast<uint8_t>(characterCount);
                     for (size_t i = 0; i < characterCount; ++i) {
                         g_CurrentLoginMediator->SeedRecoveredCharacterSlotRecordFromAuthReply(
-                            static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.characters[i]);
+                            static_cast<uint8_t>(i), cachedAuthReply.characters[i]);
                         const SlotRecordState_0x4b5328& slotRecord =
                             g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
                         const int matchedWorldIndex =
@@ -230,7 +235,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
                     authBootstrapChild,
                     *g_CurrentLoginMediator,
-                    g_CurrentLoginMediator->lastAuthReply_);
+                    cachedAuthReply);
             }
 
             // The binary dispatches this->field_0x4->GetStateId() up to 3 times here

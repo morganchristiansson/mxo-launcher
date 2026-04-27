@@ -249,7 +249,6 @@ CLTLoginMediator::CLTLoginMediator()
       lastAuthPublicKeyReply_(),
       lastAuthRequestBuildResult_(),
       lastAuthChallenge_(),
-      lastAuthReply_(),
       lastAuthConnectStatus_(0),
       lastMarginConnectStatus_(0),
       authConnectStatusCount_(0),
@@ -1369,11 +1368,12 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
 // Tighter launcher page-`7` read now makes this high-word consumer better fit the active
 // selection-entry / slot-record index on the auth-valid path.
 uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
-    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const bool stateAllowsRecoveredSelectionRouteRead =
+        currentState_ != nullptr && currentState_->GetStateId() > 2u;
 
     uint32_t state = 3u;
     const char* source = "arg6-selection-fallback";
-    if (useRecoveredActiveEntryTable) {
+    if (stateAllowsRecoveredSelectionRouteRead) {
         if (variantIndex >= 0 && variantIndex <= 0xff) {
             state = GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex));
             source = "owner+0x688.status+0x0b";
@@ -1403,24 +1403,18 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
 }
 
 // anchor: launcher.exe:0x41ec00 +0xe8
-// Original body is narrower than the current replacement-side bookkeeping:
-// - gate on current helper/state code `> 2`
-// - require selection-route count `!= 0` and input `< 100`
-// - decrement selection-route slot count
-// - release/remove owner `+0x688[index]`
-// - shift later `+0x688` pointers and `+0x818` string-triples down
-// - clear the final pointer/string tail
-// Current source still keeps extra replacement-side mirrors like `lastAuthReply_` and
-// `PersistCharactersIniFromRecoveredAuthStateScaffold()` coherent around that narrower original
-// mutation.
+// Fidelity: 0x41ec00 gates on GetStateId()>2, selectedSlotRecordIndex<100, and
+// selectionRouteState684_.slotRecordCount00_!=0; then it decrements +0x684, releases the
+// selected +0x688 slot record when non-null, shifts later +0x688 entries and +0x818
+// string-triples down, and clears the final pointer/string tail.
 uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) {
-    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
-    if (stateCode <= 2u || selectedSlotRecordIndex >= 100u ||
+    const uint32_t stateId = currentState_ ? currentState_->GetStateId() : 0u;
+    if (stateId <= 2u || selectedSlotRecordIndex >= 100u ||
         selectionRouteState684_.slotRecordCount00_ == 0u) {
         spdlog::info(
-            "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex rejected slotIndex={} stateCode={} count={} currentState={}",
+            "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex rejected slotIndex={} stateId={} count={} currentState={}",
             static_cast<unsigned>(selectedSlotRecordIndex),
-            static_cast<unsigned>(stateCode),
+            static_cast<unsigned>(stateId),
             static_cast<unsigned>(selectionRouteState684_.slotRecordCount00_),
             currentState_ ? currentState_->DebugName() : "<null>");
         return 0u;
@@ -1428,34 +1422,24 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 
     const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
     const uint8_t oldCount = selectionRouteState684_.slotRecordCount00_;
-    const std::string removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].debugString14 ? selectionRouteState684_.slotRecordTable04_[slotIndex].debugString14 : "";
+    const char* removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].debugString14;
 
-    // anchor: launcher.exe:0x41ec00
-    // Original order:
-    // - decrement `+0x684`
-    // - release/remove `+0x688[index]`
-    // - shift later `+0x688` pointers and `+0x818` string-triples down
-    // - clear the final pointer/string tail
     selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(oldCount - 1u);
-    selectionRouteState684_.slotRecordTable04_[slotIndex] = {};
     selectionRouteState684_.slotRecordValid04_[slotIndex] = false;
+    selectionRouteState684_.slotRecordTable04_[slotIndex] = {};
 
-    for (size_t i = slotIndex; i + 1u < selectionRouteState684_.slotRecordTable04_.size(); ++i) {
+    for (size_t i = slotIndex; i + 1u < static_cast<size_t>(selectionRouteState684_.slotRecordCount00_); ++i) {
         selectionRouteState684_.slotRecordTable04_[i] = selectionRouteState684_.slotRecordTable04_[i + 1u];
         selectionRouteState684_.slotRecordValid04_[i] = selectionRouteState684_.slotRecordValid04_[i + 1u];
         selectionRouteState684_.routeHostStringTriples194_[i] =
             selectionRouteState684_.routeHostStringTriples194_[i + 1u];
     }
-    selectionRouteState684_.slotRecordTable04_.back() = {};
-    selectionRouteState684_.slotRecordValid04_.back() = false;
-    selectionRouteState684_.routeHostStringTriples194_.back().Clear();
 
-    // Replacement-only mirror maintenance kept explicit after the narrower original mutation.
-    postAuthMarginLoadingState_0xf14.characterRouteIndexCc8 = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
-    marginRouteState_.currentCharacterOrRouteIndex = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
-    if (slotIndex < lastAuthReply_.characters.size()) {
-        lastAuthReply_.characters.erase(lastAuthReply_.characters.begin() + static_cast<std::ptrdiff_t>(slotIndex));
-    }
+    const size_t tailIndex = static_cast<size_t>(selectionRouteState684_.slotRecordCount00_);
+    selectionRouteState684_.slotRecordTable04_[tailIndex] = {};
+    selectionRouteState684_.slotRecordValid04_[tailIndex] = false;
+    selectionRouteState684_.routeHostStringTriples194_[tailIndex].Clear();
+
     PersistCharactersIniFromRecoveredAuthStateScaffold();
 
     spdlog::info(
@@ -1463,7 +1447,7 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
         static_cast<unsigned>(selectedSlotRecordIndex),
         static_cast<unsigned>(oldCount),
         static_cast<unsigned>(selectionRouteState684_.slotRecordCount00_),
-        removedName.empty() ? "<empty>" : removedName.c_str(),
+        (removedName && removedName[0] != '\0') ? removedName : "<empty>",
         currentState_ ? currentState_->DebugName() : "<null>");
     return 0u;
 }
@@ -1563,15 +1547,16 @@ const void* CLTLoginMediator::GetState8PersistenceF1c() const {
 
 // anchor: launcher.exe:0x41af30 / launcher.exe:0x40e5b0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xf8
+// Fidelity: 0x41af30 only calls GetStateId() and returns owner byte +0xd80 when the
+// current helper/state id is >2; otherwise it returns 0.
 uint32_t CLTLoginMediator::GetWorldCount() const {
-    const uint32_t worldCount = lastAuthReply_.valid && !lastAuthReply_.isErrorReply
-        ? static_cast<uint32_t>(worldDescriptorCountD80_)
-        : 0u;
+    const uint32_t stateId = currentState_ ? currentState_->GetStateId() : 0u;
+    const uint32_t worldCount = (stateId > 2u) ? static_cast<uint32_t>(worldDescriptorCountD80_) : 0u;
 
     spdlog::info(
         "CLTLoginMediator::GetWorldCount(+0xf8) -> {} [source={}]",
         worldCount,
-        (worldCount != 0u) ? "owner+0xd84" : "no-active-descriptor-table");
+        (stateId > 2u) ? "owner+0xd80" : "state<=2");
     return worldCount;
 }
 
@@ -1582,8 +1567,9 @@ uint32_t CLTLoginMediator::GetWorldCount() const {
 // - so this wrapper-facing getter can stay owner-table-backed without the older synthetic
 //   startup world-list sidecar
 const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
+    const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const char* worldName =
-        (lastAuthReply_.valid && !lastAuthReply_.isErrorReply && index <= 0xffu)
+        (stateAllowsDescriptorRead && index <= 0xffu)
             ? GetDescriptorInlineNameByIndex(static_cast<uint8_t>(index))
             : nullptr;
 
@@ -1601,8 +1587,9 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
 // - the current text-mode selection menu only reaches this after auth success
 // - so the wrapper-facing gate byte now comes only from the recovered owner descriptor Status byte
 uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const {
+    const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t selectionGateByte100 =
-        (lastAuthReply_.valid && !lastAuthReply_.isErrorReply && index <= 0xffu)
+        (stateAllowsDescriptorRead && index <= 0xffu)
             ? GetDescriptorStatusByIndex(static_cast<uint8_t>(index))
             : 0u;
 
@@ -1619,8 +1606,8 @@ uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const
 // Corrected off-by-one read from Ghidra/disassembly: this wrapper slot now surfaces owner
 // descriptor Type byte `+0x18`, not server-version low byte.
 uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
-    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const uint8_t worldTypeByte = useRecoveredDescriptorTable
+    const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
+    const uint8_t worldTypeByte = stateAllowsDescriptorRead
         ? ((index <= 0xffu) ? GetDescriptorTypeByIndex(static_cast<uint8_t>(index)) : 0u)
         : 0u;
 
@@ -1628,15 +1615,15 @@ uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
         "CLTLoginMediator::GetWorldTypeByteByIndex(+0x104 index=0x{:06x}) -> {} [source={}]",
         static_cast<unsigned>(index & 0x00ffffffu),
         static_cast<unsigned>(worldTypeByte),
-        useRecoveredDescriptorTable ? "owner+0xd84.type+0x18" : "no-startup-fallback");
+        stateAllowsDescriptorRead ? "owner+0xd84.type+0x18" : "state<=2");
     return worldTypeByte;
 }
 
 // anchor: launcher.exe:0x41b3a0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x108
 uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const {
-    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const uint8_t populationNibble = useRecoveredDescriptorTable
+    const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
+    const uint8_t populationNibble = stateAllowsDescriptorRead
         ? ((index <= 0xffu) ? GetDescriptorPopulationNibbleByIndex(static_cast<uint8_t>(index)) : 0u)
         : 0u;
 
@@ -1644,7 +1631,7 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
         "CLTLoginMediator::GetWorldPopulationNibbleByIndex(+0x108 index=0x{:06x}) -> {} [source={}]",
         static_cast<unsigned>(index & 0x00ffffffu),
         static_cast<unsigned>(populationNibble),
-        useRecoveredDescriptorTable ? "owner+0xd84.population+0x1f.low4" : "no-startup-fallback");
+        stateAllowsDescriptorRead ? "owner+0xd84.population+0x1f.low4" : "state<=2");
     return populationNibble;
 }
 

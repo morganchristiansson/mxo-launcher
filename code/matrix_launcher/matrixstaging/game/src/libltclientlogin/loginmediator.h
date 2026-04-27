@@ -1635,7 +1635,6 @@ public:
     mxo::auth::GetPublicKeyReply lastAuthPublicKeyReply_;
     mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
     mxo::auth::AuthChallenge lastAuthChallenge_;
-    mxo::auth::AuthReply lastAuthReply_;
     // Replacement-only compatibility auth payload copy:
     // - auth leaf/base dispatch now keeps `0x449a30` thin again
     // - when current source still needs raw auth payload bytes, state2 / owner+0x680 child copies
