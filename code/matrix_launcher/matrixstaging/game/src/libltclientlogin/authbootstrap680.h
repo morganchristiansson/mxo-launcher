@@ -586,9 +586,6 @@ enum AuthBootstrap680InboundAuthResult : uint32_t {
     kAuthBootstrap680InboundAuthReplyValidationError = 6u,
 };
 
-void AuthBootstrap680LogParsedAuthReply(
-    const CLTLoginMediator& owner,
-    const mxo::auth::AuthReply& reply);
 void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     AuthBootstrap680Child_0x441290& child,
     CLTLoginMediator& owner,

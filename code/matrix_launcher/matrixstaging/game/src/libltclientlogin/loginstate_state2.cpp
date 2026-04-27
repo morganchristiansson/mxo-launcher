@@ -140,9 +140,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 authBootstrapChild,
                 g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data());
 
-            // SOURCE-ONLY: diagnostic logging; no binary counterpart.
-            AuthBootstrap680LogParsedAuthReply(*g_CurrentLoginMediator, g_CurrentLoginMediator->lastAuthReply_);
-
             if (!AuthBootstrap680State2AuthReplySuccessOneTimeGateIsSet()) {
                 AuthBootstrap680State2AuthReplySuccessOneTimeGateSet();
                 // anchor: launcher.exe:0x43f300 one-time gate body

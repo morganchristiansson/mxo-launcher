@@ -102,9 +102,6 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     // - keep access narrow by granting focused friendship instead of widening the mediator
     //   surface generically
     friend struct AuthBootstrap680Child_0x441290;
-    friend void AuthBootstrap680LogParsedAuthReply(
-        const CLTLoginMediator& owner,
-        const mxo::auth::AuthReply& reply);
     friend void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
         AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
