@@ -479,18 +479,19 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), selectionName);
     }
 
-    const char exactMarginHostName[] = "";
     mxo::ltlogin::g_qsAuthServerDNSName = authServerDnsName ? authServerDnsName : "";
     mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
     mxo::ltlogin::g_AuthServerPort = authServerPort;
     mxo::ltlogin::g_marginServerDNSName = "";
     mxo::ltlogin::g_marginServerPort = marginServerPort;
-
-    if (mxo::ltlogin::CLTLoginMediator* mediator = reinterpret_cast<mxo::ltlogin::CLTLoginMediator*>(g_pILTLoginMediator_0x4af2b8Default)) {
-        mediator->ignoreHostsFileForMargin_ = ignoreHostsFileForMargin;
-        mediator->marginRouteState_.routeHostPrefix = marginRoutePrefix;
-        mediator->marginRouteState_.exactMarginHostName = exactMarginHostName;
-    }
+    spdlog::info(
+        "DIAGNOSTIC: launcher startup config auth='{}' authPort={} marginRoutePrefix='{}' marginPort={} ignoreAuthHosts={} ignoreMarginHosts={}",
+        authServerDnsName ? authServerDnsName : "<empty>",
+        authServerPort,
+        marginRoutePrefix,
+        marginServerPort,
+        ignoreHostsFileForAuth ? 1 : 0,
+        ignoreHostsFileForMargin ? 1 : 0);
 
     return true;
 }
