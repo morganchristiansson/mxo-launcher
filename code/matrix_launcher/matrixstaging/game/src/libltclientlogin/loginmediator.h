@@ -946,13 +946,6 @@ public:
     bool UnregisterLoginObserver(void* observer) override;
     // Observer count getters for wrapper diagnostics (moved from g_MediatorRuntimeState):
 
-    // Narrow post-auth receive-boundary counters used only for short runtime discrimination:
-    // - no packet arrived yet
-    // - packet arrived but would be consumed by base margin dispatch before slot 6
-    // - packet survived into current helper slot 6
-    uint32_t MarginPacketReceiveCountScaffold() const { return marginPacketReceiveCountScaffold_; }
-    uint32_t MarginPacketFilteredBeforeSlot6CountScaffold() const { return marginPacketFilteredBeforeSlot6CountScaffold_; }
-    uint32_t MarginPacketSlot6DispatchCountScaffold() const { return marginPacketSlot6DispatchCountScaffold_; }
 
     // Focused source home for this early auth/state-entry wiring:
     // - `loginmediator_auth_entry.cpp`
@@ -1023,7 +1016,6 @@ public:
     // config path instead of treating connection setup as generic ad-hoc socket work.
 
     std::string ResolvedMarginHostName() const;
-
 
     bool AuthPeerCloseQueuedScaffold() const { return authPeerCloseQueuedScaffold_; }
     bool MarginPeerCloseQueuedScaffold() const { return marginPeerCloseQueuedScaffold_; }
@@ -1465,13 +1457,6 @@ private:
     // anchor: launcher.exe:0x41b1cd - owner byte +0x04 set to 1 during Initialize()
     uint8_t ownerReadyFlag04_ = 0;
 
-    uint32_t marginPacketReceiveCountScaffold_ = 0;
-    uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;
-    uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
-    uint16_t lastMarginPacketOpcodeScaffold_ = 0;
-    uint32_t lastMarginPacketSizeScaffold_ = 0;
-    bool authPeerCloseQueuedScaffold_ = false;
-    bool marginPeerCloseQueuedScaffold_ = false;
 
 public:
     mxo::liblttcp::CMessageConnection_0x4b7928* authConnection_;
@@ -1479,6 +1464,9 @@ public:
 
     // anchor: launcher.exe:0x4b01c8 +0x10 (current helper/state object)
     CLTLoginState* currentState_;
+
+    bool authPeerCloseQueuedScaffold_ = false;
+    bool marginPeerCloseQueuedScaffold_ = false;
 
     // owner `+0x80` - world list count or auth/status (used by state4 slot2)
     uint32_t worldListCountOrStatus80 = 0;

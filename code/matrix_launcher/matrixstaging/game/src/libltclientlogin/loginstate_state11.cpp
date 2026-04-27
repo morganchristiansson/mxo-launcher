@@ -264,11 +264,8 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
         g_CurrentLoginMediator->GetGameSessionId() ? g_CurrentLoginMediator->GetGameSessionId() : "<empty>",
         sendResult);
     spdlog::info(
-        "CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
-        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(g_CurrentLoginMediator->MarginPacketReceiveCountScaffold()),
-        static_cast<unsigned>(g_CurrentLoginMediator->MarginPacketFilteredBeforeSlot6CountScaffold()),
-        static_cast<unsigned>(g_CurrentLoginMediator->MarginPacketSlot6DispatchCountScaffold()));
+        "CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={}",
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     return;
 }
 
