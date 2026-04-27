@@ -220,25 +220,31 @@ bool CLauncher::ParseCommandLineStage() const {
 bool CLauncher::InitializeThreadPerClientTCPEngine() const {
     // Call-shape note:
     // - `CLauncher::InitInstance` reaches this through `mov ecx, ebx; call 0x40a380`
-    // - current Ghidra still decompiles the body as if `this` were unused, but keeping the source
-    //   as a `CLauncher` method preserves the original `InitInstance` ownership/call boundary
+    // - Ghidra currently flattens the body to a free function, but the original launcher method
+    //   boundary still matters for the recovered startup sequence
+    // - faithful order from the raw listing is:
+    //   1) allocate / construct the thread-per-client TCP engine shell (`malloc(0xb4)` + ctor)
+    //   2) store the result to `0x4d6304`
+    //   3) invoke the mediator's resolved vtable slot `+0x08` with that object
+    //   4) return `result < 1`
     if (!g_pILTLoginMediator_0x4af2b8Default) {
-        spdlog::error("launcher.exe:0x40a380 requires ILTLoginMediator_0x4af2b8.Default before arg5 create/store/register");
+        spdlog::error(
+            "launcher.exe:0x40a380 requires ILTLoginMediator_0x4af2b8.Default before slot +0x08 handoff");
         return false;
     }
 
     // anchor: launcher.exe:0x40a3c0..0x40a3e9
-    // - allocate/construct arg5 launcher object
+    // - allocate/construct the thread-per-client TCP engine shell
     // - store it to global `0x4d6304`
     // anchor: launcher.exe:0x40a3e9..0x40a406
-    // - call resolved arg6 wrapper slot `+0x08` with that freshly built object
+    // - call resolved mediator slot `+0x08` with that freshly built object
     // - preserve the original `result < 1` success test
     g_pLauncherObject6304 = LauncherCreateNetworkEngineAbiShell();
 
-    void** vtable = *reinterpret_cast<void***>(g_pILTLoginMediator_0x4af2b8Default);
+    void** mediatorVtable = *reinterpret_cast<void***>(g_pILTLoginMediator_0x4af2b8Default);
     typedef int (__thiscall *RegisterEngineFn)(void*, void*);
-    RegisterEngineFn registerEngine = (vtable && vtable[2])
-        ? reinterpret_cast<RegisterEngineFn>(vtable[2])
+    RegisterEngineFn registerEngine = (mediatorVtable && mediatorVtable[2])
+        ? reinterpret_cast<RegisterEngineFn>(mediatorVtable[2])
         : nullptr;
     const int registerResult = registerEngine
         ? registerEngine(g_pILTLoginMediator_0x4af2b8Default, g_pLauncherObject6304)
@@ -246,7 +252,7 @@ bool CLauncher::InitializeThreadPerClientTCPEngine() const {
 
     const bool operationSucceeded = (registerResult < 1);
     spdlog::info(
-        "DIAGNOSTIC: 0x40a380-style arg5 create/store/register mediatorResult={} object={} success={}",
+        "DIAGNOSTIC: launcher.exe:0x40a380 thread-per-client TCP engine handoff mediatorResult={} object={} success={}",
         registerResult,
         fmt::ptr(g_pLauncherObject6304),
         operationSucceeded ? 1 : 0);
