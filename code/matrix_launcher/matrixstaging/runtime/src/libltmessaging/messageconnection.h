@@ -1102,12 +1102,9 @@ public:
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 
     // Non-virtual auth-bootstrap helper family currently recovered by Ghidra on this receiver.
-    // The concrete derived implementation now lives in the auth bootstrap child hierarchy, but
-    // the public method surface is intentionally rooted here to match the recovered receiver type.
-    uint32_t PrepareAndDispatch(
-        mxo::ltlogin::CLTLoginMediator& owner,
-        void* sendTarget,
-        const char* sessionTokenBegin);
+    // PrepareAndDispatch (launcher.exe:0x448050) was moved back to the auth bootstrap child after
+    // callsite evidence showed its only direct caller (0x43928b) passes owner+0x680, constructed by
+    // AuthBootstrap680Child_0x441290::ctor at 0x441290.
     uint32_t HandleInboundAuthMessage(
         void* incomingAuthMessage,
         mxo::ltlogin::CLTLoginMediator& owner);

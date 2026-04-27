@@ -1647,23 +1647,12 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
 }
 
 
-}  // namespace mxo::ltlogin
-
-namespace mxo::liblttcp {
-
 // anchor: launcher.exe:0x448050
-uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch(
-    mxo::ltlogin::CLTLoginMediator& mediator,
+uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
+    CLTLoginMediator& mediator,
     void* sendTarget,
     const char* sessionTokenBegin) {
-    using namespace mxo::ltlogin;
-
-    AuthBootstrap680ChildBase_0x4b7134* childBase =
-        owner08 ? owner08->authBootstrapChildBase_SOURCEONLY : nullptr;
-    if (childBase == nullptr) {
-        childBase = &AuthBootstrapChildFromWriteHelper(*this);
-    }
-    auto& child = *static_cast<AuthBootstrap680Child_0x441290*>(childBase);
+    auto& child = *this;
 
     child.loginType28 = 1u;
 
@@ -1693,31 +1682,30 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch(
     AssignSmallStringMirror(child.string1C, sessionToken);
 
     if (!mediator.ownerAuthBootstrapSource94_.keyConfigMd540.empty()) {
-        block30 = mediator.ownerAuthBootstrapSource94_.keyConfigMd540;
+        child.block30 = mediator.ownerAuthBootstrapSource94_.keyConfigMd540;
     }
     if (!mediator.ownerAuthBootstrapSource94_.uiConfigMd550.empty()) {
-        block40 = mediator.ownerAuthBootstrapSource94_.uiConfigMd550;
+        child.block40 = mediator.ownerAuthBootstrapSource94_.uiConfigMd550;
     }
 
     child.sendTarget50 = sendTarget;
 
-    const uint8_t authRequestReadyA0Value = authRequestReadyA0;
+    const uint8_t authRequestReadyA0Value = child.authRequestReadyA0;
     const bool sendAuthRequestBranch = authRequestReadyA0Value != 0u;
 
     spdlog::info(
-        "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94 len04={} len10={} len1C={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={} helper={} module={} childBase={}",
+        "AuthBootstrap680Child_0x441290::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94 len04={} len10={} len1C={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={} child={} childBase={}",
         static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string1C)),
         static_cast<unsigned>(child.loginType28),
         static_cast<unsigned>(child.launcherVersion2C),
-        static_cast<unsigned>(currentPublicKeyId9C),
+        static_cast<unsigned>(child.currentPublicKeyId9C),
         fmt::ptr(child.sendTarget50),
         static_cast<unsigned>(authRequestReadyA0Value),
         sendAuthRequestBranch ? "raw0x08/auth-request" : "raw0x06/get-public-key",
         fmt::ptr(this),
-        fmt::ptr(owner08),
-        fmt::ptr(childBase));
+        fmt::ptr(static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this)));
 
     if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
@@ -1725,8 +1713,12 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch(
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-    return SendGetPublicKeyRequest(mediator);
+    return child.SendGetPublicKeyRequest(mediator);
 }
+
+}  // namespace mxo::ltlogin
+
+namespace mxo::liblttcp {
 
 // anchor: launcher.exe:0x448140
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage(

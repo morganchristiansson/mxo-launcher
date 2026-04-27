@@ -163,6 +163,14 @@ public:
     const mxo::auth::AuthChallenge& CachedAuthChallenge_SOURCEOWNED() const;
     const mxo::auth::AuthReply& CachedAuthReply_SOURCEOWNED() const;
 
+    // anchor: launcher.exe:0x448050
+    // Only known direct caller is state2 ready-side handoff at launcher.exe:0x43928b, where
+    // assembly loads ECX from CLTLoginMediator +0x680 before CALL 0x448050.
+    uint32_t PrepareAndDispatch(
+        CLTLoginMediator& owner,
+        void* sendTarget,
+        const char* sessionTokenBegin);
+
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;

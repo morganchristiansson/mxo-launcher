@@ -1505,7 +1505,7 @@ public:
     //   suffix family without re-inventing a semantic object model
     // Replacement source now also keeps the ownership boundary explicit by storing this as a
     // separate child object instead of flattening it into the mediator body.
-    std::unique_ptr<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690> authBootstrapChild680_;
+    std::unique_ptr<AuthBootstrap680Child_0x441290> authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
     // Lazily allocated session callback helper (a LaunchPadClient_0x4b0e48)
