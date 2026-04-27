@@ -76,8 +76,7 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
     const uint32_t sendResult =
-        reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(*child)
-            .PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
+        child->PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
     spdlog::info(
         "CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
         fmt::ptr(upstreamOrArg),
@@ -106,9 +105,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
     // - this state2 body only switches on that helper's return code to drive owner `+0x80`,
     //   helper-switch, and event/error flow
     const uint32_t childResult =
-        reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(
-            *g_CurrentLoginMediator->authBootstrapChild680_)
-            .HandleInboundAuthMessage(workItem, *g_CurrentLoginMediator);
+        g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(
+            workItem, *g_CurrentLoginMediator);
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(
@@ -123,7 +121,9 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
         return 1u;
     }
 
-    g_CurrentLoginMediator->worldListCountOrStatus80 = g_CurrentLoginMediator->authBootstrapChild680_->inboundAuthStatusEc;
+    g_CurrentLoginMediator->worldListCountOrStatus80 =
+        AuthBootstrapChildFromWriteHelper(*g_CurrentLoginMediator->authBootstrapChild680_)
+            .inboundAuthStatusEc;
     // anchor: launcher.exe:0x43f300 / sets authConnectionFlag2c_ = 1 when childResult != 0 && childResult != 1
     g_CurrentLoginMediator->authConnectionFlag2c_ = 1u;
 
@@ -135,7 +135,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             // 2. inline prompt-password / SecurID mirror update at `0x441330`
             // 3. test global `DAT_004f79e0`
             // 4. if clear, set `DAT_004f79e0 = 1` and run the once-only writeback body
-            auto& authBootstrapChild = *g_CurrentLoginMediator->authBootstrapChild680_;
+            auto& authBootstrapChild =
+                AuthBootstrapChildFromWriteHelper(*g_CurrentLoginMediator->authBootstrapChild680_);
             const mxo::auth::AuthReply& cachedAuthReply =
                 authBootstrapChild.CachedAuthReply_SOURCEOWNED();
             const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject =

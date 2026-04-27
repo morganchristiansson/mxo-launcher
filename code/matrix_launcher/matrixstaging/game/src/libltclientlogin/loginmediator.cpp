@@ -806,7 +806,9 @@ const char* CLTLoginMediator::GetProfileOrSessionName() const {
 void* CLTLoginMediator::BootstrapRaw08AuxHandle50() const {
     // Fidelity to static-RE: reads dword at offset +0xa8 from copyShadow
     const auto* copyShadow =
-        authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr;
+        authBootstrapChild680_
+            ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authReplyCopyShadowF4
+            : nullptr;
     if (copyShadow != nullptr) {
         return reinterpret_cast<void*>(
             *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(copyShadow) + 0xa8));
@@ -816,7 +818,10 @@ void* CLTLoginMediator::BootstrapRaw08AuxHandle50() const {
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
 bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
-    const bool present = authBootstrapChild680_ ? authBootstrapChild680_->HasBootstrapRaw08AuxHandle54() : false;
+    const bool present = authBootstrapChild680_
+                             ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
+                                   .HasBootstrapRaw08AuxHandle54()
+                             : false;
     spdlog::debug(
         "CLTLoginMediator::HasBootstrapRaw08AuxHandle54(+0x54) -> {}",
         present ? 1u : 0u);
@@ -825,7 +830,10 @@ bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
 
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
 uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
-    const uint8_t prompt = authBootstrapChild680_ ? authBootstrapChild680_->GetCrashReporterPromptForSecurId58() : 0u;
+    const uint8_t prompt = authBootstrapChild680_
+                               ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
+                                     .GetCrashReporterPromptForSecurId58()
+                               : 0u;
     spdlog::debug(
         "CLTLoginMediator::GetCrashReporterPromptForSecurId58(+0x58) -> {}",
         static_cast<unsigned>(prompt));
@@ -852,7 +860,10 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
     const char* authPassword = Arg6AuthPassword();
-    const char* bootstrapPassword = authBootstrapChild680_ ? authBootstrapChild680_->stringF8.begin : nullptr;
+    const char* bootstrapPassword = authBootstrapChild680_
+                                        ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
+                                              .stringF8.begin
+                                        : nullptr;
     const char* effectivePassword =
         (bootstrapPassword && bootstrapPassword[0] != '\0') ? bootstrapPassword : authPassword;
     spdlog::info(
@@ -2755,13 +2766,16 @@ uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
 // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
 void CLTLoginMediator::PrepareState5MarginConnectionCopySend() {
     auto* marginConnection = static_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
-    AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(*authBootstrapChild680_)
+    AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(
+        AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_))
         .PrepareState5MarginConnectionCopySend(*marginConnection);
     marginConnection->SendStoredBootstrapReplyCopy98();
 }
 
 const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
-    return authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr;
+    return authBootstrapChild680_
+               ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authReplyCopyShadowF4
+               : nullptr;
 }
 
 bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
@@ -2772,7 +2786,9 @@ bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
     //   where child `+0x80` is the server-time bias seeded by `0x448140`, so the left side is
     //   effectively the current auth-server time
     const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(
-        authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr);
+        authBootstrapChild680_
+            ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authReplyCopyShadowF4
+            : nullptr);
     if (copyShadow == nullptr) {
         return false;
     }
@@ -2780,7 +2796,9 @@ bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
     const uint32_t expiryTimeAc = ReadU32LE(copyShadow->signedData80.data() + 0x2cu);
     const std::time_t now = std::time(nullptr);
     const uint32_t authServerTimeBias80 =
-        authBootstrapChild680_ ? authBootstrapChild680_->authServerTimeBias80 : 0u;
+        authBootstrapChild680_
+            ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authServerTimeBias80
+            : 0u;
     const uint32_t currentAuthServerTime =
         (now > static_cast<std::time_t>(authServerTimeBias80))
             ? static_cast<uint32_t>(now - static_cast<std::time_t>(authServerTimeBias80))

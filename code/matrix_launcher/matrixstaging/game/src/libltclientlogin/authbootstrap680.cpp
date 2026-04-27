@@ -2525,20 +2525,6 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
 
 }  // namespace mxo::ltlogin
 
-namespace {
-
-mxo::ltlogin::AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelperBridge(
-    mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690& helper) {
-    // Source bridge: the auth/bootstrap owner `+0x680` object is still modeled as
-    // `AuthBootstrap680Child_0x441290`, but Ghidra recovers several non-virtual auth helpers on
-    // the same receiver shape under `CStreamPacketEncryptionModuleWriteHelper_0x4b8690`.
-    // While we grind toward a tighter unified class model, route those methods through the current
-    // child storage by reinterpreting the shared prefix layout.
-    return reinterpret_cast<mxo::ltlogin::AuthBootstrap680Child_0x441290&>(helper);
-}
-
-}  // namespace
-
 namespace mxo::liblttcp {
 
 // anchor: launcher.exe:0x448050
@@ -2546,7 +2532,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch(
     mxo::ltlogin::CLTLoginMediator& owner,
     void* sendTarget,
     const char* sessionTokenBegin) {
-    return AuthBootstrapChildFromWriteHelperBridge(*this)
+    return mxo::ltlogin::AuthBootstrapChildFromWriteHelper(*this)
         .PrepareAndDispatch_SOURCEOWNED(owner, sendTarget, sessionTokenBegin);
 }
 
@@ -2554,21 +2540,21 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::PrepareAndDispatch(
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage(
     void* incomingAuthMessage,
     mxo::ltlogin::CLTLoginMediator& owner) {
-    return AuthBootstrapChildFromWriteHelperBridge(*this)
+    return mxo::ltlogin::AuthBootstrapChildFromWriteHelper(*this)
         .HandleInboundAuthMessage_SOURCEOWNED(incomingAuthMessage, owner);
 }
 
 // anchor: launcher.exe:0x447eb0
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendGetPublicKeyRequest(
     mxo::ltlogin::CLTLoginMediator& owner) {
-    return AuthBootstrapChildFromWriteHelperBridge(*this)
+    return mxo::ltlogin::AuthBootstrapChildFromWriteHelper(*this)
         .SendGetPublicKeyRequest_SOURCEOWNED(owner);
 }
 
 // anchor: launcher.exe:0x4474f0
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(
     mxo::ltlogin::CLTLoginMediator& owner) {
-    return AuthBootstrapChildFromWriteHelperBridge(*this)
+    return mxo::ltlogin::AuthBootstrapChildFromWriteHelper(*this)
         .SendAuthRequest_SOURCEOWNED(owner);
 }
 
@@ -2576,7 +2562,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply(
     mxo::ltlogin::CLTLoginMediator& owner,
     const mxo::auth::GetPublicKeyReply& reply) {
-    return AuthBootstrapChildFromWriteHelperBridge(*this)
+    return mxo::ltlogin::AuthBootstrapChildFromWriteHelper(*this)
         .HandleGetPublicKeyReply_SOURCEOWNED(owner, reply);
 }
 

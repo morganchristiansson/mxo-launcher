@@ -6,6 +6,7 @@
 #include <string>
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
+#include "../../../runtime/src/libltmessaging/messageconnection.h"
 
 namespace mxo::liblttcp {
 class CMarginConnection_0x4aff38;
@@ -426,7 +427,8 @@ static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
 // Base class containing fields +0x00 through +0xf4
 // Constructor: launcher.exe:0x445500 = AuthBootstrap680ChildBase_0x4b7134::ctor
 // Destructor: launcher.exe:0x445610 = AuthBootstrap680ChildBase_0x4b7134::dtor
-class AuthBootstrap680ChildBase_0x4b7134 {
+class AuthBootstrap680ChildBase_0x4b7134
+    : public mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690 {
 public:
  // VTable at 0x004b7134:
  // +0x00: destructor (0x00445610)
@@ -582,6 +584,16 @@ public:
     // Source-owned (NOT static-RE): inlined into HandleInboundAuthMessage case 0x09u at 0x44831c..0x448467
  uint32_t SendAuthChallengeResponse_SOURCEOWNED_NO_RE(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 };
+
+inline AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelper(
+    mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690& helper) {
+    return static_cast<AuthBootstrap680Child_0x441290&>(helper);
+}
+
+inline const AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelper(
+    const mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690& helper) {
+    return static_cast<const AuthBootstrap680Child_0x441290&>(helper);
+}
 
 class AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0 {
 public:
