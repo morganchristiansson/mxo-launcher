@@ -16,34 +16,7 @@ extern void* g_pLauncherObject6304;
 // Broad ILTLoginMediator_0x4af2b8.Default ABI shell:
 // - keep startup-selection and general arg6 surface here
 
-struct DiagnosticMediatorResolverNode {
-    DiagnosticMediatorResolverNode* next;
-    const char* serviceName;
-    void* resolvedObject;
-};
-
-struct DiagnosticBinderRegistry {
-    void* reserved0;
-    void* reserved4;
-    void* reserved8;
-    void* reservedC;
-    void* reserved10;
-    void* reserved14;
-    DiagnosticMediatorResolverNode* resolverList; // mirrors interest in launcher.exe registry+0x18
-};
-
-struct DiagnosticBinderWrapper {
-    const char* serviceName;
-    uint32_t mode;
-    void** outSlot;
-    DiagnosticBinderRegistry* registry;
-    DiagnosticMediatorResolverNode* lastResolvedNode;
-};
-
 static MinimalLoginMediatorStub g_LoginMediatorStub = {};
-static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
-static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
-static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
 void* g_LoginMediatorVtable[104] = {0};
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringC[] = "standalone";
@@ -1341,74 +1314,22 @@ static void InitializeMediatorStub() {
     ResetMediatorObjectState();
 }
 
-// UNANCHORED: diagnostic binder scaffold that mimics launcher-side interface materialization for arg6.
+// UNANCHORED: direct installer for the replacement arg6 mediator stub.
 static void DiagnosticInitializeBinderScaffold(void** outMediatorPtr) {
     InitializeMediatorStub();
-
-    std::memset(&g_DiagnosticMediatorResolver, 0, sizeof(g_DiagnosticMediatorResolver));
-    std::memset(&g_DiagnosticBinderRegistry, 0, sizeof(g_DiagnosticBinderRegistry));
-    std::memset(&g_DiagnosticBinderWrapper, 0, sizeof(g_DiagnosticBinderWrapper));
-
-    g_DiagnosticMediatorResolver.serviceName = g_MediatorName;
-    g_DiagnosticMediatorResolver.resolvedObject = &g_LoginMediatorStub;
-
-    g_DiagnosticBinderRegistry.resolverList = &g_DiagnosticMediatorResolver;
-
-    g_DiagnosticBinderWrapper.serviceName = g_MediatorName;
-    g_DiagnosticBinderWrapper.mode = 0;
-    g_DiagnosticBinderWrapper.outSlot = outMediatorPtr;
-    g_DiagnosticBinderWrapper.registry = &g_DiagnosticBinderRegistry;
-}
-
-// UNANCHORED: binder-scaffold lookup over the replacement resolver list.
-static DiagnosticMediatorResolverNode* DiagnosticLookupResolverNode(
-    DiagnosticBinderRegistry* registry,
-    const char* serviceName) {
-    if (!registry || !serviceName) return NULL;
-
-    for (DiagnosticMediatorResolverNode* node = registry->resolverList; node; node = node->next) {
-        if (node->serviceName && std::strcmp(node->serviceName, serviceName) == 0) {
-            return node;
-        }
+    if (outMediatorPtr) {
+        *outMediatorPtr = &g_LoginMediatorStub;
     }
-
-    return NULL;
 }
 
-// UNANCHORED: binder-scaffold resolver that writes the materialized arg6 pointer into the caller slot.
-static bool DiagnosticResolveBinderWrapper(DiagnosticBinderWrapper* wrapper) {
-    if (!wrapper || !wrapper->outSlot || !wrapper->registry) return false;
-
-
-
-    DiagnosticMediatorResolverNode* node =
-        DiagnosticLookupResolverNode(wrapper->registry, wrapper->serviceName);
-    wrapper->lastResolvedNode = node;
-    if (!node) {
-        spdlog::info("DIAGNOSTIC: binder lookup failed for '{}'", wrapper->serviceName ? wrapper->serviceName : "<null>");
-        return false;
-    }
-
-    *wrapper->outSlot = node->resolvedObject;
-    return true;
-}
-
-// UNANCHORED: diagnostic binder-backed installer for the replacement arg6 mediator stub.
-void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr) {
+// UNANCHORED: direct installer for the replacement arg6 mediator stub.
+void DiagnosticInstallMediatorDirect(void** outMediatorPtr) {
     DiagnosticInitializeBinderScaffold(outMediatorPtr);
-
     spdlog::info(
-        "DIAGNOSTIC: binder scaffold prepared wrapper={} registry={} resolver={} targetSlot={}",
-        fmt::ptr(&g_DiagnosticBinderWrapper),
-        fmt::ptr(&g_DiagnosticBinderRegistry),
-        fmt::ptr(&g_DiagnosticMediatorResolver),
-        fmt::ptr(outMediatorPtr));
-
-    if (!DiagnosticResolveBinderWrapper(&g_DiagnosticBinderWrapper)) {
-        spdlog::info("DIAGNOSTIC: binder scaffold failed to materialize arg6");
-        return;
-    }
-
+        "DIAGNOSTIC: direct mediator stub install targetSlot={} stub={} vtable={}",
+        fmt::ptr(outMediatorPtr),
+        fmt::ptr(&g_LoginMediatorStub),
+        fmt::ptr(g_LoginMediatorVtable));
 }
 
 // UNANCHORED: diagnostic selection configurator for the replacement arg6 sidecar model.

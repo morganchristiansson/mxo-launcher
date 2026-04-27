@@ -404,7 +404,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         return false;
     }
 
-    DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediator_0x4af2b8Default);
+    DiagnosticInstallMediatorDirect(&g_pILTLoginMediator_0x4af2b8Default);
 
     const RecoveredLauncherSelectionRecord* recoveredSelection =
         FindRecoveredLauncherSelectionRecord(selectionName);
