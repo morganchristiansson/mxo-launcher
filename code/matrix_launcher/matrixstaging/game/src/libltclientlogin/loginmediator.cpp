@@ -849,21 +849,22 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
     // Original body ignores caller state and returns:
     //   owner+0x680->authReplyCopyShadowF4(+0xf4)->field_0x85 when +0xf4 is non-null,
     //   otherwise a static fallback object at launcher.exe:this_004aafbb.
-    // Do not return the launcher VA in the replacement process. The observed fallback object starts
-    // with NUL, and this wrapper exposes the value as a C-string seed, so a local stable empty
-    // string preserves the meaningful fallback behavior without hardcoding an original image address.
+    // Do not return the launcher VA in the replacement process. The original fallback address is a
+    // pooled empty C-string in .rdata: code can pass it anywhere a non-null "" pointer is needed.
+    // Source mirrors that role with a local static empty string instead of hardcoding an original
+    // image address.
     // The public ABI wrapper may still pass a caller-clean chained token on the client path; keep
     // it only for diagnostics because launcher.exe:0x41f3a0 does not read a stack argument.
-    static constexpr char kBootstrapField85Fallback5c[] = "";
+    static constexpr char kRdataEmptyStringMirror[] = "";
     const auto* copyShadow = authBootstrapChild680_->authReplyCopyShadowF4;
     const char* usernameSeed = copyShadow
                                    ? reinterpret_cast<const char*>(copyShadow->signedData80.data() + 0x5u)
-                                   : kBootstrapField85Fallback5c;
+                                   : kRdataEmptyStringMirror;
     spdlog::info(
         "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
         fmt::ptr(usernameSeed),
-        copyShadow ? "owner+0x680+0xf4+0x85" : "local-empty-mirror-of-launcher:this_004aafbb");
+        copyShadow ? "owner+0x680+0xf4+0x85" : "local-mirror-of-g_rdataEmptyString");
     return usernameSeed;
 }
 
