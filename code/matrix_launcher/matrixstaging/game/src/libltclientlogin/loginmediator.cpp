@@ -824,12 +824,15 @@ bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
 
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
 uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
-    const uint8_t prompt = authBootstrapChild680_
-                               ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
-                                     .GetCrashReporterPromptForSecurId58()
-                               : 0u;
+    // Static body:
+    //   mov eax, [ecx+0x680]
+    //   mov al,  [eax+0x104]
+    //   ret
+    // So the meaningful ABI result is AL/uint8_t; Ghidra's CONCAT31 is just stale upper EAX
+    // bytes from the child pointer because the original does not zero-extend before returning.
+    const uint8_t prompt = authBootstrapChild680_->crashReporterPromptForSecurId104;
     spdlog::debug(
-        "CLTLoginMediator::GetCrashReporterPromptForSecurId58(+0x58) -> {}",
+        "CLTLoginMediator::GetCrashReporterPromptForSecurId58(+0x58) -> {} [source=owner+0x680+0x104/AL]",
         static_cast<unsigned>(prompt));
     return prompt;
 }
