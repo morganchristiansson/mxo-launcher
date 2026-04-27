@@ -874,6 +874,17 @@ const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValu
     return passwordSeed;
 }
 
+// anchor: launcher.exe:0x41f2b0 / vtable +0x64
+uint32_t CLTLoginMediator::GetBootstrapSuccessHeaderDword64() const {
+    // Exact static body returns owner+0x680+0x110. This field is written in the state2 auth-reply
+    // success path from authReplyParseObjectF0->replyHeader10 + 0x07 before the one-time gate.
+    const uint32_t value = authBootstrapChild680_->authReplySuccessHeaderDword07_110;
+    spdlog::info(
+        "CLTLoginMediator::GetBootstrapSuccessHeaderDword64(+0x64) -> 0x{:08x} [source=owner+0x680+0x110]",
+        static_cast<unsigned>(value));
+    return value;
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x68
 uint32_t CLTLoginMediator::HasLiveHlCfg68() const {

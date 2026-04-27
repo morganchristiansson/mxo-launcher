@@ -352,6 +352,13 @@ __attribute__((naked)) static void Mediator_GetCrashReporterPassword60() {
         : "eax");
 }
 
+// anchor: launcher.exe:0x41f2b0 / owner vtable +0x64
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x64
+static uint32_t __thiscall Mediator_GetBootstrapSuccessHeaderDword64(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetBootstrapSuccessHeaderDword64();
+}
+
 // UNANCHORED: C helper behind the caller-clean +0x5c ABI wrapper.
 // Keep the chained value opaque here for the same launcher/client split as `+0x60`.
 extern "C" const char* Mediator_GetCrashReporterUsername5c_Impl(
@@ -1160,7 +1167,6 @@ DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(18)
 DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(20)
 DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(28)
 DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(34)
-DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(64)
 DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(E8)
 DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(F0)
 DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(110)
@@ -1223,7 +1229,7 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[22] = (void*)Mediator_GetCrashReporterPromptForSecurId58; // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetCrashReporterUsername5c; // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetCrashReporterPassword60; // +0x60
-    g_LoginMediatorVtable[25] = (void*)Mediator_UnimplementedSlot64; // +0x64
+    g_LoginMediatorVtable[25] = (void*)Mediator_GetBootstrapSuccessHeaderDword64; // +0x64
     g_LoginMediatorVtable[26] = (void*)Mediator_HasLiveCorpus68; // +0x68
     g_LoginMediatorVtable[27] = (void*)Mediator_HasLiveCorpus6c; // +0x6c
     g_LoginMediatorVtable[28] = (void*)Mediator_HasLiveCorpus70; // +0x70

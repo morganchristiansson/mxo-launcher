@@ -416,7 +416,7 @@ public:
     // +0x60
     virtual const char* GetCrashReporterPassword60(const void* chainedValueToken) = 0;
     // +0x64
-    void UnknownSlot25();
+    virtual uint32_t GetBootstrapSuccessHeaderDword64() const = 0;
     // +0x68
     virtual uint32_t HasLiveHlCfg68() const = 0;
     // +0x6c

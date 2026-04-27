@@ -778,6 +778,9 @@ public:
     const char* GetCrashReporterUsername5c(const void* chainedValueToken) override;
     // +0x60
     const char* GetCrashReporterPassword60(const void* chainedValueToken) override;
+    // +0x64
+    // anchor: launcher.exe:0x41f2b0 / exact tiny body returns owner+0x680+0x110
+    uint32_t GetBootstrapSuccessHeaderDword64() const override;
     // +0x68
     // client.dll:0x62198670 = `hl.cfg` live-corpus gate; launcher getter returns owner byte `+0x140e
     uint32_t HasLiveHlCfg68() const override;
