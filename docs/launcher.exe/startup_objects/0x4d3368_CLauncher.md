@@ -433,7 +433,9 @@ Implication for the replacement source:
   - that helper writes `CLauncher+0xa8/+0xac` (`0x4d3410/0x4d3414`) and persists `Last_WorldName`
     - replacement negative result from pruning the diagnostic shim:
       - do not keep a second `0x40d6f0` facsimile in `launcher_mediator_abi.cpp`; `textmode_launcher_flow.cpp` is the replacement's loose static-RE-based selection model
-      - `0x40d6f0` still matters as documentation/field-layout evidence, but pre-client boot should only seed the mediator ABI shell with the already-selected arg7/world defaults
+      - do not keep `DiagnosticConfigureMediatorSelection` / `DiagnosticApplyDefaultNopatchMediatorConfig` wrappers either; pre-client boot now calls only the anchored nopatch `+0x1c/+0x24` surface directly
+      - `ConfigureSelectionSeed` was the same infidel in class-method form and has also been removed; `textmode_launcher_flow.cpp` is the only replacement selection model
+      - `0x40d6f0` still matters as documentation/field-layout evidence, but pre-client boot should not seed a synthetic mediator selection sidecar
     - tighter create-row consequence from `0x40e480/0x40d530/0x40d6f0`:
       - the placeholder `"- - -"` row still resolves through the same writeback helper
       - it writes `0x4d3410 = 0xffffffff` / selected slot-record index `-1`

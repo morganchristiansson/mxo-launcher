@@ -8,15 +8,6 @@ namespace mxo::ltlogin {
 struct ProcessLoginRequestInputSketch;
 }
 
-void DiagnosticConfigureMediatorSelection(
-    uint32_t worldUpperBoundExclusive,
-    uint32_t variantUpperBoundExclusive,
-    const char* mappedSelectionName,
-    const char* mappedVariantName,
-    uint32_t selectedWorldIndexLow24,
-    uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedVariantState);
-void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr, uint32_t parsedNoPatchValue, uint32_t clientVersionValue);
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);

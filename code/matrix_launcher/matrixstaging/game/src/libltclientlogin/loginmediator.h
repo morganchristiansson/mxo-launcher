@@ -1064,18 +1064,10 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Active replacement note:
     // - the current no-GUI launcher path no longer keeps a synthetic pre-auth world-list sidecar
     // - selection now runs after auth success and consumes the recovered owner tables directly
-    // - the narrower configured arg6 selection scratch below remains only for wrapper-facing
+    // - the narrow arg6 selection scratch below remains only as a fixed fallback for wrapper-facing
     //   descriptor/profile bridges still reached from launcher/client scaffolding
-    void ConfigureSelectionSeed(
-        uint32_t worldUpperBoundExclusive,
-        uint32_t variantUpperBoundExclusive,
-        const char* mappedSelectionName,
-        const char* mappedVariantName,
-        uint32_t selectedWorldIndexLow24,
-        uint32_t selectedVariantIndexHigh8,
-        uint32_t selectedVariantState);
-    // Source-owned arg6 bootstrap seed helpers.
-    // These are replacement-side setup helpers, not recovered launcher.exe vtable slots.
+    // Source-owned arg6 bootstrap fallback helpers.
+    // These are replacement-side helpers, not recovered launcher.exe vtable slots.
     uint32_t SelectionWorldUpperBoundExclusive() const;
     uint32_t SelectionVariantUpperBoundExclusive() const;
     uint32_t SelectedWorldIndexLow24() const;

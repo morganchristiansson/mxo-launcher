@@ -2650,31 +2650,9 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 //   - late-login arg6 slots `+0xd4/+0x124/+0x18c` live separately under:
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::ConfigureSelectionSeed(
-    uint32_t worldUpperBoundExclusive,
-    uint32_t variantUpperBoundExclusive,
-    const char* mappedSelectionName,
-    const char* mappedVariantName,
-    uint32_t selectedWorldIndexLow24,
-    uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedVariantState) {
-    selectionSeed_.worldUpperBoundExclusive_ = worldUpperBoundExclusive ? worldUpperBoundExclusive : 1u;
-    selectionSeed_.variantUpperBoundExclusive_ = variantUpperBoundExclusive ? variantUpperBoundExclusive : 1u;
-    selectionSeed_.selectedWorldIndexLow24_ = selectedWorldIndexLow24 & 0x00ffffffu;
-    selectionSeed_.selectedVariantIndexHigh8_ = selectedVariantIndexHigh8 & 0xffu;
-    selectionSeed_.selectedVariantState_ = selectedVariantState;
-    selectionSeed_.mappedSelectionId_ = selectionSeed_.selectedWorldIndexLow24_;
-    selectionSeed_.mappedSelectionName_ =
-        (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : "standalone";
-    selectionSeed_.mappedVariantName_ =
-        (mappedVariantName && mappedVariantName[0]) ? mappedVariantName : selectionSeed_.mappedSelectionName_;
-}
-
-// Source-owned selection-seed helpers.
-// These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They seed the
-// startup-side selection/route bridge while the anchored wrapper-facing readers below stay tied to the
-// recovered owner fields.
+// Source-owned selection fallback helpers.
+// These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They only provide
+// fixed fallback values for wrapper-facing readers until the recovered owner fields are available.
 uint32_t CLTLoginMediator::SelectionWorldUpperBoundExclusive() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
     if (stateCode >= 3u && worldDescriptorCountD80_ != 0u) {

@@ -389,27 +389,14 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
 
     DiagnosticInitializeMediatorStub();
 
-    const uint32_t selectedVariantState = bootSelectionRecord ? bootSelectionRecord->variantState : 0u;
-    const uint32_t selectedHighByte = (packedArg7Selection >> 24) & 0xffu;
-    const uint32_t selectionPackedLow24 = packedArg7Selection & 0x00ffffffu;
-    const uint32_t worldUpperBoundExclusive = (selectionPackedLow24 < 0xffu) ? (selectionPackedLow24 + 1u) : 1u;
-    const uint32_t variantUpperBoundExclusive = (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 1u;
-    DiagnosticConfigureMediatorSelection(
-        worldUpperBoundExclusive,
-        variantUpperBoundExclusive,
-        bootSelectionName,
-        bootSelectionName,
-        selectionPackedLow24,
-        selectedHighByte,
-        selectedVariantState);
-    DiagnosticApplyDefaultNopatchMediatorConfig(
-        &g_LoginMediatorStub,
-        nopatchLauncherVersionValue,
-        nopatchClientVersionValue);
+    // textmode_launcher_flow.cpp owns the replacement's loose static-RE-based selection model.
+    // Do not seed a synthetic pre-auth mediator selection sidecar here.
 
-    // The text-mode launcher flow is the replacement's loose static-RE-based selection model.
-    // Do not re-run a second `0x40d6f0` facsimile here; this pre-client boot path only seeds the
-    // mediator ABI shell with the already-selected arg7/world defaults.
+    // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c/+0x24
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetValue1(
+        const_cast<void*>(static_cast<const void*>(&nopatchLauncherVersionValue)));
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetValue2(
+        const_cast<void*>(static_cast<const void*>(&nopatchClientVersionValue)));
 
     // Read auth server config from mediator globals (set by ApplySelectedServerConfigToMediator)
     // anchor: launcher.exe:0x4f7b14 / 0x4f7a50
