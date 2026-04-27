@@ -225,9 +225,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     g_CurrentLoginMediator->lastAuthReply_);
             }
 
-            // SOURCE-ONLY: expectedMarginRequestName_ has no binary counterpart in 0x43f300.
-            g_CurrentLoginMediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
-
             // The binary dispatches this->field_0x4->GetStateId() up to 3 times here
             // (confirmed by improved Ghidra types: all three calls are
             // `local_1c->field4_0x4->vftptr_0x0->GetStateId()`).
