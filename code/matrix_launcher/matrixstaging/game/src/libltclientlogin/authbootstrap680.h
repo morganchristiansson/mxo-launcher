@@ -596,20 +596,6 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     AuthBootstrap680Child_0x441290& child,
     CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
-void AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag(
-    AuthBootstrap680Child_0x441290& child,
-    const char* passwordText);
-uint32_t AuthBootstrap680ReadAuthReplySuccessHeaderDword07(
-    const AuthBootstrap680Child_0x441290& child,
-    const mxo::auth::AuthReply& reply);
-bool AuthBootstrap680State2AuthReplySuccessOneTimeGateIsSet();
-void AuthBootstrap680State2AuthReplySuccessOneTimeGateSet();
-void AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
-    AuthBootstrap680Child_0x441290& child,
-    const mxo::auth::AuthReply& reply);
-void AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
-    AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& owner,
-    const mxo::auth::AuthReply& reply);
+extern bool g_authBootstrap680State2AuthReplySuccessOneTimeGate;
 
 }  // namespace mxo::ltlogin

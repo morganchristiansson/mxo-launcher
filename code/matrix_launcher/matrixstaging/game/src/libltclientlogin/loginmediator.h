@@ -106,13 +106,6 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
         AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
-    friend void AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
-        AuthBootstrap680Child_0x441290& child,
-        const mxo::auth::AuthReply& reply);
-    friend void AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
-        AuthBootstrap680Child_0x441290& child,
-        CLTLoginMediator& owner,
-        const mxo::auth::AuthReply& reply);
     friend class CLTLoginState_AuthenticatePending_0x4b5014;
     friend class CLTLoginState_State4_0x4b503c;
     friend class CLTLoginState_State6_0x4b508c;
@@ -1429,8 +1422,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
 
 public:
-    void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
-    void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
     void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
 

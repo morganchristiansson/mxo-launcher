@@ -37,10 +37,10 @@ struct AuthBootstrap680RsaPublicKeyPairOwnedState {
     std::vector<uint8_t> exponentBytes;
 };
 
-namespace {
-
 // anchor: launcher.exe:DAT_004f79e0
-static bool g_authBootstrap680State2AuthReplySuccessOneTimeGate = false;
+bool g_authBootstrap680State2AuthReplySuccessOneTimeGate = false;
+
+namespace {
 
 // Keep non-layout ownership outside `AuthBootstrap680Child_0x441290` so the child mirror can stay
 // faithful to launcher field boundaries while source still owns heap-backed helper payloads.
@@ -2441,121 +2441,5 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
         fmt::ptr(parseObject));
 }
 
-// anchor: launcher.exe:0x441330
-// Narrow mirror of the original child-side prompt-password/string update.
-// Caller is responsible for the neighboring `+0x110` write that happens separately in `0x43f300`.
-void AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag(
-    AuthBootstrap680Child_0x441290& child,
-    const char* passwordText) {
-    std::string promptPassword = passwordText != nullptr ? passwordText : "";
-    const bool promptForSecurId = HasTrailingSlashSixDigitSuffix(promptPassword);
-    if (promptForSecurId && promptPassword.size() >= 7u) {
-        promptPassword.resize(promptPassword.size() - 7u);
-    }
-    AssignSmallStringMirror(child.stringF8, promptPassword.c_str());
-    child.crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
-
-    spdlog::info(
-        "AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag childStringF8Len={} promptForSecurId={}",
-        static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)),
-        static_cast<unsigned>(child.crashReporterPromptForSecurId104));
-}
-
-uint32_t AuthBootstrap680ReadAuthReplySuccessHeaderDword07(
-    const AuthBootstrap680Child_0x441290& child,
-    const mxo::auth::AuthReply& reply) {
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
-    return parseObject != nullptr
-               ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x07u)
-               : reply.successHeaderUnknownDword07;
-}
-
-// anchor: launcher.exe:DAT_004f79e0 / 0x43f300 success-side global one-time gate
-bool AuthBootstrap680State2AuthReplySuccessOneTimeGateIsSet() {
-    return g_authBootstrap680State2AuthReplySuccessOneTimeGate;
-}
-
-// anchor: launcher.exe:DAT_004f79e0 / 0x43f300 success-side global one-time gate
-void AuthBootstrap680State2AuthReplySuccessOneTimeGateSet() {
-    g_authBootstrap680State2AuthReplySuccessOneTimeGate = true;
-}
-
-// UNANCHORED: source-owned narrower mirror of the gated neighboring `0x43f300` success-side
-// helper subset after the world/character arrays are built.
-// Current source now keeps these gated consequences explicit through the copied `+0xf0`
-// auth-reply parse-object family:
-// - `0x441260 = AuthBootstrap680_StoreField114AndTimestamp118`
-// - owner vtable `+0x150` fed from `0x43d480 = AuthBootstrap680_CopyReplyString54`
-// - `0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c`
-// anchor: launcher.exe:0x441260 = AuthBootstrap680_StoreField114AndTimestamp118
-// Split out from the former monolithic OneTimeScaffold to match binary ordering:
-// the original writes field114/118 after the world-descriptor loop but before the
-// character-slot loop.
-void AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
-    AuthBootstrap680Child_0x441290& child,
-    const mxo::auth::AuthReply& reply) {
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
-
-    child.authReplySuccessField15_114 =
-        parseObject != nullptr
-            ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x15u)
-            : reply.unknown3;
-    child.authReplySuccessField15Timestamp118 = static_cast<uint32_t>(std::time(nullptr));
-
-    spdlog::info(
-        "AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp childField114=0x{:08x} childField118=0x{:08x}",
-        static_cast<unsigned>(child.authReplySuccessField15_114),
-        static_cast<unsigned>(child.authReplySuccessField15Timestamp118));
-}
-
-// anchor: launcher.exe:0x43d480 = AuthBootstrap680_CopyReplyString54,
-//          launcher.exe:0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c
-// Split out from the former monolithic OneTimeScaffold to match binary ordering:
-// the original copies reply-string and opaque blobs after PersistCharactersIni + PostEvent(6).
-void AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
-    AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& mediator,
-    const mxo::auth::AuthReply& reply) {
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
-
-    std::string replyString1d = parseObject != nullptr
-        ? CopyAuthBootstrap680ReplyParseString(
-            parseObject->replyString1dBytes54,
-            parseObject->replyString1dByteLength58)
-        : std::string();
-    if (!replyString1d.empty()) {
-        mediator.SetLaunchPadSourceBlock94FirstString(replyString1d.c_str());
-    } else if (!reply.username.text.empty()) {
-        mediator.SetLaunchPadSourceBlock94FirstString(reply.username.text.c_str());
-    }
-
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
-    if (parseObject != nullptr) {
-        CopyAuthBootstrap680ParseFieldToOwnedBytes(
-            ownedState.opaqueReplyBlob108Owned,
-            parseObject->opaqueField0fBytes2c,
-            parseObject->opaqueField0fByteLength30);
-        CopyAuthBootstrap680ParseFieldToOwnedBytes(
-            ownedState.opaqueReplyBlob10COwned,
-            parseObject->opaqueField11Bytes34,
-            parseObject->opaqueField11ByteLength38);
-    } else {
-        ownedState.opaqueReplyBlob108Owned = reply.authSignatureBytes;
-        ownedState.opaqueReplyBlob10COwned = reply.encryptedPrivateExponentBytes;
-    }
-    PointOpaqueBlobPointerAtOwnedBytes(child.opaqueReplyBlob108, ownedState.opaqueReplyBlob108Owned);
-    PointOpaqueBlobPointerAtOwnedBytes(child.opaqueReplyBlob10C, ownedState.opaqueReplyBlob10COwned);
-
-    spdlog::info(
-        "AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
-        mediator.ownerAuthBootstrapSource94_.username00[0] != '\0'
-            ? mediator.ownerAuthBootstrapSource94_.username00.data()
-            : "<empty>",
-        static_cast<unsigned>(ownedState.opaqueReplyBlob108Owned.size()),
-        static_cast<unsigned>(ownedState.opaqueReplyBlob10COwned.size()),
-        fmt::ptr(child.opaqueReplyBlob108),
-        fmt::ptr(child.opaqueReplyBlob10C),
-        fmt::ptr(parseObject));
-}
 
 }  // namespace mxo::ltlogin

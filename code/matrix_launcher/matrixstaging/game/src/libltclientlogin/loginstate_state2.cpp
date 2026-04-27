@@ -128,25 +128,59 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             // anchor: launcher.exe:0x43f300 case 2 — pre-gate setup
             // Binary order at the top of case 2:
             // 1. child `+0x110` = parsed success-header dword at header offset `0x07`
-            // 2. `0x441330 = AuthBootstrap680_SetPromptPasswordF8AndSecurIdFlag`
+            // 2. inline prompt-password / SecurID mirror update at `0x441330`
             // 3. test global `DAT_004f79e0`
             // 4. if clear, set `DAT_004f79e0 = 1` and run the once-only writeback body
             auto& authBootstrapChild = *g_CurrentLoginMediator->authBootstrapChild680_;
             const mxo::auth::AuthReply& cachedAuthReply =
                 authBootstrapChild.CachedAuthReply_SOURCEOWNED();
-            // `0x448140` itself no longer writes mediator-side world/character mirrors.
-            // The owner tables at `+0x688/+0x818/+0xd84/+0xd80` are populated below by the
-            // once-only state2 success body, which is the launcher-faithful source of truth.
+            const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject =
+                authBootstrapChild.authReplyParseObjectF0;
             authBootstrapChild.authReplySuccessHeaderDword07_110 =
-                AuthBootstrap680ReadAuthReplySuccessHeaderDword07(
-                    authBootstrapChild,
-                    cachedAuthReply);
-            AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag(
-                authBootstrapChild,
-                g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data());
+                parseObject != nullptr && parseObject->replyHeader10 != nullptr
+                    ? ReadU32LE(parseObject->replyHeader10 + 0x07u)
+                    : cachedAuthReply.successHeaderUnknownDword07;
 
-            if (!AuthBootstrap680State2AuthReplySuccessOneTimeGateIsSet()) {
-                AuthBootstrap680State2AuthReplySuccessOneTimeGateSet();
+            const char* const passwordText =
+                g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data();
+            if (passwordText != nullptr) {
+                std::string promptPassword = passwordText;
+                bool promptForSecurId = false;
+                const size_t slashPos = promptPassword.find('/');
+                if (slashPos != std::string::npos && slashPos + 7u == promptPassword.size()) {
+                    promptForSecurId = true;
+                    for (size_t i = slashPos + 1u; i < promptPassword.size(); ++i) {
+                        const unsigned char ch = static_cast<unsigned char>(promptPassword[i]);
+                        if (ch < static_cast<unsigned char>('0') ||
+                            ch > static_cast<unsigned char>('9')) {
+                            promptForSecurId = false;
+                            break;
+                        }
+                    }
+                }
+                if (promptForSecurId && promptPassword.size() >= 7u) {
+                    promptPassword.resize(promptPassword.size() - 7u);
+                }
+                authBootstrapChild.stringF8.owned = promptPassword;
+                authBootstrapChild.stringF8.begin = authBootstrapChild.stringF8.owned.c_str();
+                authBootstrapChild.stringF8.current =
+                    authBootstrapChild.stringF8.begin + authBootstrapChild.stringF8.owned.size();
+                authBootstrapChild.stringF8.capacity = authBootstrapChild.stringF8.current;
+                authBootstrapChild.crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
+            } else {
+                authBootstrapChild.stringF8.owned.clear();
+                authBootstrapChild.stringF8.begin = nullptr;
+                authBootstrapChild.stringF8.current = nullptr;
+                authBootstrapChild.stringF8.capacity = nullptr;
+                authBootstrapChild.crashReporterPromptForSecurId104 = 0u;
+            }
+            spdlog::info(
+                "AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag childStringF8Len={} promptForSecurId={}",
+                static_cast<unsigned>(authBootstrapChild.stringF8.owned.size()),
+                static_cast<unsigned>(authBootstrapChild.crashReporterPromptForSecurId104));
+
+            if (!g_authBootstrap680State2AuthReplySuccessOneTimeGate) {
+                g_authBootstrap680State2AuthReplySuccessOneTimeGate = true;
                 // anchor: launcher.exe:0x43f300 one-time gate body
                 //
                 // Binary ordering (verified against Ghidra decompilation of 0x43f300):
@@ -157,7 +191,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // 5. PersistCharactersIni
                 // 6. PostEvent(6)
                 // 7. AuthBootstrap680_CopyReplyString54 + SetLaunchPadSourceBlock94FirstString
-                // 8. AuthBootstrap680_CopyOpaqueReplyBlobs108_10c
+                // 8. inline opaque-blob pointer adoption
                 // anchor: launcher.exe:0x43f300 world-descriptor loop (inline, no function call)
                 // Binary shape:
                 // - iterates the parsed success-object world table (`this_01->mbr_0x44/0x48`)
@@ -165,33 +199,68 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // - validates status/type inline with `AuthReplyWorldStatus_IsValid` /
                 //   `AuthReplyWorldType_IsValid`
                 //
-                // Source keeps the same ownership/resulting state but routes the per-entry copy +
-                // normalization through `SeedRecoveredWorldDescriptorFromAuthReply(...)` because
-                // our replacement stores fixed recovered records instead of the launcher's heap
-                // allocations. Important fidelity correction from the `0x43f300` recheck:
-                // world status/type are not only invalid when zero; the binary runs validator
-                // helpers and forces any invalid value to `0` after logging.
+                // Source keeps the same ownership/resulting state but inlines the per-entry copy +
+                // normalization that `0x43f300` performs while materializing the owner `+0xd84`
+                // world-descriptor table and `+0xd80` count mirror.
                 g_CurrentLoginMediator->worldDescriptorValidD84_.fill(false);
                 g_CurrentLoginMediator->worldDescriptorCountD80_ = 0;
                 {
                     const size_t worldCount = std::min(
                         g_CurrentLoginMediator->worldDescriptorsD84_.size(),
                         cachedAuthReply.worlds.size());
-                    // Fidelity boundary note:
-                    // - binary walks the child `+0xf0` parse-object world temp records, not the
-                    //   replacement-owned cached auth-reply vector directly
-                    // - `worldDescriptorCountD80_` is a faithful owner `+0xd80` mirror
-                    // - `worldDescriptorValidD84_` is source-owned sidecar state, not a proven
-                    //   launcher field despite the suffix-styled naming
                     for (size_t i = 0; i < worldCount; ++i) {
-                        g_CurrentLoginMediator->SeedRecoveredWorldDescriptorFromAuthReply(
-                            static_cast<uint8_t>(i), cachedAuthReply.worlds[i]);
+                        const auto& world = cachedAuthReply.worlds[i];
+                        const uint8_t rawStatus = static_cast<uint8_t>(world.status & 0xffu);
+                        const uint8_t rawType = static_cast<uint8_t>(world.type & 0xffu);
+                        const uint8_t normalizedStatus = (rawStatus != 0u && rawStatus < 6u)
+                                                            ? rawStatus
+                                                            : 0u;
+                        const uint8_t normalizedType = (rawType != 0u && rawType < 4u)
+                                                           ? rawType
+                                                           : 0u;
+
+                        if (normalizedStatus != rawStatus) {
+                            spdlog::info(
+                                CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidWorldStatus,
+                                world.worldName.c_str(),
+                                static_cast<unsigned>(world.worldId),
+                                static_cast<unsigned>(rawStatus));
+                        }
+                        if (normalizedType != rawType) {
+                            spdlog::info(
+                                CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidWorldType,
+                                world.worldName.c_str(),
+                                static_cast<unsigned>(world.worldId),
+                                static_cast<unsigned>(rawType));
+                        }
+
+                        auto& descriptor = g_CurrentLoginMediator->worldDescriptorsD84_[i];
+                        descriptor.worldId01 = world.worldId;
+                        descriptor.inlineNamePlus03 = world.worldName;
+                        descriptor.status17 = normalizedStatus;
+                        descriptor.type18 = normalizedType;
+                        descriptor.serverVersion19 = world.clientVersion;
+                        descriptor.serverLanguage1d = static_cast<uint8_t>(world.unknown4 & 0xffu);
+                        descriptor.privateFlag1e = static_cast<uint8_t>((world.unknown4 >> 8) & 0xffu);
+                        descriptor.populationLevel1f = world.load;
+                        g_CurrentLoginMediator->worldDescriptorValidD84_[i] = true;
                         ++g_CurrentLoginMediator->worldDescriptorCountD80_;
                     }
                 }
-                AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
-                    authBootstrapChild,
-                    cachedAuthReply);
+                {
+                    const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject2 =
+                        authBootstrapChild.authReplyParseObjectF0;
+                    authBootstrapChild.authReplySuccessField15_114 =
+                        parseObject2 != nullptr && parseObject2->replyHeader10 != nullptr
+                            ? ReadU32LE(parseObject2->replyHeader10 + 0x15u)
+                            : cachedAuthReply.unknown3;
+                    authBootstrapChild.authReplySuccessField15Timestamp118 =
+                        static_cast<uint32_t>(std::time(nullptr));
+                    spdlog::info(
+                        "AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp childField114=0x{:08x} childField118=0x{:08x}",
+                        static_cast<unsigned>(authBootstrapChild.authReplySuccessField15_114),
+                        static_cast<unsigned>(authBootstrapChild.authReplySuccessField15Timestamp118));
+                }
                 // anchor: launcher.exe:0x43f300 character-slot loop + route-host string copy (inline, no function call)
                 // Binary shape:
                 // - ResetSelectionRouteState
@@ -200,12 +269,10 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // - validate slot status inline and force invalid values to `7`
                 // - walk owner `+0xd84` and seed `+0x818` when worldId matches
                 //
-                // Source again keeps the same resulting owner state while routing the per-slot
-                // copy + normalization through `SeedRecoveredCharacterSlotRecordFromAuthReply(...)`.
-                // Fidelity correction from the `0x43f300` recheck: the binary treats character
-                // status as invalid when it is `> 6`, not when it is zero.
-                // Also note what it does *not* do here: no post-auth source-block seeding,
-                // no margin-route state backfill, and no local staged-packet/raw-code reads.
+                // Source again keeps the same resulting owner state while inlining the per-slot
+                // copy + normalization that `0x43f300` performs for the selection-route table and
+                // route-host seeding by matching each slot's worldId against the recovered world
+                // descriptors.
                 {
                     g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
                     const size_t characterCount = std::min(
@@ -214,13 +281,39 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ =
                         static_cast<uint8_t>(characterCount);
                     for (size_t i = 0; i < characterCount; ++i) {
-                        g_CurrentLoginMediator->SeedRecoveredCharacterSlotRecordFromAuthReply(
-                            static_cast<uint8_t>(i), cachedAuthReply.characters[i]);
-                        const SlotRecordState_0x4b5328& slotRecord =
-                            g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
-                        const int matchedWorldIndex =
-                            g_CurrentLoginMediator->FindRecoveredWorldDescriptorIndexByWorldId(
-                                slotRecord.worldId3c);
+                        const auto& character = cachedAuthReply.characters[i];
+                        const uint8_t rawStatus = static_cast<uint8_t>(character.status & 0xffu);
+                        const uint8_t normalizedStatus = (rawStatus <= 6u) ? rawStatus : 7u;
+                        if (normalizedStatus != rawStatus) {
+                            spdlog::info(
+                                CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidCharacterStatus,
+                                character.handle.text.c_str(),
+                                static_cast<unsigned long long>(character.characterId),
+                                static_cast<unsigned>(rawStatus));
+                        }
+
+                        auto& slotRecord = g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
+                        slotRecord = {};
+                        slotRecord.debugString14 = character.handle.text.c_str();
+                        slotRecord.characterIdLow32 =
+                            static_cast<uint32_t>(character.characterId & 0xffffffffull);
+                        slotRecord.characterIdHigh36 =
+                            static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
+                        slotRecord.status3a = normalizedStatus;
+                        slotRecord.worldId3c = character.worldId;
+                        g_CurrentLoginMediator->selectionRouteState684_.slotRecordValid04_[i] = true;
+
+                        int matchedWorldIndex = -1;
+                        for (size_t worldIndex = 0;
+                             worldIndex < g_CurrentLoginMediator->worldDescriptorsD84_.size();
+                             ++worldIndex) {
+                            if (g_CurrentLoginMediator->worldDescriptorValidD84_[worldIndex] &&
+                                g_CurrentLoginMediator->worldDescriptorsD84_[worldIndex].worldId01 ==
+                                    slotRecord.worldId3c) {
+                                matchedWorldIndex = static_cast<int>(worldIndex);
+                                break;
+                            }
+                        }
                         if (matchedWorldIndex >= 0) {
                             // anchor: launcher.exe:0x43f74a
                             g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[i]
@@ -232,10 +325,69 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 }
                 g_CurrentLoginMediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
                 g_CurrentLoginMediator->PostEvent(6u);
-                AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
-                    authBootstrapChild,
-                    *g_CurrentLoginMediator,
-                    cachedAuthReply);
+
+                const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject3 =
+                    authBootstrapChild.authReplyParseObjectF0;
+                std::string replyString1d;
+                if (parseObject3 != nullptr && parseObject3->replyString1dBytes54 != nullptr &&
+                    parseObject3->replyString1dByteLength58 != 0u) {
+                    const char* const replyStringBegin =
+                        reinterpret_cast<const char*>(parseObject3->replyString1dBytes54);
+                    size_t replyStringLength = 0u;
+                    while (replyStringLength < parseObject3->replyString1dByteLength58 &&
+                           replyStringBegin[replyStringLength] != '\0') {
+                        ++replyStringLength;
+                    }
+                    replyString1d.assign(replyStringBegin, replyStringLength);
+                }
+                if (!replyString1d.empty()) {
+                    g_CurrentLoginMediator->SetLaunchPadSourceBlock94FirstString(
+                        replyString1d.c_str());
+                } else if (!cachedAuthReply.username.text.empty()) {
+                    g_CurrentLoginMediator->SetLaunchPadSourceBlock94FirstString(
+                        cachedAuthReply.username.text.c_str());
+                }
+
+                if (parseObject3 != nullptr && parseObject3->opaqueField0fBytes2c != nullptr &&
+                    parseObject3->opaqueField0fByteLength30 != 0u) {
+                    authBootstrapChild.opaqueReplyBlob108 = const_cast<void*>(
+                        static_cast<const void*>(parseObject3->opaqueField0fBytes2c));
+                } else if (!cachedAuthReply.authSignatureBytes.empty()) {
+                    authBootstrapChild.opaqueReplyBlob108 = const_cast<void*>(
+                        static_cast<const void*>(cachedAuthReply.authSignatureBytes.data()));
+                } else {
+                    authBootstrapChild.opaqueReplyBlob108 = nullptr;
+                }
+                if (parseObject3 != nullptr && parseObject3->opaqueField11Bytes34 != nullptr &&
+                    parseObject3->opaqueField11ByteLength38 != 0u) {
+                    authBootstrapChild.opaqueReplyBlob10C = const_cast<void*>(
+                        static_cast<const void*>(parseObject3->opaqueField11Bytes34));
+                } else if (!cachedAuthReply.encryptedPrivateExponentBytes.empty()) {
+                    authBootstrapChild.opaqueReplyBlob10C = const_cast<void*>(
+                        static_cast<const void*>(
+                            cachedAuthReply.encryptedPrivateExponentBytes.data()));
+                } else {
+                    authBootstrapChild.opaqueReplyBlob10C = nullptr;
+                }
+
+                spdlog::info(
+                    "AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
+                    g_CurrentLoginMediator->ownerAuthBootstrapSource94_.username00[0] != '\0'
+                        ? g_CurrentLoginMediator->ownerAuthBootstrapSource94_.username00.data()
+                        : "<empty>",
+                    static_cast<unsigned>(parseObject3 != nullptr &&
+                                          parseObject3->opaqueField0fBytes2c != nullptr &&
+                                          parseObject3->opaqueField0fByteLength30 != 0u
+                                              ? parseObject3->opaqueField0fByteLength30
+                                              : cachedAuthReply.authSignatureBytes.size()),
+                    static_cast<unsigned>(parseObject3 != nullptr &&
+                                          parseObject3->opaqueField11Bytes34 != nullptr &&
+                                          parseObject3->opaqueField11ByteLength38 != 0u
+                                              ? parseObject3->opaqueField11ByteLength38
+                                              : cachedAuthReply.encryptedPrivateExponentBytes.size()),
+                    fmt::ptr(authBootstrapChild.opaqueReplyBlob108),
+                    fmt::ptr(authBootstrapChild.opaqueReplyBlob10C),
+                    fmt::ptr(parseObject3));
             }
 
             // The binary dispatches this->field_0x4->GetStateId() up to 3 times here
