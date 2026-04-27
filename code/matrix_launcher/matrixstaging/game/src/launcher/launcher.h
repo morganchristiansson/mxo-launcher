@@ -78,7 +78,7 @@ public:
 
     // UNANCHORED: replacement-only synthesis that materializes arg6/arg7-owned InitClientDLL
     // state before the later 0x40a380 / 0x40b74d..0x40b7af pre-client continuation corridor.
-    bool MaterializeRecoveredInitClientStateFromSelectionName(const char* selectionName);
+    bool MaterializeRecoveredInitClientStateFromSelectionName(const char* startupSelectionName);
 
     // UNANCHORED: recovered continuation for the 0x40b74d..0x40b790 pre-client corridor
     // (0x402ec0 gate + optional 0x40b75a autodetect path). This is not claimed as a separate

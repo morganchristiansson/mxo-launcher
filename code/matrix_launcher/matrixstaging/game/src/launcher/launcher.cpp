@@ -301,10 +301,93 @@ void CLauncher::UnloadCresDLL() const {
 // corridor by materializing current arg6/arg7 startup state. This is more honest than treating the
 // entire pre-client stretch as one faux method, but it still does not claim an exact original
 // boundary.
-bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char* selectionName) {
-    if (!selectionName) {
+bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char* startupSelectionName) {
+    if (!startupSelectionName) {
         return false;
     }
+
+    char bootSelectionName[64] = {};
+    std::strncpy(bootSelectionName, startupSelectionName, sizeof(bootSelectionName) - 1);
+    bootSelectionName[sizeof(bootSelectionName) - 1] = '\0';
+
+    // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
+    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
+    // the later pre-client character-selection stage after the character index is read.
+    if (const RecoveredLauncherSelectionRecord* defaultSelection =
+            DefaultRecoveredLauncherSelectionRecord();
+        defaultSelection != nullptr && defaultSelection->selectionName != nullptr) {
+        std::strncpy(bootSelectionName, defaultSelection->selectionName, sizeof(bootSelectionName) - 1);
+        bootSelectionName[sizeof(bootSelectionName) - 1] = '\0';
+        spdlog::info(
+            "DIAGNOSTIC: defaulting launcher selection name to first recovered world '{}'",
+            bootSelectionName);
+    } else {
+        std::strcpy(bootSelectionName, "standalone");
+        spdlog::warn(
+            "DIAGNOSTIC: no recovered launcher selection records are available; falling back to '{}'",
+            bootSelectionName);
+    }
+
+    const RecoveredLauncherSelectionRecord* bootSelectionRecord =
+        FindRecoveredLauncherSelectionRecord(bootSelectionName);
+    if (bootSelectionRecord) {
+        std::strncpy(bootSelectionName, bootSelectionRecord->selectionName, sizeof(bootSelectionName) - 1);
+        bootSelectionName[sizeof(bootSelectionName) - 1] = '\0';
+        m_FieldA8 = 0u;
+        m_FieldAC = RecoveredSelectionWorldIndexLow24();
+        const uint32_t packedArg7Selection = BuildPackedArg7Selection();
+        spdlog::info(
+            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
+            bootSelectionRecord->selectionName,
+            m_FieldA8,
+            m_FieldAC,
+            packedArg7Selection,
+            (unsigned)bootSelectionRecord->selectionGateByte100,
+            (unsigned)bootSelectionRecord->variantState,
+            bootSelectionRecord->routeHostPrefix ? bootSelectionRecord->routeHostPrefix : "");
+    } else if (bootSelectionName[0] && lstrcmpiA(bootSelectionName, "standalone") != 0) {
+        spdlog::warn(
+            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields until that world has a recovered launcher-owned selection record",
+            bootSelectionName);
+    }
+
+    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
+    if ((m_FieldA8 | m_FieldAC) != 0) {
+        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
+    }
+
+    const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
+    const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
+
+    if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
+        spdlog::info(
+            "DIAGNOSTIC: explicit -nopatch rebuilt packed launcher-version dword from launcher.exe version info = '{}' (0x{:08x})",
+            g_LauncherCommandLine.NoPatchLauncherVersionString(),
+            nopatchLauncherVersionValue);
+    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
+        spdlog::info(
+            "UNANCHORED: replacement default nopatch policy is using fallback packed launcher-version dword 0.1 (0x{:08x})",
+            nopatchLauncherVersionValue);
+    } else {
+        spdlog::info(
+            "DIAGNOSTIC: nopatch launcher-version dword is using fallback 0.1 (0x{:08x})",
+            nopatchLauncherVersionValue);
+    }
+    if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
+        spdlog::info(
+            "DIAGNOSTIC: explicit -nopatch rebuilt packed client-version dword from client.dll version info = '{}' (0x{:08x})",
+            g_LauncherCommandLine.NoPatchClientVersionString(),
+            nopatchClientVersionValue);
+    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
+        spdlog::info(
+            "UNANCHORED: replacement default nopatch policy is using fallback packed client-version dword 0.1 (0x{:08x})",
+            nopatchClientVersionValue);
+    } else {
+        spdlog::info(
+            "DIAGNOSTIC: nopatch client-version dword is using fallback 0.1 (0x{:08x})",
+            nopatchClientVersionValue);
+    }
+
     if (!PreloadDependencies()) {
         spdlog::info("ERROR: preload failed");
         return false;
@@ -312,13 +395,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
 
     DiagnosticInstallMediatorDirect(&g_pILTLoginMediator_0x4af2b8Default);
 
-    const RecoveredLauncherSelectionRecord* recoveredSelection =
-        FindRecoveredLauncherSelectionRecord(selectionName);
-    const uint32_t selectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
-    const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
-    const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
-
-    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
+    const uint32_t selectedVariantState = bootSelectionRecord ? bootSelectionRecord->variantState : 0u;
     const uint32_t selectedHighByte = (packedArg7Selection >> 24) & 0xffu;
     const uint32_t selectionPackedLow24 = packedArg7Selection & 0x00ffffffu;
     const uint32_t worldUpperBoundExclusive = (selectionPackedLow24 < 0xffu) ? (selectionPackedLow24 + 1u) : 1u;
@@ -326,8 +403,8 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
     DiagnosticConfigureMediatorSelection(
         worldUpperBoundExclusive,
         variantUpperBoundExclusive,
-        selectionName,
-        selectionName,
+        bootSelectionName,
+        bootSelectionName,
         selectionPackedLow24,
         selectedHighByte,
         selectedVariantState);
@@ -350,7 +427,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
                 sizeof(resolvedSelectionName))) {
             m_FieldA8 = resolvedA8;
             m_FieldAC = resolvedAC;
-            const uint32_t packedArg7Selection = BuildPackedArg7Selection();
+            const uint32_t packedArg7Selection2 = BuildPackedArg7Selection();
             if (resolvedSelectionName[0]) {
                 std::strncpy(g_LastWorldName, resolvedSelectionName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
@@ -360,8 +437,8 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
                 "DIAGNOSTIC: arg7 rebuilt through ILTLoginMediator_0x4af2b8.Default selection path -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
                 m_FieldA8,
                 m_FieldAC,
-                packedArg7Selection,
-                g_LastWorldName[0] ? g_LastWorldName : selectionName);
+                packedArg7Selection2,
+                g_LastWorldName[0] ? g_LastWorldName : bootSelectionName);
         }
     }
 
@@ -375,14 +452,13 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
     // TODO: make this configurable per-server like auth
     const uint16_t marginServerPort = 10000;
     const bool ignoreHostsFileForMargin = false;
-
     char marginRoutePrefix[256] = {0};
-    if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
-        std::strncpy(marginRoutePrefix, recoveredSelection->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
+    if (bootSelectionRecord && bootSelectionRecord->routeHostPrefix && bootSelectionRecord->routeHostPrefix[0]) {
+        std::strncpy(marginRoutePrefix, bootSelectionRecord->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
         marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
-        spdlog::info("DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'", marginRoutePrefix, recoveredSelection->selectionName);
+        spdlog::info("DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'", marginRoutePrefix, bootSelectionRecord->selectionName);
     } else {
-        LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), selectionName);
+        LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), bootSelectionName);
     }
 
     mxo::ltlogin::g_qsAuthServerDNSName = authServerDnsName ? authServerDnsName : "";
@@ -539,100 +615,15 @@ bool CLauncher::RunClientDllLifecycle() const {
 // anchor: launcher.exe:0x40b430
 bool CLauncher::InitInstance() {
     bool operationSucceeded = false;
-    char selectionName[64] = {};
-    const RecoveredLauncherSelectionRecord* recoveredSelection = nullptr;
-    uint32_t packedArg7Selection = 0u;
-    uint32_t nopatchLauncherVersionValue = 0u;
-    uint32_t nopatchClientVersionValue = 0u;
+    char startupSelectionName[64] = {};
 
     if (!ParseCommandLineStage()) {
         goto cleanup;
     }
 
-    // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
-    // and nopatch state before the later pre-client continuation corridor.
-    std::memset(selectionName, 0, sizeof(selectionName));
-
-    // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
-    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
-    // the later pre-client character-selection stage after the character index is read.
-    if (const RecoveredLauncherSelectionRecord* defaultSelection =
-            DefaultRecoveredLauncherSelectionRecord();
-        defaultSelection != nullptr && defaultSelection->selectionName != nullptr) {
-        std::strncpy(selectionName, defaultSelection->selectionName, sizeof(selectionName) - 1);
-        selectionName[sizeof(selectionName) - 1] = '\0';
-        spdlog::info(
-            "DIAGNOSTIC: defaulting launcher selection name to first recovered world '{}'",
-            selectionName);
-    } else {
-        std::strcpy(selectionName, "standalone");
-        spdlog::warn(
-            "DIAGNOSTIC: no recovered launcher selection records are available; falling back to '{}'",
-            selectionName);
-    }
-
-    recoveredSelection = FindRecoveredLauncherSelectionRecord(selectionName);
-    if (recoveredSelection) {
-        std::strncpy(selectionName, recoveredSelection->selectionName, sizeof(selectionName) - 1);
-        selectionName[sizeof(selectionName) - 1] = '\0';
-        m_FieldA8 = 0u;
-        m_FieldAC = RecoveredSelectionWorldIndexLow24();
-        packedArg7Selection = BuildPackedArg7Selection();
-        spdlog::info(
-            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
-            recoveredSelection->selectionName,
-            m_FieldA8,
-            m_FieldAC,
-            packedArg7Selection,
-            (unsigned)recoveredSelection->selectionGateByte100,
-            (unsigned)recoveredSelection->variantState,
-            recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
-    } else if (selectionName[0] && lstrcmpiA(selectionName, "standalone") != 0) {
-        spdlog::warn(
-            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields until that world has a recovered launcher-owned selection record",
-            selectionName);
-    }
-
-    packedArg7Selection = BuildPackedArg7Selection();
-    if ((m_FieldA8 | m_FieldAC) != 0) {
-        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
-    }
-
-    nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
-    nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
-
-    if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
-        spdlog::info(
-            "DIAGNOSTIC: explicit -nopatch rebuilt packed launcher-version dword from launcher.exe version info = '{}' (0x{:08x})",
-            g_LauncherCommandLine.NoPatchLauncherVersionString(),
-            nopatchLauncherVersionValue);
-    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
-        spdlog::info(
-            "UNANCHORED: replacement default nopatch policy is using fallback packed launcher-version dword 0.1 (0x{:08x})",
-            nopatchLauncherVersionValue);
-    } else {
-        spdlog::info(
-            "DIAGNOSTIC: nopatch launcher-version dword is using fallback 0.1 (0x{:08x})",
-            nopatchLauncherVersionValue);
-    }
-    if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
-        spdlog::info(
-            "DIAGNOSTIC: explicit -nopatch rebuilt packed client-version dword from client.dll version info = '{}' (0x{:08x})",
-            g_LauncherCommandLine.NoPatchClientVersionString(),
-            nopatchClientVersionValue);
-    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
-        spdlog::info(
-            "UNANCHORED: replacement default nopatch policy is using fallback packed client-version dword 0.1 (0x{:08x})",
-            nopatchClientVersionValue);
-    } else {
-        spdlog::info(
-            "DIAGNOSTIC: nopatch client-version dword is using fallback 0.1 (0x{:08x})",
-            nopatchClientVersionValue);
-    }
-
     // UNANCHORED within 0x40b430: replacement-only arg6/arg7 startup-state materialization that
     // feeds the later anchored 0x40a380 / 0x40a4d0 call shape.
-    if (!MaterializeRecoveredInitClientStateFromSelectionName(selectionName)) {
+    if (!MaterializeRecoveredInitClientStateFromSelectionName(startupSelectionName)) {
         goto cleanup;
     }
 
