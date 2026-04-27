@@ -1576,7 +1576,6 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
     // +0x50: send target from caller-passed pointer (original reads from child vtable+0x168 return)
     child.sendTarget50 = sendTarget;
 
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     const uint8_t authRequestReadyA0 = child.authRequestReadyA0;
     const bool sendAuthRequestBranch = authRequestReadyA0 != 0u;
 
@@ -1594,13 +1593,7 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 
     if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-        if (!ownedState.cachedGetPublicKeyReply.valid || !ownedState.cachedGetPublicKeyReply.hasEmbeddedPublicKey) {
-            spdlog::warn(
-                "AuthBootstrap680Child_0x441290::PrepareAndDispatch expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present authRequestReadyA0=0x{:02x}",
-                static_cast<unsigned>(authRequestReadyA0));
-            return 0u;
-        }
-        return SendAuthRequest(mediator, ownedState.cachedGetPublicKeyReply);
+        return SendAuthRequest(mediator);
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
@@ -1693,7 +1686,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundGetPublicKeyWorkerError;
             }
 
-            return SendAuthRequest(mediator, effectiveReplyForSend) != 0u
+            return SendAuthRequest(mediator) != 0u
                 ? kAuthBootstrap680InboundHandledContinueWaiting
                 : kAuthBootstrap680InboundGetPublicKeyWorkerError;
         }
@@ -2051,15 +2044,17 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(CLTLoginMediato
 
 // anchor: launcher.exe:0x4474f0
 uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest(
-    CLTLoginMediator& mediator,
-    const mxo::auth::GetPublicKeyReply& reply) {
-    if (!reply.hasEmbeddedPublicKey) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth GetPublicKeyReply has no embedded public key material");
-        return 0;
-    }
-
+    CLTLoginMediator& mediator) {
     AuthBootstrap680Child_0x441290& child = *this;
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
+    const mxo::auth::GetPublicKeyReply& reply = ownedState.cachedGetPublicKeyReply;
+    if (!reply.valid || !reply.hasEmbeddedPublicKey) {
+        spdlog::warn(
+            "AuthBootstrap680_SendAuthRequest missing cached valid embedded-public-key reply at child-owned state while authRequestReadyA0=0x{:02x}",
+            static_cast<unsigned>(child.authRequestReadyA0));
+        return 0u;
+    }
+
     const char* username = SmallStringMirrorDataOrEmpty(child.string04);
     if (SmallStringMirrorLength(child.string04) == 0u) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without child+0x04 username data");
