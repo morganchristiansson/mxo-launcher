@@ -44,7 +44,6 @@ extern char** g_LauncherFilteredArgv;          // original: [0x4d2c60]
 // Launcher-owned startup/auth state outside the command-line parser.
 extern CLauncher g_Launcher;                    // original global object: [0x4d3368]
 extern void* g_pLauncherObject6304;            // original: [0x4d6304]
-extern void* g_pILTLoginMediator_0x4af2b8Default;       // original: [0x4d2c58]
 extern void* g_pILTLoginMediator_0x4af2b8Selection3584; // original sibling slot: [0x4d3584]
 extern char g_LastWorldName[256];              // original registry value: Last_WorldName
 
