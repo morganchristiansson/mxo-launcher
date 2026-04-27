@@ -91,9 +91,9 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
 
 // anchor: launcher.exe:0x43f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
 uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* workItem) {
-    if (!g_CurrentLoginMediator) {
-        return 0u;
-    }
+    // Static RE note: `0x43f300` immediately dereferences the global mediator and does not
+    // guard `g_CurrentLoginMediator` for null before entering the child dispatch.
+    // Keep the source shaped the same instead of adding a protective early return here.
 
     // Current best recovered role from `0x43f300`:
     // - it does not inspect staged raw auth bytes locally
@@ -136,6 +136,9 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             // SOURCE-ONLY: diagnostic logging; no binary counterpart.
             AuthBootstrap680LogParsedAuthReply(*g_CurrentLoginMediator, g_CurrentLoginMediator->lastAuthReply_);
 
+            // Binary gates the heavy success-side writeback through global `DAT_004f79e0`.
+            // Source currently reaches that same once-only branch via the scaffold helper
+            // instead of pretending this TU owns a local `g_AuthBootstrap680...` global.
             if (AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold()) {
                 // anchor: launcher.exe:0x43f300 one-time gate body
                 //
