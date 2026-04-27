@@ -538,10 +538,9 @@ public:
     //       undefined4 loginType, undefined4 launcherVersionOrDispatchValue,
     //       undefined4 *pKeyConfigMd5, undefined4 *pUiConfigMd5,
     //       undefined4 pSendTarget, char *pszStationOrFallback)
-    // But source consolidates args to mirror caller-gathered call shape:
-    // Source-owned bridge implementations called by
-    // `mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690` methods while source
-    // still stores the auth-bootstrap state in the owner `+0x680` child layout.
+    // But source consolidates args to mirror caller-gathered call shape.
+    // These `_SOURCEOWNED` bodies are the concrete derived-auth-helper implementations reached
+    // through the inherited `CStreamPacketEncryptionModuleWriteHelper_0x4b8690` method surface.
     uint32_t PrepareAndDispatch_SOURCEOWNED(
         CLTLoginMediator& owner,
         void* sendTarget,

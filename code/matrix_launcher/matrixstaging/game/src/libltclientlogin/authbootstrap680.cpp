@@ -1593,13 +1593,11 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch_SOURCEOWNED(
 
     if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-        return reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
-            .SendAuthRequest(mediator);
+        return child.SendAuthRequest(mediator);
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-    return reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
-        .SendGetPublicKeyRequest(mediator);
+    return child.SendGetPublicKeyRequest(mediator);
 }
 
 // anchor: launcher.exe:0x448140
@@ -1648,8 +1646,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage_SOURCEOWNED(
             child.authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
             const uint32_t workerResult =
-                reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
-                    .HandleGetPublicKeyReply(mediator, reply);
+                child.HandleGetPublicKeyReply(mediator, reply);
             if (workerResult != 0u) {
                 child.inboundAuthStatusEc = workerResult;
             }
@@ -1689,8 +1686,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage_SOURCEOWNED(
                 return kAuthBootstrap680InboundGetPublicKeyWorkerError;
             }
 
-            return reinterpret_cast<mxo::liblttcp::CStreamPacketEncryptionModuleWriteHelper_0x4b8690&>(child)
-                       .SendAuthRequest(mediator) != 0u
+            return child.SendAuthRequest(mediator) != 0u
                 ? kAuthBootstrap680InboundHandledContinueWaiting
                 : kAuthBootstrap680InboundGetPublicKeyWorkerError;
         }
