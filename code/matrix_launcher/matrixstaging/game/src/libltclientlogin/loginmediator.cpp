@@ -849,7 +849,7 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
     // The public ABI wrapper may still pass a caller-clean chained token on the client path; keep
     // it only for diagnostics because launcher.exe:0x41f3a0 does not read a stack argument.
     static constexpr uintptr_t kLauncherStaticFallback4aafbb = 0x004aafbb;
-    const auto* copyShadow = authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr;
+    const auto* copyShadow = authBootstrapChild680_->authReplyCopyShadowF4;
     const char* usernameSeed = copyShadow
                                    ? reinterpret_cast<const char*>(copyShadow->signedData80.data() + 0x5u)
                                    : reinterpret_cast<const char*>(kLauncherStaticFallback4aafbb);
@@ -864,14 +864,13 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
 // anchor: launcher.exe:0x41f3c0 / vtable +0x60
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
     // Original body ignores caller state and returns the child small-string begin pointer at
-    // owner+0x680+0xf8. Source keeps the null guard only because replacement mediator lifetime can
-    // be entered from wrappers before the static launcher would have initialized owner+0x680.
-    const char* passwordSeed = authBootstrapChild680_ ? authBootstrapChild680_->stringF8.begin : nullptr;
+    // owner+0x680+0xf8; it assumes owner+0x680 is already initialized.
+    const char* passwordSeed = authBootstrapChild680_->stringF8.begin;
     spdlog::info(
         "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
         MaskedSensitiveValue(passwordSeed),
-        authBootstrapChild680_ ? "owner+0x680+0xf8.begin" : "<null-child> (source guard)");
+        "owner+0x680+0xf8.begin");
     return passwordSeed;
 }
 
