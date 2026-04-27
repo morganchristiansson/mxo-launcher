@@ -129,14 +129,6 @@ static std::string DescribeRouteDescriptorText(
     return std::string(descriptor->begin, descriptor->current);
 }
 
-// UNANCHORED: resets the replacement mediator stub and clears stale active-state registration.
-static void ResetMediatorObjectState() {
-    std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
-    // inline UnregisterActiveStateSourceScaffold
-    mxo::ltlogin::g_CurrentLoginMediator = nullptr;
-    g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
-}
-
 // anchor: launcher.exe dynamic initializer uses the registration string at 0x4ab34c for ILTLoginMediator_0x4af2b8.Default
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x00
 static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
@@ -1311,7 +1303,10 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[102] = (void*)Mediator_UnimplementedSlot198; // +0x198
     g_LoginMediatorVtable[103] = (void*)Mediator_UnimplementedSlot19c; // +0x19c
 
-    ResetMediatorObjectState();
+    std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
+    // inline UnregisterActiveStateSourceScaffold
+    mxo::ltlogin::g_CurrentLoginMediator = nullptr;
+    g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
 
 // UNANCHORED: diagnostic selection configurator for the replacement arg6 sidecar model.
