@@ -478,40 +478,6 @@ static void ResetAuthBootstrap680FeedbackTransforms(
  ownedState.feedbackTransformSmall98.reset();
 }
 
-// anchor: launcher.exe:0x447260 / 0x447c10
-// Current bounded source mirror keeps the concrete lazy child `+0xa4` validator object typed and
-// seeded from the recovered fallback modulus at `g_AuthBootstrap680PubkeyDatFallbackModulus100`.
-// Static `0x447eb0 -> 0x447c10` now proves the non-fallback branch opens `qspubkey.dat`, reads a
-// cached `(publicKeyId, modulus big-int, exponent big-int, 0x100-byte signature)` family, and
-// then re-enters `0x447780 = AuthBootstrap680_RebuildReplyPublicKeyWorkers` with that same call
-// shape. Current live runs also show the file absent in the shipped runtime directory used here,
-// so launcher behavior on this path currently falls back to the embedded modulus as expected. The
-// exact file-reader/object stack and on-disk field framing are still not recovered tightly enough
-// to replace the current fallback-only source model.
-static bool EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(
-    CLTLoginMediator& /*mediator*/,
-    AuthBootstrap680Child_0x441290& child) {
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
-    if (child.lazyPubkeyDatValidatorA4 != nullptr && ownedState.lazyPubkeyDatValidatorA4.object) {
-        return true;
-    }
-
-    ownedState.lazyPubkeyDatValidatorA4.object =
-        std::make_unique<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch>();
-    if (!ownedState.lazyPubkeyDatValidatorA4.object->ConstructFromReplyPublicKey(
-            &ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c,
-            kAuthBootstrap680PubkeyDatFallbackModulus.data(),
-            kAuthBootstrap680PubkeyDatFallbackModulus.size(),
-            0x11u)) {
-        ownedState.lazyPubkeyDatValidatorA4.object.reset();
-        child.lazyPubkeyDatValidatorA4 = nullptr;
-        return false;
-    }
-
-    child.lazyPubkeyDatValidatorA4 = ownedState.lazyPubkeyDatValidatorA4.object.get();
-    return true;
-}
-
 static void ResetAuthBootstrap680Field54Helper(
     AuthBootstrap680Field54HelperSketch* outHelper,
     AuthBootstrap680Field54HelperOwnedState* ownedState) {
@@ -1088,50 +1054,6 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextIntoCiphertex
 
 namespace {
 
-// anchor: launcher.exe:0x468f80
-// Replacement: when g_SkipAuthPublicKeyReplyValidation is set, skip the lazy pubkey.dat validator
-// entirely (which requires 1024-bit keys with signatures) and just accept the key.
-static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(
-    CLTLoginMediator& mediator,
-    AuthBootstrap680Child_0x441290& child,
-    const mxo::auth::GetPublicKeyReply& reply) {
-    if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation != 0u) {
-        // Skip validation for non-standard key sizes (e.g., 2048-bit)
-        (void)mediator;
-        (void)child;
-        (void)reply;
-        return true;
-    }
-
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
-    if (!EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(mediator, child) ||
-        child.lazyPubkeyDatValidatorA4 == nullptr) {
-        return false;
-    }
-    if (reply.modulusBytes.size() != 0x80u || reply.signatureBytes.empty() || reply.publicExponentByte == 0u) {
-        return false;
-    }
-
-    // `0x468f80` now closes the caller-side byte span tightly:
-    // - convert the reply modulus big-int to exactly `0x80` bytes
-    // - append the exponent low byte read from bit offset `0`
-    // - pass the reply signature buffer to validator vtable `+0x2c` with fixed byte count `0x100`
-    // Combined with the recovered finalize path, source now mirrors this exactly as:
-    // - worker MD5 over those `0x81` bytes
-    // - EMSA-PKCS1-v1_5(MD5) block build
-    // - byte-for-byte compare against the RSA-decoded representative
-    // Current live fallback-key runs now pass through this source-side validator path.
-    std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
-    std::copy(reply.modulusBytes.begin(), reply.modulusBytes.end(), signedReplyPublicKeyBytes.begin());
-    signedReplyPublicKeyBytes.back() = reply.publicExponentByte;
-    return child.lazyPubkeyDatValidatorA4->VerifySignatureRecoveredFinalizeScaffold(
-        ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c,
-        signedReplyPublicKeyBytes.data(),
-        signedReplyPublicKeyBytes.size(),
-        reply.signatureBytes.data(),
-        reply.signatureBytes.size());
-}
-
 static void ClearSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror) {
     mirror.owned.clear();
     mirror.begin = nullptr;
@@ -1405,6 +1327,105 @@ std::string AuthBootstrap680Child_0x441290::CopyReplyString54_SOURCEOWNED() cons
         ++replyStringLength;
     }
     return std::string(replyStringBegin, replyStringLength);
+}
+
+// anchor: launcher.exe:0x447260 / 0x447c10
+bool AuthBootstrap680Child_0x441290::EnsureLazyPubkeyDatValidatorA4_SOURCEOWNED(
+    CLTLoginMediator& /*owner*/) {
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
+    if (lazyPubkeyDatValidatorA4 != nullptr && ownedState.lazyPubkeyDatValidatorA4.object) {
+        return true;
+    }
+
+    // Current bounded source mirror keeps the concrete lazy child `+0xa4` validator object typed
+    // and seeded from the recovered fallback modulus at `DAT_004b6b38`. Static
+    // `0x447eb0 -> 0x447c10` proves the non-fallback branch opens `qspubkey.dat`, reads a cached
+    // `(publicKeyId, modulus big-int, exponent big-int, 0x100-byte signature)` family, and then
+    // re-enters `0x447780 = AuthBootstrap680_RebuildReplyPublicKeyWorkers` with that same call
+    // shape. Current live runs also show the file absent in the shipped runtime directory used
+    // here, so launcher behavior on this path currently falls back to the embedded modulus as
+    // expected.
+    ownedState.lazyPubkeyDatValidatorA4.object =
+        std::make_unique<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch>();
+    if (!ownedState.lazyPubkeyDatValidatorA4.object->ConstructFromReplyPublicKey(
+            &ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c,
+            kAuthBootstrap680PubkeyDatFallbackModulus.data(),
+            kAuthBootstrap680PubkeyDatFallbackModulus.size(),
+            0x11u)) {
+        ownedState.lazyPubkeyDatValidatorA4.object.reset();
+        lazyPubkeyDatValidatorA4 = nullptr;
+        return false;
+    }
+
+    lazyPubkeyDatValidatorA4 = ownedState.lazyPubkeyDatValidatorA4.object.get();
+    return true;
+}
+
+// anchor: launcher.exe:0x468f80
+bool AuthBootstrap680Child_0x441290::VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
+    CLTLoginMediator& owner,
+    const mxo::auth::GetPublicKeyReply& reply) {
+    if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation != 0u) {
+        return true;
+    }
+
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
+    if (!EnsureLazyPubkeyDatValidatorA4_SOURCEOWNED(owner) ||
+        lazyPubkeyDatValidatorA4 == nullptr) {
+        return false;
+    }
+    if (reply.modulusBytes.size() != 0x80u || reply.signatureBytes.empty() ||
+        reply.publicExponentByte == 0u) {
+        return false;
+    }
+
+    // `0x468f80` closes the caller-side byte span tightly:
+    // - convert the reply modulus big-int to exactly `0x80` bytes
+    // - append the exponent low byte read from bit offset `0`
+    // - pass the reply signature buffer to validator vtable `+0x2c` with fixed byte count `0x100`
+    std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
+    std::copy(reply.modulusBytes.begin(), reply.modulusBytes.end(), signedReplyPublicKeyBytes.begin());
+    signedReplyPublicKeyBytes.back() = reply.publicExponentByte;
+    return lazyPubkeyDatValidatorA4->VerifySignatureRecoveredFinalizeScaffold(
+        ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c,
+        signedReplyPublicKeyBytes.data(),
+        signedReplyPublicKeyBytes.size(),
+        reply.signatureBytes.data(),
+        reply.signatureBytes.size());
+}
+
+// anchor: launcher.exe:0x447780
+uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers_SOURCEOWNED(
+    const mxo::auth::GetPublicKeyReply& reply) {
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
+    ResetAuthBootstrap680ReplyPublicKeyWorkers(*this, ownedState);
+    currentPublicKeyId9C = reply.publicKeyId;
+
+    ownedState.raw08PublicKeyWorkerA8.object =
+        std::make_unique<AuthBootstrap680Raw08PublicKeyWorkerA8Sketch>();
+    if (ownedState.raw08PublicKeyWorkerA8.object->ConstructFromReplyPublicKey(
+            &ownedState.raw08PublicKeyWorkerA8.publicKeyPair0c,
+            reply.modulusBytes.data(),
+            reply.modulusBytes.size(),
+            reply.publicExponentByte)) {
+        raw08PublicKeyWorkerA8 = ownedState.raw08PublicKeyWorkerA8.object.get();
+    } else {
+        ownedState.raw08PublicKeyWorkerA8.object.reset();
+    }
+
+    ownedState.replyAuthDataValidatorAC.object =
+        std::make_unique<AuthBootstrap680ReplyAuthDataValidatorACSketch>();
+    if (ownedState.replyAuthDataValidatorAC.object->ConstructFromReplyPublicKey(
+            &ownedState.replyAuthDataValidatorAC.publicKeyPair0c,
+            reply.modulusBytes.data(),
+            reply.modulusBytes.size(),
+            reply.publicExponentByte)) {
+        replyAuthDataValidatorAC = ownedState.replyAuthDataValidatorAC.object.get();
+    } else {
+        ownedState.replyAuthDataValidatorAC.object.reset();
+    }
+
+    return (raw08PublicKeyWorkerA8 != nullptr && replyAuthDataValidatorAC != nullptr) ? 0u : 1u;
 }
 
 // anchor: launcher.exe:0x445610
@@ -1988,7 +2009,7 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
 uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(CLTLoginMediator& mediator) {
     const AuthBootstrap680Child_0x441290& child = *this;
     const bool ensuredLazyPubkeyDatValidatorA4 =
-        EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(mediator, *this);
+        EnsureLazyPubkeyDatValidatorA4_SOURCEOWNED(mediator);
 
     mxo::auth::FramedPacket packet;
     if (!mxo::auth::BuildGetPublicKeyRequestPacket(
@@ -2304,7 +2325,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {
     AuthBootstrap680Child_0x441290& child = *this;
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
 
     // Static `0x447f50` only rebuilds the child `+0xa8/+0xac` worker pair when the incoming
     // public-key id differs from child `+0x9c`; otherwise it just sets child `+0xa0 = 1`.
@@ -2332,37 +2352,16 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
             reply.modulusBytes.size());
     }
     const bool lazyPubkeyDatValidatorAccepted =
-        VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(mediator, child, reply);
+        child.VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(mediator, reply);
     if (!lazyPubkeyDatValidatorAccepted) {
         child.authRequestReadyA0 = 0u;
         return 1u;
     }
 
-    ResetAuthBootstrap680ReplyPublicKeyWorkers(child, ownedState);
-    child.currentPublicKeyId9C = reply.publicKeyId;
-
-    ownedState.raw08PublicKeyWorkerA8.object =
-        std::make_unique<AuthBootstrap680Raw08PublicKeyWorkerA8Sketch>();
-    if (ownedState.raw08PublicKeyWorkerA8.object->ConstructFromReplyPublicKey(
-            &ownedState.raw08PublicKeyWorkerA8.publicKeyPair0c,
-            reply.modulusBytes.data(),
-            reply.modulusBytes.size(),
-            reply.publicExponentByte)) {
-        child.raw08PublicKeyWorkerA8 = ownedState.raw08PublicKeyWorkerA8.object.get();
-    } else {
-        ownedState.raw08PublicKeyWorkerA8.object.reset();
-    }
-
-    ownedState.replyAuthDataValidatorAC.object =
-        std::make_unique<AuthBootstrap680ReplyAuthDataValidatorACSketch>();
-    if (ownedState.replyAuthDataValidatorAC.object->ConstructFromReplyPublicKey(
-            &ownedState.replyAuthDataValidatorAC.publicKeyPair0c,
-            reply.modulusBytes.data(),
-            reply.modulusBytes.size(),
-            reply.publicExponentByte)) {
-        child.replyAuthDataValidatorAC = ownedState.replyAuthDataValidatorAC.object.get();
-    } else {
-        ownedState.replyAuthDataValidatorAC.object.reset();
+    const uint32_t rebuildResult = child.RebuildReplyPublicKeyWorkers_SOURCEOWNED(reply);
+    if (rebuildResult != 0u) {
+        child.authRequestReadyA0 = 0u;
+        return rebuildResult;
     }
 
     child.authRequestReadyA0 = 1u;

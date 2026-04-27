@@ -565,6 +565,15 @@ public:
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;
 
+    // anchor: launcher.exe:0x447260 / 0x447c10
+    bool EnsureLazyPubkeyDatValidatorA4_SOURCEOWNED(CLTLoginMediator& owner);
+    // anchor: launcher.exe:0x468f80
+    bool VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
+        CLTLoginMediator& owner,
+        const mxo::auth::GetPublicKeyReply& reply);
+    // anchor: launcher.exe:0x447780
+    uint32_t RebuildReplyPublicKeyWorkers_SOURCEOWNED(
+        const mxo::auth::GetPublicKeyReply& reply);
     // anchor: launcher.exe:0x447eb0
     uint32_t SendGetPublicKeyRequest(CLTLoginMediator& owner);
     // anchor: launcher.exe:0x4474f0
