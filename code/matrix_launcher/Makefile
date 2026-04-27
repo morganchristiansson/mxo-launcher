@@ -91,8 +91,10 @@ LAUNCHER_ARGS = -nopatch -noeula $(if $(MXO_SERVER),-server $(MXO_SERVER)) $(if 
 all: $(TARGET)
 
 CPPFLAGS = -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include
-CXXFLAGS = -Wall -Wextra -O0 -g -fno-omit-frame-pointer
-LDFLAGS = -L$(BUILD_DIR)
+# Keep line tables for debugging, but avoid full DWARF debug info in every object.
+# That materially reduces .o size and shortens the final link step.
+CXXFLAGS = -Wall -Wextra -O0 -g1 -fno-omit-frame-pointer -pipe -pthread
+LDFLAGS = -L$(BUILD_DIR) -pthread
 LDLIBS = -lversion -lws2_32 -lcryptopp
 
 # MinGW arg5 native-vptr mode:
