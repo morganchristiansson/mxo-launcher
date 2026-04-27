@@ -1479,24 +1479,19 @@ void DiagnosticConfigureLoginControllerNetwork(
         return;
     }
 
-    // Faithful launcher.exe-style auth config - set globals that Initialize() reads directly.
-    // Original launcher sets these globals during startup, Initialize() reads them directly.
+    // Faithful launcher.exe-style config - set globals that Initialize()/BeginMarginConnection()
+    // read directly. The per-instance auth port mirror is intentionally omitted because Initialize()
+    // seeds it from `g_AuthServerPort` and the margin DNS suffix mirror is dead state.
     // anchor: launcher.exe:0x4f7b14 / 0x4d6780 / 0x4f7a50
     mxo::ltlogin::g_qsAuthServerDNSName = authDnsName ? authDnsName : "";
     mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
     mxo::ltlogin::g_AuthServerPort = authPortHostOrder;
-    // Mirror to instance fields for replacement code paths (authServerDnsName_ removed - uses global directly)
-    mediator->authServerPortHostOrder_ = authPortHostOrder;
-    mediator->ignoreHostsFileForAuth_ = ignoreHostsFileForAuth != 0;
 
-    // Set margin globals - faithful to static-RE (original reads globals directly)
     mxo::ltlogin::g_marginServerDNSName = marginDnsSuffix ? marginDnsSuffix : "";
     mxo::ltlogin::g_marginServerPort = marginPortHostOrder;
-    // Also mirror to instance fields for replacement code paths
-    mediator->marginServerDnsSuffix_ = mxo::ltlogin::g_marginServerDNSName;
-    mediator->marginServerPortHostOrder_ = marginPortHostOrder;
 
-    // Set route state fields directly - no infidel methods
+    // Set the actual instance state that is not already sourced from globals.
+    mediator->ignoreHostsFileForMargin_ = ignoreHostsFileForMargin;
     mediator->marginRouteState_.routeHostPrefix = marginRouteHostPrefix ? marginRouteHostPrefix : "";
     mediator->marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
     (void)authDnsName;

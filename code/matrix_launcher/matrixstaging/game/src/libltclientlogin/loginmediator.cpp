@@ -226,7 +226,6 @@ CLTLoginMediator::CLTLoginMediator()
     selectionRouteState684_{},
     postAuthMarginLoadingState_0xf14{},
       authServerPortHostOrder_(11000),
-      ignoreHostsFileForAuth_(false),
       marginServerPortHostOrder_(10000),
       ignoreHostsFileForMargin_(false),
       authEndpoint_(BuildLoopbackEndpoint(authServerPortHostOrder_)),

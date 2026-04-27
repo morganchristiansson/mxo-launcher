@@ -1592,9 +1592,7 @@ public:
     void* latestObserver174_ = nullptr;         // most recent unregister call observer
 
     uint16_t authServerPortHostOrder_;
-    bool ignoreHostsFileForAuth_;
 
-    std::string marginServerDnsSuffix_;
     uint16_t marginServerPortHostOrder_;
     bool ignoreHostsFileForMargin_;
 
