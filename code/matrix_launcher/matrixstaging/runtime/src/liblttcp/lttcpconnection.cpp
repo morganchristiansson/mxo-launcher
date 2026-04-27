@@ -387,10 +387,10 @@ static unsigned EndpointIpv4OctetForOnReceiveLogScaffold(
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family.
 CLTTCPConnection::CLTTCPConnection()
     : CBaseConnection(LTTCPEngineConnectionState::kClosed),
+      remoteEndpoint_(),
       ownerContext_(nullptr),
       socketHandle_(kInvalidSocketHandle),
       workerThread08_(nullptr),
-      remoteEndpoint_(),
       remoteHostName_(),
       pendingSendQueueState38_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
@@ -399,10 +399,10 @@ CLTTCPConnection::CLTTCPConnection()
 // replacement-side owner-context scaffold.
 CLTTCPConnection::CLTTCPConnection(void* ownerContext)
     : CBaseConnection(LTTCPEngineConnectionState::kClosed),
+      remoteEndpoint_(),
       ownerContext_(ownerContext),
       socketHandle_(kInvalidSocketHandle),
       workerThread08_(nullptr),
-      remoteEndpoint_(),
       remoteHostName_(),
       pendingSendQueueState38_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
