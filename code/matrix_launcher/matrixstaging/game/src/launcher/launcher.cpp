@@ -467,7 +467,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
 
     // Margin config - for now use empty suffix to connect to same host as auth
     // TODO: make this configurable per-server like auth
-    const char marginServerSuffix[] = "";
     const uint16_t marginServerPort = 10000;
     const bool ignoreHostsFileForMargin = false;
 
@@ -481,15 +480,17 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
     }
 
     const char exactMarginHostName[] = "";
-    DiagnosticConfigureLoginControllerNetwork(
-        authServerDnsName,
-        authServerPort,
-        ignoreHostsFileForAuth,
-        marginServerSuffix,
-        marginServerPort,
-        ignoreHostsFileForMargin,
-        marginRoutePrefix,
-        exactMarginHostName);
+    mxo::ltlogin::g_qsAuthServerDNSName = authServerDnsName ? authServerDnsName : "";
+    mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
+    mxo::ltlogin::g_AuthServerPort = authServerPort;
+    mxo::ltlogin::g_marginServerDNSName = "";
+    mxo::ltlogin::g_marginServerPort = marginServerPort;
+
+    if (mxo::ltlogin::CLTLoginMediator* mediator = reinterpret_cast<mxo::ltlogin::CLTLoginMediator*>(g_pILTLoginMediator_0x4af2b8Default)) {
+        mediator->ignoreHostsFileForMargin_ = ignoreHostsFileForMargin;
+        mediator->marginRouteState_.routeHostPrefix = marginRoutePrefix;
+        mediator->marginRouteState_.exactMarginHostName = exactMarginHostName;
+    }
 
     return true;
 }

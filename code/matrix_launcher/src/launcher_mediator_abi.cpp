@@ -1464,45 +1464,6 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     return true;
 }
 
-void DiagnosticConfigureLoginControllerNetwork(
-    const char* authDnsName,
-    uint16_t authPortHostOrder,
-    bool ignoreHostsFileForAuth,
-    const char* marginDnsSuffix,
-    uint16_t marginPortHostOrder,
-    bool ignoreHostsFileForMargin,
-    const char* marginRouteHostPrefix,
-    const char* exactMarginHostName) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator) {
-        spdlog::info("DIAGNOSTIC: login controller network configure skipped (no installed CLTLoginMediator)");
-        return;
-    }
-
-    // Faithful launcher.exe-style config - set globals that Initialize()/BeginMarginConnection()
-    // read directly. The per-instance auth port mirror is intentionally omitted because Initialize()
-    // seeds it from `g_AuthServerPort` and the margin DNS suffix mirror is dead state.
-    // anchor: launcher.exe:0x4f7b14 / 0x4d6780 / 0x4f7a50
-    mxo::ltlogin::g_qsAuthServerDNSName = authDnsName ? authDnsName : "";
-    mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
-    mxo::ltlogin::g_AuthServerPort = authPortHostOrder;
-
-    mxo::ltlogin::g_marginServerDNSName = marginDnsSuffix ? marginDnsSuffix : "";
-    mxo::ltlogin::g_marginServerPort = marginPortHostOrder;
-
-    // Set the actual instance state that is not already sourced from globals.
-    mediator->ignoreHostsFileForMargin_ = ignoreHostsFileForMargin;
-    mediator->marginRouteState_.routeHostPrefix = marginRouteHostPrefix ? marginRouteHostPrefix : "";
-    mediator->marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
-    (void)authDnsName;
-    (void)marginDnsSuffix;
-    (void)marginRouteHostPrefix;
-    (void)authPortHostOrder;
-    (void)marginPortHostOrder;
-    (void)ignoreHostsFileForAuth;
-    (void)ignoreHostsFileForMargin;
-}
-
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures ILTLoginMediator_0x4af2b8.Default before InitClientDLL
 // vtable: ILTLoginMediator_0x4af2b8.Default slots +0x1c and +0x24
 void DiagnosticApplyDefaultNopatchMediatorConfig(

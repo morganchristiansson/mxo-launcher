@@ -26,15 +26,6 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     char* outWorldName,
     uint32_t outWorldNameCapacity);
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr, uint32_t parsedNoPatchValue, uint32_t clientVersionValue);
-void DiagnosticConfigureLoginControllerNetwork(
-    const char* authDnsName,
-    uint16_t authPortHostOrder,
-    bool ignoreHostsFileForAuth,
-    const char* marginDnsSuffix,
-    uint16_t marginPortHostOrder,
-    bool ignoreHostsFileForMargin,
-    const char* marginRouteHostPrefix,
-    const char* exactMarginHostName);
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
