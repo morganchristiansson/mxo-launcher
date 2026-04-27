@@ -570,6 +570,161 @@ public:
 static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
 
 // =============================================================================
+// Packet_MsConnectChallenge_0x4b6ca4 - Parse/builder accessor for MS_ConnectChallenge (opcode 0x07)
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b6ca4 (5 slots, 20 bytes)
+// anchor: launcher.exe:0x443910 = Packet_MsConnectChallenge_0x4b6ca4::InitFromIncomingMessage
+// anchor: launcher.exe:0x4439f0 = Packet_MsConnectChallenge_0x4b6ca4::ResetAndInitialize
+//
+// Recovered role:
+// - the class directly subclasses Packet_0x4af2a4 and reuses the inherited fields at
+//   +0x10/+0x14/+0x18/+0x1c/+0x20/+0x24 rather than adding new raw members
+// - `0x443910` can either attach to an existing message-ref and decode the payload view, or grow
+//   a builder payload and stamp opcode 0x07 with zeroed trailing fields
+// - state6 later consumes the first three dwords as goHereAddr/goHerePort/sessionSecret
+//
+// Fixed payload bytes initialized by `0x443910` when the object is used as a local packet view:
+//   [0x00] opcode             = 0x07
+//   [0x01] goHereAddr         = dword
+//   [0x05] goHerePort         = dword
+//   [0x09] sessionSecret      = dword
+//   [0x0d] trailingWord0d     = word
+//   [0x0f] trailingByte0f     = byte
+//   [0x10] trailingWord10     = word
+// =============================================================================
+
+struct State6Packet0x07FixedPayload {
+ static constexpr uint8_t kPayloadTag07 = 0x07;
+ static constexpr size_t kGoHereAddrOffset = 0x01;
+ static constexpr size_t kGoHerePortOffset = 0x05;
+ static constexpr size_t kSessionSecretOffset = 0x09;
+ static constexpr size_t kTrailingWord0dOffset = 0x0d;
+ static constexpr size_t kTrailingByte0fOffset = 0x0f;
+ static constexpr size_t kTrailingWord10Offset = 0x10;
+ static constexpr size_t kFixedByteCount = 0x12;
+};
+
+// anchor: launcher.exe vtable 0x004b6ca4 / opcode 0x07 parse-or-build accessor
+// VTable layout matches the shared Packet_0x4af2a4 surface except for the slot-3 init helper:
+// - slot 0 (+0x00): inherited destructor
+// - slot 1 (+0x04): inherited StubReturn0
+// - slot 4 (+0x10): inherited GetPayloadBase
+class Packet_MsConnectChallenge_0x4b6ca4 : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+ // anchor: launcher.exe:0x443910
+ // `initializeWritablePayload=false` mirrors the local build path that grows the retained
+ // message-ref by 0x12 bytes and stamps opcode 0x07 plus zeroed trailing fields.
+ // `initializeWritablePayload=true` mirrors the incoming-view path that decodes the effective
+ // payload start from either direct or headerless storage layout and then dispatches to 0x443410.
+ void InitFromIncomingMessage(
+     ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* sourceMessageRef,
+     bool initializeWritablePayload) {
+  if (messageRef08 && messageRef08 != sourceMessageRef) {
+    messageRef08->Release();
+  }
+
+  messageRef08 = sourceMessageRef;
+  if (messageRef08) {
+    messageRef08->AddRef();
+  }
+
+  if (!messageRef08 || !messageRef08->messageStorage0c) {
+    payloadPtr04 = 0u;
+    payloadAlias10 = nullptr;
+    createRefParam0c = initializeWritablePayload ? 1u : 0u;
+    return;
+  }
+
+  uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
+  if (!messageRef08->headerless10) {
+    payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
+  } else {
+    const uint8_t descriptor = *(payloadBase + 1);
+    payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase) +
+        g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
+        g_MessageOffsetLookupTable[descriptor & 7] +
+        0x12u;
+    messageRef08->headerless10 = 1u;
+  }
+
+  createRefParam0c = initializeWritablePayload ? 1u : 0u;
+  payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+
+  if (!initializeWritablePayload) {
+    messageRef08->GrowPayloadByteCount(State6Packet0x07FixedPayload::kFixedByteCount);
+    uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+    if (payload) {
+      payload[0] = State6Packet0x07FixedPayload::kPayloadTag07;
+      *reinterpret_cast<uint32_t*>(payload + State6Packet0x07FixedPayload::kGoHereAddrOffset) = 0u;
+      *reinterpret_cast<uint32_t*>(payload + State6Packet0x07FixedPayload::kGoHerePortOffset) = 0u;
+      *reinterpret_cast<uint32_t*>(payload + State6Packet0x07FixedPayload::kSessionSecretOffset) = 0u;
+      *reinterpret_cast<uint16_t*>(payload + State6Packet0x07FixedPayload::kTrailingWord0dOffset) = 0u;
+      *(payload + State6Packet0x07FixedPayload::kTrailingByte0fOffset) = 0u;
+      *reinterpret_cast<uint16_t*>(payload + State6Packet0x07FixedPayload::kTrailingWord10Offset) = 0u;
+    }
+    debugString14 = nullptr;
+    payloadSize18 = 0u;
+    packetType1a = 0u;
+    padding1b = 0u;
+    characterIdLow1c = 0u;
+    characterIdHigh20 = 0u;
+    worldId24 = 0u;
+    return;
+  }
+
+  InitializePayloadSize();
+ }
+
+ // anchor: launcher.exe:0x4439f0 / vtable slot 3
+ // Recomputes the effective payload start for the current retained message-ref and clears the
+ // inherited reused fields. This matches the original class staying entirely within the inherited
+ // Packet_0x4af2a4 layout rather than appending new members.
+ void InitializePayloadSize() override {
+  if (!messageRef08 || !messageRef08->messageStorage0c) {
+    payloadPtr04 = 0u;
+    payloadAlias10 = nullptr;
+    return;
+  }
+
+  uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
+  const uint8_t descriptor = *(payloadBase + 1);
+  const uint32_t payloadOffset =
+      g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
+      g_MessageOffsetLookupTable[descriptor & 7] +
+      State6Packet0x07FixedPayload::kFixedByteCount;
+  payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase) + payloadOffset;
+
+  uint32_t localConsumedByteCount = 0u;
+  (void)localConsumedByteCount;
+  messageRef08->GrowPayloadByteCount(static_cast<uint16_t>(payloadOffset));
+
+  payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+  messageRef08->GrowPayloadByteCount(State6Packet0x07FixedPayload::kFixedByteCount);
+
+  uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+  if (payload) {
+    payload[0] = State6Packet0x07FixedPayload::kPayloadTag07;
+    *reinterpret_cast<uint32_t*>(payload + State6Packet0x07FixedPayload::kGoHereAddrOffset) = 0u;
+    *reinterpret_cast<uint32_t*>(payload + State6Packet0x07FixedPayload::kGoHerePortOffset) = 0u;
+    *reinterpret_cast<uint32_t*>(payload + State6Packet0x07FixedPayload::kSessionSecretOffset) = 0u;
+    *reinterpret_cast<uint16_t*>(payload + State6Packet0x07FixedPayload::kTrailingWord0dOffset) = 0u;
+    *(payload + State6Packet0x07FixedPayload::kTrailingByte0fOffset) = 0u;
+    *reinterpret_cast<uint16_t*>(payload + State6Packet0x07FixedPayload::kTrailingWord10Offset) = 0u;
+  }
+
+  debugString14 = nullptr;
+  payloadSize18 = 0u;
+  packetType1a = 0u;
+  padding1b = 0u;
+  characterIdLow1c = 0u;
+  characterIdHigh20 = 0u;
+  worldId24 = 0u;
+ }
+};
+
+static_assert(sizeof(Packet_MsConnectChallenge_0x4b6ca4) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
+
+// =============================================================================
 // Packet_MsConnectReply_0x4b6ce0 - Parse accessor for MS_ConnectReply (opcode 0x09)
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6ce0 (5 slots, 20 bytes)
@@ -629,6 +784,46 @@ public:
 // Minimal parse object inherits from Packet_0x4af2a4
 // Total: same as base class (0x28 bytes) - no additional fields
 static_assert(sizeof(Packet_MsConnectReply_0x4b6ce0) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectReply_0x4b6ce0 size mismatch");
+
+// =============================================================================
+// Packet_MsClaimCharacterNameRequest_0x4b6d08 - Minimal packet builder (opcode 0x0a)
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b6d08 (5 slots, 20 bytes)
+// anchor: launcher.exe:0x444240 = ctor/init helper
+//
+// This is a compact `Packet_0x4af2a4` subclass that reserves only 3 payload bytes and stamps:
+// - byte  [payload+0x00] = 0x0a
+// - word  [payload+0x01] = 0x0000
+//
+// Unlike the larger `0x4b6cf4` sibling, this class does not append extra reservation scaffolds.
+class Packet_MsClaimCharacterNameRequest_0x4b6d08 : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+ // anchor: launcher.exe:0x444240 / ctor body after Packet_0x4af2a4 default ctor
+ // VTable layout matches the shared Packet_0x4af2a4 surface except for the slot-3 init helper:
+ // - slot 0 (+0x00): inherited destructor
+ // - slot 1 (+0x04): inherited StubReturn0
+ // - slot 4 (+0x10): inherited GetPayloadBase
+ void InitializePayloadSize() override {
+  createRefParam0c = 0u;
+  payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+
+  if (!messageRef08) {
+    return;
+  }
+
+  messageRef08->GrowPayloadByteCount(3u);
+  uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+  if (payload) {
+    payload[0] = 0x0au;
+    *reinterpret_cast<uint16_t*>(payload + 1) = 0u;
+  }
+
+  debugString14 = nullptr;
+  payloadSize18 = 0u;
+ }
+};
+
+static_assert(sizeof(Packet_MsClaimCharacterNameRequest_0x4b6d08) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsClaimCharacterNameRequest_0x4b6d08 size mismatch");
 
 // =============================================================================
 // Packet_MsClaimCharacterNameRequest_0x4b6cf4 - Multi-field packet builder (opcode 0x0a)

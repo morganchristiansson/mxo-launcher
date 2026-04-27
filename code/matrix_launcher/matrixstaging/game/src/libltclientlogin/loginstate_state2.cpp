@@ -5,12 +5,12 @@
 
 namespace mxo::ltlogin {
 
-// anchor: launcher.exe vtable 0x004b5014
+// anchor: launcher.exe vtable 0x4b5014
 const char* CLTLoginState_AuthenticatePending_0x4b5014::DebugName() const {
     return "CLTLoginState_AuthenticatePending";
 }
 
-// anchor: launcher.exe:0x00439210 / vtable 0x4b5014 slot 3
+// anchor: launcher.exe:0x439210 / vtable 0x4b5014 slot 3
 // Ghidra signature:
 //   void __thiscall CLTLoginState_AuthenticatePending_Slot3_BeginOrContinue(void *this, int *pUpstreamState)
 //   - Original returns void (return value in EAX is not set)
@@ -89,41 +89,32 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
     return;
 }
 
-// anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
+// anchor: launcher.exe:0x43f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
 uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* workItem) {
     if (!g_CurrentLoginMediator) {
         return 0u;
     }
 
     // Current best recovered role from `0x43f300`:
-    // - it does not parse raw auth bytes directly
-    // - instead it forwards the incoming auth-message object into
+    // - it does not inspect staged raw auth bytes locally
+    // - instead it forwards the incoming auth-message object straight into
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
-    // - then it interprets that child helper's return code to decide owner `+0x80`,
+    // - Ghidra currently places `0x448140` under namespace
+    //   `CStreamPacketEncryptionModuleWriteHelper_0x4b8690`
+    // - this state2 body only switches on that helper's return code to drive owner `+0x80`,
     //   helper-switch, and event/error flow
-    // Current source-owned boundary now keeps the original object split closer:
-    // - this state2 body forwards the local receive/message-ref object straight into the
-    //   owner+0x680 child
-    // - any replacement-only raw-payload sidecar copy now happens inside that child after it
-    //   resolves the `0x41bc20`-style logical payload span from the incoming message object
-    // - this state2 body still owns the early inbound auth return-code switch
     const uint32_t childResult =
         g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(workItem, *g_CurrentLoginMediator);
-    const std::vector<uint8_t>& stagedBytes = g_CurrentLoginMediator->stagedIncomingAuthPacketBytes_;
-    const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(
-            "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch rejected staged auth bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000004 and returned false-like",
-            static_cast<unsigned>(stagedBytes.size()),
-            static_cast<unsigned>(rawCode));
+            "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch helper returned unhandled; mirrored original owner+0x80=0x12000004 and returned false-like");
         return 0u;
     }
 
     if (childResult == kAuthBootstrap680InboundHandledContinueWaiting) {
         spdlog::info(
-            "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch routed staged auth rawCode=0x{:02x} through owner+0x680 child and remained in the early wait path currentState={}",
-            static_cast<unsigned>(rawCode),
+            "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch helper consumed inbound auth message and remained in the early wait path currentState={}",
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
@@ -207,56 +198,34 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
                     *g_CurrentLoginMediator->authBootstrapChild680_,
                     g_CurrentLoginMediator->lastAuthReply_);
-                // anchor: launcher.exe:0x43f300 character-slot loop + route-host seeding (inline, no function call)
-            // FIDELITY: original binary has inline loops here, not function calls
-            {
-              const size_t worldCount = std::min(
-                  g_CurrentLoginMediator->worldSlots_.size(),
-                  g_CurrentLoginMediator->lastAuthReply_.worlds.size());
-              g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
-              const size_t characterCount = std::min(
-                  g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size(),
-                  g_CurrentLoginMediator->lastAuthReply_.characters.size());
-              g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ =
-                  static_cast<uint8_t>(characterCount);
-              for (size_t i = 0; i < characterCount; ++i) {
-                g_CurrentLoginMediator->SeedRecoveredCharacterSlotRecordFromAuthReply(
-                    static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.characters[i]);
-                const SlotRecordState_0x4b5328& slotRecord =
-                    g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
-                const int matchedWorldIndex =
-                    g_CurrentLoginMediator->FindRecoveredWorldDescriptorIndexByWorldId(
-                        slotRecord.worldId3c);
-                if (matchedWorldIndex >= 0) {
-                  // anchor: launcher.exe:0x43f74a
-                  g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[i]
-                      .Assign(g_CurrentLoginMediator->worldDescriptorsD84_[static_cast<size_t>(
-                                                                                matchedWorldIndex)]
-                                  .inlineNamePlus03);
+                // anchor: launcher.exe:0x43f300 character-slot loop + route-host string copy (inline, no function call)
+                // FIDELITY: original binary has inline loops here, not function calls.
+                // Also note what it does *not* do here: no post-auth source-block seeding,
+                // no margin-route state backfill, and no local staged-packet/raw-code reads.
+                {
+                    g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
+                    const size_t characterCount = std::min(
+                        g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size(),
+                        g_CurrentLoginMediator->lastAuthReply_.characters.size());
+                    g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ =
+                        static_cast<uint8_t>(characterCount);
+                    for (size_t i = 0; i < characterCount; ++i) {
+                        g_CurrentLoginMediator->SeedRecoveredCharacterSlotRecordFromAuthReply(
+                            static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.characters[i]);
+                        const SlotRecordState_0x4b5328& slotRecord =
+                            g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
+                        const int matchedWorldIndex =
+                            g_CurrentLoginMediator->FindRecoveredWorldDescriptorIndexByWorldId(
+                                slotRecord.worldId3c);
+                        if (matchedWorldIndex >= 0) {
+                            // anchor: launcher.exe:0x43f74a
+                            g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[i]
+                                .Assign(g_CurrentLoginMediator->worldDescriptorsD84_[static_cast<size_t>(
+                                                                                      matchedWorldIndex)]
+                                            .inlineNamePlus03);
+                        }
+                    }
                 }
-              }
-              if (characterCount != 0) {
-                g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(0u);
-                const SlotRecordState_0x4b5328& currentSlotRecord =
-                    g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[0];
-                g_CurrentLoginMediator->marginRouteState_.pendingWorldId = currentSlotRecord.worldId3c;
-                g_CurrentLoginMediator->marginRouteState_.currentWorldId =
-                    static_cast<int32_t>(currentSlotRecord.worldId3c);
-              } else if (worldCount != 0) {
-                const mxo::auth::AuthWorldEntry& firstWorld =
-                    g_CurrentLoginMediator->lastAuthReply_.worlds[0];
-                g_CurrentLoginMediator->marginRouteState_.pendingWorldId = firstWorld.worldId;
-                g_CurrentLoginMediator->marginRouteState_.currentWorldId =
-                    static_cast<int32_t>(firstWorld.worldId);
-              }
-              if (const char* routeHostPrefix = g_CurrentLoginMediator->LookupRouteHostPrefixBySlot(
-                      g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)) {
-                g_CurrentLoginMediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
-              } else {
-                g_CurrentLoginMediator->marginRouteState_.routeHostPrefix.clear();
-              }
-              g_CurrentLoginMediator->SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
-            }
                 // anchor: launcher.exe:0x43f3f4-0x43f410 — character slot validation logging
                 // Binary validates each character's status (offset 0xb)
                 // If invalid (==0), it logs "Character %s (gcid = ...) has an invalid status!"
@@ -319,8 +288,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             g_CurrentLoginMediator->PostEvent(5u);
 
             spdlog::info(
-                "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
-                static_cast<unsigned>(rawCode),
+                "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch adopted early auth-reply success owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
                 static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80),
                 fmt::ptr(cachedUpstreamOrArg_0x4),
                 static_cast<unsigned>(nextHelperStateId),
@@ -364,13 +332,12 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
     (void)g_CurrentLoginMediator->SetCurrentState(0u);
     g_CurrentLoginMediator->PostError(4u);
     spdlog::warn(
-        "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch reached unexpected childResult={} rawCode=0x{:02x}; mirrored fallback state0 switch and error=4",
-        static_cast<unsigned>(childResult),
-        static_cast<unsigned>(rawCode));
+        "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch reached unexpected childResult={}; mirrored fallback state0 switch and error=4",
+        static_cast<unsigned>(childResult));
     return 1u;
 }
 
-// anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
+// anchor: launcher.exe:0x418150 (vtable 0x4b5014 slot 7)
 uint32_t CLTLoginState_AuthenticatePending_0x4b5014::GetStateId() const {
     return 2;
 }

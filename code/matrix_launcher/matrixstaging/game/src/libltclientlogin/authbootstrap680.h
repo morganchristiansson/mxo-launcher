@@ -541,6 +541,9 @@ public:
     uint32_t PrepareAndDispatch(CLTLoginMediator& owner, void* sendTarget, const char* sessionTokenBegin);
     // anchor: launcher.exe:0x448140
     // Original call shape consumes the incoming auth-message object directly.
+    // Ghidra currently recovers this method under namespace
+    // `CStreamPacketEncryptionModuleWriteHelper_0x4b8690`; source still keeps the
+    // concrete owner+0x680 implementation grouped under this child mirror.
     uint32_t HandleInboundAuthMessage(void* incomingAuthMessage, CLTLoginMediator& owner);
 
     void* BootstrapRaw08AuxHandle50() const;
