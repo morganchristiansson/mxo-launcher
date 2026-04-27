@@ -1321,6 +1321,92 @@ AuthBootstrap680Child_0x441290::~AuthBootstrap680Child_0x441290() {
  // Base class destructor handles +0x00..+0xf4
 }
 
+// anchor: launcher.exe:0x441330
+void AuthBootstrap680Child_0x441290::SetPromptPasswordF8AndSecurIdFlag(
+    const char* promptPasswordWithOptionalSecurId) {
+    if (promptPasswordWithOptionalSecurId == nullptr) {
+        stringF8.owned.clear();
+        stringF8.begin = nullptr;
+        stringF8.current = nullptr;
+        stringF8.capacity = nullptr;
+        crashReporterPromptForSecurId104 = 0u;
+        return;
+    }
+
+    std::string promptPassword = promptPasswordWithOptionalSecurId;
+    bool promptForSecurId = false;
+    const size_t slashPos = promptPassword.find('/');
+    if (slashPos != std::string::npos && slashPos + 7u == promptPassword.size()) {
+        promptForSecurId = true;
+        for (size_t i = slashPos + 1u; i < promptPassword.size(); ++i) {
+            const unsigned char ch = static_cast<unsigned char>(promptPassword[i]);
+            if (ch < static_cast<unsigned char>('0') ||
+                ch > static_cast<unsigned char>('9')) {
+                promptForSecurId = false;
+                break;
+            }
+        }
+    }
+    if (promptForSecurId && promptPassword.size() >= 7u) {
+        promptPassword.resize(promptPassword.size() - 7u);
+    }
+
+    stringF8.owned = std::move(promptPassword);
+    stringF8.begin = stringF8.owned.c_str();
+    stringF8.current = stringF8.begin + stringF8.owned.size();
+    stringF8.capacity = stringF8.current;
+    crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
+}
+
+// anchor: launcher.exe:0x441260
+void AuthBootstrap680Child_0x441290::StoreField114AndTimestamp118(uint32_t field114Value) {
+    authReplySuccessField15_114 = field114Value;
+    authReplySuccessField15Timestamp118 = static_cast<uint32_t>(std::time(nullptr));
+}
+
+// anchor: launcher.exe:0x441170
+void AuthBootstrap680Child_0x441290::CopyOpaqueReplyBlobs108_10c() {
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
+    ownedState.opaqueReplyBlob108Owned.clear();
+    ownedState.opaqueReplyBlob10COwned.clear();
+    opaqueReplyBlob108 = nullptr;
+    opaqueReplyBlob10C = nullptr;
+
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject = authReplyParseObjectF0;
+    if (parseObject != nullptr && parseObject->opaqueField0fBytes2c != nullptr &&
+        parseObject->opaqueField0fByteLength30 != 0u) {
+        ownedState.opaqueReplyBlob108Owned.assign(
+            parseObject->opaqueField0fBytes2c,
+            parseObject->opaqueField0fBytes2c + parseObject->opaqueField0fByteLength30);
+        opaqueReplyBlob108 = ownedState.opaqueReplyBlob108Owned.data();
+    }
+    if (parseObject != nullptr && parseObject->opaqueField11Bytes34 != nullptr &&
+        parseObject->opaqueField11ByteLength38 != 0u) {
+        ownedState.opaqueReplyBlob10COwned.assign(
+            parseObject->opaqueField11Bytes34,
+            parseObject->opaqueField11Bytes34 + parseObject->opaqueField11ByteLength38);
+        opaqueReplyBlob10C = ownedState.opaqueReplyBlob10COwned.data();
+    }
+}
+
+// anchor: launcher.exe:0x43d480
+std::string AuthBootstrap680Child_0x441290::CopyReplyString54_SOURCEOWNED() const {
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject = authReplyParseObjectF0;
+    if (parseObject == nullptr || parseObject->replyString1dBytes54 == nullptr ||
+        parseObject->replyString1dByteLength58 == 0u) {
+        return {};
+    }
+
+    const char* const replyStringBegin =
+        reinterpret_cast<const char*>(parseObject->replyString1dBytes54);
+    size_t replyStringLength = 0u;
+    while (replyStringLength < parseObject->replyString1dByteLength58 &&
+           replyStringBegin[replyStringLength] != '\0') {
+        ++replyStringLength;
+    }
+    return std::string(replyStringBegin, replyStringLength);
+}
+
 // anchor: launcher.exe:0x445610
 // Base dtor handles +0x00..+0xf4 (validators, helpers, big-ints, parse objects, copy shadow)
 AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {

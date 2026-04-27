@@ -143,37 +143,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
 
             const char* const passwordText =
                 g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data();
-            if (passwordText != nullptr) {
-                std::string promptPassword = passwordText;
-                bool promptForSecurId = false;
-                const size_t slashPos = promptPassword.find('/');
-                if (slashPos != std::string::npos && slashPos + 7u == promptPassword.size()) {
-                    promptForSecurId = true;
-                    for (size_t i = slashPos + 1u; i < promptPassword.size(); ++i) {
-                        const unsigned char ch = static_cast<unsigned char>(promptPassword[i]);
-                        if (ch < static_cast<unsigned char>('0') ||
-                            ch > static_cast<unsigned char>('9')) {
-                            promptForSecurId = false;
-                            break;
-                        }
-                    }
-                }
-                if (promptForSecurId && promptPassword.size() >= 7u) {
-                    promptPassword.resize(promptPassword.size() - 7u);
-                }
-                authBootstrapChild.stringF8.owned = promptPassword;
-                authBootstrapChild.stringF8.begin = authBootstrapChild.stringF8.owned.c_str();
-                authBootstrapChild.stringF8.current =
-                    authBootstrapChild.stringF8.begin + authBootstrapChild.stringF8.owned.size();
-                authBootstrapChild.stringF8.capacity = authBootstrapChild.stringF8.current;
-                authBootstrapChild.crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
-            } else {
-                authBootstrapChild.stringF8.owned.clear();
-                authBootstrapChild.stringF8.begin = nullptr;
-                authBootstrapChild.stringF8.current = nullptr;
-                authBootstrapChild.stringF8.capacity = nullptr;
-                authBootstrapChild.crashReporterPromptForSecurId104 = 0u;
-            }
+            authBootstrapChild.SetPromptPasswordF8AndSecurIdFlag(passwordText);
             spdlog::info(
                 "AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag childStringF8Len={} promptForSecurId={}",
                 static_cast<unsigned>(authBootstrapChild.stringF8.owned.size()),
@@ -250,12 +220,11 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 {
                     const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject2 =
                         authBootstrapChild.authReplyParseObjectF0;
-                    authBootstrapChild.authReplySuccessField15_114 =
+                    const uint32_t field114Value =
                         parseObject2 != nullptr && parseObject2->replyHeader10 != nullptr
                             ? ReadU32LE(parseObject2->replyHeader10 + 0x15u)
                             : cachedAuthReply.unknown3;
-                    authBootstrapChild.authReplySuccessField15Timestamp118 =
-                        static_cast<uint32_t>(std::time(nullptr));
+                    authBootstrapChild.StoreField114AndTimestamp118(field114Value);
                     spdlog::info(
                         "AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp childField114=0x{:08x} childField118=0x{:08x}",
                         static_cast<unsigned>(authBootstrapChild.authReplySuccessField15_114),
@@ -328,63 +297,26 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
 
                 const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject3 =
                     authBootstrapChild.authReplyParseObjectF0;
-                std::string replyString1d;
-                if (parseObject3 != nullptr && parseObject3->replyString1dBytes54 != nullptr &&
-                    parseObject3->replyString1dByteLength58 != 0u) {
-                    const char* const replyStringBegin =
-                        reinterpret_cast<const char*>(parseObject3->replyString1dBytes54);
-                    size_t replyStringLength = 0u;
-                    while (replyStringLength < parseObject3->replyString1dByteLength58 &&
-                           replyStringBegin[replyStringLength] != '\0') {
-                        ++replyStringLength;
-                    }
-                    replyString1d.assign(replyStringBegin, replyStringLength);
-                }
-                if (!replyString1d.empty()) {
-                    g_CurrentLoginMediator->SetLaunchPadSourceBlock94FirstString(
-                        replyString1d.c_str());
-                } else if (!cachedAuthReply.username.text.empty()) {
-                    g_CurrentLoginMediator->SetLaunchPadSourceBlock94FirstString(
-                        cachedAuthReply.username.text.c_str());
-                }
+                const std::string replyString1d =
+                    authBootstrapChild.CopyReplyString54_SOURCEOWNED();
+                g_CurrentLoginMediator->SetLaunchPadSourceBlock94FirstString(
+                    replyString1d.c_str());
 
-                if (parseObject3 != nullptr && parseObject3->opaqueField0fBytes2c != nullptr &&
-                    parseObject3->opaqueField0fByteLength30 != 0u) {
-                    authBootstrapChild.opaqueReplyBlob108 = const_cast<void*>(
-                        static_cast<const void*>(parseObject3->opaqueField0fBytes2c));
-                } else if (!cachedAuthReply.authSignatureBytes.empty()) {
-                    authBootstrapChild.opaqueReplyBlob108 = const_cast<void*>(
-                        static_cast<const void*>(cachedAuthReply.authSignatureBytes.data()));
-                } else {
-                    authBootstrapChild.opaqueReplyBlob108 = nullptr;
-                }
-                if (parseObject3 != nullptr && parseObject3->opaqueField11Bytes34 != nullptr &&
-                    parseObject3->opaqueField11ByteLength38 != 0u) {
-                    authBootstrapChild.opaqueReplyBlob10C = const_cast<void*>(
-                        static_cast<const void*>(parseObject3->opaqueField11Bytes34));
-                } else if (!cachedAuthReply.encryptedPrivateExponentBytes.empty()) {
-                    authBootstrapChild.opaqueReplyBlob10C = const_cast<void*>(
-                        static_cast<const void*>(
-                            cachedAuthReply.encryptedPrivateExponentBytes.data()));
-                } else {
-                    authBootstrapChild.opaqueReplyBlob10C = nullptr;
-                }
+                authBootstrapChild.CopyOpaqueReplyBlobs108_10c();
 
                 spdlog::info(
                     "AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
-                    g_CurrentLoginMediator->ownerAuthBootstrapSource94_.username00[0] != '\0'
-                        ? g_CurrentLoginMediator->ownerAuthBootstrapSource94_.username00.data()
-                        : "<empty>",
+                    replyString1d.empty() ? "<empty>" : replyString1d.c_str(),
                     static_cast<unsigned>(parseObject3 != nullptr &&
                                           parseObject3->opaqueField0fBytes2c != nullptr &&
                                           parseObject3->opaqueField0fByteLength30 != 0u
                                               ? parseObject3->opaqueField0fByteLength30
-                                              : cachedAuthReply.authSignatureBytes.size()),
+                                              : 0u),
                     static_cast<unsigned>(parseObject3 != nullptr &&
                                           parseObject3->opaqueField11Bytes34 != nullptr &&
                                           parseObject3->opaqueField11ByteLength38 != 0u
                                               ? parseObject3->opaqueField11ByteLength38
-                                              : cachedAuthReply.encryptedPrivateExponentBytes.size()),
+                                              : 0u),
                     fmt::ptr(authBootstrapChild.opaqueReplyBlob108),
                     fmt::ptr(authBootstrapChild.opaqueReplyBlob10C),
                     fmt::ptr(parseObject3));

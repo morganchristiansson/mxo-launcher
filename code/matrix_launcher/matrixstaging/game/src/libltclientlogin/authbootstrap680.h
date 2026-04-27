@@ -546,6 +546,15 @@ public:
     // concrete owner+0x680 implementation grouped under this child mirror.
     uint32_t HandleInboundAuthMessage(void* incomingAuthMessage, CLTLoginMediator& owner);
 
+    // anchor: launcher.exe:0x441330
+    void SetPromptPasswordF8AndSecurIdFlag(const char* promptPasswordWithOptionalSecurId);
+    // anchor: launcher.exe:0x441260
+    void StoreField114AndTimestamp118(uint32_t field114Value);
+    // anchor: launcher.exe:0x441170
+    void CopyOpaqueReplyBlobs108_10c();
+    // anchor: launcher.exe:0x43d480
+    std::string CopyReplyString54_SOURCEOWNED() const;
+
     // Source-owned compatibility accessors for code that still needs recovered auth payloads
     // after `0x448140` finishes. Keep these out of the mirrored child layout.
     const mxo::auth::GetPublicKeyReply& CachedGetPublicKeyReply_SOURCEOWNED() const;
