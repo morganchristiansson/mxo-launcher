@@ -149,57 +149,45 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // 7. AuthBootstrap680_CopyReplyString54 + SetLaunchPadSourceBlock94FirstString
                 // 8. AuthBootstrap680_CopyOpaqueReplyBlobs108_10c
                 // anchor: launcher.exe:0x43f300 world-descriptor loop (inline, no function call)
-                // FIDELITY: original binary has inline loops here, not function calls
-                g_CurrentLoginMediator->worldSlots_.fill(nullptr);
-                g_CurrentLoginMediator->worldPayloadSlots_.fill(nullptr);
+                // Binary shape:
+                // - iterates the parsed success-object world table (`this_01->mbr_0x44/0x48`)
+                // - materializes owner `+0xd84`
+                // - validates status/type inline with `AuthReplyWorldStatus_IsValid` /
+                //   `AuthReplyWorldType_IsValid`
+                //
+                // Source keeps the same ownership/resulting state but routes the per-entry copy +
+                // normalization through `SeedRecoveredWorldDescriptorFromAuthReply(...)` because
+                // our replacement stores fixed recovered records instead of the launcher's heap
+                // allocations. Important fidelity correction from the `0x43f300` recheck:
+                // world status/type are not only invalid when zero; the binary runs validator
+                // helpers and forces any invalid value to `0` after logging.
                 g_CurrentLoginMediator->worldDescriptorValidD84_.fill(false);
                 g_CurrentLoginMediator->worldDescriptorCountD80_ = 0;
                 {
                     const size_t worldCount = std::min(
-                        g_CurrentLoginMediator->worldSlots_.size(),
+                        g_CurrentLoginMediator->worldDescriptorsD84_.size(),
                         g_CurrentLoginMediator->lastAuthReply_.worlds.size());
                     for (size_t i = 0; i < worldCount; ++i) {
-                        g_CurrentLoginMediator->worldSlots_[i] =
-                            const_cast<mxo::auth::AuthWorldEntry*>(&g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
-                        g_CurrentLoginMediator->worldPayloadSlots_[i] =
-                            const_cast<mxo::auth::AuthWorldEntry*>(&g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
                         g_CurrentLoginMediator->SeedRecoveredWorldDescriptorFromAuthReply(
                             static_cast<uint8_t>(i), g_CurrentLoginMediator->lastAuthReply_.worlds[i]);
                         ++g_CurrentLoginMediator->worldDescriptorCountD80_;
-                    }
-                }
-                // anchor: launcher.exe:0x43f386-0x43f3a2 — world descriptor validation logging
-                // Binary validates each world's status (offset 0x17) and type (offset 0x18)
-                // For invalid values, it logs using LogRouter_FprintfCompatUsingTlsSourceLoc
-                // and forces the field to 0 (invalid). This is inline, no function calls.
-                for (size_t i = 0; i < g_CurrentLoginMediator->worldDescriptorCountD80_; ++i) {
-                    mxo::auth::AuthWorldEntry& entry =
-                        g_CurrentLoginMediator->lastAuthReply_.worlds[i];
-                    // FIDELITY: binary checks status byte at offset 0x17, type byte at offset 0x18
-                    // If invalid (==0), it logs "World %s (id = %d) has an invalid status/type!"
-                    // and forces the field to 0. This is inline processing.
-                    if (entry.status == 0u) {
-                        std::string worldName = entry.worldName;
-                        uint16_t worldId = entry.worldId;
-                        spdlog::warn(
-                            "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): World %s (id = %d) has an invalid status!  Forcing it to WORLDSTATUS_INVALID.",
-                            worldName.c_str(), worldId);
-                        entry.status = 0u;  // FIDELITY: binary forces field to 0
-                    }
-                    if (entry.type == 0u) {
-                        std::string worldName = entry.worldName;
-                        uint16_t worldId = entry.worldId;
-                        spdlog::warn(
-                            "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): World %s (id = %d) has an invalid type!  Forcing it to WORLDTYPE_INVALID.",
-                            worldName.c_str(), worldId);
-                        entry.type = 0u;  // FIDELITY: binary forces field to 0
                     }
                 }
                 AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
                     *g_CurrentLoginMediator->authBootstrapChild680_,
                     g_CurrentLoginMediator->lastAuthReply_);
                 // anchor: launcher.exe:0x43f300 character-slot loop + route-host string copy (inline, no function call)
-                // FIDELITY: original binary has inline loops here, not function calls.
+                // Binary shape:
+                // - ResetSelectionRouteState
+                // - clamp character count to <= 100
+                // - materialize owner `+0x688`
+                // - validate slot status inline and force invalid values to `7`
+                // - walk owner `+0xd84` and seed `+0x818` when worldId matches
+                //
+                // Source again keeps the same resulting owner state while routing the per-slot
+                // copy + normalization through `SeedRecoveredCharacterSlotRecordFromAuthReply(...)`.
+                // Fidelity correction from the `0x43f300` recheck: the binary treats character
+                // status as invalid when it is `> 6`, not when it is zero.
                 // Also note what it does *not* do here: no post-auth source-block seeding,
                 // no margin-route state backfill, and no local staged-packet/raw-code reads.
                 {
@@ -224,26 +212,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                                                                                       matchedWorldIndex)]
                                             .inlineNamePlus03);
                         }
-                    }
-                }
-                // anchor: launcher.exe:0x43f3f4-0x43f410 — character slot validation logging
-                // Binary validates each character's status (offset 0xb)
-                // If invalid (==0), it logs "Character %s (gcid = ...) has an invalid status!"
-                // and forces the field to 7 (AUTHDBCHARSTATUS_INVALID). This is inline.
-                for (size_t i = 0; i < g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_; ++i) {
-                    SlotRecordState_0x4b5328& slotRecord =
-                        g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
-                    // FIDELITY: binary checks status byte at offset 0xb (status3a field)
-                    // If invalid (==0), it logs "Character %s (gcid = ...) has an invalid status!"
-                    // and forces the field to 7. This is inline processing.
-                    if (slotRecord.debugString14 != nullptr && slotRecord.status3a == 0u) {
-                        uint64_t gcid =
-                            (static_cast<uint64_t>(slotRecord.characterIdHigh36) << 32) | slotRecord.characterIdLow32;
-                        spdlog::warn(
-                            "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): Character %s (gcid = %I64u) has an invalid status!  Forcing it to AUTHDBCHARSTATUS_INVALID.",
-                            slotRecord.debugString14,
-                            gcid);
-                        slotRecord.status3a = 7u;  // FIDELITY: binary forces field to 7
                     }
                 }
                 g_CurrentLoginMediator->PersistCharactersIniFromRecoveredAuthStateScaffold();

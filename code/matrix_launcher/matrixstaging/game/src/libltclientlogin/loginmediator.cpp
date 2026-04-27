@@ -255,9 +255,7 @@ CLTLoginMediator::CLTLoginMediator()
       authConnectStatusCount_(0),
       marginConnectStatusCount_(0),
       expectedAuthRequestName_(nullptr),
-      expectedMarginRequestName_(nullptr),
-      worldSlots_{},
-      worldPayloadSlots_{} {
+      expectedMarginRequestName_(nullptr) {
     InitializeObserverTree674();
 }
 

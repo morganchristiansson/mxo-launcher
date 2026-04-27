@@ -1665,8 +1665,6 @@ public:
     const char* expectedAuthRequestName_;
     const char* expectedMarginRequestName_;
 
-    std::array<void*, kRecoveredWorldSlotCapacity> worldSlots_;
-    std::array<void*, kRecoveredWorldSlotCapacity> worldPayloadSlots_;
 
     // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x4c`.
     // Recovered original in-object layout:
