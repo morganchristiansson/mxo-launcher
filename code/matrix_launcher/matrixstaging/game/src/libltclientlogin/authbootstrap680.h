@@ -148,23 +148,7 @@ public:
  // anchor: launcher.exe:0x445a40 (dtor in vtable), then base dtor at 0x445610
  ~AuthBootstrap680Child_0x441290() override;
 
- // anchor: launcher.exe:0x448050
-    // Static RE mirrors original signature:
-    //   void __thiscall AuthBootstrap680Child_0x441290::AuthBootstrap680_PrepareAndDispatch(
-    //       AuthBootstrap680Child_0x441290 *this, char *pszUsername, char *pszPassword,
-    //       undefined4 loginType, undefined4 launcherVersionOrDispatchValue,
-    //       undefined4 *pKeyConfigMd5, undefined4 *pUiConfigMd5,
-    //       undefined4 pSendTarget, char *pszStationOrFallback)
-    // But source consolidates args to mirror caller-gathered call shape.
-    // These `_SOURCEOWNED` bodies are the concrete derived-auth-helper implementations reached
-    // through the inherited `CStreamPacketEncryptionModuleWriteHelper_0x4b8690` method surface.
-    uint32_t PrepareAndDispatch_SOURCEOWNED(
-        CLTLoginMediator& owner,
-        void* sendTarget,
-        const char* sessionTokenBegin);
-    uint32_t HandleInboundAuthMessage_SOURCEOWNED(void* incomingAuthMessage, CLTLoginMediator& owner);
-
-    // anchor: launcher.exe:0x441330
+ // anchor: launcher.exe:0x441330
     void SetPromptPasswordF8AndSecurIdFlag(const char* promptPasswordWithOptionalSecurId);
     // anchor: launcher.exe:0x441260
     void StoreField114AndTimestamp118(uint32_t field114Value);
@@ -183,18 +167,8 @@ public:
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;
 
-    // anchor: launcher.exe:0x447260 / 0x447c10
-    bool EnsureLazyPubkeyDatValidatorA4_SOURCEOWNED(CLTLoginMediator& owner);
     // anchor: launcher.exe:0x468f80
     bool VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
-        CLTLoginMediator& owner,
-        const mxo::auth::GetPublicKeyReply& reply);
-    // anchor: launcher.exe:0x447780
-    uint32_t RebuildReplyPublicKeyWorkers_SOURCEOWNED(
-        const mxo::auth::GetPublicKeyReply& reply);
-    uint32_t SendGetPublicKeyRequest_SOURCEOWNED(CLTLoginMediator& owner);
-    uint32_t SendAuthRequest_SOURCEOWNED(CLTLoginMediator& owner);
-    uint32_t HandleGetPublicKeyReply_SOURCEOWNED(
         CLTLoginMediator& owner,
         const mxo::auth::GetPublicKeyReply& reply);
     // Source-owned (NOT static-RE): inlined into HandleInboundAuthMessage case 0x09u at 0x44831c..0x448467

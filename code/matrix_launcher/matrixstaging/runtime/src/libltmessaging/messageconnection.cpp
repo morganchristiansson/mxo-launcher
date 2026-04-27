@@ -2667,6 +2667,16 @@ void CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed8
     if (needsInitialInstall) {
         streamPacketEncryptionModule9c_ =
             std::make_unique<CStreamPacketEncryptionModule_0x4b8704>();
+        auto* const mediator =
+            static_cast<mxo::ltlogin::CLTLoginMediator*>(OwnerContext());
+        if (streamPacketEncryptionModule9c_ != nullptr && mediator != nullptr &&
+            mediator->authBootstrapChild680_ != nullptr) {
+            // UNANCHORED: source-only back-reference for the current class split cleanup.
+            // The launcher ctor at `0x44da00` does not know about the separate auth bootstrap
+            // child mirror in source, so seed it at the only recovered construction site.
+            streamPacketEncryptionModule9c_->authBootstrapChildBase_SOURCEONLY =
+                &mxo::ltlogin::AuthBootstrapChildFromWriteHelper(*mediator->authBootstrapChild680_);
+        }
     }
     if (!streamPacketEncryptionModule9c_) {
         ConfigurePacketAgenda(nullptr);

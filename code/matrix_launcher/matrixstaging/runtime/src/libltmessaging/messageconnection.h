@@ -12,8 +12,11 @@
 
 #include "../../../game/src/libltclientlogin/authbootstrap680_shared.h"
 
-// Forward declare CLTLoginMediator to avoid circular include
-namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
+// Forward declare auth/login-side types to avoid circular include
+namespace mxo { namespace ltlogin {
+class CLTLoginMediator;
+class AuthBootstrap680ChildBase_0x4b7134;
+} }
 #include "../libltcrypto/auth_internal.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
@@ -1110,6 +1113,8 @@ public:
         mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t SendGetPublicKeyRequest(mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t SendAuthRequest(mxo::ltlogin::CLTLoginMediator& owner);
+    uint32_t RebuildReplyPublicKeyWorkers(
+        const mxo::auth::GetPublicKeyReply& reply);
     uint32_t HandleGetPublicKeyReply(
         mxo::ltlogin::CLTLoginMediator& owner,
         const mxo::auth::GetPublicKeyReply& reply);
@@ -1163,6 +1168,10 @@ public:
     CStreamPacketEncryptionModuleReadHelper_0x4b86f0 ownedReadHelper14{};
     CStreamPacketEncryptionModuleWriteHelper_0x4b8690 ownedWriteHelper2c{};
     std::array<uint8_t, 16> associatedSeedBytes40{};
+    // UNANCHORED: source-only back-reference used while separating the launcher auth-bootstrap
+    // child mirror from the packet-encryption module family. This supports direct field access to
+    // the previous class variables while methods are moved over to the correct receiver class.
+    mxo::ltlogin::AuthBootstrap680ChildBase_0x4b7134* authBootstrapChildBase_SOURCEONLY = nullptr;
 
     const char* ClassName() const override { return "CStreamPacketEncryptionModule"; }
     void InitializeForMarginConnectionSeed(const std::array<uint8_t, 16>& seedBytes85);
