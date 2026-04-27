@@ -823,8 +823,18 @@ public:
     // - module read helper `0x004b86f0`
     // - module write helper `0x004b8690`
     // - embedded agenda helper `0x004baf48`
+    //
+    // Recovered 5-slot base layout:
+    // - `+0x00 = 0x44c680` deleting dtor on the shared helper-base vtable
+    // - `+0x04 = 0x44bb60` helper-family cleanup shim (`flag==0 -> slot0`)
+    // - `+0x08 = 0x44bb80` shared descriptor pointer getter
+    // - `+0x0c = purecall` on the abstract base, overridden by concrete helpers
+    // - `+0x10 = 0x44c670` chained-helper delegate (`nextHelper04->slot4()`)
     virtual ~CStreamPacketEncryptionHelperBase_0x4b81c8() = default;
+    virtual void DestroyIfFlagZero(uint8_t deleteFlag);
+    virtual const void* GetHelperDescriptorOrLabel() const;
     virtual void HandleOpaqueMessageRef(void* opaqueMessageRef) = 0;
+    virtual void DelegateToChainedHelper();
 
     // Current best role for original helper `+0x04`:
     // - a downstream helper-family object link, not a message-ref or owner pointer
@@ -1042,6 +1052,13 @@ public:
     // - `0x44d390` can forward either a fresh transformed message-ref or a null discard through
     //   helper `+0x04`
     // - source now models that as a real worker class rather than raw placeholder pointers
+    //
+    // Recovered slot map for this concrete helper vtable:
+    // - `+0x00 = 0x44d890` deleting dtor wrapper over `0x44d8c0`
+    // - `+0x04 = 0x44bb60` inherited cleanup shim
+    // - `+0x08 = 0x44bb80` inherited shared descriptor pointer getter
+    // - `+0x0c = 0x44d390` transform incoming message-ref then forward result via helper `+0x04`
+    // - `+0x10 = 0x44c670` inherited chained-helper delegate
     CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8 transformWorker;
     bool hasTransformWorker = false;
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
@@ -1067,17 +1084,14 @@ public:
     // anchor: launcher.exe:0x44c680 / vtable `0x004baf48 +0x00`
     ~PacketProcessingAgenda_0x4baf48() override;
 
-    // anchor: launcher.exe:0x44bb60 / vtable `0x004baf48 +0x04`
-    virtual void VirtualMethod1_0x44bb60();
-
     // anchor: launcher.exe:0x481750 / vtable `0x004baf48 +0x08`
-    virtual uint32_t VirtualMethod2_0x481750();
+    const void* GetHelperDescriptorOrLabel() const override;
 
     // anchor: launcher.exe:0x469980 / vtable `0x004baf48 +0x0c`
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
 
     // anchor: launcher.exe:0x469720 / vtable `0x004baf48 +0x10`
-    virtual void DelegateToChainedHelper();
+    void DelegateToChainedHelper() override;
 
     // anchor: launcher.exe:0x469980
     // Store opaque message ref with proper ref counting

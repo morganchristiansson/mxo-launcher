@@ -604,6 +604,32 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     }
 }
 
+// anchor: launcher.exe:0x44bb60 / helper-family vtable `0x004b81c8 +0x04`
+void CStreamPacketEncryptionHelperBase_0x4b81c8::DestroyIfFlagZero(uint8_t deleteFlag) {
+    // Ghidra shows `0x44bb60` shared by the helper base, read helper, write helper, and agenda
+    // helper vtables. The body is tiny: when the caller passes zero, it dispatches slot 0 on the
+    // same helper object. Source keeps the exact slot relationship explicit without trying to
+    // over-name the higher-level ownership protocol yet.
+    if (deleteFlag == 0) {
+        delete this;
+    }
+}
+
+// anchor: launcher.exe:0x44bb80 / helper-family vtable `0x004b81c8 +0x08`
+const void* CStreamPacketEncryptionHelperBase_0x4b81c8::GetHelperDescriptorOrLabel() const {
+    // Shared read/write helper implementation returns the same static descriptor pointer
+    // (`0x004aafbb`). The embedded packet-agenda helper overrides this slot with its own `+0x0c`
+    // label field (`0x481750`).
+    return reinterpret_cast<const void*>(0x004aafbb);
+}
+
+// anchor: launcher.exe:0x44c670 / helper-family vtable `0x004b81c8 +0x10`
+void CStreamPacketEncryptionHelperBase_0x4b81c8::DelegateToChainedHelper() {
+    if (nextHelper04) {
+        nextHelper04->DelegateToChainedHelper();
+    }
+}
+
 // UNANCHORED: source-owned helper forwarding through the recovered helper-family `nextHelper04`
 // link used by the agenda read/write chains.
 void CStreamPacketEncryptionHelperBase_0x4b81c8::ForwardToNextHelper(
@@ -734,25 +760,27 @@ PacketProcessingAgenda_0x4baf48::~PacketProcessingAgenda_0x4baf48() {
     // Default destructor implementation
 }
 
-// anchor: launcher.exe:0x44bb60 / vtable `0x004baf48 +0x04`
-void PacketProcessingAgenda_0x4baf48::VirtualMethod1_0x44bb60() {
-    // Virtual method 1 implementation
-    // Original at 0x44bb60 - placeholder for future implementation
-}
-
 // anchor: launcher.exe:0x481750 / vtable `0x004baf48 +0x08`
-uint32_t PacketProcessingAgenda_0x4baf48::VirtualMethod2_0x481750() {
-    // Virtual method 2 implementation
-    // Original at 0x481750 - placeholder for future implementation
-    return 0;
+const void* PacketProcessingAgenda_0x4baf48::GetHelperDescriptorOrLabel() const {
+    // `0x481750` is just `mov eax,[ecx+0xc] ; ret`, so on the agenda helper family this slot
+    // returns the embedded helper label pointer rather than the shared static descriptor used by
+    // the concrete module read/write helpers.
+    return helperLabel0c;
 }
 
 // anchor: launcher.exe:0x469720 / vtable `0x004baf48 +0x10`
 void PacketProcessingAgenda_0x4baf48::DelegateToChainedHelper() {
-    // Delegate to chained helper implementation
-    // Original at 0x469720 - delegates to nextHelper04 if available
-    if (nextHelper04) {
-        nextHelper04->HandleOpaqueMessageRef(nullptr);
+    // Ghidra decompilation of `0x469720` shows this helper does *not* read the direct helper-base
+    // `+0x04` link. Instead it loads agenda helper `+0x14 = downstreamHelperSlot14`, dereferences
+    // that slot to get the current chained helper pointer, and then dispatches that helper's own
+    // slot `+0x10`.
+    if (!downstreamHelperSlot14) {
+        return;
+    }
+    CStreamPacketEncryptionHelperBase_0x4b81c8* const downstreamHelper =
+        *downstreamHelperSlot14;
+    if (downstreamHelper) {
+        downstreamHelper->DelegateToChainedHelper();
     }
 }
 
