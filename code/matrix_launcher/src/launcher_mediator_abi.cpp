@@ -16,7 +16,7 @@ extern void* g_pLauncherObject6304;
 // Broad ILTLoginMediator_0x4af2b8.Default ABI shell:
 // - keep startup-selection and general arg6 surface here
 
-static MinimalLoginMediatorStub g_LoginMediatorStub = {};
+MinimalLoginMediatorStub g_LoginMediatorStub = {};
 void* g_LoginMediatorVtable[104] = {0};
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringC[] = "standalone";
@@ -1199,7 +1199,7 @@ DEFINE_MEDIATOR_UNIMPLEMENTED_STUB(19c)
 #undef DEFINE_MEDIATOR_UNIMPLEMENTED_STUB
 
 // UNANCHORED: seeds the replacement ILTLoginMediator_0x4af2b8.Default ABI vtable from recovered slot usage.
-static void InitializeMediatorStub() {
+void DiagnosticInitializeMediatorStub() {
     static bool initialized = false;
     if (initialized) return;
     initialized = true;
@@ -1312,24 +1312,6 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[103] = (void*)Mediator_UnimplementedSlot19c; // +0x19c
 
     ResetMediatorObjectState();
-}
-
-// UNANCHORED: direct installer for the replacement arg6 mediator stub.
-static void DiagnosticInitializeBinderScaffold(void** outMediatorPtr) {
-    InitializeMediatorStub();
-    if (outMediatorPtr) {
-        *outMediatorPtr = &g_LoginMediatorStub;
-    }
-}
-
-// UNANCHORED: direct installer for the replacement arg6 mediator stub.
-void DiagnosticInstallMediatorDirect(void** outMediatorPtr) {
-    DiagnosticInitializeBinderScaffold(outMediatorPtr);
-    spdlog::info(
-        "DIAGNOSTIC: direct mediator stub install targetSlot={} stub={} vtable={}",
-        fmt::ptr(outMediatorPtr),
-        fmt::ptr(&g_LoginMediatorStub),
-        fmt::ptr(g_LoginMediatorVtable));
 }
 
 // UNANCHORED: diagnostic selection configurator for the replacement arg6 sidecar model.

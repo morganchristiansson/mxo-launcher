@@ -8,7 +8,6 @@ namespace mxo::ltlogin {
 struct ProcessLoginRequestInputSketch;
 }
 
-void DiagnosticInstallMediatorDirect(void** outMediatorPtr);
 void DiagnosticConfigureMediatorSelection(
     uint32_t worldUpperBoundExclusive,
     uint32_t variantUpperBoundExclusive,

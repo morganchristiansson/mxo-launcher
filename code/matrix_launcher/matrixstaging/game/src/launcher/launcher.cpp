@@ -14,6 +14,7 @@
 #include <spdlog/cfg/env.h>
 #include "autodetectdialog.h"
 #include "../../../../src/diagnostics.h"
+#include "../../../../src/launcher_mediator_abi.h"
 #include "../../../../src/launcher_network_object_abi.h"
 #include "../../../../src/launcher_replacement_support.h"
 #include "../libltclientlogin/loginmediator.h"
@@ -393,7 +394,8 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         return false;
     }
 
-    DiagnosticInstallMediatorDirect(&g_pILTLoginMediator_0x4af2b8Default);
+    DiagnosticInitializeMediatorStub();
+    g_pILTLoginMediator_0x4af2b8Default = &g_LoginMediatorStub;
 
     const uint32_t selectedVariantState = bootSelectionRecord ? bootSelectionRecord->variantState : 0u;
     const uint32_t selectedHighByte = (packedArg7Selection >> 24) & 0xffu;

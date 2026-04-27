@@ -18,8 +18,10 @@ struct MinimalLoginMediatorStub {
     unsigned char payload[0x100];
 };
 
+extern MinimalLoginMediatorStub g_LoginMediatorStub;
 extern void* g_LoginMediatorVtable[104];
 
+void DiagnosticInitializeMediatorStub();
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();
 bool IsProfilePathBuilderCaller(void* returnAddress);
 const char* DescribeMediatorCaller(void* returnAddress);
