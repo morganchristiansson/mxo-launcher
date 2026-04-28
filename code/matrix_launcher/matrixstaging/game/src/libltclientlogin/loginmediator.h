@@ -1171,7 +1171,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - these mediator methods only mirror the owner-side route-string getters that feed `0x41e500`
     const char* ResolveMarginRouteFromCurrentCharacterSlot() const;            // current best anchor: recovered route-host helper `0x41b260`
     const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
-    const char* ResolveMarginRouteFromWorldId(uint32_t worldId) const;         // provisional fallback helper for world-id keyed route recovery
     const char* ResolveMarginRouteDescriptor() const;                          // current best owner-side route-text resolver used to back arg6 `+0x10c`
     // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator_0x4af2b8.Default slot +0x10c
     // Keep the wrapper-facing small-string object explicit instead of collapsing it into the
@@ -1392,9 +1391,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Returns whether the owner `+0x680 +0xf4` auth-reply-derived `0x136` copy block is present
     // and still fresh enough for the state5 copy/send path.
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
-
-public:
-    int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
 
 private:
     void MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input);

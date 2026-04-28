@@ -54,24 +54,6 @@ const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t des
     return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
 }
 
-const char* CLTLoginMediator::ResolveMarginRouteFromWorldId(uint32_t worldId) const {
-    // Address anchors:
-    // - launcher.exe:0x439300 default branch
-    // - owner vtable `+0xfc`
-    //
-    // Keep this narrower fallback helper for places where source still only has a recovered
-    // world-id value and must rejoin it against the descriptor table.
-    if (worldId > 0xffffu) {
-        return nullptr;
-    }
-
-    const int descriptorIndex = FindRecoveredWorldDescriptorIndexByWorldId(static_cast<uint16_t>(worldId));
-    if (descriptorIndex < 0) {
-        return nullptr;
-    }
-    return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
-}
-
 // anchor: launcher.exe:0x41e500
 uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint8_t cachedRouteSelector) {
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`

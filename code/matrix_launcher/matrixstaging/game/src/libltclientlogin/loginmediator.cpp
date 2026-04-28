@@ -2655,16 +2655,6 @@ bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
     return currentAuthServerTime < expiryTimeAc;
 }
 
-// UNANCHORED: source-owned lookup helper over the mirrored world-descriptor table
-int CLTLoginMediator::FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const {
-    for (size_t i = 0; i < worldDescriptorsD84_.size(); ++i) {
-        if (worldDescriptorValidD84_[i] && worldDescriptorsD84_[i].worldId01 == worldId) {
-            return static_cast<int>(i);
-        }
-    }
-    return -1;
-}
-
 // anchor: launcher.exe:0x41e760
 void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() const {
     const char* profileName = ownerAuthBootstrapSource94_.username00.data();

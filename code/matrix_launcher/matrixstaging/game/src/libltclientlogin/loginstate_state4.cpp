@@ -19,12 +19,12 @@ static uint32_t BeginMarginConnectionForState4Case(
 
 }  // namespace
 
-// anchor: launcher.exe vtable 0x004b503c
+// anchor: launcher.exe vtable 0x4b503c
 const char* CLTLoginState_State4_0x4b503c::DebugName() const {
     return "CLTLoginState_State4_0x4b503c";
 }
 
-// anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
+// anchor: launcher.exe:0x4393f0 (vtable 0x4b503c slot 2)
 uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem) {
     if (!workItem || !g_CurrentLoginMediator) {
         return 0u;
@@ -98,14 +98,14 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
     return 1u;
 }
 
-// anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
+// anchor: launcher.exe:0x439300 (vtable 0x4b503c slot 3)
 void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     if (!g_CurrentLoginMediator) {
         return;
     }
 
     // Faithfulness/ownership correction from the fresh `0x439300` disassembly review:
-    // - `0x439300` belongs to `CLTLoginState_State4_0x4b503c` vtable `0x004b503c` slot 3
+    // - `0x439300` belongs to `CLTLoginState_State4_0x4b503c` vtable `0x4b503c` slot 3
     // - this object caches the first incoming upstream/helper pointer at `this+4`
     // - it then calls that cached object's vtable `+0x18` and uses the returned phase/state code
     //   for the real case split
@@ -141,6 +141,27 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
             return;
         }
 
+        default: {
+            // Current source-owned mirror for the default branch's owner `+0x104` dword remains
+            // `marginRouteState_.currentWorldId`; keep the field meaning provisional and
+            // treat it as the recovered descriptor selector for the original
+            // `!= -1 -> owner vtable +0xfc -> if non-null call 0x41e500` structure here.
+            const int32_t field104Value = g_CurrentLoginMediator->marginRouteState_.currentWorldId;
+            if (field104Value == -1) {
+                return;
+            }
+            const char* const routeHostText =
+                g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
+                    static_cast<uint32_t>(field104Value));
+            if (routeHostText == nullptr) {
+                return;
+            }
+            BeginMarginConnectionForState4Case(
+                g_CurrentLoginMediator,
+                routeHostText,
+                0u);
+        }
+
         case 10: {
             BeginMarginConnectionForState4Case(
                 g_CurrentLoginMediator,
@@ -150,36 +171,16 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
                     g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 & 0xffu));
             return;
         }
-
-        default: {
-            // Current source-owned mirror for the default branch's owner `+0x104` dword remains
-            // `marginRouteState_.currentWorldId`; keep the field meaning provisional and
-            // only preserve the original `!= -1 -> owner vtable +0xfc -> if non-null call 0x41e500`
-            // structure here.
-            const int32_t field104Value = g_CurrentLoginMediator->marginRouteState_.currentWorldId;
-            if (field104Value == -1) {
-                return;
-            }
-            const char* const routeHostText =
-                g_CurrentLoginMediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value));
-            if (routeHostText == nullptr) {
-                return;
-            }
-            BeginMarginConnectionForState4Case(
-                g_CurrentLoginMediator,
-                routeHostText,
-                0u);
-        }
     }
 }
 
-// anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
+// anchor: launcher.exe:0x439190 (vtable 0x4b503c slot 6)
 uint32_t CLTLoginState_State4_0x4b503c::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     (void)workItem;
     return 0;
 }
 
-// anchor: launcher.exe:0x004686b0 (vtable 0x004b503c slot 7)
+// anchor: launcher.exe:0x4686b0 (vtable 0x4b503c slot 7)
 uint32_t CLTLoginState_State4_0x4b503c::GetStateId() const {
     return 4;
 }
