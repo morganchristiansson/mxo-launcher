@@ -765,7 +765,7 @@ public:
 static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
 
 // =============================================================================
-// Packet_MsConnectReply_0x4b6ce0 - Parse accessor for MS_ConnectReply (opcode 0x09)
+// Packet_AsAuthChallenge_0x4b6ce0 - Parse accessor for AS_AuthChallenge (opcode 0x09)
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6ce0 (5 slots, 20 bytes)
 // anchor: launcher.exe:0x443e30 = ResetAndInitialize (writes opcode 0x09)
@@ -779,27 +779,20 @@ static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == sizeof(mxo::liblttc
 // - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
 //
 // Object layout: compact parse object, size = 0x14 bytes (20 bytes)
-// This is a PARSE accessor class for reading incoming MS_ConnectReply (opcode 0x09)
+// This is a PARSE accessor class for reading incoming AS_AuthChallenge (opcode 0x09)
 // Used in auth bootstrap flow at 0x448140 (HandleInboundAuthMessage)
 //
 // Usage pattern from 0x443d90:
-// 1. Stack-allocate Packet_MsConnectReply_0x4b6ce0
+// 1. Stack-allocate Packet_AsAuthChallenge_0x4b6ce0
 // 2. Call InitFromIncomingMessage with source message ref
 // 3. Read payload fields at fixed offsets
 // =============================================================================
 
-struct StateAuthReply0x09FixedPayload {
- // anchor: launcher.exe:0x443e98 - opcode written in ResetAndInitialize
- // raw auth opcode `0x09` = MS_ConnectReply (used by auth bootstrap)
- static constexpr uint8_t kPayloadTag09 = 0x09;
- static constexpr size_t kPayloadBaseOffset = 0x10;
-};
-
 // anchor: launcher.exe vtable 0x004b6ce0 / parse accessor for opcode 0x09
 // This is a minimal parse object, NOT a full packet builder
-class Packet_MsConnectReply_0x4b6ce0 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_AsAuthChallenge_0x4b6ce0 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
- // anchor: launcher.exe:0x443e30 = Packet_MsConnectReply_0x4b6ce0::ResetAndInitialize
+ // anchor: launcher.exe:0x443e30 = Packet_AsAuthChallenge_0x4b6ce0::ResetAndInitialize
  // Original implementation pattern:
  // 1. Calculates payload offset from message header encoding byte
  // 2. Advances message read position by 0x11 bytes
@@ -813,17 +806,17 @@ public:
  }
 
  // Override virtual methods to match 5-slot vtable
- ~Packet_MsConnectReply_0x4b6ce0() override = default;
+ ~Packet_AsAuthChallenge_0x4b6ce0() override = default;
  uint32_t StubReturn0() override { return 0u; }
  void DebugString(int /*formatType*/ = 2) override {}
  void InitializePayloadSize() override {}
  void* GetPayloadBase() override { return payloadAlias10; }
 };
 
-// Packet_MsConnectReply_0x4b6ce0 layout:
+// Packet_AsAuthChallenge_0x4b6ce0 layout:
 // Minimal parse object inherits from Packet_0x4af2a4
 // Total: same as base class (0x28 bytes) - no additional fields
-static_assert(sizeof(Packet_MsConnectReply_0x4b6ce0) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectReply_0x4b6ce0 size mismatch");
+static_assert(sizeof(Packet_AsAuthChallenge_0x4b6ce0) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_AsAuthChallenge_0x4b6ce0 size mismatch");
 
 // =============================================================================
 // Packet_AsAuthChallengeResponse_0x4b6d08 - Minimal packet builder (opcode 0x0a)

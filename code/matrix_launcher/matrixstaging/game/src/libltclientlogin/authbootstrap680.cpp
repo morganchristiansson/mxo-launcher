@@ -1712,39 +1712,25 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 
     if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-        return child.SendAuthRequest(mediator);
+        return child.SendAuthRequest();
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-    return child.SendGetPublicKeyRequest(mediator);
+    return child.SendGetPublicKeyRequest();
 }
 
-}  // namespace mxo::ltlogin
-
-namespace mxo::liblttcp {
-
 // anchor: launcher.exe:0x448140
-uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage(
-    void* incomingAuthMessage,
-    mxo::ltlogin::CLTLoginMediator& mediator) {
-    using namespace mxo::ltlogin;
-
+uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
+    void* incomingAuthMessage) {
+    auto* const mediator = g_CurrentLoginMediator;
     auto* const module = owner08;
-    AuthBootstrap680ChildBase_0x4b7134* childBase =
-        module ? module->authBootstrapChildBase_SOURCEONLY : nullptr;
-    if (childBase == nullptr) {
-        childBase = &AuthBootstrapChildFromWriteHelper(*this);
-    }
-    if (childBase == nullptr) {
-        return kAuthBootstrap680InboundUnhandled;
-    }
-
-    auto& child = *static_cast<AuthBootstrap680Child_0x441290*>(childBase);
+    auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
+    auto& child = *this;
     auto& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
 
     IncomingAuthPayloadViewScaffold incomingPayload = {};
     if (!BuildIncomingAuthPayloadViewScaffold(
-            static_cast<const CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
+            static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
             &incomingPayload)) {
         ownedState.stagedIncomingAuthPacketBytes.clear();
         return kAuthBootstrap680InboundUnhandled;
@@ -1777,8 +1763,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
 
             child.authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
-            const uint32_t workerResult =
-                HandleGetPublicKeyReply(mediator, reply);
+            const uint32_t workerResult = HandleGetPublicKeyReply(reply);
             if (workerResult != 0u) {
                 child.inboundAuthStatusEc = workerResult;
             }
@@ -1821,7 +1806,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
                 return kAuthBootstrap680InboundGetPublicKeyWorkerError;
             }
 
-            return SendAuthRequest(mediator) != 0u
+            return SendAuthRequest() != 0u
                 ? kAuthBootstrap680InboundHandledContinueWaiting
                 : kAuthBootstrap680InboundGetPublicKeyWorkerError;
         }
@@ -1909,7 +1894,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
                         buildResult.ciphertextBytes.size());
                 }
 
-                auto* sendTarget = static_cast<CMessageConnection_0x4b7928*>(child.sendTarget50);
+                auto* sendTarget = static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(child.sendTarget50);
                 sendTarget->SendPacketMessageRef(*encryptedPacket.messageRef08);
 
                 const uint32_t sendResult = 1u;
@@ -1948,7 +1933,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
 
             const bool storedParseObjectF0 =
                 StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
-                    mediator,
+                    *mediator,
                     child,
                     stagedBytes);
             const auto* parseObject = child.authReplyParseObjectF0;
@@ -2007,7 +1992,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            AuthBootstrap680MaterializeReplyCopyShadowScaffold(child, mediator, reply);
+            AuthBootstrap680MaterializeReplyCopyShadowScaffold(child, *mediator, reply);
             return kAuthBootstrap680InboundAuthReplySuccess;
         }
 
@@ -2018,13 +2003,8 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
     return kAuthBootstrap680InboundUnhandled;
 }
 
-}  // namespace mxo::liblttcp
-
-namespace mxo::ltlogin {
-
 // anchor: launcher.exe:0x447eb0
-uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(
-    CLTLoginMediator& mediator) {
+uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
     bool ensuredLazyPubkeyDatValidatorA4 = false;
     if (lazyPubkeyDatValidatorA4 != nullptr && ownedState.lazyPubkeyDatValidatorA4.object) {
@@ -2098,25 +2078,14 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(
         fmt::ptr(this),
         fmt::ptr(owner08),
         static_cast<unsigned>(sendResult));
-    mediator.authGetPublicKeyRequestSent_ = (sendResult != 0u);
+    g_CurrentLoginMediator->authGetPublicKeyRequestSent_ = (sendResult != 0u);
     return sendResult;
 }
 
-}  // namespace mxo::ltlogin
-
-namespace mxo::liblttcp {
-
 // anchor: launcher.exe:0x4474f0
-uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(
-    mxo::ltlogin::CLTLoginMediator& mediator) {
-    using namespace mxo::ltlogin;
-
-    AuthBootstrap680ChildBase_0x4b7134* childBase =
-        owner08 ? owner08->authBootstrapChildBase_SOURCEONLY : nullptr;
-    if (childBase == nullptr) {
-        childBase = &AuthBootstrapChildFromWriteHelper(*this);
-    }
-    auto& child = *static_cast<AuthBootstrap680Child_0x441290*>(childBase);
+uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
+    auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
+    auto& child = *this;
     auto& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     const mxo::auth::GetPublicKeyReply& reply = ownedState.cachedGetPublicKeyReply;
     if (!reply.valid || !reply.hasEmbeddedPublicKey) {
@@ -2282,7 +2251,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(
         fmt::ptr(owner08),
         fmt::ptr(childBase),
         static_cast<unsigned>(sendResult));
-    mediator.authRequestSent_ = (sendResult != 0u);
+    g_CurrentLoginMediator->authRequestSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
         spdlog::info(
             "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId={} loginType={} keySize={} blobLen={} raw08WorkerExpectedBlobLen={} usernameLengthField={} usedChildRaw08PublicKeyWorker={} keyConfigMd5Len={} uiConfigMd5Len={} childSendTarget50={} childRaw08PublicKeyWorkerA8={} childString04Len={} childString10Len={} childString1CLen={} feedbackSeed84='{}' helper54NextBufferedByte28=0x{:08x}",
@@ -2307,16 +2276,9 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(
 }
 
 // anchor: launcher.exe:0x447780
-uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::RebuildReplyPublicKeyWorkers(
+uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     const mxo::auth::GetPublicKeyReply& reply) {
-    using namespace mxo::ltlogin;
-
-    AuthBootstrap680ChildBase_0x4b7134* childBase =
-        owner08 ? owner08->authBootstrapChildBase_SOURCEONLY : nullptr;
-    if (childBase == nullptr) {
-        childBase = &AuthBootstrapChildFromWriteHelper(*this);
-    }
-    auto& child = *static_cast<AuthBootstrap680Child_0x441290*>(childBase);
+    auto& child = *this;
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
 
     ResetAuthBootstrap680ReplyPublicKeyWorkers(child, ownedState);
@@ -2352,17 +2314,10 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::RebuildReplyPublicKe
 }
 
 // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
-uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply(
-    mxo::ltlogin::CLTLoginMediator& mediator,
+uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
     const mxo::auth::GetPublicKeyReply& reply) {
-    using namespace mxo::ltlogin;
-
-    AuthBootstrap680ChildBase_0x4b7134* childBase =
-        owner08 ? owner08->authBootstrapChildBase_SOURCEONLY : nullptr;
-    if (childBase == nullptr) {
-        childBase = &AuthBootstrapChildFromWriteHelper(*this);
-    }
-    auto& child = *static_cast<AuthBootstrap680Child_0x441290*>(childBase);
+    auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
+    auto& child = *this;
 
     if (reply.publicKeyId == currentPublicKeyId9C) {
         authRequestReadyA0 = 1u;
@@ -2412,4 +2367,4 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyRe
     return 0u;
 }
 
-}  // namespace mxo::liblttcp
+}  // namespace mxo::ltlogin

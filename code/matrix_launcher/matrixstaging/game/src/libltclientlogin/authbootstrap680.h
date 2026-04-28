@@ -171,10 +171,24 @@ public:
         void* sendTarget,
         const char* sessionTokenBegin);
 
+    // anchor: launcher.exe:0x448140
+    // Sole direct caller is `0x43f321`, which loads ECX from owner `+0x680` before the CALL.
+    // Keep this on the concrete auth bootstrap child even though the field layout is inherited
+    // through the stream-packet write-helper base.
+    uint32_t HandleInboundAuthMessage(void* incomingAuthMessage);
+
     // anchor: launcher.exe:0x447eb0
     // The state2 ready-side dispatcher calls this directly on the owner `+0x680` auth child when
     // `authRequestReadyA0 == 0`; it is not a standalone write-helper receiver method.
-    uint32_t SendGetPublicKeyRequest(CLTLoginMediator& owner);
+    uint32_t SendGetPublicKeyRequest();
+
+    // anchor: launcher.exe:0x4474f0 / 0x447780 / 0x447f50
+    // These helpers stay child-owned alongside `0x448140`; Ghidra currently keeps the old
+    // write-helper prefix in the symbol names, but the callsites and ECX setup point at the
+    // owner `+0x680` auth child.
+    uint32_t SendAuthRequest();
+    uint32_t RebuildReplyPublicKeyWorkers(const mxo::auth::GetPublicKeyReply& reply);
+    uint32_t HandleGetPublicKeyReply(const mxo::auth::GetPublicKeyReply& reply);
 
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;

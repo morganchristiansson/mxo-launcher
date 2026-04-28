@@ -1101,19 +1101,10 @@ public:
     void ResetForOwner(CStreamPacketEncryptionModule_0x4b8704* owner);
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 
-    // Non-virtual auth-bootstrap helper family currently recovered by Ghidra on this receiver.
-    // PrepareAndDispatch (launcher.exe:0x448050) was moved back to the auth bootstrap child after
-    // callsite evidence showed its only direct caller (0x43928b) passes owner+0x680, constructed by
-    // AuthBootstrap680Child_0x441290::ctor at 0x441290.
-    uint32_t HandleInboundAuthMessage(
-        void* incomingAuthMessage,
-        mxo::ltlogin::CLTLoginMediator& owner);
-    uint32_t SendAuthRequest(mxo::ltlogin::CLTLoginMediator& owner);
-    uint32_t RebuildReplyPublicKeyWorkers(
-        const mxo::auth::GetPublicKeyReply& reply);
-    uint32_t HandleGetPublicKeyReply(
-        mxo::ltlogin::CLTLoginMediator& owner,
-        const mxo::auth::GetPublicKeyReply& reply);
+    // Auth-bootstrap `0x4474f0/0x447780/0x447f50/0x448050/0x448140` now lives on the concrete
+    // owner `+0x680` child (`AuthBootstrap680Child_0x441290`), not on this write-helper type.
+    // Keep the overlapping field mirror here because the original child literally inherits this
+    // write-helper layout before extending it at `+0xf8`.
 };
 
 class PacketProcessingAgenda_0x4baf48 : public CStreamPacketEncryptionHelperBase_0x4b81c8 {

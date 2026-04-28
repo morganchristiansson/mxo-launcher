@@ -99,14 +99,13 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
     // Current best recovered role from `0x43f300`:
     // - it does not inspect staged raw auth bytes locally
     // - instead it forwards the incoming auth-message object straight into
-    //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
-    // - Ghidra currently places `0x448140` under namespace
-    //   `CStreamPacketEncryptionModuleWriteHelper_0x4b8690`
-    // - this state2 body only switches on that helper's return code to drive owner `+0x80`,
+    //   `0x448140 = AuthBootstrap680Child_0x441290::HandleInboundAuthMessage`
+    // - the direct callsite loads ECX from owner `+0x680`, so this belongs to the concrete auth
+    //   bootstrap child rather than the inherited stream-packet write-helper base
+    // - this state2 body only switches on that child method's return code to drive owner `+0x80`,
     //   helper-switch, and event/error flow
     const uint32_t childResult =
-        g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(
-            workItem, *g_CurrentLoginMediator);
+        g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(workItem);
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(
