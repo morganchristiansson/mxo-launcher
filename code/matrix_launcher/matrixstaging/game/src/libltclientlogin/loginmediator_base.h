@@ -37,15 +37,15 @@ struct SelectionSeedConfig;
 //   - `worldId24`         = selected world id
 // - its virtual surface follows the shared `Packet_0x4af2a4` shape with slot-specific overrides
 //   for the debug-string/reset helpers at `0x43dc80` / `0x439940`
-class SlotRecordState_0x4b5328 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_MsClaimCharacterNameReply_0x4b5328 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
-    ~SlotRecordState_0x4b5328() override = default;
+    ~Packet_MsClaimCharacterNameReply_0x4b5328() override = default;
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
 };
 
-static_assert(sizeof(SlotRecordState_0x4b5328) == sizeof(mxo::liblttcp::Packet_0x4af2a4),
-              "SlotRecordState_0x4b5328 should currently be a pure Packet_0x4af2a4-derived view");
+static_assert(sizeof(Packet_MsClaimCharacterNameReply_0x4b5328) == sizeof(mxo::liblttcp::Packet_0x4af2a4),
+              "Packet_MsClaimCharacterNameReply_0x4b5328 should currently be a pure Packet_0x4af2a4-derived view");
 
 // anchor: launcher.exe:0x4b5378 / vtable
 // Margin message reply view class - used in state6 slot6 for margin reply handling.
@@ -71,7 +71,7 @@ public:
 // - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
 // - wrapper `+0x44` returns a current-slot record object consumed by later save/profile code
 // Those are not the same thing as the owner-side `+0x40/+0x44` slot-record table accessors.
-// Note: SelectionCurrentSlotRecord44PayloadSketch removed - payload10 now points directly to SlotRecordState_0x4b5328
+// Note: SelectionCurrentSlotRecord44PayloadSketch removed - payload10 now points directly to Packet_MsClaimCharacterNameReply_0x4b5328
 
 struct CurrentSlotRecord44ObjectSketch {
     // Wrapper-facing selection `+0x44` current-slot object.
@@ -84,7 +84,7 @@ struct CurrentSlotRecord44ObjectSketch {
     void* backingObject08;
     uint8_t flag0c;
     uint8_t padding0d[3];
-    SlotRecordState_0x4b5328* payload10;  // points to current slot record
+    Packet_MsClaimCharacterNameReply_0x4b5328* payload10;  // points to current slot record
     const char* debugString14;  // Character name string (was: heapString14)
     uint16_t debugStringLen18;  // Length of character name (was: heapStringLen18)
     uint8_t padding1a[2];

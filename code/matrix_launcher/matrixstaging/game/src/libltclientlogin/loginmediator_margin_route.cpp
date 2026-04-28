@@ -190,7 +190,7 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
 // Original body: direct field access without validation
-const SlotRecordState_0x4b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
+const Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
     if (slotIndex != 0xffu) {
         return &selectionRouteState684_.slotRecordTable04_[slotIndex];
     }
@@ -199,7 +199,7 @@ const SlotRecordState_0x4b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t s
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
 // Original body: direct field access
-const SlotRecordState_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
+const Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
     const uint8_t currentSlot = selectionRouteState684_.currentSlotOrSelectionIndex644_;
     if (currentSlot != 0xffu) {
         return &selectionRouteState684_.slotRecordTable04_[currentSlot];
@@ -220,7 +220,7 @@ const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotInde
     if (slotIndex >= 100u) {
         return nullptr;
     }
-    const SlotRecordState_0x4b5328* record = &selectionRouteState684_.slotRecordTable04_[slotIndex];
+    const Packet_MsClaimCharacterNameReply_0x4b5328* record = &selectionRouteState684_.slotRecordTable04_[slotIndex];
     if (!record) {
         return nullptr;
     }
@@ -257,7 +257,7 @@ uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
     if (slotIndex >= 100u) {
         return 7u;
     }
-    const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
+    const Packet_MsClaimCharacterNameReply_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
     return record ? record->packetType1a : 7u;
 }
 

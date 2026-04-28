@@ -612,7 +612,7 @@ CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetCurrentSlotRecordObject44(
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
-    const SlotRecordState_0x4b5328* slotRecord = GetCurrentSlotRecord();
+    const Packet_MsClaimCharacterNameReply_0x4b5328* slotRecord = GetCurrentSlotRecord();
     if (!slotRecord) {
         slotRecord = GetSlotRecordByIndex(0u);
     }
@@ -1952,7 +1952,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 0x12000009u;
     }
 
-    const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
+    const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (!currentSlotRecord) {
         std::memset(outDwords, 0, 0x20u);
         spdlog::info(
@@ -2685,7 +2685,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
             continue;
         }
 
-        const SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
+        const Packet_MsClaimCharacterNameReply_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const RouteHostStringTripleState& route = selectionRouteState684_.routeHostStringTriples194_[i];
         const char* characterName = slotRecord.debugString14 ? slotRecord.debugString14 : "";
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";

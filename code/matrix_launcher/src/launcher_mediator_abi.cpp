@@ -150,7 +150,7 @@ static void** MediatorSelectionObjectVtable() {
     return vtable;
 }
 
-static const mxo::ltlogin::SlotRecordState_0x4b5328* ResolveSelectionDescriptorSlotRecord(
+static const mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328* ResolveSelectionDescriptorSlotRecord(
     mxo::ltlogin::CLTLoginMediator& mediator,
     uint32_t selectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
@@ -168,7 +168,7 @@ static const mxo::ltlogin::SlotRecordState_0x4b5328* ResolveSelectionDescriptorS
 mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorSelectionDescriptorObject40AbiShim(
     CLTLoginMediator& mediator,
     uint32_t selectionIndex) {
-    const SlotRecordState_0x4b5328* const currentSlotRecord =
+    const Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
         ResolveSelectionDescriptorSlotRecord(mediator, selectionIndex);
     const uint32_t expectedScratchRequest = mediator.ExpectedSelectionDescriptorScratchRequest();
     const uint8_t currentSlotIndex = mediator.CurrentCharacterRouteIndexCc8Scaffold();
@@ -188,7 +188,7 @@ mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorSelect
 
     g_MediatorSelectionDescriptor40 = {};
     g_MediatorSelectionDescriptor40.vtable = MediatorSelectionObjectVtable();
-    g_MediatorSelectionDescriptor40.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
+    g_MediatorSelectionDescriptor40.payload10 = const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
     g_MediatorSelectionDescriptor40.flag0c = 1u;
 
     const char* matchMode =
@@ -211,7 +211,7 @@ mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorSelect
 
 mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorCurrentSlotRecordObject44AbiShim(
     CLTLoginMediator& mediator) {
-    const SlotRecordState_0x4b5328* const currentSlotRecord = mediator.GetCurrentSlotRecord();
+    const Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord = mediator.GetCurrentSlotRecord();
 
     g_MediatorCurrentSlotRecord44 = {};
     g_MediatorCurrentSlotRecord44NameOwned.clear();
@@ -224,7 +224,7 @@ mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorCurren
     }
 
     g_MediatorCurrentSlotRecord44.vtable = MediatorSelectionObjectVtable();
-    g_MediatorCurrentSlotRecord44.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
+    g_MediatorCurrentSlotRecord44.payload10 = const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
     g_MediatorCurrentSlotRecord44.flag0c = 1u;
     g_MediatorCurrentSlotRecord44NameOwned = currentSlotRecord->debugString14
         ? currentSlotRecord->debugString14

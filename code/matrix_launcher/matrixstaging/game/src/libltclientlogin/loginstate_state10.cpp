@@ -258,7 +258,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Original at 0x4401ec-0x440228: PUSH 0x1c; CALL 0x403260 (TrackedMalloc);
     // CALL 0x4398b0 (SlotRecord_Initialize); then stores the pointer at
     // [ESI + count*4 + 4] (pointer table at +0x688). Current source uses an
-    // inline std::array<SlotRecordState_0x4b5328, N> instead of a pointer table,
+    // inline std::array<Packet_MsClaimCharacterNameReply_0x4b5328, N> instead of a pointer table,
     // so the TrackedMalloc+Init is approximated by value-initialization.
     const uint8_t appendedSlotIndex = g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_;
     const uint32_t selectedWorldDescriptorIndex =
@@ -306,7 +306,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Current code approximates this by setting the debugString14 pointer directly.
     // TODO: Once slot records are heap-allocated with payload buffers, replace with
     // a proper SetCharacterName call.
-    SlotRecordState_0x4b5328& appendedSlotRecord =
+    Packet_MsClaimCharacterNameReply_0x4b5328& appendedSlotRecord =
         g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
     appendedSlotRecord.debugString14 =
         g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
