@@ -3535,7 +3535,7 @@ uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
         CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
         if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnection(this, mediator)) {
-            mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 0u;
+            mediator->state10SendGateFlagF14 = 0u;
         }
 
         // anchor: launcher.exe:0x44af60 tail

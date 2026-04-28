@@ -33,7 +33,7 @@ uint8_t CLTLoginMediator::CurrentCharacterRouteIndexCc8Scaffold() const {
 
 void CLTLoginMediator::SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex) {
     selectionRouteState684_.SetCurrentSlotOrSelectionIndex644(slotIndex);
-    postAuthMarginLoadingState_0xf14.characterRouteIndexCc8 = slotIndex;
+    characterRouteIndexCc8 = slotIndex;
     marginRouteState_.currentCharacterOrRouteIndex = slotIndex;
 }
 

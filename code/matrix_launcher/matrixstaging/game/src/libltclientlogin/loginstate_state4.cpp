@@ -167,9 +167,9 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
             BeginMarginConnectionForState4Case(
                 g_CurrentLoginMediator,
                 g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
-                    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24),
+                    g_CurrentLoginMediator->createCharacterData108.selectedWorldField24),
                 static_cast<uint8_t>(
-                    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 & 0xffu));
+                    g_CurrentLoginMediator->createCharacterData108.selectedWorldField24 & 0xffu));
             return;
         }
     }

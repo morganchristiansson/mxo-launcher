@@ -90,14 +90,14 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     //   and then stalls before any incoming `MS_LoadCharacterReply`
     std::array<uint32_t, 17> sourceDwords134{};
     std::copy(
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.begin(),
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.end(),
+        g_CurrentLoginMediator->createCharacterData108.header2c.begin(),
+        g_CurrentLoginMediator->createCharacterData108.header2c.end(),
         sourceDwords134.begin());
     std::copy(
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.begin(),
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.end(),
+        g_CurrentLoginMediator->createCharacterData108.secondary4c.begin(),
+        g_CurrentLoginMediator->createCharacterData108.secondary4c.end(),
         sourceDwords134.begin() + 8);
-    sourceDwords134[16] = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.bodyWord6c;
+    sourceDwords134[16] = g_CurrentLoginMediator->createCharacterData108.bodyWord6c;
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     // anchor: launcher.exe:0x43a470 = Packet_MsCreateCharacterRequest_0x4b53c8::ResetAndInitialize
@@ -128,7 +128,7 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     }
 
     // SetRealFirstName - anchor: launcher.exe:0x43a640
-    const char* realFirstName = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data();
+    const char* realFirstName = g_CurrentLoginMediator->createCharacterData108.realFirstName70.data();
     if (payload && realFirstName && packetBuilder.realFirstName14_.reservedContentByteCount04 == 0u) {
         size_t textLen = 0;
         const char* p = realFirstName;
@@ -156,7 +156,7 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     }
 
     // SetRealLastName - anchor: launcher.exe:0x43a740
-    const char* realLastName = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data();
+    const char* realLastName = g_CurrentLoginMediator->createCharacterData108.realLastName90.data();
     if (payload && realLastName && packetBuilder.realLastName1c_.reservedContentByteCount04 == 0u) {
         size_t textLen = 0;
         const char* p = realLastName;
@@ -184,7 +184,7 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     }
 
     // SetBackground - anchor: launcher.exe:0x43a840
-    const char* background = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data();
+    const char* background = g_CurrentLoginMediator->createCharacterData108.backgroundB0.data();
     if (payload && background && packetBuilder.background24_.reservedContentByteCount04 == 0u) {
         size_t textLen = 0;
         const char* p = background;
@@ -258,9 +258,9 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
         sourceDwords134[3],
         sourceDwords134[4],
         sourceDwords134[16],
-        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data()),
-        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data()),
-        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data()),
+        std::string(g_CurrentLoginMediator->createCharacterData108.realFirstName70.data()),
+        std::string(g_CurrentLoginMediator->createCharacterData108.realLastName90.data()),
+        std::string(g_CurrentLoginMediator->createCharacterData108.backgroundB0.data()),
         g_CurrentLoginMediator->GetGameSessionId() ? g_CurrentLoginMediator->GetGameSessionId() : "<empty>",
         sendResult);
     spdlog::info(
@@ -298,7 +298,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
         return 0u;
     }
 
-    auto& ownerState = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14;
+    auto& ownerState = *g_CurrentLoginMediator;
     g_CurrentLoginMediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
@@ -572,7 +572,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             replySectionsSeen_,
             replySectionsExpected_,
             firstFragment ? 1u : 0u,
-            g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c[0] ? g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c : "<empty>");
+            g_CurrentLoginMediator->characterNameBufferF1c[0] ? g_CurrentLoginMediator->characterNameBufferF1c : "<empty>");
         replySectionsSeen_ = 0;
         replySectionsExpected_ = 0;
     } else {
@@ -587,7 +587,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             replySectionsExpected_,
             loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
             firstFragment ? 1u : 0u,
-            g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c[0] ? g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.characterNameBufferF1c : "<empty>");
+            g_CurrentLoginMediator->characterNameBufferF1c[0] ? g_CurrentLoginMediator->characterNameBufferF1c : "<empty>");
     }
     return 1u;
 }

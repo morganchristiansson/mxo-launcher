@@ -392,138 +392,9 @@ public:
         std::array<uint32_t, 4> blockD70{};            // `+0xd70 .. +0xd7f`
     };
 
-    class PostAuthMarginLoadingState {
-    public:
-        // Source-owned owner layout projection over the original shared
-        // `CLTLoginMediatorCharacterPersistenceData_0x41d900` family.
-        // owner post-auth margin/loading block shared by the active state8 path and the later
-        // state10/state11 path.
-        // Current high-value field read:
-        // - `+0x108 .. +0x5d8` = earlier shared `CLTLoginMediatorCharacterPersistenceData_0x41d900`
-        //   source block reused by the create-character / helper11 path
-        //   - `characterName00` = owner `+0x108`
-        //   - `selectedWorldField24` = owner `+0x12c`
-        //   - `header2c[0..16]` = owner `+0x134 .. +0x174`
-        //   - `realFirstName70` = owner `+0x178`
-        //   - `realLastName90` = owner `+0x198`
-        //   - `backgroundB0` = owner `+0x1b8`
-        //   - client wrapper-facing `+0x120` writer currently copies up to `0x400` bytes there
-        //   - later state11 packet building still uses only the bounded prefix that fits the
-        //     packet builder's own field limits
-        // - `+0xf1c ...` = later load-character reply materialization area
-        CLTLoginMediatorCharacterPersistenceData_0x41d900 createCharacterData108{}; // owner `+0x108 .. +0x5d8`
-
-        // ========================================================================
-        // Post-auth HandleLoadCharacterReply outputs (0x440320)
-        // ========================================================================
-
-        // owner byte `+0xf14`; shared send gate used by the active state8 path and later state10.
-        // Strongest current writer is state6 opcode-`9` success, which sets it alongside owner
-        // `+0xf18 = parsed opcode-9 UDPSessionSecret / session-id dword`; later clears are now
-        // anchored both at state9 success `0x41b420` and margin-completion work-type-1 tail
-        // `0x44af60`.
-        uint8_t state10SendGateFlagF14 = 0;             // `+0xf14`
-
-        // Canonical owner `+0xf1c` object returned by the original `+0xf4/+0xbc/+0xc0/+0xc4`
-        // getter family.
-        CLTLoginMediatorCharacterPersistenceData_0x41d900 state8PersistenceDataF1c{}; // owner `+0xf1c .. +0x146b`
-
-        // Legacy decomposed mirrors still kept while neighboring source is migrated onto the
-        // canonical `state8PersistenceDataF1c` object.
-        // Active state8 reply path prefers the current slot record (`+0x688[owner+0xcc8]`) as the
-        // first-fragment seed for this name/world block, falling back to the older `+0x108` text.
-        // Later state11 (`0x440320`) is tighter: its first fragment copies owner `+0x108`
-        // directly and does not consult the current-slot record table.
-        char characterNameBufferF1c[32] = {0};           // `+0xf1c .. +0xf3b`
-        uint32_t characterReplyFieldF3c = 0;             // `+0xf3c`
-        uint32_t characterReplyFieldF40 = 0;             // `+0xf40`
-        uint32_t characterReplyFieldF44 = 0x1000;        // `+0xf44`; shared reset helper `0x438a50` seeds this before state8/state11 first-fragment materialization
-        std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`; original getter `0x41f170` / arg6 `+0xbc`
-        std::array<uint32_t, 8> secondaryCharacterDataF68{}; // `+0xf68 .. +0xf87` (provisional world/status seed area)
-        std::array<uint32_t, 10> characterRecordPointersF88{}; // post-auth/scaffold parsed subview
-        std::array<char, 0x20> section0StringF8c{};      // post-auth/scaffold parsed subview
-        std::array<char, 0x20> section0StringFac{};      // post-auth/scaffold parsed subview
-        std::array<char, 0x20> section0StringFcc{};      // post-auth/scaffold parsed subview
-        std::array<uint8_t, 0x465> state8Section0RawF88{}; // source-owned raw mirror of original owner `+0xf88 .. +0x13ec`; original getter `0x41f180` / arg6 `+0xc0`
-
-        // state8 case `0x00` also has a one-shot overflow tail at `+0x13f0/+0x13f4` when the
-        // incoming section exceeds `0x485` bytes. Keep that separate from the append families
-        // below because the original only allocates it once on the case-0 path instead of using
-        // the later generic append buffers.
-        void* state8Section0OverflowBuffer13f0 = nullptr; // `+0x13f0` (state8 case 0x00 overflow tail); original getter `0x41aec0` / arg6 `+0xc4`
-        uint16_t state8Section0OverflowLength13f4 = 0;    // `+0x13f4` out-length paired with the same `+0xc4` getter
-
-        // Allocated buffer pointers for load-character fragment families.
-        // Keep the owner offsets explicit because state8 (`0x43f930`) and state11 (`0x440320`)
-        // both reuse this wider owner region with different section selectors.
-        void* allocatedBuffer13f8 = nullptr;             // `+0x13f8` (state8 case 0x01); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x7c/+0xa8` / `bl.cfg`
-        uint16_t allocatedBufferLength13fc = 0;         // `+0x13fc` out-length paired with the same arg6 `+0xa8` getter
-        uint8_t flag13fe = 0;                            // `+0x13fe` bool gate paired with arg6 `+0x7c`
-
-        void* allocatedBuffer1400 = nullptr;             // `+0x1400` (state8 case 0x02); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x80/+0xac` / `il.cfg`
-        uint16_t allocatedBufferLength1404 = 0;         // `+0x1404` out-length paired with the same arg6 `+0xac` getter
-        uint8_t flag1406 = 0;                            // `+0x1406` bool gate paired with arg6 `+0x80`
-
-        void* allocatedBuffer1408 = nullptr;             // `+0x1408` (state8 case 0x06 / state11 case 0x06); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x68/+0x94` / `hl.cfg`
-        uint16_t allocatedBufferLength140c = 0;         // `+0x140c` out-length paired with the same arg6 `+0x94` getter
-        uint8_t allocatedBufferFlag140e = 0;             // `+0x140e` bool gate paired with arg6 `+0x68`
-
-        void* allocatedBuffer1410 = nullptr;             // `+0x1410` (state8 case 0x07); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x6c/+0x98` / `an.cfg`
-        uint16_t allocatedBufferLength1414 = 0;         // `+0x1414` out-length paired with the same arg6 `+0x98` getter
-        uint8_t flag1416 = 0;                            // `+0x1416` bool gate paired with arg6 `+0x6c`
-
-        void* allocatedBuffer1418 = nullptr;             // `+0x1418` (state8 case 0x03 / state11 case 0x03); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x70/+0x9c` / `pi.cfg`
-        uint16_t allocatedBufferLength141c = 0;         // `+0x141c` out-length paired with the same arg6 `+0x9c` getter
-        uint8_t allocatedBufferFlag141e = 0;             // `+0x141e` bool gate paired with arg6 `+0x70`
-
-        void* allocatedBuffer1420 = nullptr;             // `+0x1420` (state8 case 0x04 / state11 case 0x04); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x74/+0xa0` / `ai.cfg`
-        uint16_t allocatedBufferLength1424 = 0;         // `+0x1424` out-length paired with the same arg6 `+0xa0` getter
-        uint8_t allocatedBufferFlag1426 = 0;             // `+0x1426` bool gate paired with arg6 `+0x74`
-
-        void* allocatedBuffer1428 = nullptr;             // `+0x1428` (state8 case 0x05 / state11 case 0x05); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x78/+0xa4` / `cs.cfg`
-        uint16_t allocatedBufferLength142c = 0;         // `+0x142c` out-length paired with the same arg6 `+0xa4` getter
-        uint8_t allocatedBufferFlag142e = 0;             // `+0x142e` bool gate paired with arg6 `+0x78`
-
-        void* allocatedBuffer1430 = nullptr;             // `+0x1430` (state8 case 0x0c)
-        uint16_t allocatedBufferLength1434 = 0;         // `+0x1434`
-        uint8_t flag1436 = 0;                            // `+0x1436`
-
-        void* allocatedBuffer1438 = nullptr;             // `+0x1438` (state8 case 0x0d)
-        uint16_t allocatedBufferLength143c = 0;         // `+0x143c`
-        uint8_t flag143e = 0;                            // `+0x143e`
-
-        void* allocatedBuffer1440 = nullptr;             // `+0x1440` (state8 case 0x08); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x84/+0xb0` / `rl.cfg`
-        uint32_t allocatedBufferLength1444 = 0;         // `+0x1444` out-length paired with the same arg6 `+0xb0` getter
-        uint8_t flag1448 = 0;                            // `+0x1448` bool gate paired with arg6 `+0x84`
-
-        void* allocatedBuffer144c = nullptr;             // `+0x144c` (state8 case 0x09); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x88/+0xb4` / `cl.cfg`
-        uint16_t allocatedBufferLength1450 = 0;         // `+0x1450` out-length paired with the same arg6 `+0xb4` getter
-        uint8_t flag1452 = 0;                            // `+0x1452` bool gate paired with arg6 `+0x88`
-
-        void* allocatedBuffer1454 = nullptr;             // `+0x1454` (state8 case 0x0a); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x90/+0xb8` / `cui.cfg`
-        uint16_t allocatedBufferLength1458 = 0;         // `+0x1458` out-length paired with the same arg6 `+0xb8` getter
-        uint8_t flag145a = 0;                            // `+0x145a` bool gate paired with arg6 `+0x90`
-        uint32_t state8Section10ChunkBitmap = 0;         // source-owned mirror of the original `DAT_004f79e4` bitmap
-
-        // state8/state11 case `0x0b` / `0x43f8c0` side effect:
-        // - owner `+0x145c` = first dword of the section payload when byteCount > 4
-        // - owner `+0x1460` = trailing small-string-like copy of the remaining payload bytes
-        // - sibling original getters now anchored too:
-        //   - `0x41f190` / arg6 `+0xc8` = bool-style test for non-zero `+0x145c`
-        //   - `0x41f1a0` / arg6 `+0xcc` = return dword `+0x145c`
-        //   - `0x41f1b0` / arg6 `+0xd0` = return small-string-like `+0x1460`
-        uint32_t state8Section11Dword145c = 0;          // `+0x145c`
-        std::string state8Section11String1460;          // `+0x1460` small-string-like mirror
-
-        // Additional fields for character reply parsing:
-        std::array<uint8_t, 8> replyParseBuffer{};       // `+0x13cc .. +0x13d3` scratch family
-        uint32_t replySectionData13cc = 0;               // `+0x13cc`
-        uint32_t replySectionData13d0 = 0;               // `+0x13d0`
-        uint8_t section0Flag13f6 = 0;                    // `+0x13f6`; exact corrected mediator-backed `mcd.cfg` gate for arg6 `+0x8c`
-
-        // +0xcc8 = character/route index byte (mirrored from auth reply)
-        uint8_t characterRouteIndexCc8 = 0;              // `+0xcc8`
-    };
+    // Fidelity note: the old source-only `PostAuthMarginLoadingState` wrapper has been retired.
+    // Static-RE now shows this region is just ordinary `CLTLoginMediator` storage, with the
+    // canonical state8 persistence object living directly at owner `+0xf1c`.
 
     class CLTLoginMediatorSelectionRouteState {
     public:
@@ -1468,8 +1339,76 @@ public:
     // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
     // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).
   CLTLoginMediatorSelectionRouteState selectionRouteState684_{};
-  // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
-  PostAuthMarginLoadingState postAuthMarginLoadingState_0xf14;
+    // Canonical owner `+0xf1c` object returned by the original `+0xf4/+0xbc/+0xc0/+0xc4`
+    // getter family.
+    CLTLoginMediatorCharacterPersistenceData_0x41d900 state8PersistenceDataF1c{}; // anchor: launcher.exe owner `+0xf1c .. +0x146b`
+    // launcher.exe owner `+0x108 .. +0x5d8`; earlier shared persistence block reused by the
+    // create-character / helper11 path.
+    CLTLoginMediatorCharacterPersistenceData_0x41d900 createCharacterData108{};
+
+    // owner byte `+0xf14`; shared send gate used by the active state8 path and later state10.
+    uint8_t state10SendGateFlagF14 = 0;
+
+    // Legacy decomposed mirrors around owner `+0xf1c` still kept while neighboring source is
+    // migrated onto the canonical mediator-owned `state8PersistenceDataF1c` object.
+    char characterNameBufferF1c[32] = {0};
+    uint32_t characterReplyFieldF3c = 0;
+    uint32_t characterReplyFieldF40 = 0;
+    uint32_t characterReplyFieldF44 = 0x1000;
+    std::array<uint32_t, 8> characterFlagsF48{};
+    std::array<uint32_t, 8> secondaryCharacterDataF68{};
+    std::array<uint32_t, 10> characterRecordPointersF88{};
+    std::array<char, 0x20> section0StringF8c{};
+    std::array<char, 0x20> section0StringFac{};
+    std::array<char, 0x20> section0StringFcc{};
+    std::array<uint8_t, 0x465> state8Section0RawF88{};
+    void* state8Section0OverflowBuffer13f0 = nullptr;
+    uint16_t state8Section0OverflowLength13f4 = 0;
+    void* allocatedBuffer13f8 = nullptr;
+    uint16_t allocatedBufferLength13fc = 0;
+    uint8_t flag13fe = 0;
+    void* allocatedBuffer1400 = nullptr;
+    uint16_t allocatedBufferLength1404 = 0;
+    uint8_t flag1406 = 0;
+    void* allocatedBuffer1408 = nullptr;
+    uint16_t allocatedBufferLength140c = 0;
+    uint8_t allocatedBufferFlag140e = 0;
+    void* allocatedBuffer1410 = nullptr;
+    uint16_t allocatedBufferLength1414 = 0;
+    uint8_t flag1416 = 0;
+    void* allocatedBuffer1418 = nullptr;
+    uint16_t allocatedBufferLength141c = 0;
+    uint8_t allocatedBufferFlag141e = 0;
+    void* allocatedBuffer1420 = nullptr;
+    uint16_t allocatedBufferLength1424 = 0;
+    uint8_t allocatedBufferFlag1426 = 0;
+    void* allocatedBuffer1428 = nullptr;
+    uint16_t allocatedBufferLength142c = 0;
+    uint8_t allocatedBufferFlag142e = 0;
+    void* allocatedBuffer1430 = nullptr;
+    uint16_t allocatedBufferLength1434 = 0;
+    uint8_t flag1436 = 0;
+    void* allocatedBuffer1438 = nullptr;
+    uint16_t allocatedBufferLength143c = 0;
+    uint8_t flag143e = 0;
+    void* allocatedBuffer1440 = nullptr;
+    uint32_t allocatedBufferLength1444 = 0;
+    uint8_t flag1448 = 0;
+    void* allocatedBuffer144c = nullptr;
+    uint16_t allocatedBufferLength1450 = 0;
+    uint8_t flag1452 = 0;
+    void* allocatedBuffer1454 = nullptr;
+    uint16_t allocatedBufferLength1458 = 0;
+    uint8_t flag145a = 0;
+    uint32_t state8Section10ChunkBitmap = 0;
+    uint32_t state8Section11Dword145c = 0;
+    std::string state8Section11String1460;
+    std::array<uint8_t, 8> replyParseBuffer{};
+    uint32_t replySectionData13cc = 0;
+    uint32_t replySectionData13d0 = 0;
+    uint8_t section0Flag13f6 = 0;
+    uint8_t characterRouteIndexCc8 = 0;
+
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18
     // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
     std::array<WorldDescriptorState_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;

@@ -89,7 +89,7 @@ CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
         view.characterName = slotZeroRecord->debugString14;
     }
 
-    const auto& ownerState = postAuthMarginLoadingState_0xf14;
+    const auto& ownerState = *this;
     view.characterName = PreferNonEmpty(view.characterName, ownerState.characterNameBufferF1c);
     view.characterName = PreferNonEmpty(
         view.characterName,

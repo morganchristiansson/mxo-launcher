@@ -97,7 +97,7 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
             static_cast<unsigned>(fallbackResult));
         return;
     }
-    if (g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
+    if (g_CurrentLoginMediator->state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
@@ -111,7 +111,7 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
 
     // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
     // Implement reservation inline for source fidelity
-    const char* characterName = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
+    const char* characterName = g_CurrentLoginMediator->createCharacterData108.characterName00.data();
     uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
     if (payload && characterName && packetBuilder.reservation14_.reservedContentByteCount04 == 0u) {
         size_t textLen = 0;
@@ -164,7 +164,7 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
         "DIAGNOSTIC: CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> postEvent=0x13",
         State10Packet0x0aFixedPayload::kFixedByteCount,
         totalBytes,
-        std::string(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data()));
+        std::string(g_CurrentLoginMediator->createCharacterData108.characterName00.data()));
     return;
 }
 
@@ -262,7 +262,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // so the TrackedMalloc+Init is approximated by value-initialization.
     const uint8_t appendedSlotIndex = g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_;
     const uint32_t selectedWorldDescriptorIndex =
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24;
+        g_CurrentLoginMediator->createCharacterData108.selectedWorldField24;
     if (appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size() ||
         appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
         selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldDescriptorCountD80_ ||
@@ -309,7 +309,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     Packet_MsClaimCharacterNameReply_0x4b5328& appendedSlotRecord =
         g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
     appendedSlotRecord.debugString14 =
-        g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
+        g_CurrentLoginMediator->createCharacterData108.characterName00.data();
 
     // anchor: launcher.exe:0x440288-0x4402ab
     // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,

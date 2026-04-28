@@ -246,7 +246,7 @@ uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
         return reinterpret_cast<uintptr_t>(this) & 0xffffff00;
     }
     // anchor: launcher.exe:0x41b42c / clear owner+0xf14
-    postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 0u;
+    state10SendGateFlagF14 = 0u;
     // anchor: launcher.exe:0x41b433 / set owner+0x2d
     marginConnectionFlag2d_ = 1u;
     // anchor: launcher.exe:0x41b437 / query margin connection state at +0x34

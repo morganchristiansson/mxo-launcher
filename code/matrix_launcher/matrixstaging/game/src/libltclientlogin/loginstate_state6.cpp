@@ -336,7 +336,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
 
   // Store for use in challenge-response construction
   g_CurrentLoginMediator->state6UdpSessionSecretF18_ = sessionSecret;
-  g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+  g_CurrentLoginMediator->state10SendGateFlagF14 = 1u;
 
   // anchor: launcher.exe:0x43fd20..0x440a30 - Build and send opcode 0x08 challenge response
   // Original constructs packet via vtable +0x68 / SendCurrentMarginPacket at 0x440a18
@@ -469,7 +469,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
 
   // anchor: launcher.exe:0x440ab9..0x440ac9 - write owner +0xf14 = 1 and owner +0xf18 = session secret
   const uint32_t udpSessionSecret09 = ReadU32LE(payloadBytes + 0x09u);
-  g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+  g_CurrentLoginMediator->state10SendGateFlagF14 = 1u;
   g_CurrentLoginMediator->state6UdpSessionSecretF18_ = udpSessionSecret09;
 
   // anchor: launcher.exe:0x440acc..0x440ae0 - get next helper state from cached upstream vtable+0x18

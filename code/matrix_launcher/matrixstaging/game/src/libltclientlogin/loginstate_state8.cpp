@@ -17,8 +17,6 @@
 namespace mxo::ltlogin {
 namespace {
 
-using PostAuthMarginLoadingState = CLTLoginMediator::PostAuthMarginLoadingState;
-
 // Shared chunk-seen helper used by state8 slot6 section-0x0a handling.
 // anchor: launcher.exe:0x43c240 = StateReplyChunkBitset_SetSeen
 // anchor: launcher.exe:0x43c280 = StateReplyChunkBitset_HasSeen
@@ -99,14 +97,14 @@ static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src
 }
 
 static void LogState8PersistenceFamilySnapshot(
-    const PostAuthMarginLoadingState& ownerState,
+    const CLTLoginMediator& ownerState,
     const char* reason,
     uint32_t sectionSelectorMinus2,
     uint16_t sectionByteCount,
     bool completed);
 
 static void LogState8PersistenceFamilySnapshot(
-    const PostAuthMarginLoadingState& ownerState,
+    const CLTLoginMediator& ownerState,
     const char* reason,
     uint32_t sectionSelectorMinus2,
     uint16_t sectionByteCount,
@@ -146,12 +144,12 @@ static void LogState8PersistenceFamilySnapshot(
 
 }  // namespace
 
-// anchor: launcher.exe vtable 0x004b5104
+// anchor: launcher.exe vtable 0x4b5104
 const char* CLTLoginState_State8_0x4b5104::DebugName() const {
     return "CLTLoginState_State8_0x4b5104";
 }
 
-// anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
+// anchor: launcher.exe:0x43bd20 (vtable 0x4b5104 slot 3)
 void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     (void)upstreamOrArg;
     if (!g_CurrentLoginMediator) {
@@ -213,7 +211,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<unchanged>");
         return;
     }
-    if (g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
+    if (g_CurrentLoginMediator->state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
@@ -224,7 +222,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
     spdlog::info(
         "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
-        static_cast<unsigned>(g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14),
+        static_cast<unsigned>(g_CurrentLoginMediator->state10SendGateFlagF14),
         static_cast<unsigned>(g_CurrentLoginMediator->state6UdpSessionSecretF18_),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
 
@@ -428,7 +426,7 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     return;
 }
 
-// anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
+// anchor: launcher.exe:0x43f930 (vtable 0x4b5104 slot 6)
 uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     if (!g_CurrentLoginMediator || workItem == nullptr) {
         return 0u;
@@ -486,7 +484,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionByteCount),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
 
-    auto& ownerState = g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14;
+    auto& ownerState = *g_CurrentLoginMediator;
+    auto& persistence = g_CurrentLoginMediator->state8PersistenceDataF1c; // anchor: launcher.exe owner `+0xf1c`
     g_CurrentLoginMediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         (void)g_CurrentLoginMediator->SetCurrentState(3u);
@@ -504,7 +503,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         // anchor: launcher.exe:0x438a50 first-fragment reset inside `0x43f930`
         // Keep this inlined here instead of routing through replacement-only helper methods:
         // current static-RE shows this work as part of the original slot6 body.
-        ownerState.state8PersistenceDataF1c = {};
+        persistence = {};
         std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
         ownerState.characterReplyFieldF3c = 0u;
         ownerState.characterReplyFieldF40 = 0u;
@@ -540,7 +539,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         ownerState.state8Section11String1460.clear();
 
         ownerState.characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
-        ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
+        persistence.replyField20 = loadCharacterReplyEnvelope.field05;
 
         const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
             g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
@@ -562,14 +561,14 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             std::copy(
                 ownerState.characterNameBufferF1c,
                 ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
-                ownerState.state8PersistenceDataF1c.characterName00.begin());
+                persistence.characterName00.begin());
         }
         ownerState.characterReplyFieldF40 = currentSlotRecord->worldId24;
         ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId24;
         ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->packetType1a;
-        ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId24;
-        ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId24;
-        ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->packetType1a;
+        persistence.selectedWorldField24 = currentSlotRecord->worldId24;
+        persistence.secondary4c[0] = currentSlotRecord->worldId24;
+        persistence.secondary4c[1] = currentSlotRecord->packetType1a;
         usedCurrentSlotRecord = true;
     }
 
@@ -577,7 +576,6 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         replySectionsExpected_ = loadCharacterReplyEnvelope.expectedSectionCount0b;
     }
 
-    auto& persistence = ownerState.state8PersistenceDataF1c;
     switch (loadCharacterReplyEnvelope.sectionSelectorMinus2) {
         case 0u:
             // anchor: launcher.exe:0x43fa6e
@@ -1045,7 +1043,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
     return 1u;
 }
 
-// anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
+// anchor: launcher.exe:0x438c90 (vtable 0x4b5104 slot 7)
 uint32_t CLTLoginState_State8_0x4b5104::GetStateId() const {
     return 8;
 }
