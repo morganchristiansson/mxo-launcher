@@ -601,13 +601,65 @@ const char* CLTLoginMediator::GetUsername() const {
 // `0x004b01c8 +0x40/+0x44` methods. Keep the fake outer-object construction in
 // `src/launcher_mediator_abi.cpp` so the launcher-owned mediator stays aligned with the tiny raw
 // slot-record accessors at `0x41f2e0 / 0x41f300`.
-CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetSelectionDescriptorObject40(
+Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescriptorObject40(
     uint32_t selectionIndex) {
-    return BuildMediatorSelectionDescriptorObject40AbiShim(*this, selectionIndex);
+    const uint32_t low24 = selectionIndex & 0x00ffffffu;
+    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
+    const uint32_t expectedScratchRequest = ExpectedSelectionDescriptorScratchRequest();
+    const bool matchedConfiguredRequest = SelectionDescriptorMatchesRequest(selectionIndex);
+    const uint8_t currentSlotIndex = this->CurrentCharacterRouteIndexCc8Scaffold();
+    const bool matchedCurrentSlotIndexRequest =
+        high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex);
+
+    const Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
+        (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
+            ? this->GetCurrentSlotRecord()
+            : nullptr;
+
+    if (!currentSlotRecord) {
+        spdlog::debug(
+            "CLTLoginMediator::GetSelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={}]",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            static_cast<unsigned>(currentSlotIndex),
+            static_cast<unsigned>(expectedScratchRequest),
+            matchedConfiguredRequest ? 1u : 0u,
+            matchedCurrentSlotIndexRequest ? 1u : 0u);
+        return nullptr;
+    }
+
+    spdlog::debug(
+        "CLTLoginMediator::GetSelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x}) -> payload {} [currentSlotIndex=0x{:02x} slotName='{}' charIdLow=0x{:08x} charIdHigh=0x{:08x}]",
+        static_cast<unsigned>(selectionIndex),
+        fmt::ptr(currentSlotRecord),
+        static_cast<unsigned>(currentSlotIndex),
+        currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
+        static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
+        static_cast<unsigned>(currentSlotRecord->characterIdHigh20));
+    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
 }
 
-CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetCurrentSlotRecordObject44() {
-    return BuildMediatorCurrentSlotRecordObject44AbiShim(*this);
+Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecordObject44() {
+    const Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
+        this->GetCurrentSlotRecord();
+
+    if (!currentSlotRecord) {
+        spdlog::info(
+            "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
+            static_cast<unsigned>(this->CurrentCharacterRouteIndexCc8Scaffold()));
+        return nullptr;
+    }
+
+    spdlog::info(
+        "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> payload {} [name='{}' charIdLow=0x{:08x} charIdHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
+        fmt::ptr(currentSlotRecord),
+        currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
+        static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
+        static_cast<unsigned>(currentSlotRecord->characterIdHigh20),
+        static_cast<unsigned>(currentSlotRecord->packetType1a),
+        static_cast<unsigned>(currentSlotRecord->worldId24));
+    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
 }
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48

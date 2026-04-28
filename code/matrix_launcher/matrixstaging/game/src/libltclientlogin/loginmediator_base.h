@@ -68,38 +68,11 @@ public:
 // Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
 // Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under
 // `0x004b01c8`:
-// - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
-// - wrapper `+0x44` returns a current-slot record object consumed by later save/profile code
-// Those are not the same thing as the owner-side `+0x40/+0x44` slot-record table accessors.
-// Note: SelectionCurrentSlotRecord44PayloadSketch removed - payload10 now points directly to Packet_MsClaimCharacterNameReply_0x4b5328
-
-struct CurrentSlotRecord44ObjectSketch {
-    // Wrapper-facing selection `+0x44` current-slot object.
-    // Current Ghidra tightening:
-    // - this outer `0x1c` layout matches the concrete `0x004b5328` slot-record class layout
-    //   closely (`+0x10 payload`, `+0x14 heapString`, `+0x18 heapStringLen`)
-    // - but wrapper slot `+0x44` is still distinct from owner vtable `+0x44 = GetCurrentSlotRecord`
-    void** vtable;
-    void* bufferBase04;
-    void* backingObject08;
-    uint8_t flag0c;
-    uint8_t padding0d[3];
-    Packet_MsClaimCharacterNameReply_0x4b5328* payload10;  // points to current slot record
-    const char* debugString14;  // Character name string (was: heapString14)
-    uint16_t debugStringLen18;  // Length of character name (was: heapStringLen18)
-    uint8_t padding1a[2];
-};
-
-// Offsets verified: inherited Packet_0x4af2a4 fields match the wrapper payload access pattern:
-// - characterIdLow1c at +0x1c
-// - characterIdHigh20 at +0x20
-// - packetType1a (slot status byte) at +0x1a
-// - worldId24 at +0x24
-static_assert(offsetof(CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
-static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugString14) == 0x14);
-static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugStringLen18) == 0x18);
-static_assert(sizeof(CurrentSlotRecord44ObjectSketch) == 0x1c);
-
+// - wrapper `+0x40` consumes an outer selection-descriptor object
+// - wrapper `+0x44` consumes an outer current-slot object
+// - both wrappers are built in `src/launcher_mediator_abi.cpp`
+// - the launcher-owned mediator returns the underlying
+//   `Packet_MsClaimCharacterNameReply_0x4b5328 *` payload pointer for those slots
 struct RouteDescriptor30SmallStringLikeSketch {
     // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
     // Wrapper-facing late-runtime object shape returned through arg6 `+0x10c`.
@@ -375,9 +348,10 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
-    virtual CurrentSlotRecord44ObjectSketch* GetSelectionDescriptorObject40(uint32_t selectionIndex) = 0;
+    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetSelectionDescriptorObject40(
+        uint32_t selectionIndex) = 0;
     // +0x44
-    virtual CurrentSlotRecord44ObjectSketch* GetCurrentSlotRecordObject44() = 0;
+    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetCurrentSlotRecordObject44() = 0;
     // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c
