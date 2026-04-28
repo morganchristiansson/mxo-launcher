@@ -866,7 +866,7 @@ public:
 static_assert(sizeof(Packet_AsAuthChallengeResponse_0x4b6d08) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsClaimCharacterNameRequest_0x4b6d08 size mismatch");
 
 // =============================================================================
-// Packet_MsClaimCharacterNameRequest_0x4b6cf4 - Multi-field packet builder (opcode 0x0a)
+// Packet_AsAuthChallengeResponse_0x4b6cf4 - Multi-field packet builder (opcode 0x0a)
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6cf4 (5 slots, 50 bytes)
 // anchor: launcher.exe:0x443ea0 = ctor (clustered with 0x443f00 virt_meth)
@@ -892,10 +892,10 @@ static_assert(sizeof(Packet_AsAuthChallengeResponse_0x4b6d08) == sizeof(mxo::lib
 
 // anchor: launcher.exe vtable 0x004b6cf4 / multi-field builder
 // Margin opcode 0x0a = MS_ClaimCharacterNameRequest (but used generically for auth responses)
-class Packet_MsClaimCharacterNameRequest_0x4b6cf4 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_AsAuthChallengeResponse_0x4b6cf4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
- // anchor: launcher.exe:0x443ea0 = Packet_MsClaimCharacterNameRequest_0x4b6cf4::ctor
- // anchor: launcher.exe:0x443f00 = Packet_MsClaimCharacterNameRequest_0x4b6cf4::ResetAndInitialize
+ // anchor: launcher.exe:0x443ea0 = Packet_AsAuthChallengeResponse_0x4b6cf4::ctor
+ // anchor: launcher.exe:0x443f00 = Packet_AsAuthChallengeResponse_0x4b6cf4::ResetAndInitialize
  // Original implementation pattern:
  // 1. Calls Packet_0x4af2a4 default ctor
  // 2. Sets vtable to 0x4b6cf4
@@ -1032,7 +1032,7 @@ public:
  ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold soePasswordField24_{};
 
  // Override virtual methods to match 5-slot vtable
- ~Packet_MsClaimCharacterNameRequest_0x4b6cf4() override = default;
+ ~Packet_AsAuthChallengeResponse_0x4b6cf4() override = default;
  uint32_t StubReturn0() override { return 0u; }
  void DebugString(int /*formatType*/ = 2) override {}
  void InitializePayloadSize() override {}

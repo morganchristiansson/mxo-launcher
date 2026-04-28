@@ -1877,7 +1877,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
                     return kAuthBootstrap680InboundUnhandled;
                 }
 
-                Packet_MsClaimCharacterNameRequest_0x4b6cf4 plaintextPacket;
+                Packet_AsAuthChallengeResponse_0x4b6cf4 plaintextPacket;
                 plaintextPacket.ResetAndInitialize();
 
                 if (buildResult.processedChallengeMd5Bytes.size() >= 16u) {
@@ -1915,7 +1915,7 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
                 const uint32_t sendResult = 1u;
 
                 spdlog::debug(
-                    "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage observed raw0x0a send using Packet_MsClaimCharacterNameRequest_0x4b6cf4 + Packet_AsAuthChallengeResponse_0x4b6d08 decryptedChallengeBytes={} processedChallengeMd5Bytes={}",
+                    "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage observed raw0x0a send using Packet_AsAuthChallengeResponse_0x4b6cf4 + Packet_AsAuthChallengeResponse_0x4b6d08 decryptedChallengeBytes={} processedChallengeMd5Bytes={}",
                     static_cast<unsigned>(buildResult.decryptedChallengeBytes.size()),
                     static_cast<unsigned>(buildResult.processedChallengeMd5Bytes.size()));
                 spdlog::info(
