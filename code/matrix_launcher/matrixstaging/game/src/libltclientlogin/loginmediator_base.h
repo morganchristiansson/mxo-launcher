@@ -75,13 +75,70 @@ public:
 //   `Packet_MsClaimCharacterNameReply_0x4b5328 *` payload pointer for those slots
 struct RouteDescriptor30SmallStringLikeSketch {
     // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
-    // ABI-compatibility wrapper object shape returned through arg6 `+0x10c`.
-    // Current client-side evidence only consumes the first two dwords as a small-string
-    // begin/current pair, but keep the third dword explicit because the original getter returns a
-    // full 3-dword string-like object at owner `+0x30`.
+    // Shared 3-dword string-state layout used by the owner route-descriptor field at `+0x30`.
+    // Wrapper callers currently consume it through arg6 `+0x10c`.
     const char* begin = nullptr;
     const char* current = nullptr;
     const char* capacity = nullptr;
+};
+
+class StringTriple_0x403f90 : public RouteDescriptor30SmallStringLikeSketch {
+public:
+    // anchor: launcher.exe:0x403f20
+    StringTriple_0x403f90() { SyncFromOwned(); }
+
+    // anchor: launcher.exe:0x403f20 = cls_0x403f90::meth_0x403f20
+    void* AssignFromCString(const char* text) {
+        owned_ = text ? text : "";
+        SyncFromOwned();
+        return this;
+    }
+
+    // anchor: launcher.exe:0x407dd0 = cls_0x403f90::StringTriple_AssignFromRange
+    StringTriple_0x403f90* AssignFromRange(const char* sourceBegin, const char* sourceEnd) {
+        if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
+            Clear();
+            return this;
+        }
+        owned_.assign(sourceBegin, sourceEnd);
+        SyncFromOwned();
+        return this;
+    }
+
+    void Assign(const char* value) {
+        AssignFromCString(value);
+    }
+
+    void Assign(const std::string& value) {
+        owned_ = value;
+        SyncFromOwned();
+    }
+
+    int CompareNoCase(const char* other) const;
+
+    void Clear() {
+        owned_.clear();
+        SyncFromOwned();
+    }
+
+    void ReleaseStorage() {
+        owned_.clear();
+        owned_.shrink_to_fit();
+        SyncFromOwned();
+    }
+
+    const char* BeginOrNull() const {
+        return (begin != nullptr && begin != current) ? begin : nullptr;
+    }
+
+private:
+    void SyncFromOwned() {
+        begin = owned_.c_str();
+        current = begin + owned_.size();
+        capacity = current;
+    }
+
+    std::string owned_;
 };
 
 struct LateEntryList1470EntrySketch {

@@ -89,13 +89,14 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
 //     }
 // }
 
-// Faithful: use global directly (original doesn't have this helper - just uses StringTriple result)
+// Faithful bounded helper around owner `+0x30` usage in `0x41e500`.
 std::string CLTLoginMediator::ResolvedMarginHostName() const {
     if (!marginRouteState_.exactMarginHostName.empty()) {
         return marginRouteState_.exactMarginHostName;
     }
-    if (!marginRouteState_.routeHostPrefix.empty() && g_marginServerDNSName && g_marginServerDNSName[0]) {
-        return marginRouteState_.routeHostPrefix + g_marginServerDNSName;
+    if (const char* const routeDescriptorBegin = routeDescriptor30_.BeginOrNull();
+        routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
+        return std::string(routeDescriptorBegin) + g_marginServerDNSName;
     }
     return std::string();
 }

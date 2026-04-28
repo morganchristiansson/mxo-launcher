@@ -53,6 +53,14 @@ namespace {
 char g_CLTLoginMediatorCharacterPersistenceDataEmptySection11Buffer[8] = {'\0'};
 }
 
+int StringTriple_0x403f90::CompareNoCase(const char* other) const {
+#if defined(_WIN32)
+    return _stricmp(begin ? begin : "", other ? other : "");
+#else
+    return strcasecmp(begin ? begin : "", other ? other : "");
+#endif
+}
+
 CLTLoginMediatorCharacterPersistenceData_0x41d900::CLTLoginMediatorCharacterPersistenceData_0x41d900() {
     // anchor: launcher.exe:0x41d900
     // Static-RE ctor summary:
@@ -2689,7 +2697,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         }
 
         const Packet_MsClaimCharacterNameReply_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
-        const RouteHostStringTripleState& route = selectionRouteState684_.routeHostStringTriples194_[i];
+        const StringTriple_0x403f90& route = selectionRouteState684_.routeHostStringTriples194_[i];
         const char* characterName = slotRecord.debugString14 ? slotRecord.debugString14 : "";
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";
         std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);

@@ -32,9 +32,9 @@ const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const
 
     // Current bounded stand-in for the still-unrecovered earlier producer of owner
     // `+0x30/+0x3c/+0x6c` on the existing-character path:
-    // when the per-slot route table is not populated yet, reuse the launcher-selected route host
-    // prefix already mirrored on the owner.
-    return marginRouteState_.routeHostPrefix.empty() ? nullptr : marginRouteState_.routeHostPrefix.c_str();
+    // when the per-slot route table is not populated yet, reuse the owner `+0x30`
+    // route-descriptor string directly.
+    return routeDescriptor30_.BeginOrNull();
 }
 
 const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const {
@@ -68,8 +68,10 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner++0x6c)`
 
-    // Fidelity: the original path consumes the caller-supplied route-host text directly.
-    // The callsite is responsible for feeding the margin-server suffix/global-backed value.
+    // Fidelity correction from `0x41e500`:
+    // - arg1 is compared against owner `+0x30`
+    // - on change, owner `+0x30` is reassigned from that caller-supplied route text
+    // - the later address-list rebuild path then consumes owner `+0x30`, not a sidecar prefix
     // Use global port for endpoint construction.
     const uint16_t portHostOrder = g_marginServerPort != 0u ? g_marginServerPort : marginServerPortHostOrder_;
 
@@ -93,11 +95,14 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         (cachedRouteSelector != 0u) && (marginEndpoint_.ipv4NetworkOrder == 0u);
     if (shouldRefreshRouteState || needsBoundedNonZeroSelectorMaterialization) {
         // `0x41e500` only refreshes owner `+0x30/+0x3c/+0x6c` on the exact `arg2 == 0` path.
-        // The extra `selector != 0 && endpoint still zero` branch below is a bounded source-owned
+        // The extra `selector != 0 && endpoint still zero` branch below remains a bounded
         // stand-in for the still-unrecovered earlier producer that should already have
         // materialized owner `+0x6c` before the non-zero-selector state4/state8 path reaches here.
-        if (shouldRefreshRouteState || marginRouteState_.routeHostPrefix.empty()) {
-            marginRouteState_.routeHostPrefix = routeHostText;
+        if (shouldRefreshRouteState) {
+            const char* const newRouteDescriptor = routeHostText ? routeHostText : "";
+            if (routeDescriptor30_.CompareNoCase(newRouteDescriptor) != 0) {
+                routeDescriptor30_.AssignFromCString(newRouteDescriptor);
+            }
         }
 
         const std::string marginHost = ResolvedMarginHostName();
@@ -204,7 +209,7 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
     if (slotIndex >= 100u) {
         return nullptr;
     }
-    const RouteHostStringTripleState& slot = selectionRouteState684_.routeHostStringTriples194_[slotIndex];
+    const StringTriple_0x403f90& slot = selectionRouteState684_.routeHostStringTriples194_[slotIndex];
     return slot.BeginOrNull();
 }
 

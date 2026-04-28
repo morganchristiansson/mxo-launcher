@@ -525,85 +525,6 @@ public:
         uint8_t characterRouteIndexCc8 = 0;              // `+0xcc8`
     };
 
-    struct RouteHostStringTripleState {
-        // Source-owned mirror of owner `+0x818`.
-        // Faithful current read from `0x43f300 / 0x4401a0 / 0x41b260`:
-        // - original storage is the common 3-dword string-triple family (`begin/current/capacity`)
-        // - `+0x818` stores the copied world-descriptor inline-name string (`payload + 0x03`)
-        // - wrapper-facing arg6 `+0xe0` returns that same begin pointer when the slot is live
-        // - state-7/8/0x0d margin-route consumers then reuse that copied descriptor text as their
-        //   route/world string input instead of a replacement-only lowercase host-prefix variant
-        // - `+0x1470` remains a separate later late-entry string-triple vector
-        std::string owned;
-        const char* begin = nullptr;
-        const char* current = nullptr;
-        const char* capacity = nullptr;
-
-        RouteHostStringTripleState() { SyncFromOwned(); }
-
-        RouteHostStringTripleState(const RouteHostStringTripleState& other)
-            : owned(other.owned) {
-            SyncFromOwned();
-        }
-
-        RouteHostStringTripleState& operator=(const RouteHostStringTripleState& other) {
-            if (this != &other) {
-                owned = other.owned;
-                SyncFromOwned();
-            }
-            return *this;
-        }
-
-        RouteHostStringTripleState(RouteHostStringTripleState&& other) noexcept
-            : owned(std::move(other.owned)) {
-            SyncFromOwned();
-            other.SyncFromOwned();
-        }
-
-        RouteHostStringTripleState& operator=(RouteHostStringTripleState&& other) noexcept {
-            if (this != &other) {
-                owned = std::move(other.owned);
-                SyncFromOwned();
-                other.SyncFromOwned();
-            }
-            return *this;
-        }
-
-        void Assign(const char* value) {
-            owned = value ? value : "";
-            SyncFromOwned();
-        }
-
-        void Assign(const std::string& value) {
-            owned = value;
-            SyncFromOwned();
-        }
-
-        void Clear() {
-            if (!owned.empty()) {
-                owned.clear();
-            }
-            SyncFromOwned();
-        }
-
-        void ReleaseStorage() {
-            owned.clear();
-            owned.shrink_to_fit();
-            SyncFromOwned();
-        }
-
-        const char* BeginOrNull() const {
-            return (begin != nullptr && begin != current) ? begin : nullptr;
-        }
-
-    private:
-        void SyncFromOwned() {
-            begin = owned.c_str();
-            current = begin + owned.size();
-            capacity = current;
-        }
-    };
-
     class CLTLoginMediatorSelectionRouteState {
     public:
         struct PersistedSelectionContext64c {
@@ -642,13 +563,13 @@ public:
         // Source-owned mirrors of the original embedded helper layout:
         // - `+0x00`  = active slot-record count
         // - `+0x04`  = slot-record pointer table (mirrored here as value objects plus validity bits)
-        // - `+0x194` = route-string triples
+        // - `+0x194` = route-string triples (`StringTriple_0x403f90` / cls_0x403f90 family)
         // - `+0x644` = current slot / selection byte
         // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
         uint8_t slotRecordCount00_ = 0;
         std::array<Packet_MsClaimCharacterNameReply_0x4b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
         std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
-        std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity> routeHostStringTriples194_{};
+        std::array<StringTriple_0x403f90, kRecoveredWorldSlotCapacity> routeHostStringTriples194_{};
         uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
         PersistedSelectionContext64c persistedSelectionContext64c_{};
     };
@@ -1514,7 +1435,7 @@ public:
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
-    RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
+    StringTriple_0x403f90 routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
     // - entries are 12-byte owned string-triples copied by `0x41f640`
