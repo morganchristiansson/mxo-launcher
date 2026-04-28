@@ -598,35 +598,32 @@ const char* CLTLoginMediator::GetUsername() const {
 }
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
-// Static-RE shape:
-// - consumes only the low byte of the caller argument
-// - if that byte is `0xff`, return null
-// - otherwise return owner `+0x688 + slotIndex*4`
-// Wrapper-facing selection-descriptor policy and fake outer-object construction live at the ABI
-// boundary in `src/launcher_mediator_abi.cpp`, not here.
+// Original body: direct field access without validation
 Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescriptorObject40(
     uint32_t selectionIndex) {
-    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(
-        GetSlotRecordByIndex(static_cast<uint8_t>(selectionIndex & 0xffu)));
+    const uint8_t slotIndex = static_cast<uint8_t>(selectionIndex & 0xffu);
+    if (slotIndex != 0xffu) {
+        return &selectionRouteState684_.slotRecordTable04_[slotIndex];
+    }
+    return nullptr;
 }
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
-// Static-RE shape:
-// - load owner byte `+0xcc8`
-// - forward that low byte into owner `+0x40`
-// Source fidelity note:
-// - `loginmediator_margin_route.cpp` already holds the clean direct-field reconstruction of this
-//   owner accessor as `GetCurrentSlotRecord()`
-// - reuse that exact helper here instead of the older scaffold-flavored current-slot accessor
+// Original body: direct field access
 Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecordObject44() {
-    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(GetCurrentSlotRecord());
+    const uint8_t currentSlot = selectionRouteState684_.currentSlotOrSelectionIndex644_;
+    if (currentSlot != 0xffu) {
+        return &selectionRouteState684_.slotRecordTable04_[currentSlot];
+    }
+    return nullptr;
 }
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
-    const Packet_MsClaimCharacterNameReply_0x4b5328* slotRecord = GetCurrentSlotRecord();
+    const Packet_MsClaimCharacterNameReply_0x4b5328* slotRecord =
+        const_cast<CLTLoginMediator*>(this)->GetCurrentSlotRecordObject44();
     if (!slotRecord) {
-        slotRecord = GetSlotRecordByIndex(0u);
+        slotRecord = const_cast<CLTLoginMediator*>(this)->GetSelectionDescriptorObject40(0u);
     }
 
     const auto& ownerState = postAuthMarginLoadingState_0xf14;
@@ -1964,7 +1961,8 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 0x12000009u;
     }
 
-    const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
+    const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
+        GetCurrentSlotRecordObject44();
     if (!currentSlotRecord) {
         std::memset(outDwords, 0, 0x20u);
         spdlog::info(
