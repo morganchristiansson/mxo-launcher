@@ -552,6 +552,64 @@ public:
 static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
 
 // =============================================================================
+// Packet_AsGetPublicKeyRequest_0x4b6c74 - Compact auth packet builder (opcode 0x06)
+// =============================================================================
+// anchor: launcher.exe vtable 0x004b6c74
+// anchor: launcher.exe:0x447eb0 = AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest
+//
+// Recovered role:
+// - compact `Packet_0x4af2a4` subclass used on the raw auth bootstrap send path
+// - reserves a fixed 9-byte payload and stamps opcode `0x06`
+// - caller then writes:
+//   - dword [payload+0x01] = launcherVersion
+//   - dword [payload+0x05] = currentPublicKeyId
+//
+// Important fidelity note:
+// - launcher.exe also retables the larger auth-reply parse-object shell to this same vtable
+//   address (`0x004b6c74`) before copying the expanded non-virtual state that follows the first
+//   `Packet_0x4af2a4`-sized prefix. Keep the compact builder name explicit here because
+//   `0x447eb0` only uses the base packet envelope surface.
+class Packet_AsGetPublicKeyRequest_0x4b6c74 : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+ static constexpr uint8_t kPayloadTag06 = 0x06;
+ static constexpr size_t kLauncherVersionOffset = 0x01;
+ static constexpr size_t kCurrentPublicKeyIdOffset = 0x05;
+ static constexpr size_t kFixedByteCount = 0x09;
+
+ // anchor: launcher.exe:0x447eb0 / local packet init after Packet_0x4af2a4 default ctor
+ // The original grows a 9-byte payload, zeros both trailing dwords, then the caller patches in
+ // child `+0x2c` launcherVersion and child `+0x9c` currentPublicKeyId before send.
+ void InitializePayloadSize() override {
+  payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+
+  if (!messageRef08 || !messageRef08->messageStorage0c) {
+   return;
+  }
+
+  messageRef08->GrowPayloadByteCount(kFixedByteCount);
+
+  // Source-owned stability: refresh the inherited payload pointer after growth before writing.
+  payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+  payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+
+  uint8_t* payload = PayloadBase();
+  if (payload) {
+   payload[0] = kPayloadTag06;
+   *reinterpret_cast<uint32_t*>(payload + kLauncherVersionOffset) = 0u;
+   *reinterpret_cast<uint32_t*>(payload + kCurrentPublicKeyIdOffset) = 0u;
+  }
+
+  debugString14 = nullptr;
+  payloadSize18 = 0u;
+ }
+
+ uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadAlias10); }
+ const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
+};
+
+static_assert(sizeof(Packet_AsGetPublicKeyRequest_0x4b6c74) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_AsGetPublicKeyRequest_0x4b6c74 size mismatch");
+
+// =============================================================================
 // Packet_MsConnectChallenge_0x4b6ca4 - Parse/builder accessor for MS_ConnectChallenge (opcode 0x07)
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6ca4 (5 slots, 20 bytes)

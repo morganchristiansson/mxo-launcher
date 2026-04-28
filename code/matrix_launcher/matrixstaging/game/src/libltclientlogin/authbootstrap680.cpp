@@ -600,6 +600,9 @@ static bool BuildAuthBootstrap680AuthReplyParseObjectFromPacketBody(
     }
 
     *outParseObject = {};
+    // anchor: launcher.exe:0x004b6c74
+    // The launcher reuses this same vtable address for the compact
+    // `Packet_AsGetPublicKeyRequest_0x4b6c74` builder and the larger copied auth-reply parse shell.
     outParseObject->vtable00 = 0x004b6c74u;
     outParseObject->packetBody04 = packetBodyBytes->empty() ? nullptr : packetBodyBytes->data();
     outParseObject->incomingMessage08 = nullptr;
@@ -2043,13 +2046,29 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(
         }
     }
 
+    Packet_AsGetPublicKeyRequest_0x4b6c74 packetBuilder;
+    packetBuilder.InitializePayloadSize();
+    uint8_t* const getPublicKeyRequestPayload = packetBuilder.PayloadBase();
+    if (!getPublicKeyRequestPayload) {
+        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to initialize Packet_AsGetPublicKeyRequest_0x4b6c74 payload");
+        return 0;
+    }
+
+    getPublicKeyRequestPayload[0] = Packet_AsGetPublicKeyRequest_0x4b6c74::kPayloadTag06;
+    *reinterpret_cast<uint32_t*>(
+        getPublicKeyRequestPayload + Packet_AsGetPublicKeyRequest_0x4b6c74::kLauncherVersionOffset) =
+        launcherVersion2C;
+    *reinterpret_cast<uint32_t*>(
+        getPublicKeyRequestPayload + Packet_AsGetPublicKeyRequest_0x4b6c74::kCurrentPublicKeyIdOffset) =
+        currentPublicKeyId9C;
+
     mxo::auth::FramedPacket packet;
-    if (!mxo::auth::BuildGetPublicKeyRequestPacket(
-            launcherVersion2C,
-            currentPublicKeyId9C,
+    if (!mxo::auth::BuildVariableLengthPacket(
+            getPublicKeyRequestPayload,
+            Packet_AsGetPublicKeyRequest_0x4b6c74::kFixedByteCount,
             mxo::auth::kFrameModeAuto,
             &packet)) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_GetPublicKeyRequest");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to frame Packet_AsGetPublicKeyRequest_0x4b6c74");
         return 0;
     }
 
