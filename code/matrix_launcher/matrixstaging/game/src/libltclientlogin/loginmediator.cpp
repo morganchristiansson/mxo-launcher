@@ -1553,7 +1553,10 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
 
 // anchor: launcher.exe:0x41f2c0 slot +0x10c
 RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30() {
-    return BuildMediatorRouteDescriptor30AbiShim(*this);
+    // This wrapper-facing small-string surface is materialized by
+    // `src/launcher_mediator_abi.cpp::Mediator_GetRouteDescriptor10c`.
+    // Keep owner-side code off this ABI object and use the route-text helpers directly.
+    return nullptr;
 }
 
 // anchor: launcher.exe:0x41af50 +0x118

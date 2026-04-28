@@ -2,6 +2,7 @@
 #include "loginmediator.h"
 
 #include <spdlog/spdlog.h>
+#include <string>
 #include <system_error>
 
 namespace mxo::ltlogin {
@@ -118,10 +119,10 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     switch (upstreamPhaseCode) {
         case 6: {
-            const auto* routeDescriptor30 = g_CurrentLoginMediator->GetRouteDescriptor30();
+            const std::string routeDescriptor30 = g_CurrentLoginMediator->ResolvedMarginHostName();
             BeginMarginConnectionForState4Case(
                 g_CurrentLoginMediator,
-                routeDescriptor30 ? routeDescriptor30->begin : nullptr,
+                routeDescriptor30.empty() ? nullptr : routeDescriptor30.c_str(),
                 0u);
             return;
         }

@@ -4,10 +4,6 @@
 
 namespace mxo::ltlogin {
 class CLTLoginMediator;
-struct RouteDescriptor30SmallStringLikeSketch;
-
-RouteDescriptor30SmallStringLikeSketch* BuildMediatorRouteDescriptor30AbiShim(
-    CLTLoginMediator& mediator);
 }
 
 struct MinimalLoginMediatorStub {
