@@ -90,35 +90,33 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
 
     marginConnectionFlag2d_ = 0;
 
-    const bool shouldRefreshRouteState = (cachedRouteSelector == 0u);
-    const bool needsBoundedNonZeroSelectorMaterialization =
-        (cachedRouteSelector != 0u) && (marginEndpoint_.ipv4NetworkOrder == 0u);
-    if (shouldRefreshRouteState || needsBoundedNonZeroSelectorMaterialization) {
-        // `0x41e500` only refreshes owner `+0x30/+0x3c/+0x6c` on the exact `arg2 == 0` path.
-        // The extra `selector != 0 && endpoint still zero` branch below remains a bounded
-        // stand-in for the still-unrecovered earlier producer that should already have
-        // materialized owner `+0x6c` before the non-zero-selector state4/state8 path reaches here.
-        if (shouldRefreshRouteState) {
-            const char* const newRouteDescriptor = routeHostText ? routeHostText : "";
-            if (routeDescriptor30_.CompareNoCase(newRouteDescriptor) != 0) {
-                routeDescriptor30_.AssignFromCString(newRouteDescriptor);
+    std::string marginHost;
+    if (cachedRouteSelector == 0u) {
+        // `0x41e500` exact route refresh shape:
+        // - compare caller arg1 against owner `+0x30`
+        // - when different, assign `[arg1, terminator)` into owner `+0x30`
+        // - rebuild owner `+0x3c` from owner `+0x30` plus the global suffix
+        const char* const newRouteDescriptor = routeHostText ? routeHostText : "";
+        if (_stricmp(routeDescriptor30_.begin ? routeDescriptor30_.begin : "", newRouteDescriptor) != 0) {
+            const char* sourceEnd = newRouteDescriptor;
+            while (*sourceEnd != '\0') {
+                ++sourceEnd;
             }
+            routeDescriptor30_.AssignFromRange(newRouteDescriptor, sourceEnd);
         }
 
-        const std::string marginHost = ResolvedMarginHostName();
+        if (const char* const routeDescriptorBegin = routeDescriptor30_.BeginOrNull();
+            routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
+            marginHost = std::string(routeDescriptorBegin) + g_marginServerDNSName;
+        }
         if (marginHost.empty()) {
             spdlog::debug("CLTLoginMediator::BeginMarginConnection has no resolved margin host");
             return 0u;
         }
 
-        // Faithful: inline rebuild address list (original reads owner `+0x3c` directly)
         const bool routeChanged = (marginAddressListResolvedHostName3c_ != marginHost);
         if (routeChanged || marginAddressList3c_.Empty()) {
             marginAddressListResolvedHostName3c_ = marginHost;
-            if (marginHost.empty()) {
-                marginAddressList3c_.Reset();
-                return 0u;
-            }
             uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
             if (ignoreHostsFileForMargin_) {
                 flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
@@ -128,7 +126,6 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
             }
         }
 
-        // Faithful: inline select and build (original reads owner `+0x7c` directly)
         if (marginSelectedIpv4_7c_ == 0u) {
             marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
         }
@@ -138,18 +135,19 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
                 marginHost);
             return 0u;
         }
-        // Faithful inline endpoint build (original writes to owner `+0x6c` directly)
         marginEndpoint_.family = 2;
         marginEndpoint_.portNetworkOrder =
             static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
         marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
+    } else if (const char* const routeDescriptorBegin = routeDescriptor30_.BeginOrNull();
+               routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
+        marginHost = std::string(routeDescriptorBegin) + g_marginServerDNSName;
     }
 
     ++marginBeginCount24_;
     marginSelectedIpv4_7c_ = 0u;
 
     // Original does NOT call SetRemoteHostName - only sets endpoint
-    const std::string marginHost = ResolvedMarginHostName();
     connection->remoteEndpoint_ = marginEndpoint_;
 
     // Call Connect via vtable+0x1c (same as BeginAuthConnection)
