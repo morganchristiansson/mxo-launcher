@@ -252,7 +252,7 @@ namespace mxo::ltlogin {
 
 // Note: The original launcher.exe does NOT have a shared "PacketBuilderEnvelopeBase" class.
 // Each packet builder class directly inherits from Packet_0x4af2a4 with its own vtable.
-// Source code should use the concrete classes (Packet_MsDeleteCharacterRequest_0x4b53f0, Packet_MsClaimCharacterNameRequest_0x4b53b4, Packet_MsCreateCharacterRequest_0x4b53c8, Packet_MsLoadCharacterRequest_0x4b5418)
+// Source code should use the concrete classes (Packet_MsDeleteCharacterRequest_0x4b53f0, Packet_AsAuthChallengeResponse_0x4b53b4, Packet_MsCreateCharacterRequest_0x4b53c8, Packet_MsLoadCharacterRequest_0x4b5418)
 // and access fields directly.
 
 struct State7Packet0x0dFixedPayload {
@@ -391,7 +391,7 @@ struct State10Packet0x0aFixedPayload {
 // Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
 //
 // Margin opcode 0x0a = MS_ClaimCharacterNameRequest (used by state10)
-class Packet_MsClaimCharacterNameRequest_0x4b53b4 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_AsAuthChallengeResponse_0x4b53b4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
     // anchor: launcher.exe:0x43a1f0
     void ResetAndInitialize() {

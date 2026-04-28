@@ -105,8 +105,8 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
         return;
     }
 
-    // anchor: launcher.exe:0x43a1f0 = Packet_MsClaimCharacterNameRequest_0x4b53b4::ResetAndInitialize
-    Packet_MsClaimCharacterNameRequest_0x4b53b4 packetBuilder;
+    // anchor: launcher.exe:0x43a1f0 = Packet_AsAuthChallengeResponse_0x4b53b4::ResetAndInitialize
+    Packet_AsAuthChallengeResponse_0x4b53b4 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
