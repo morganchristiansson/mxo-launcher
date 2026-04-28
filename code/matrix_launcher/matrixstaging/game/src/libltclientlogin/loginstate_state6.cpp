@@ -14,7 +14,7 @@
 namespace mxo::ltlogin {
 namespace {
 
-// State6Packet0x06FixedPayload is defined in loginstate_packet_builder_scaffold.h
+// Raw state6 payload layout is inlined here to match the launcher static-RE.
 
 static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* mediator) {
   // anchor: launcher.exe:0x438e60 = GetGOBFileGUID
@@ -231,7 +231,7 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     : 0u);
   spdlog::info(
     "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
-    State6Packet0x06FixedPayload::kFixedByteCount,
+    0x23u,
     static_cast<unsigned>(loggedLauncherVersion),
     static_cast<unsigned>(loggedClientVersion),
     static_cast<unsigned>(loggedGobGuid[0]),

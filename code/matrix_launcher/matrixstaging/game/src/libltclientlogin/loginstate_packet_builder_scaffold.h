@@ -505,23 +505,6 @@ struct State8MarginPacketFixedPayload {
 //   4. Call CLTLoginMediator::SetGameSessionIdOnPacket() helper (mediator method)
 //   5. Send via CLTLoginMediator::SendCurrentMarginPacket()
 
-struct State6Packet0x06FixedPayload {
-    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
-    // raw margin opcode `0x06` = `MS_ConnectRequest`
-    static constexpr uint8_t kPayloadTag06 = 0x06;
-    static constexpr size_t kLauncherVersionOffset = 0x01;
-    static constexpr size_t kClientVersionOffset = 0x05;
-    static constexpr size_t kStateByteOffset = 0x09;
-    static constexpr uint8_t kStateByteValue = 0x01;
-    static constexpr size_t kFixedDwordAOffset = 0x0a;
-    static constexpr uint32_t kFixedDwordA = 0x11186887u;
-    static constexpr size_t kFixedDwordEOffset = 0x0e;
-    static constexpr uint32_t kFixedDwordE = 0x7460a4b0u;
-    static constexpr size_t kGobFileGuidOffset = 0x12;
-    static constexpr size_t kCurrentHelperPhaseOffset = 0x22;
-    static constexpr size_t kFixedByteCount = 0x23;
-};
-
 // anchor: launcher.exe vtable 0x004b5364 / packet 0x06 builder
 // anchor: launcher.exe:0x43b8f0 = ResetAndInitialize
 //
@@ -539,26 +522,25 @@ public:
         }
 
         if (messageRef08 && messageRef08->messageStorage0c) {
-            messageRef08->messageStorage0c->ResetPayloadByteCount(
-                State6Packet0x06FixedPayload::kFixedByteCount);
+            messageRef08->messageStorage0c->ResetPayloadByteCount(0x23u);
             payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
             payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
         }
 
         uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
         if (payload) {
-            payload[0] = State6Packet0x06FixedPayload::kPayloadTag06;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kLauncherVersionOffset) = 0u;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kClientVersionOffset) = 0u;
-            payload[State6Packet0x06FixedPayload::kStateByteOffset] = State6Packet0x06FixedPayload::kStateByteValue;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordAOffset) = State6Packet0x06FixedPayload::kFixedDwordA;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kFixedDwordEOffset) = State6Packet0x06FixedPayload::kFixedDwordE;
+            payload[0] = 0x06;
+            *reinterpret_cast<uint32_t*>(payload + 0x01) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + 0x05) = 0u;
+            payload[0x09] = 0x01;
+            *reinterpret_cast<uint32_t*>(payload + 0x0a) = 0x11186887u;
+            *reinterpret_cast<uint32_t*>(payload + 0x0e) = 0x7460a4b0u;
             // GobFileGuid at +0x12 (4 dwords)
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0) = 0u;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4) = 0u;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8) = 0u;
-            *reinterpret_cast<uint32_t*>(payload + State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc) = 0u;
-            payload[State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset] = 0u;
+            *reinterpret_cast<uint32_t*>(payload + 0x12 + 0x0) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + 0x12 + 0x4) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + 0x12 + 0x8) = 0u;
+            *reinterpret_cast<uint32_t*>(payload + 0x12 + 0xc) = 0u;
+            payload[0x22] = 0u;
         }
     }
 
