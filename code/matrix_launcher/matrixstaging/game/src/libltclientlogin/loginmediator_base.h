@@ -348,10 +348,10 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
-    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetSelectionDescriptorObject40(
+    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetAuthReplyPacketByIndex40(
         uint32_t selectionIndex) = 0;
     // +0x44
-    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetCurrentSlotRecordObject44() = 0;
+    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetCurrentAuthReplyPacket44() = 0;
     // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c

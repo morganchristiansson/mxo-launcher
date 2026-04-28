@@ -599,7 +599,7 @@ const char* CLTLoginMediator::GetUsername() const {
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
 // Original body: direct field access without validation
-Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescriptorObject40(
+Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetAuthReplyPacketByIndex40(
     uint32_t selectionIndex) {
     const uint8_t slotIndex = static_cast<uint8_t>(selectionIndex & 0xffu);
     if (slotIndex != 0xffu) {
@@ -610,7 +610,7 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescrip
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
 // Original body: direct field access
-Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecordObject44() {
+Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentAuthReplyPacket44() {
     const uint8_t currentSlot = selectionRouteState684_.currentSlotOrSelectionIndex644_;
     if (currentSlot != 0xffu) {
         return &selectionRouteState684_.slotRecordTable04_[currentSlot];
@@ -621,9 +621,9 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecor
 // anchor: launcher.exe:0x41f350 / vtable +0x48
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     const Packet_MsClaimCharacterNameReply_0x4b5328* slotRecord =
-        const_cast<CLTLoginMediator*>(this)->GetCurrentSlotRecordObject44();
+        const_cast<CLTLoginMediator*>(this)->GetCurrentAuthReplyPacket44();
     if (!slotRecord) {
-        slotRecord = const_cast<CLTLoginMediator*>(this)->GetSelectionDescriptorObject40(0u);
+        slotRecord = const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(0u);
     }
 
     const auto& ownerState = postAuthMarginLoadingState_0xf14;
@@ -1962,7 +1962,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     }
 
     const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
-        GetCurrentSlotRecordObject44();
+        GetCurrentAuthReplyPacket44();
     if (!currentSlotRecord) {
         std::memset(outDwords, 0, 0x20u);
         spdlog::info(

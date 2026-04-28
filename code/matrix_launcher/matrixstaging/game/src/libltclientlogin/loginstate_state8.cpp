@@ -231,7 +231,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
-        g_CurrentLoginMediator->GetCurrentSlotRecordObject44();
+        g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
 
     // DIAGNOSTIC: Trace slot record state before using it
     spdlog::info(
@@ -543,7 +543,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
 
         const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
-            g_CurrentLoginMediator->GetCurrentSlotRecordObject44();
+            g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
         if (currentSlotRecord == nullptr) {
             spdlog::info(
                 "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage first-fragment invariant failed: currentSlotRecord is null; original 0x43f930 dereferences owner vtable +0x44 result directly here");

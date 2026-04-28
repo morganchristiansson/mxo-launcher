@@ -240,7 +240,7 @@ uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
         return 7u;
     }
     const Packet_MsClaimCharacterNameReply_0x4b5328* record =
-        const_cast<CLTLoginMediator*>(this)->GetSelectionDescriptorObject40(
+        const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(
             static_cast<uint32_t>(slotIndex));
     return record ? record->packetType1a : 7u;
 }

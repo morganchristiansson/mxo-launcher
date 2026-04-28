@@ -385,7 +385,7 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
 
     const mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
         (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
-            ? mediator->GetCurrentSlotRecordObject44()
+            ? mediator->GetCurrentAuthReplyPacket44()
             : nullptr;
 
     if (!currentSlotRecord) {
@@ -427,12 +427,12 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
 }
 
 // UNANCHORED: C helper behind the recovered +0x44 ABI wrapper.
-extern "C" void* Mediator_GetCurrentSlotRecordObject44_Impl(MinimalLoginMediatorStub* self) {
+extern "C" void* Mediator_GetCurrentAuthReplyPacket44_Impl(MinimalLoginMediatorStub* self) {
     (void)self;
     mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
     return mediator
         ? BuildMediatorCurrentSlotRecordObject44AbiShim(
-              mediator->GetCurrentSlotRecordObject44(),
+              mediator->GetCurrentAuthReplyPacket44(),
               mediator->GetDefaultSelectionIndex())
         : nullptr;
 }
@@ -444,7 +444,7 @@ extern "C" void* Mediator_GetCurrentSlotRecordObject44_Impl(MinimalLoginMediator
 //   layout
 // - keep that split explicit from the owner-side `0x004b01c8 +0x44 = 0x41f300`
 //   `CLTLoginMediator_GetCurrentSlotRecord` thunk
-__attribute__((naked)) static void Mediator_GetCurrentSlotRecordObject44() {
+__attribute__((naked)) static void Mediator_GetCurrentAuthReplyPacket44() {
     __asm__ volatile(
         "push %%ecx\n\t"
         "mov %0, %%eax\n\t"
@@ -452,7 +452,7 @@ __attribute__((naked)) static void Mediator_GetCurrentSlotRecordObject44() {
         "add $4, %%esp\n\t"
         "ret\n\t"
         :
-        : "i"(Mediator_GetCurrentSlotRecordObject44_Impl)
+        : "i"(Mediator_GetCurrentAuthReplyPacket44_Impl)
         : "eax");
 }
 
@@ -1395,7 +1395,7 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[14] = (void*)Mediator_GetUsername38;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
-    g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentSlotRecordObject44; // +0x44
+    g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentAuthReplyPacket44; // +0x44
     g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
     g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
     g_LoginMediatorVtable[20] = (void*)Mediator_GetBootstrapRaw08AuxHandle50; // +0x50
