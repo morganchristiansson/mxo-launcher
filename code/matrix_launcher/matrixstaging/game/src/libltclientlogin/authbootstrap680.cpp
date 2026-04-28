@@ -2015,21 +2015,16 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMes
     return kAuthBootstrap680InboundUnhandled;
 }
 
+}  // namespace mxo::liblttcp
+
+namespace mxo::ltlogin {
+
 // anchor: launcher.exe:0x447eb0
-uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendGetPublicKeyRequest(
-    mxo::ltlogin::CLTLoginMediator& mediator) {
-    using namespace mxo::ltlogin;
-
-    AuthBootstrap680ChildBase_0x4b7134* childBase =
-        owner08 ? owner08->authBootstrapChildBase_SOURCEONLY : nullptr;
-    if (childBase == nullptr) {
-        childBase = &AuthBootstrapChildFromWriteHelper(*this);
-    }
-    const auto& child = *static_cast<const AuthBootstrap680Child_0x441290*>(childBase);
-
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&const_cast<AuthBootstrap680Child_0x441290&>(child));
+uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest(
+    CLTLoginMediator& mediator) {
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
     bool ensuredLazyPubkeyDatValidatorA4 = false;
-    if (child.lazyPubkeyDatValidatorA4 != nullptr && ownedState.lazyPubkeyDatValidatorA4.object) {
+    if (lazyPubkeyDatValidatorA4 != nullptr && ownedState.lazyPubkeyDatValidatorA4.object) {
         ensuredLazyPubkeyDatValidatorA4 = true;
     } else {
         // anchor: launcher.exe:0x447260 / 0x447c10
@@ -2040,18 +2035,17 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendGetPublicKeyRequ
                 kAuthBootstrap680PubkeyDatFallbackModulus.data(),
                 kAuthBootstrap680PubkeyDatFallbackModulus.size(),
                 0x11u)) {
-            const_cast<AuthBootstrap680Child_0x441290&>(child).lazyPubkeyDatValidatorA4 =
-                ownedState.lazyPubkeyDatValidatorA4.object.get();
+            lazyPubkeyDatValidatorA4 = ownedState.lazyPubkeyDatValidatorA4.object.get();
             ensuredLazyPubkeyDatValidatorA4 = true;
         } else {
             ownedState.lazyPubkeyDatValidatorA4.object.reset();
-            const_cast<AuthBootstrap680Child_0x441290&>(child).lazyPubkeyDatValidatorA4 = nullptr;
+            lazyPubkeyDatValidatorA4 = nullptr;
         }
     }
 
     mxo::auth::FramedPacket packet;
     if (!mxo::auth::BuildGetPublicKeyRequestPacket(
-            child.launcherVersion2C,
+            launcherVersion2C,
             currentPublicKeyId9C,
             mxo::auth::kFrameModeAuto,
             &packet)) {
@@ -2059,36 +2053,39 @@ uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendGetPublicKeyRequ
         return 0;
     }
 
-    if (!child.sendTarget50) {
+    if (!sendTarget50) {
         spdlog::warn(
             "AuthBootstrap680_SendGetPublicKeyRequest missing child+0x50 send target; recovered 0x447eb0 tail expects direct virtual send through that field");
         return 0u;
     }
 
-    auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(child.sendTarget50);
+    auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(sendTarget50);
     const uint8_t rawCode = packet.payloadBytes.empty() ? 0u : packet.payloadBytes[0];
     const uint32_t sendResult = sendTarget->SendPacket(
         packet.bytes.data(),
         static_cast<uint32_t>(packet.bytes.size()),
         nullptr);
     spdlog::info(
-        "DIAGNOSTIC: launcher-owned auth send via 0x447eb0 child+0x50->vtable+0x24 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} ensuredLazyPubkeyDatValidatorA4={} childLazyPubkeyDatValidatorA4={} helper={} module={} childBase={} -> sendResult=0x{:08x}",
+        "DIAGNOSTIC: launcher-owned auth send via 0x447eb0 child+0x50->vtable+0x24 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} ensuredLazyPubkeyDatValidatorA4={} childLazyPubkeyDatValidatorA4={} child={} helperOwner={} -> sendResult=0x{:08x}",
         CLTLoginMediator::kMessageAsGetPublicKeyRequest,
         rawCode,
         mxo::auth::AuthOpcodeName(rawCode),
         packet.headerBytes.size(),
         packet.payloadBytes.size(),
         packet.bytes.size(),
-        fmt::ptr(child.sendTarget50),
+        fmt::ptr(sendTarget50),
         ensuredLazyPubkeyDatValidatorA4 ? 1u : 0u,
-        fmt::ptr(child.lazyPubkeyDatValidatorA4),
+        fmt::ptr(lazyPubkeyDatValidatorA4),
         fmt::ptr(this),
         fmt::ptr(owner08),
-        fmt::ptr(childBase),
         static_cast<unsigned>(sendResult));
     mediator.authGetPublicKeyRequestSent_ = (sendResult != 0u);
     return sendResult;
 }
+
+}  // namespace mxo::ltlogin
+
+namespace mxo::liblttcp {
 
 // anchor: launcher.exe:0x4474f0
 uint32_t CStreamPacketEncryptionModuleWriteHelper_0x4b8690::SendAuthRequest(

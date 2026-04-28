@@ -171,6 +171,11 @@ public:
         void* sendTarget,
         const char* sessionTokenBegin);
 
+    // anchor: launcher.exe:0x447eb0
+    // The state2 ready-side dispatcher calls this directly on the owner `+0x680` auth child when
+    // `authRequestReadyA0 == 0`; it is not a standalone write-helper receiver method.
+    uint32_t SendGetPublicKeyRequest(CLTLoginMediator& owner);
+
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;

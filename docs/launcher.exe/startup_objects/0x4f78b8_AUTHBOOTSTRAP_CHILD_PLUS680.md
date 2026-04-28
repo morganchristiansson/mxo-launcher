@@ -111,6 +111,8 @@ On the prepare/dispatch path:
 ### 2. Raw `0x06` send path (`0x447eb0`)
 
 Current best read:
+- `0x448050` calls `0x447eb0` directly with `ECX = owner+0x680`, so this send routine belongs to
+  the auth-bootstrap child, not to an abstract write-helper receiver boundary
 - lazily ensures `+0xa4` through:
   - `0x447260 = AuthBootstrap680_CreateLazyPubkeyDatState`
   - `0x447c10 = AuthBootstrap680_InitializeLazyPubkeyDatState`
@@ -120,6 +122,13 @@ Current best read:
   - child `+0x9c` = current public-key id dword
   - child `+0x50` = send target
 - send step itself is a direct virtual call through child `+0x50` slot `+0x24`
+- the stack-local packet object is first default-constructed as `Packet_0x4af2a4`, then retabled to
+  `0x4b6c90` (an interior row inside vtable block `0x4b6c74`) before writing raw code `0x06`
+
+Important restraint:
+- that `0x4b6c74/0x4b6c90` vtable family is **not** current evidence for `AS_AuthRequest (0x08)`
+- `0x447eb0` writes opcode `0x06`, while the later inbound raw `0x0b` auth-reply parse path also
+  reuses the broader `0x4b6c74` family
 
 So `+0xa4` is no longer best described as generic lazy state; it is specifically the lazy
 `pubkey.dat`-backed state family used on the get-public-key path.

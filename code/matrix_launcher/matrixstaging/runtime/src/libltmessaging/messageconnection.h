@@ -1108,7 +1108,6 @@ public:
     uint32_t HandleInboundAuthMessage(
         void* incomingAuthMessage,
         mxo::ltlogin::CLTLoginMediator& owner);
-    uint32_t SendGetPublicKeyRequest(mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t SendAuthRequest(mxo::ltlogin::CLTLoginMediator& owner);
     uint32_t RebuildReplyPublicKeyWorkers(
         const mxo::auth::GetPublicKeyReply& reply);
