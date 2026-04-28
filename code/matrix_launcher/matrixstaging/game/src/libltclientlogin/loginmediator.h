@@ -1514,6 +1514,7 @@ public:
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
+    RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
     // - entries are 12-byte owned string-triples copied by `0x41f640`
