@@ -826,7 +826,7 @@ public:
 static_assert(sizeof(Packet_MsConnectReply_0x4b6ce0) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectReply_0x4b6ce0 size mismatch");
 
 // =============================================================================
-// Packet_MsClaimCharacterNameRequest_0x4b6d08 - Minimal packet builder (opcode 0x0a)
+// Packet_AsAuthChallengeResponse_0x4b6d08 - Minimal packet builder (opcode 0x0a)
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6d08 (5 slots, 20 bytes)
 // anchor: launcher.exe:0x444240 = ctor/init helper
@@ -836,7 +836,7 @@ static_assert(sizeof(Packet_MsConnectReply_0x4b6ce0) == sizeof(mxo::liblttcp::Pa
 // - word  [payload+0x01] = 0x0000
 //
 // Unlike the larger `0x4b6cf4` sibling, this class does not append extra reservation scaffolds.
-class Packet_MsClaimCharacterNameRequest_0x4b6d08 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_AsAuthChallengeResponse_0x4b6d08 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
  // anchor: launcher.exe:0x444240 / ctor body after Packet_0x4af2a4 default ctor
  // VTable layout matches the shared Packet_0x4af2a4 surface except for the slot-3 init helper:
@@ -863,7 +863,7 @@ public:
  }
 };
 
-static_assert(sizeof(Packet_MsClaimCharacterNameRequest_0x4b6d08) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsClaimCharacterNameRequest_0x4b6d08 size mismatch");
+static_assert(sizeof(Packet_AsAuthChallengeResponse_0x4b6d08) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsClaimCharacterNameRequest_0x4b6d08 size mismatch");
 
 // =============================================================================
 // Packet_MsClaimCharacterNameRequest_0x4b6cf4 - Multi-field packet builder (opcode 0x0a)
