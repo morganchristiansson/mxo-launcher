@@ -371,12 +371,39 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     (void)self;
     (void)returnAddress;
     mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
-    return mediator
-        ? BuildMediatorSelectionDescriptorObject40AbiShim(
-              mediator->GetSelectionDescriptorObject40(selectionIndex),
-              selectionIndex,
-              mediator->GetDefaultSelectionIndex())
-        : nullptr;
+    if (!mediator) {
+        return nullptr;
+    }
+
+    const uint32_t low24 = selectionIndex & 0x00ffffffu;
+    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
+    const uint32_t expectedScratchRequest = mediator->ExpectedSelectionDescriptorScratchRequest();
+    const bool matchedConfiguredRequest = mediator->SelectionDescriptorMatchesRequest(selectionIndex);
+    const uint8_t currentSlotIndex = mediator->CurrentCharacterRouteIndexCc8Scaffold();
+    const bool matchedCurrentSlotIndexRequest =
+        high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex);
+
+    const mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
+        (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
+            ? mediator->GetCurrentSlotRecordObject44()
+            : nullptr;
+
+    if (!currentSlotRecord) {
+        spdlog::debug(
+            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={}]",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            static_cast<unsigned>(currentSlotIndex),
+            static_cast<unsigned>(expectedScratchRequest),
+            matchedConfiguredRequest ? 1u : 0u,
+            matchedCurrentSlotIndexRequest ? 1u : 0u);
+    }
+
+    return BuildMediatorSelectionDescriptorObject40AbiShim(
+        currentSlotRecord,
+        selectionIndex,
+        mediator->GetDefaultSelectionIndex());
 }
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
