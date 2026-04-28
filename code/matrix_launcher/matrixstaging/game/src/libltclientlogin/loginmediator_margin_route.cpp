@@ -6,12 +6,11 @@
 namespace mxo::ltlogin {
 namespace {
 
-// anchor: launcher.exe:0x4043b0
-// Conservative recovered helper shape:
-// - allocate/reset a temporary concatenation buffer
-// - append the full range of lhs then rhs via `0x403dc0`
+// anchor: launcher.exe:0x4043b0 = StringTriple_0x403f90_ConcatInto
+// Conservative recovered helper shape shared across multiple callsites:
+// - append the full range of lhs then rhs into a temporary string-family object
 // - materialize the output as a fresh `StringTriple_0x403f90`
-static void BuildConcatenatedStringTriple_0x4043b0(
+static StringTriple_0x403f90* StringTriple_0x403f90_ConcatInto(
     StringTriple_0x403f90& out,
     const StringTriple_0x403f90& lhs,
     const StringTriple_0x403f90& rhs) {
@@ -20,6 +19,7 @@ static void BuildConcatenatedStringTriple_0x4043b0(
     local_20.meth_0x403dc0(lhs.begin, lhs.current);
     local_20.meth_0x403dc0(rhs.begin, rhs.current);
     out.ResetAndAssignCString(local_20.begin);
+    return &out;
 }
 
 }  // namespace
@@ -129,7 +129,7 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         // shows a read and the pointed-at bytes are zero, so model the second concatenation input
         // as empty until a real initializer/write is recovered.
         StringTriple_0x403f90 rebuiltAddressListInput;
-        BuildConcatenatedStringTriple_0x4043b0(
+        (void)StringTriple_0x403f90_ConcatInto(
             rebuiltAddressListInput,
             routeDescriptor30_,
             StringTriple_0x403f90{});

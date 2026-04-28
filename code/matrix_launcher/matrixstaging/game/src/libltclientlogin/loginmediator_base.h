@@ -87,9 +87,19 @@ public:
     // anchor: launcher.exe:0x403f20
     StringTriple_0x403f90() { SyncFromOwned(); }
 
-    // anchor: launcher.exe:0x403f20 = cls_0x403f90::meth_0x403f20
-    void* AssignFromCString(const char* text) {
+    // anchor: launcher.exe:0x403f20 = cls_0x403f90::ResetAndAssignCString
+    void* ResetAndAssignCString(const char* text) {
         owned_ = text ? text : "";
+        SyncFromOwned();
+        return this;
+    }
+
+    // anchor: launcher.exe:0x403dc0 = StringTriple_0x403f90::meth_0x403dc0
+    StringTriple_0x403f90* meth_0x403dc0(const char* sourceBegin, const char* sourceEnd) {
+        if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
+            return this;
+        }
+        owned_.append(sourceBegin, sourceEnd);
         SyncFromOwned();
         return this;
     }
@@ -106,7 +116,7 @@ public:
     }
 
     void Assign(const char* value) {
-        AssignFromCString(value);
+        ResetAndAssignCString(value);
     }
 
     void Assign(const std::string& value) {
