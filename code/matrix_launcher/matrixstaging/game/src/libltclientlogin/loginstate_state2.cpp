@@ -269,12 +269,12 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         auto& slotRecord = g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
                         slotRecord = {};
                         slotRecord.debugString14 = character.handle.text.c_str();
-                        slotRecord.characterIdLow32 =
+                        slotRecord.characterIdLow1c =
                             static_cast<uint32_t>(character.characterId & 0xffffffffull);
-                        slotRecord.characterIdHigh36 =
+                        slotRecord.characterIdHigh20 =
                             static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
-                        slotRecord.status3a = normalizedStatus;
-                        slotRecord.worldId3c = character.worldId;
+                        slotRecord.packetType1a = normalizedStatus;
+                        slotRecord.worldId24 = character.worldId;
                         g_CurrentLoginMediator->selectionRouteState684_.slotRecordValid04_[i] = true;
 
                         int matchedWorldIndex = -1;
@@ -283,7 +283,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                              ++worldIndex) {
                             if (g_CurrentLoginMediator->worldDescriptorValidD84_[worldIndex] &&
                                 g_CurrentLoginMediator->worldDescriptorsD84_[worldIndex].worldId01 ==
-                                    slotRecord.worldId3c) {
+                                    slotRecord.worldId24) {
                                 matchedWorldIndex = static_cast<int>(worldIndex);
                                 break;
                             }

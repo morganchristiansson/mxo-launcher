@@ -119,50 +119,6 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
-// Wrapper-facing selection `+0x40` outer object currently only needs the common 5-slot virtual
-// surface shape shared by the launcher descriptor/slot-record families.
-// Current fidelity tightening from Ghidra:
-// - slot `+0x04` is the shared tiny getter at `0x437b50` and returns `0`
-// - slot `+0x10` is the shared tiny getter at `0x481760` and returns the `+0x10` payload pointer
-// - keep `+0x08/+0x0c` conservative until the concrete wrapper object class is recovered
-static uint32_t __thiscall SelectionDescriptor40_Destroy(CurrentSlotRecord44ObjectSketch* self) {
-    return self ? 1u : 0u;
-}
-
-static uint32_t __thiscall SelectionDescriptor40_GetStateId(CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 0u;
-}
-
-static uint32_t __thiscall SelectionDescriptor40_AppendDebugString(CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 1u;
-}
-
-static uint32_t __thiscall SelectionDescriptor40_ResetPayloadForSourceDescriptor(CurrentSlotRecord44ObjectSketch* self) {
-    if (!self) {
-        return 0u;
-    }
-    self->backingObject08 = nullptr;
-    self->flag0c = (self->payload10 != nullptr) ? 1u : 0u;
-    return 1u;
-}
-
-static uint32_t __thiscall SelectionDescriptor40_GetPayload10(CurrentSlotRecord44ObjectSketch* self) {
-    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
-}
-
-static void** CurrentSlotRecord44Vtable() {
-    static void* vtable[5] = {
-        reinterpret_cast<void*>(SelectionDescriptor40_Destroy),
-        reinterpret_cast<void*>(SelectionDescriptor40_GetStateId),
-        reinterpret_cast<void*>(SelectionDescriptor40_AppendDebugString),
-        reinterpret_cast<void*>(SelectionDescriptor40_ResetPayloadForSourceDescriptor),
-        reinterpret_cast<void*>(SelectionDescriptor40_GetPayload10),
-    };
-    return vtable;
-}
-
 struct LiveSelectionCfgCorpusView {
     uint32_t ready = 0u;
     void* buffer = nullptr;
@@ -641,114 +597,20 @@ const char* CLTLoginMediator::GetUsername() const {
     return ownerAuthBootstrapSource94_.username00.data();
 }
 
-// Wrapper-facing selection `+0x40` selection-descriptor object builder.
-// Keep this naming split explicit from owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex`.
-// Fidelity tightening:
-// - keep the wrapper-facing object because client selection `+0x40` really returns a distinct ABI shape
-// - but source its payload directly from the anchored owner-side current-slot family instead of
-//   carrying a second synthetic arg6-side source picker/fallback tree
+// Wrapper-facing selection `+0x40`/`+0x44` object builders are ABI shims, not owner-side
+// `0x004b01c8 +0x40/+0x44` methods. Keep the fake outer-object construction in
+// `src/launcher_mediator_abi.cpp` so the launcher-owned mediator stays aligned with the tiny raw
+// slot-record accessors at `0x41f2e0 / 0x41f300`.
 CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetSelectionDescriptorObject40(
     uint32_t selectionIndex) {
-    const uint32_t low24 = selectionIndex & 0x00ffffffu;
-    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
-    const uint32_t expectedScratchRequest = ExpectedSelectionDescriptorScratchRequest();
-    const bool matchedConfiguredRequest = SelectionDescriptorMatchesRequest(selectionIndex);
-    const uint8_t currentSlotIndex = this->CurrentCharacterRouteIndexCc8Scaffold();
-    const bool matchedCurrentSlotIndexRequest =
-        CurrentHelperStateCodeOrZero(this) >= 3u &&
-        high8 == 0u &&
-        low24 == static_cast<uint32_t>(currentSlotIndex);
-
-    const SlotRecordState_0x4b5328* const currentSlotRecord =
-        (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
-            ? this->GetCurrentSlotRecord()
-            : nullptr;
-
-    if (!currentSlotRecord) {
-        spdlog::debug(
-            "CLTLoginMediator::GetSelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={})",
-            static_cast<unsigned>(selectionIndex),
-            static_cast<unsigned>(low24),
-            static_cast<unsigned>(high8),
-            static_cast<unsigned>(currentSlotIndex),
-            static_cast<unsigned>(expectedScratchRequest),
-            matchedConfiguredRequest ? 1u : 0u,
-            matchedCurrentSlotIndexRequest ? 1u : 0u);
-        return nullptr;
-    }
-
-    selectionDescriptor40_ = {};
-    // Set payload10 to point to currentSlotRecord's fields directly
-    // The client accesses fields at offset +0x03/+0x07 relative to this pointer
-    selectionDescriptor40_.vtable = CurrentSlotRecord44Vtable();
-    selectionDescriptor40_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
-    selectionDescriptor40_.flag0c = 1u;
-
-    const char* matchMode =
-        (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
-        (matchedCurrentSlotIndexRequest ? "current-slot-index" : "configured-request");
-    spdlog::debug(
-        "CLTLoginMediator::GetSelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} currentSlotIndex=0x{:02x} slotName='{}' vtable={} field03=0x{:08x} field07=0x{:08x})",
-        static_cast<unsigned>(selectionIndex),
-        static_cast<unsigned>(low24),
-        static_cast<unsigned>(high8),
-        fmt::ptr(&selectionDescriptor40_),
-        matchMode,
-        static_cast<unsigned>(currentSlotIndex),
-        currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
-        fmt::ptr(selectionDescriptor40_.vtable),
-        static_cast<unsigned>(currentSlotRecord->characterIdLow32),
-        static_cast<unsigned>(currentSlotRecord->characterIdHigh36));
-    return &selectionDescriptor40_;
+    return BuildMediatorSelectionDescriptorObject40AbiShim(*this, selectionIndex);
 }
 
-// Wrapper-facing selection `+0x44` current-slot-record wrapper builder.
-// Keep this naming split explicit from owner `+0x44 = GetCurrentSlotRecord`.
-// Fidelity tightening:
-// - keep the wrapper-facing object because client selection `+0x44` expects the `0x004b5328`-like ABI
-//   shape
-// - but source it directly from the anchored owner-side current-slot accessor instead of a second
-//   synthetic arg6-side source/fallback path
 CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetCurrentSlotRecordObject44() {
-    const SlotRecordState_0x4b5328* const currentSlotRecord = this->GetCurrentSlotRecord();
-
-    currentSlotRecord44_ = {};
-    currentSlotRecord44NameOwned_.clear();
-
-    if (!currentSlotRecord) {
-        spdlog::info(
-            "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
-            static_cast<unsigned>(this->CurrentCharacterRouteIndexCc8Scaffold()));
-        return nullptr;
-    }
-
-    // Set payload10 to point to currentSlotRecord's fields directly
-    // The client accesses fields at offset +0x03/+0x07/+0x0b/+0x0c relative to this pointer
-    currentSlotRecord44_.vtable = CurrentSlotRecord44Vtable();
-    currentSlotRecord44_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
-    currentSlotRecord44_.flag0c = 1u;
-    currentSlotRecord44NameOwned_ = currentSlotRecord->debugString14;
-
-    if (!currentSlotRecord44NameOwned_.empty()) {
-        currentSlotRecord44_.debugString14 = currentSlotRecord44NameOwned_.c_str();
-        const size_t nameLength = currentSlotRecord44NameOwned_.size();
-        currentSlotRecord44_.debugStringLen18 =
-            static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
-    }
-
-    spdlog::info(
-        "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
-        fmt::ptr(&currentSlotRecord44_),
-        currentSlotRecord44_.debugString14 ? currentSlotRecord44_.debugString14 : "<empty>",
-        static_cast<unsigned>(currentSlotRecord->characterIdLow32),
-        static_cast<unsigned>(currentSlotRecord->characterIdHigh36),
-        static_cast<unsigned>(currentSlotRecord->status3a),
-        static_cast<unsigned>(currentSlotRecord->worldId3c));
-    return &currentSlotRecord44_;
+    return BuildMediatorCurrentSlotRecordObject44AbiShim(*this);
 }
 
-// +0x48
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f350 / vtable +0x48
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     const SlotRecordState_0x4b5328* slotRecord = GetCurrentSlotRecord();
     if (!slotRecord) {
@@ -786,8 +648,7 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     return worldOrSelectionName;
 }
 
-// +0x4c
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor launcher.exe:0x41f360 / vtable +0x4c
 const char* CLTLoginMediator::GetProfileOrSessionName() const {
     const char* profileOrSessionName = ownerAuthBootstrapSource94_.username00.data();
     spdlog::debug(
@@ -2099,8 +1960,8 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 1u;
     }
 
-    outDwords[0] = currentSlotRecord->characterIdLow32;
-    outDwords[1] = currentSlotRecord->characterIdHigh36;
+    outDwords[0] = currentSlotRecord->characterIdLow1c;
+    outDwords[1] = currentSlotRecord->characterIdHigh20;
     outDwords[2] = arg2;
     outDwords[3] = arg3;
 

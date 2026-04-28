@@ -674,7 +674,7 @@ public:
         // Important broader-writer relation from `0x43f300`:
         // - this `+0xd84` world-descriptor table is built first from auth world data
         // - later `+0x688` character-slot records are built from auth character data
-        // - then `+0x818` route-host strings are seeded by joining character `worldId3c`
+        // - then `+0x818` route-host strings are seeded by joining character `worldId24`
         //   against descriptor `worldId01` and copying descriptor `inlineNamePlus03`
         uint16_t worldId01 = 0;
         std::string inlineNamePlus03;
@@ -1512,12 +1512,12 @@ public:
     // Wrapper-facing selection object mirrors:
     // - `+0x40`  = selection-descriptor object for profile-path / arg7-derived selection work
     // - `+0x44`  = current-slot record object for later save/profile work
+    // Those fake outer objects now live in `src/launcher_mediator_abi.cpp` instead of the
+    // launcher-owned mediator model so the owner-side slot-record family can stay aligned with
+    // `0x41f2e0 / 0x41f300`.
     // - `+0xd0`  = owner `+0x1460` small-string-like state8 section-11 view
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
-    CurrentSlotRecord44ObjectSketch selectionDescriptor40_{};
-    CurrentSlotRecord44ObjectSketch currentSlotRecord44_{};
-    std::string currentSlotRecord44NameOwned_;
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};

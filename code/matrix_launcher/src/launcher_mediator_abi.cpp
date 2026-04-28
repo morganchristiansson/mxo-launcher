@@ -103,7 +103,150 @@ struct LateMediatorAbiCallLogState {
     bool valid = false;
 };
 
+static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorSelectionDescriptor40{};
+static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorCurrentSlotRecord44{};
+static std::string g_MediatorCurrentSlotRecord44NameOwned;
 
+static uint32_t __thiscall MediatorSelectionObject_Destroy(
+    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
+    return self ? 1u : 0u;
+}
+
+static uint32_t __thiscall MediatorSelectionObject_GetStateId(
+    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 0u;
+}
+
+static uint32_t __thiscall MediatorSelectionObject_AppendDebugString(
+    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall MediatorSelectionObject_ResetPayloadForSourceDescriptor(
+    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
+    if (!self) {
+        return 0u;
+    }
+    self->backingObject08 = nullptr;
+    self->flag0c = (self->payload10 != nullptr) ? 1u : 0u;
+    return 1u;
+}
+
+static uint32_t __thiscall MediatorSelectionObject_GetPayload10(
+    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
+}
+
+static void** MediatorSelectionObjectVtable() {
+    static void* vtable[5] = {
+        reinterpret_cast<void*>(MediatorSelectionObject_Destroy),
+        reinterpret_cast<void*>(MediatorSelectionObject_GetStateId),
+        reinterpret_cast<void*>(MediatorSelectionObject_AppendDebugString),
+        reinterpret_cast<void*>(MediatorSelectionObject_ResetPayloadForSourceDescriptor),
+        reinterpret_cast<void*>(MediatorSelectionObject_GetPayload10),
+    };
+    return vtable;
+}
+
+static const mxo::ltlogin::SlotRecordState_0x4b5328* ResolveSelectionDescriptorSlotRecord(
+    mxo::ltlogin::CLTLoginMediator& mediator,
+    uint32_t selectionIndex) {
+    const uint32_t low24 = selectionIndex & 0x00ffffffu;
+    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
+    const uint8_t currentSlotIndex = mediator.CurrentCharacterRouteIndexCc8Scaffold();
+    const bool matchedConfiguredRequest = mediator.SelectionDescriptorMatchesRequest(selectionIndex);
+    const bool matchedCurrentSlotIndexRequest =
+        high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex);
+
+    return (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
+        ? mediator.GetCurrentSlotRecord()
+        : nullptr;
+}
+
+mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorSelectionDescriptorObject40AbiShim(
+    CLTLoginMediator& mediator,
+    uint32_t selectionIndex) {
+    const SlotRecordState_0x4b5328* const currentSlotRecord =
+        ResolveSelectionDescriptorSlotRecord(mediator, selectionIndex);
+    const uint32_t expectedScratchRequest = mediator.ExpectedSelectionDescriptorScratchRequest();
+    const uint8_t currentSlotIndex = mediator.CurrentCharacterRouteIndexCc8Scaffold();
+    const uint32_t low24 = selectionIndex & 0x00ffffffu;
+    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
+
+    if (!currentSlotRecord) {
+        spdlog::debug(
+            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x}]",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            static_cast<unsigned>(currentSlotIndex),
+            static_cast<unsigned>(expectedScratchRequest));
+        return nullptr;
+    }
+
+    g_MediatorSelectionDescriptor40 = {};
+    g_MediatorSelectionDescriptor40.vtable = MediatorSelectionObjectVtable();
+    g_MediatorSelectionDescriptor40.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
+    g_MediatorSelectionDescriptor40.flag0c = 1u;
+
+    const char* matchMode =
+        (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
+        ((high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex))
+             ? "current-slot-index"
+             : "configured-request");
+    spdlog::debug(
+        "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [matchMode={} currentSlotIndex=0x{:02x} slotName='{}' payload={} charIdLow=0x{:08x} charIdHigh=0x{:08x}]",
+        static_cast<unsigned>(selectionIndex),
+        fmt::ptr(&g_MediatorSelectionDescriptor40),
+        matchMode,
+        static_cast<unsigned>(currentSlotIndex),
+        currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
+        fmt::ptr(g_MediatorSelectionDescriptor40.payload10),
+        static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
+        static_cast<unsigned>(currentSlotRecord->characterIdHigh20));
+    return &g_MediatorSelectionDescriptor40;
+}
+
+mxo::ltlogin::CurrentSlotRecord44ObjectSketch* mxo::ltlogin::BuildMediatorCurrentSlotRecordObject44AbiShim(
+    CLTLoginMediator& mediator) {
+    const SlotRecordState_0x4b5328* const currentSlotRecord = mediator.GetCurrentSlotRecord();
+
+    g_MediatorCurrentSlotRecord44 = {};
+    g_MediatorCurrentSlotRecord44NameOwned.clear();
+
+    if (!currentSlotRecord) {
+        spdlog::info(
+            "ILTLoginMediator_0x4af2b8.Default(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
+            static_cast<unsigned>(mediator.CurrentCharacterRouteIndexCc8Scaffold()));
+        return nullptr;
+    }
+
+    g_MediatorCurrentSlotRecord44.vtable = MediatorSelectionObjectVtable();
+    g_MediatorCurrentSlotRecord44.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
+    g_MediatorCurrentSlotRecord44.flag0c = 1u;
+    g_MediatorCurrentSlotRecord44NameOwned = currentSlotRecord->debugString14
+        ? currentSlotRecord->debugString14
+        : "";
+
+    if (!g_MediatorCurrentSlotRecord44NameOwned.empty()) {
+        g_MediatorCurrentSlotRecord44.debugString14 = g_MediatorCurrentSlotRecord44NameOwned.c_str();
+        const size_t nameLength = g_MediatorCurrentSlotRecord44NameOwned.size();
+        g_MediatorCurrentSlotRecord44.debugStringLen18 =
+            static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
+    }
+
+    spdlog::info(
+        "ILTLoginMediator_0x4af2b8.Default(+0x44) -> {} [name='{}' charIdLow=0x{:08x} charIdHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
+        fmt::ptr(&g_MediatorCurrentSlotRecord44),
+        g_MediatorCurrentSlotRecord44.debugString14 ? g_MediatorCurrentSlotRecord44.debugString14 : "<empty>",
+        static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
+        static_cast<unsigned>(currentSlotRecord->characterIdHigh20),
+        static_cast<unsigned>(currentSlotRecord->packetType1a),
+        static_cast<unsigned>(currentSlotRecord->worldId24));
+    return &g_MediatorCurrentSlotRecord44;
+}
 
 static const char* DescribeKnownMediatorObserver(void* observer) {
     switch (reinterpret_cast<uintptr_t>(observer)) {
@@ -227,14 +370,18 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
 }
 
 // UNANCHORED: C helper behind the recovered +0x40 ABI wrapper.
+// The fake outer object is wrapper-owned; the launcher-side mediator keeps only the anchored
+// owner `+0x40 / +0x44` raw slot-record accessors at `0x41f2e0 / 0x41f300`.
 extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     MinimalLoginMediatorStub* self,
     uint32_t selectionIndex,
     void* returnAddress) {
     (void)self;
     (void)returnAddress;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetSelectionDescriptorObject40(
-        selectionIndex);
+    mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
+    return mediator
+        ? mxo::ltlogin::BuildMediatorSelectionDescriptorObject40AbiShim(*mediator, selectionIndex)
+        : nullptr;
 }
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
@@ -260,7 +407,10 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
 // UNANCHORED: C helper behind the recovered +0x44 ABI wrapper.
 extern "C" void* Mediator_GetCurrentSlotRecordObject44_Impl(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCurrentSlotRecordObject44();
+    mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
+    return mediator
+        ? mxo::ltlogin::BuildMediatorCurrentSlotRecordObject44AbiShim(*mediator)
+        : nullptr;
 }
 
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x44

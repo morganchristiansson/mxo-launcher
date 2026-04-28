@@ -236,8 +236,8 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     spdlog::info(
         "DIAGNOSTIC: State8 Slot3 currentSlotRecord={} charIdLow=0x{:08x} charIdHigh=0x{:08x}",
         fmt::ptr(currentSlotRecord),
-        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdLow32) : 0u,
-        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdHigh36) : 0u);
+        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdLow1c) : 0u,
+        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->characterIdHigh20) : 0u);
 
     // anchor: launcher.exe:0x43bd6a = Packet_MsLoadCharacterRequest_0x4b5418::ResetAndInitialize
     // anchor: launcher.exe:0x43ac10 = ResetAndInitialize
@@ -262,8 +262,8 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     // there is no separate state8-side "counter=9" byte write in the original body.
     uint8_t* payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
     if (payload) {
-        *reinterpret_cast<uint32_t*>(payload + 0x01) = currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u;
-        *reinterpret_cast<uint32_t*>(payload + 0x05) = currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u;
+        *reinterpret_cast<uint32_t*>(payload + 0x01) = currentSlotRecord ? currentSlotRecord->characterIdLow1c : 0u;
+        *reinterpret_cast<uint32_t*>(payload + 0x05) = currentSlotRecord ? currentSlotRecord->characterIdHigh20 : 0u;
     }
 
     // anchor: launcher.exe:0x43bd84-0x43bdfa = write selection blocks directly to payload
@@ -417,8 +417,8 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
         0xbbu,
         packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
             ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u,
-        currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
-        currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdLow1c : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdHigh20 : 0u,
         nonZeroSnapshotBlockCount,
         g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
         g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
@@ -562,12 +562,12 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                 ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
                 ownerState.state8PersistenceDataF1c.characterName00.begin());
         }
-        ownerState.characterReplyFieldF40 = currentSlotRecord->worldId3c;
-        ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId3c;
-        ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status3a;
-        ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId3c;
-        ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId3c;
-        ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status3a;
+        ownerState.characterReplyFieldF40 = currentSlotRecord->worldId24;
+        ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId24;
+        ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->packetType1a;
+        ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId24;
+        ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId24;
+        ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->packetType1a;
         usedCurrentSlotRecord = true;
     }
 

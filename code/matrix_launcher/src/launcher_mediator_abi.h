@@ -4,6 +4,13 @@
 
 namespace mxo::ltlogin {
 class CLTLoginMediator;
+struct CurrentSlotRecord44ObjectSketch;
+
+CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDescriptorObject40AbiShim(
+    CLTLoginMediator& mediator,
+    uint32_t selectionIndex);
+CurrentSlotRecord44ObjectSketch* BuildMediatorCurrentSlotRecordObject44AbiShim(
+    CLTLoginMediator& mediator);
 }
 
 struct MinimalLoginMediatorStub {

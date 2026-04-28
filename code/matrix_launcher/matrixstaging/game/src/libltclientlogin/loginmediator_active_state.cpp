@@ -71,16 +71,16 @@ CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
     const SlotRecordState_0x4b5328* slotZeroRecord = GetSlotRecordByIndex(0u);
 
     if (currentSlotRecord) {
-        view.characterIdLow = currentSlotRecord->characterIdLow32;
-        view.characterIdHigh = currentSlotRecord->characterIdHigh36;
+        view.characterIdLow = currentSlotRecord->characterIdLow1c;
+        view.characterIdHigh = currentSlotRecord->characterIdHigh20;
         if (currentSlotRecord->debugString14) {
             view.characterName = currentSlotRecord->debugString14;
         }
     }
 
     if ((view.characterIdLow == 0u && view.characterIdHigh == 0u) && slotZeroRecord) {
-        view.characterIdLow = slotZeroRecord->characterIdLow32;
-        view.characterIdHigh = slotZeroRecord->characterIdHigh36;
+        view.characterIdLow = slotZeroRecord->characterIdLow1c;
+        view.characterIdHigh = slotZeroRecord->characterIdHigh20;
     }
 
     if (!NonEmptyOrNull(view.characterName) && slotZeroRecord && slotZeroRecord->debugString14) {

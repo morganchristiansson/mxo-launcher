@@ -98,9 +98,9 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // Write character ID pair directly to payload
     if (payload) {
         *reinterpret_cast<uint32_t*>(payload + State7Packet0x0dFixedPayload::kCharacterIdLowOffset) =
-            currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u;
+            currentSlotRecord ? currentSlotRecord->characterIdLow1c : 0u;
         *reinterpret_cast<uint32_t*>(payload + State7Packet0x0dFixedPayload::kCharacterIdHighOffset) =
-            currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u;
+            currentSlotRecord ? currentSlotRecord->characterIdHigh20 : 0u;
     }
 
     // Build envelope for send
@@ -118,8 +118,8 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
         State7Packet0x0dFixedPayload::kFixedByteCount,
         totalBytes,
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
-        currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
-        currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdLow1c : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdHigh20 : 0u,
         currentSlotRecord && currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
         sendResult);
     return;

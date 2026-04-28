@@ -24,51 +24,28 @@ struct SelectionSeedConfig;
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
-// Character slot record class. VTable at 0x4b5328 semantically inherits from
-// Packet_0x4af2a4's vtable at 0x4af2a4 (first 4 slots match, slot 4 is overridden).
-// Ghidra decompiler shows SlotRecord_0x4b5328 contains Packet_0x4af2a4 as a component (composition).
-// Full object size: 0x32 (50 bytes) - verified against launcher.exe
-// VTable methods (5 slots at 0x4b5328):
-// - +0x00: dtor (0x439910) - overrides PacketBuilder dtor
-// - +0x04: stub returns 0 (0x437b50) - same as PacketBuilder
-// - +0x08: debug string (0x43dc80) - overrides with slot-specific output
-// - +0x0c: reset/prepare (0x439940) - overrides PacketBuilder reset
-// - +0x10: return payload base (0x481760) - same as PacketBuilder
-// Note: Uses explicit vtable pointer (void** vtable00) for MSVC2003 ABI compatibility.
-// Future: Could inherit from Packet_0x4af2a4 with C++ virtual, but would need
-// to verify object layout matches (vptr placement, field offsets, total size).
-class SlotRecordState_0x4b5328 {
+// Character slot record class.
+//
+// Static-RE tightening from launcher.exe owner slot accessors and the wrapper-side payload readers:
+// - `0x004b5328` is a real `Packet_0x4af2a4` subclass, not a synthetic composition shell
+// - it reuses the inherited packet fields directly:
+//   - `debugString14`     = character name string
+//   - `payloadSize18`     = slot-specific small length/state field used by the reset helper
+//   - `packetType1a`      = slot status byte
+//   - `characterIdLow1c`  = current character id low dword
+//   - `characterIdHigh20` = current character id high dword
+//   - `worldId24`         = selected world id
+// - its virtual surface follows the shared `Packet_0x4af2a4` shape with slot-specific overrides
+//   for the debug-string/reset helpers at `0x43dc80` / `0x439940`
+class SlotRecordState_0x4b5328 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
-    // PacketBuilder layout at +0x00 (composition - Ghidra shows as cls_0x4af2a4 member):
-    // Note: Removed explicit vtable00 field - C++ vptr is implicit with virtual methods
-    // This is a key step towards C++ inheritance from Packet_0x4af2a4
-    uint32_t payloadPtr04 = 0;                                 // +0x04 (was: nopatchLauncherVersionValue04)
-    liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
-    uint32_t createRefParam0c = 0;                             // +0x0c (was: ownerReadyFlag0c)
-    void* payloadAlias10 = nullptr;                            // +0x10 (was: payloadBegin10)
-    const char* debugString14 = nullptr;                       // +0x14 (was: heapString14)
-    uint16_t payloadSize16 = 0;                                // +0x16 (was: padding16)
-    uint8_t packetType18 = 0;                                  // +0x18: status/packet type byte (was: statusByte18)
-    uint8_t padding19 = 0;                                     // +0x19: alignment padding
-    // ... rest of PacketBuilder fields through +0x31
-    // Note: Packet_0x4af2a4 has characterIdLow1c/worldId24 at +0x1c/+0x24,
-    // but SlotRecordState_0x4b5328 uses different fields at +0x32+
-
-    // Slot-record specific fields at +0x32 (extend PacketBuilder layout):
-    // These fields semantically override PacketBuilder's characterId/worldId fields
-    // when accessed through the SlotRecord vtable methods
-    uint32_t characterIdLow32 = 0;                            // +0x32 (slot-record specific)
-    uint32_t characterIdHigh36 = 0;                           // +0x36 (slot-record specific)
-    uint8_t status3a = 0;                                     // +0x3a (slot-record specific)
-    uint16_t worldId3c = 0;                                   // +0x3c (slot-record specific)
-
-    // Virtual methods (override Packet_0x4af2a4)
-    ~SlotRecordState_0x4b5328() = default;
-    uint32_t StubReturn0() { return 0; }
-    const char* DebugString() const { return nullptr; }
-    void InitializePayloadSize() {}
-    void* GetPayloadBase() { return payloadAlias10; }
+    ~SlotRecordState_0x4b5328() override = default;
+    void DebugString(int /*formatType*/ = 2) override {}
+    void InitializePayloadSize() override {}
 };
+
+static_assert(sizeof(SlotRecordState_0x4b5328) == sizeof(mxo::liblttcp::Packet_0x4af2a4),
+              "SlotRecordState_0x4b5328 should currently be a pure Packet_0x4af2a4-derived view");
 
 // anchor: launcher.exe:0x4b5378 / vtable
 // Margin message reply view class - used in state6 slot6 for margin reply handling.
@@ -113,11 +90,11 @@ struct CurrentSlotRecord44ObjectSketch {
     uint8_t padding1a[2];
 };
 
-// Offsets verified: SlotRecordState_0x4b5328 fields match payload access pattern:
-// - characterIdLow03 at +0x1c (client accesses as payload+0x03)
-// - characterIdHigh07 at +0x20 (client accesses as payload+0x07)
-// - status3a at +0x18 (client accesses as payload+0x0b)
-// - worldId3c at +0x24 (client accesses as payload+0x0c)
+// Offsets verified: inherited Packet_0x4af2a4 fields match the wrapper payload access pattern:
+// - characterIdLow1c at +0x1c
+// - characterIdHigh20 at +0x20
+// - packetType1a (slot status byte) at +0x1a
+// - worldId24 at +0x24
 static_assert(offsetof(CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
 static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugString14) == 0x14);
 static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugStringLen18) == 0x18);
