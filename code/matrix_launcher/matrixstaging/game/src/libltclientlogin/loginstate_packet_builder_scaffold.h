@@ -610,11 +610,11 @@ public:
 static_assert(sizeof(Packet_AsGetPublicKeyRequest_0x4b6c74) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_AsGetPublicKeyRequest_0x4b6c74 size mismatch");
 
 // =============================================================================
-// Packet_MsConnectChallenge_0x4b6ca4 - Parse/builder accessor for MS_ConnectChallenge (opcode 0x07)
+// Packet_AsGetPublicKeyReply_0x4b6ca4 - Parse/builder accessor for MS_ConnectChallenge (opcode 0x07)
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6ca4 (5 slots, 20 bytes)
-// anchor: launcher.exe:0x443910 = Packet_MsConnectChallenge_0x4b6ca4::InitFromIncomingMessage
-// anchor: launcher.exe:0x4439f0 = Packet_MsConnectChallenge_0x4b6ca4::ResetAndInitialize
+// anchor: launcher.exe:0x443910 = Packet_AsGetPublicKeyReply_0x4b6ca4::InitFromIncomingMessage
+// anchor: launcher.exe:0x4439f0 = Packet_AsGetPublicKeyReply_0x4b6ca4::ResetAndInitialize
 //
 // Recovered role:
 // - the class directly subclasses Packet_0x4af2a4 and reuses the inherited fields at
@@ -649,7 +649,7 @@ struct State6Packet0x07FixedPayload {
 // - slot 0 (+0x00): inherited destructor
 // - slot 1 (+0x04): inherited StubReturn0
 // - slot 4 (+0x10): inherited GetPayloadBase
-class Packet_MsConnectChallenge_0x4b6ca4 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_AsGetPublicKeyReply_0x4b6ca4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
  // anchor: launcher.exe:0x443910
  // `initializeWritablePayload=false` mirrors the local build path that grows the retained
@@ -762,7 +762,7 @@ public:
  }
 };
 
-static_assert(sizeof(Packet_MsConnectChallenge_0x4b6ca4) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
+static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
 
 // =============================================================================
 // Packet_MsConnectReply_0x4b6ce0 - Parse accessor for MS_ConnectReply (opcode 0x09)
