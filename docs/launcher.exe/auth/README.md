@@ -100,6 +100,10 @@ Current evidence for that last point:
       - `matrixstaging/game/src/libltclientlogin/authbootstrap680.cpp`
     - later narrower selected-slot raw `0x0b` remains separate in state10 / `0x4401a0`
     - the current explicit state8 existing-character auth bridge remains a replacement-side exception, not proof of original ownership
+  - fidelity note from the `0x448140` pass:
+    - raw `0x0a` is driven by child `+0x94/+0x98` feedback-transform objects, not by the generic `mxo::auth::BuildAuthChallengeResponsePacket(...)` helper
+    - raw `0x0b` success-side private-exponent materialization likewise comes from child `+0x94` over the copied parse-object encrypted field, not from the generic `DecryptAuthReplyPrivateExponent(...)` convenience path
+    - keep `mxo::auth::*` packet helpers as compatibility/runtime helpers, but do not let them erase the recovered child-field ownership when `0x448140` is the anchor
 
 ## Current working wire sequence
 
