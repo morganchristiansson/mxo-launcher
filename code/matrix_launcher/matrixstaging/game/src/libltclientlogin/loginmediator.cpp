@@ -597,23 +597,26 @@ const char* CLTLoginMediator::GetUsername() const {
     return ownerAuthBootstrapSource94_.username00.data();
 }
 
-// Wrapper-facing selection `+0x40`/`+0x44` object builders are ABI shims, not owner-side
-// `0x004b01c8 +0x40/+0x44` methods. Keep the fake outer-object construction in
-// `src/launcher_mediator_abi.cpp` so the launcher-owned mediator stays aligned with the tiny raw
-// slot-record accessors at `0x41f2e0 / 0x41f300`.
+// anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
+// Wrapper split note:
+// - the ABI-facing outer selection/current-slot objects consumed by
+//   `ILTLoginMediator_0x4af2b8.Default +0x40/+0x44` are built in `src/launcher_mediator_abi.cpp`
+// - the launcher-owned mediator method here now returns the underlying
+//   `Packet_MsClaimCharacterNameReply_0x4b5328 *` payload chosen by that wrapper-facing selection
+//   policy
 Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescriptorObject40(
     uint32_t selectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
     const uint32_t expectedScratchRequest = ExpectedSelectionDescriptorScratchRequest();
     const bool matchedConfiguredRequest = SelectionDescriptorMatchesRequest(selectionIndex);
-    const uint8_t currentSlotIndex = this->CurrentCharacterRouteIndexCc8Scaffold();
+    const uint8_t currentSlotIndex = CurrentCharacterRouteIndexCc8Scaffold();
     const bool matchedCurrentSlotIndexRequest =
         high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex);
 
-    const Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
+    Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
         (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
-            ? this->GetCurrentSlotRecord()
+            ? GetCurrentSlotRecordObject44()
             : nullptr;
 
     if (!currentSlotRecord) {
@@ -637,17 +640,22 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescrip
         currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
         static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
         static_cast<unsigned>(currentSlotRecord->characterIdHigh20));
-    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
+    return currentSlotRecord;
 }
 
+// anchor: launcher.exe:0x41f300 / owner vtable +0x44
+// Wrapper split note:
+// - this launcher-owned method returns the concrete current-slot payload object
+// - `src/launcher_mediator_abi.cpp` wraps that payload in the fake outer `+0x44` object only at
+//   the ABI boundary
 Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecordObject44() {
-    const Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
-        this->GetCurrentSlotRecord();
+    Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
+        const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(GetCurrentSlotRecord());
 
     if (!currentSlotRecord) {
         spdlog::info(
             "CLTLoginMediator::GetCurrentSlotRecordObject44(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
-            static_cast<unsigned>(this->CurrentCharacterRouteIndexCc8Scaffold()));
+            static_cast<unsigned>(CurrentCharacterRouteIndexCc8Scaffold()));
         return nullptr;
     }
 
@@ -659,7 +667,7 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecor
         static_cast<unsigned>(currentSlotRecord->characterIdHigh20),
         static_cast<unsigned>(currentSlotRecord->packetType1a),
         static_cast<unsigned>(currentSlotRecord->worldId24));
-    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
+    return currentSlotRecord;
 }
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48
