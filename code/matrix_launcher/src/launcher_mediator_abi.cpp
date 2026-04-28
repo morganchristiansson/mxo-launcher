@@ -110,7 +110,7 @@ struct CurrentSlotRecord44ObjectSketch {
     void* backingObject08;
     uint8_t flag0c;
     uint8_t padding0d[3];
-    Packet_MsClaimCharacterNameReply_0x4b5328* payload10;
+    Packet_AsAuthReply_0x4b5328* payload10;
     const char* debugString14;
     uint16_t debugStringLen18;
     uint8_t padding1a[2];
@@ -169,7 +169,7 @@ static void** MediatorSelectionObjectVtable() {
 }
 
 static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDescriptorObject40AbiShim(
-    const mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord,
+    const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* currentSlotRecord,
     uint32_t selectionIndex,
     uint32_t defaultSelectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
@@ -187,7 +187,7 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
 
     g_MediatorSelectionDescriptor40 = {};
     g_MediatorSelectionDescriptor40.vtable = MediatorSelectionObjectVtable();
-    g_MediatorSelectionDescriptor40.payload10 = const_cast<mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
+    g_MediatorSelectionDescriptor40.payload10 = const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
     g_MediatorSelectionDescriptor40.flag0c = 1u;
 
     spdlog::debug(
@@ -203,7 +203,7 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
 }
 
 static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorCurrentSlotRecordObject44AbiShim(
-    const mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord,
+    const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* currentSlotRecord,
     uint32_t defaultSelectionIndex) {
     g_MediatorCurrentSlotRecord44 = {};
     g_MediatorCurrentSlotRecord44NameOwned.clear();
@@ -216,7 +216,7 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorCurrentSlotRe
     }
 
     g_MediatorCurrentSlotRecord44.vtable = MediatorSelectionObjectVtable();
-    g_MediatorCurrentSlotRecord44.payload10 = const_cast<mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328*>(currentSlotRecord);
+    g_MediatorCurrentSlotRecord44.payload10 = const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
     g_MediatorCurrentSlotRecord44.flag0c = 1u;
     g_MediatorCurrentSlotRecord44NameOwned = currentSlotRecord->debugString14
         ? currentSlotRecord->debugString14
@@ -383,7 +383,7 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     const bool matchedCurrentSlotIndexRequest =
         high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex);
 
-    const mxo::ltlogin::Packet_MsClaimCharacterNameReply_0x4b5328* const currentSlotRecord =
+    const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* const currentSlotRecord =
         (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
             ? mediator->GetCurrentAuthReplyPacket44()
             : nullptr;

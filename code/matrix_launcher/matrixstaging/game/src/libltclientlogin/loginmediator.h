@@ -438,7 +438,7 @@ public:
         // - `+0x644` = current slot / selection byte
         // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
         uint8_t slotRecordCount00_ = 0;
-        std::array<Packet_MsClaimCharacterNameReply_0x4b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
+        std::array<Packet_AsAuthReply_0x4b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
         std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
         std::array<StringTriple_0x403f90, kRecoveredWorldSlotCapacity> routeHostStringTriples194_{};
         uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
@@ -989,9 +989,9 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - selection `+0x40` = selection-descriptor object family
     // - selection `+0x44` = current-slot-record object family
     // - owner `+0x40 = 0x41f2e0` remains the separate `GetSlotRecordByIndex` accessor
-    Packet_MsClaimCharacterNameReply_0x4b5328* GetAuthReplyPacketByIndex40(
+    Packet_AsAuthReply_0x4b5328* GetAuthReplyPacketByIndex40(
         uint32_t selectionIndex) override;
-    Packet_MsClaimCharacterNameReply_0x4b5328* GetCurrentAuthReplyPacket44() override;
+    Packet_AsAuthReply_0x4b5328* GetCurrentAuthReplyPacket44() override;
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).

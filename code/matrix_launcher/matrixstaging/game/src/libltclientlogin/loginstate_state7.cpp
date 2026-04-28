@@ -47,7 +47,7 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
         return;
     }
 
-    const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
+    const Packet_AsAuthReply_0x4b5328* currentSlotRecord =
         g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
     const char* sourceBlock94String60Begin = g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
 

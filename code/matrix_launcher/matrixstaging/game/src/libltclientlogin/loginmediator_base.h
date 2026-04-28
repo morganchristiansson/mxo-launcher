@@ -37,15 +37,15 @@ struct SelectionSeedConfig;
 //   - `worldId24`         = selected world id
 // - its virtual surface follows the shared `Packet_0x4af2a4` shape with slot-specific overrides
 //   for the debug-string/reset helpers at `0x43dc80` / `0x439940`
-class Packet_MsClaimCharacterNameReply_0x4b5328 : public mxo::liblttcp::Packet_0x4af2a4 {
+class Packet_AsAuthReply_0x4b5328 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
-    ~Packet_MsClaimCharacterNameReply_0x4b5328() override = default;
+    ~Packet_AsAuthReply_0x4b5328() override = default;
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
 };
 
-static_assert(sizeof(Packet_MsClaimCharacterNameReply_0x4b5328) == sizeof(mxo::liblttcp::Packet_0x4af2a4),
-              "Packet_MsClaimCharacterNameReply_0x4b5328 should currently be a pure Packet_0x4af2a4-derived view");
+static_assert(sizeof(Packet_AsAuthReply_0x4b5328) == sizeof(mxo::liblttcp::Packet_0x4af2a4),
+              "Packet_AsAuthReply_0x4b5328 should currently be a pure Packet_0x4af2a4-derived view");
 
 // anchor: launcher.exe:0x4b5378 / vtable
 // Margin message reply view class - used in state6 slot6 for margin reply handling.
@@ -72,7 +72,7 @@ public:
 // - wrapper `+0x44` consumes an outer current-slot object
 // - both wrappers are built in `src/launcher_mediator_abi.cpp`
 // - the launcher-owned mediator returns the underlying
-//   `Packet_MsClaimCharacterNameReply_0x4b5328 *` payload pointer for those slots
+//   `Packet_AsAuthReply_0x4b5328 *` payload pointer for those slots
 struct RouteDescriptor30SmallStringLikeSketch {
     // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
     // Shared 3-dword string-state layout used by the owner route-descriptor field at `+0x30`.
@@ -415,10 +415,10 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
-    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetAuthReplyPacketByIndex40(
+    virtual Packet_AsAuthReply_0x4b5328* GetAuthReplyPacketByIndex40(
         uint32_t selectionIndex) = 0;
     // +0x44
-    virtual Packet_MsClaimCharacterNameReply_0x4b5328* GetCurrentAuthReplyPacket44() = 0;
+    virtual Packet_AsAuthReply_0x4b5328* GetCurrentAuthReplyPacket44() = 0;
     // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c

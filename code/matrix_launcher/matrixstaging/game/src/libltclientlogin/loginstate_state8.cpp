@@ -17,130 +17,35 @@
 namespace mxo::ltlogin {
 namespace {
 
-// Shared chunk-seen helper used by state8 slot6 section-0x0a handling.
-// anchor: launcher.exe:0x43c240 = StateReplyChunkBitset_SetSeen
-// anchor: launcher.exe:0x43c280 = StateReplyChunkBitset_HasSeen
-class StateReplyChunkBitset {
+// Faithful file-local class used only by state8 slot6 chunk reassembly.
+// Ghidra shows the original class is tiny and just wraps a uint32_t bitfield reference.
+class StateReplyChunkBitset_0x43c240 {
 public:
-    explicit StateReplyChunkBitset(uint32_t& bits)
+    explicit StateReplyChunkBitset_0x43c240(uint32_t& bits)
         : bits_(bits) {}
 
-    void SetSeen(uint32_t chunkIndex) {
+    // anchor: launcher.exe:0x43c240 = StateReplyChunkBitset_0x43c240::SetSeen
+    StateReplyChunkBitset_0x43c240* SetSeen(uint32_t chunkIndex) {
         if (chunkIndex >= 32u) {
+            spdlog::critical("StateReplyChunkBitset_0x43c240::SetSeen invariant failed: bitset");
             std::abort();
         }
-        bits_ |= (1u << chunkIndex);
+        bits_ |= (1u << (chunkIndex & 0x1fu));
+        return this;
     }
 
+    // anchor: launcher.exe:0x43c280 = StateReplyChunkBitset_0x43c240::HasSeen
     bool HasSeen(uint32_t chunkIndex) const {
         if (chunkIndex >= 32u) {
+            spdlog::critical("StateReplyChunkBitset_0x43c240::HasSeen invariant failed: bitset");
             std::abort();
         }
-        return (bits_ & (1u << chunkIndex)) != 0u;
+        return (bits_ & (1u << (chunkIndex & 0x1fu))) != 0u;
     }
 
 private:
     uint32_t& bits_;
 };
-
-static bool U32x4BlockHasAnyNonZero(const std::array<uint32_t, 4>& block) {
-    return block[0] != 0u || block[1] != 0u || block[2] != 0u || block[3] != 0u;
-}
-
-static void ResetOwnedSectionBytes(void*& buffer, uint16_t& length, uint8_t& flag) {
-    if (buffer) {
-        std::free(buffer);
-        buffer = nullptr;
-    }
-    length = 0u;
-    flag = 0u;
-}
-
-static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& flag) {
-    if (buffer) {
-        std::free(buffer);
-        buffer = nullptr;
-    }
-    length = 0u;
-    flag = 0u;
-}
-
-static void CopyBoundedRawBytes(uint8_t* dest, size_t destSize, const uint8_t* src, size_t srcSize) {
-    if (!dest || destSize == 0u) {
-        return;
-    }
-
-    std::memset(dest, 0, destSize);
-    if (!src || srcSize == 0u) {
-        return;
-    }
-
-    std::memcpy(dest, src, std::min(destSize, srcSize));
-}
-
-static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src, size_t srcAvailable) {
-    if (!dest || destSize == 0u) {
-        return;
-    }
-
-    std::fill(dest, dest + destSize, '\0');
-    if (!src || srcAvailable == 0u) {
-        return;
-    }
-
-    size_t copyLen = 0u;
-    while (copyLen + 1u < destSize && copyLen < srcAvailable && src[copyLen] != '\0') {
-        dest[copyLen] = static_cast<char>(src[copyLen]);
-        ++copyLen;
-    }
-    dest[copyLen] = '\0';
-}
-
-static void LogState8PersistenceFamilySnapshot(
-    const CLTLoginMediator& ownerState,
-    const char* reason,
-    uint32_t sectionSelectorMinus2,
-    uint16_t sectionByteCount,
-    bool completed);
-
-static void LogState8PersistenceFamilySnapshot(
-    const CLTLoginMediator& ownerState,
-    const char* reason,
-    uint32_t sectionSelectorMinus2,
-    uint16_t sectionByteCount,
-    bool completed) {
-    const uint32_t bodyWord00 = ReadU32LE(ownerState.state8Section0RawF88.data());
-    const uint32_t headerWord00 = ownerState.characterFlagsF48[0];
-    const uint32_t headerWord04 = ownerState.characterFlagsF48[1];
-    const uint32_t headerWord08 = ownerState.characterFlagsF48[2];
-    const uint32_t headerWord0c = ownerState.characterFlagsF48[3];
-    const uint32_t secondaryWord00 = ownerState.secondaryCharacterDataF68[0];
-    const uint32_t secondaryWord04 = ownerState.secondaryCharacterDataF68[1];
-    const uint32_t section11Length = static_cast<uint32_t>(ownerState.state8Section11String1460.size());
-
-    spdlog::info(
-        "CLTLoginState_State8_0x4b5104 persistence family [{}] completed={} section={} bytes={} f1c='{}' f3c=0x{:08x} f40=0x{:08x} f48[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] f68[0..1]=[0x{:08x} 0x{:08x}] f88_00=0x{:08x} f88_444=0x{:08x} f88_448=0x{:08x} overflow13f4=0x{:04x} gate1452={} sec11_145c=0x{:08x} sec11_len={}",
-        reason ? reason : "<unknown>",
-        completed ? 1u : 0u,
-        static_cast<unsigned>(sectionSelectorMinus2),
-        static_cast<unsigned>(sectionByteCount),
-        ownerState.characterNameBufferF1c[0] ? ownerState.characterNameBufferF1c : "<empty>",
-        static_cast<unsigned>(ownerState.characterReplyFieldF3c),
-        static_cast<unsigned>(ownerState.characterReplyFieldF40),
-        static_cast<unsigned>(headerWord00),
-        static_cast<unsigned>(headerWord04),
-        static_cast<unsigned>(headerWord08),
-        static_cast<unsigned>(headerWord0c),
-        static_cast<unsigned>(secondaryWord00),
-        static_cast<unsigned>(secondaryWord04),
-        static_cast<unsigned>(bodyWord00),
-        static_cast<unsigned>(ownerState.replySectionData13cc),
-        static_cast<unsigned>(ownerState.replySectionData13d0),
-        static_cast<unsigned>(ownerState.state8Section0OverflowLength13f4),
-        static_cast<unsigned>(ownerState.flag1452),
-        static_cast<unsigned>(ownerState.state8Section11Dword145c),
-        static_cast<unsigned>(section11Length));
-}
 
 }  // namespace
 
@@ -156,53 +61,9 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
         return;
     }
 
-    // Ownership/fidelity correction:
-    // - `0x43bd20` is `CLTLoginState_State8_0x4b5104` slot 3
-    // - it owns a structured packet-builder path, not a mediator slot body
-    // - current best read from decompilation + disassembly:
-    //   - precheck owner `+0x1c` through `0x41b4b0`
-    //     - on failure, original switches helper state to `4`
-    //   - then gate on owner byte `+0xf14`
-    //     - on zero, original switches helper state to `6`
-    //   - fetch current slot record through owner vtable `+0x44`
-    //   - initialize packet-builder family `0x43ac10`
-    //   - write the current character id pair from that current slot record into fixed packet
-    //     dwords `0x01/0x05`
-    //   - then write selection snapshot blocks from owner `+0xcd0..+0xd7f` in the original packet
-    //     order (`0x09/0x19/0x29`, `0x79/0x89/0x99/0xa9`, then `0x39/0x49/0x59/0x69`)
-    //   - negative result worth keeping explicit: state8 slot3 does **not** reuse persisted
-    //     snapshot `blockCd0[0..1]` for those fixed GCID packet fields
-    //   - append `GameSessionID` through `0x43ada0`
-    //     - newer `0x43acf0 + 0x4557b0` tightening now makes the growth rule explicit:
-    //       reserve `(GameSessionID byte count including NUL) + 2` bytes at the tail of the
-    //       retained message-ref's inner storage, write the resulting payload-relative offset back
-    //       to fixed field `+0xb9`, then copy the text into that reservation
-    //     - but fresh original-launcher WineDbg validation on the natural first state8 send now
-    //       shows owner `+0x664` / `GetGameSessionId()` returning `""` there
-    //     - practical consequence: the natural `0x0bb -> 0x13b` growth is **not** explained by a
-    //       non-empty `GameSessionID` append on that first existing-character send
-    //   - send through `0x41af70`
-    //     - newer `0x41af70` tightening matters for the current blocker:
-    //       it does not serialize raw bytes itself
-    //       it forwards the stack-local packet-envelope object into current margin connection
-    //       vtable `+0x24` / `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
-    //       and that wrapper then forwards envelope `+0x08` (the retained outer message-ref)
-    //       into vtable `+0x28` / inherited `CMessageConnection_0x4b7928::SendPacket` (`0x448cf0`)
-    //   - post event `9`
-    // Practical current boundary from the newest original-launcher runs:
-    // - natural original reaches this sender, crosses the `0x41af70/0x41cf30` send bridge, and
-    //   later does reach state8 slot 6 / `0x43f930`
-    // - so the old pre-`0x43f930` survivability question is no longer the first missing natural
-    //   boundary; the next target is deeper reply-side behavior inside slot 6 and the continuation
-    //   after it
-    // - the receive-side route for that live slot-6 hit is now tighter too:
-    //   `CMarginConnection::OnOperationCompleted` (`0x44af60`) ->
-    //   `CMessageConnection_0x4b7928::OnOperationCompleted` (`0x4490c0`) ->
-    //   `CBaseMarginConnection::DispatchMessage` (`0x442d00`) ->
-    //   mediator re-entry `0x41f260` into the active helper/state slot-6 body
-    // - newer `0x442d00/0x441bc0/0x441850` review now also rules out one tempting shortcut:
-    //   the base type-4/MS wrapper path can synthesize a local type-`0x0b` completion object and
-    //   fall into mediator fallback `0x41afc0`, which re-enters helper slot 2 instead of slot 6
+    // anchor: launcher.exe:0x43bd20 slot 3
+    // Exact behavior: gate on helper state, build/load request, append session id, send, post event 9.
+
     if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
         const uint32_t fallbackResult = g_CurrentLoginMediator->SetCurrentState(4u);
         spdlog::info(
@@ -228,10 +89,9 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
-    const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
+    const Packet_AsAuthReply_0x4b5328* currentSlotRecord =
         g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
 
-    // DIAGNOSTIC: Trace slot record state before using it
     spdlog::info(
         "DIAGNOSTIC: State8 Slot3 currentSlotRecord={} charIdLow=0x{:08x} charIdHigh=0x{:08x}",
         fmt::ptr(currentSlotRecord),
@@ -243,8 +103,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     Packet_MsLoadCharacterRequest_0x4b5418 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
-    // DIAGNOSTIC: Log raw payload header for trace
-uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
     if (rawPayloadForDiag) {
         spdlog::info(
             "DIAGNOSTIC: State8 Slot3 raw payload after Reset: opcode=0x{:02x} charIdLow=0x{:08x} charIdHigh=0x{:08x} zeroPrefixDword0=0x{:08x} weirdBlock0=0x{:08x}",
@@ -342,7 +201,6 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     // For source fidelity, we implement the reservation logic inline here.
     // The mediator caches the write pointer in its own fields (not packet builder fields).
 
-    // DIAGNOSTIC: Log payload after all writes
     if (payload) {
         spdlog::info(
             "DIAGNOSTIC: State8 Slot3 final payload: charIdLow=0x{:08x} charIdHigh=0x{:08x} zeroPrefixDword0=0x{:08x} zeroPrefixDword4=0x{:08x} weirdBlock0=0x{:08x} weirdBlock8=0x{:08x}",
@@ -398,17 +256,17 @@ uint8_t* rawPayloadForDiag = static_cast<uint8_t*>(packetBuilder.payloadAlias10)
     g_CurrentLoginMediator->PostEvent(0x09u);
 
     const unsigned nonZeroSnapshotBlockCount =
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60)) +
-        static_cast<unsigned>(U32x4BlockHasAnyNonZero(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70));
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCe0[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCf0[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD00[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD10[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD20[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD30[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD40[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD50[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD60[3] != 0u) +
+        static_cast<unsigned>(g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[0] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[1] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[2] != 0u || g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[3] != 0u);
     // gameSessionId already declared above in SetGameSessionId block
 
     spdlog::info(
@@ -432,39 +290,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         return 0u;
     }
 
-    // Newer receive-side boundary tightening from `0x44af20/0x442d00` + live original WineDbg:
-    // - the active state slot-6 body is now proven live on the natural password-submit path
-    // - it is not the first recipient for every incoming margin message
-    // - base margin dispatch fully consumes decoded message codes `2`, `4`, and `5`
-    // - only other decoded message codes fall through owner `+0x184 -> 0x41f260` and land here
-    // - practical consequence: the raw state8 reply opcode `0x10` belongs on that fallback path,
-    //   not on the base code-4 wrapper branch
-    // anchor: launcher.exe:0x43f941 / 0x41bc20 then 0x43f949 CMP AX,0x10
-    uint16_t messageCode = 0;
-    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(*workItem, &messageCode, nullptr)) {
-        // Original just observes opcode 0 here and takes the same non-0x10 fallback path.
-    }
-
-    if (messageCode != 0x10u) {
-        const uint32_t fallbackResult = g_CurrentLoginMediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
-        if (fallbackResult < 1u) {
-            spdlog::info(
-                "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 messageCode=0x{:04x} -> dispatchResult=0x{:08x}",
-                static_cast<unsigned>(messageCode),
-                fallbackResult);
-            return 1u;
-        }
-        g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
-        spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 messageCode=0x{:04x} returned 0x{:08x}; mirrored owner+0x80=0x12000005",
-            static_cast<unsigned>(messageCode),
-            fallbackResult);
-        return 0u;
-    }
-
-    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     // anchor: launcher.exe:0x43ae50
-    Packet_MsLoadCharacterReply_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
+    Packet_MsLoadCharacterReply_0x4b542c loadCharacterReplyEnvelope(workItem, 1);
     if (!loadCharacterReplyEnvelope.valid) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
@@ -484,8 +311,6 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionByteCount),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
 
-    auto& ownerState = *g_CurrentLoginMediator;
-    auto& persistence = g_CurrentLoginMediator->state8PersistenceDataF1c; // anchor: launcher.exe owner `+0xf1c`
     g_CurrentLoginMediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         (void)g_CurrentLoginMediator->SetCurrentState(3u);
@@ -500,48 +325,108 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
     const bool firstFragment = (replySectionsSeen_ == 0u);
     bool usedCurrentSlotRecord = false;
     if (firstFragment) {
-        // anchor: launcher.exe:0x438a50 first-fragment reset inside `0x43f930`
-        // Keep this inlined here instead of routing through replacement-only helper methods:
-        // current static-RE shows this work as part of the original slot6 body.
-        persistence = {};
-        std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
-        ownerState.characterReplyFieldF3c = 0u;
-        ownerState.characterReplyFieldF40 = 0u;
-        ownerState.characterReplyFieldF44 = 0x1000u;
-        std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
-        std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
-        std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
-        std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
-        std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
-        std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
-        std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
-        ownerState.replySectionData13cc = 0u;
-        ownerState.replySectionData13d0 = 0u;
-        ownerState.section0Flag13f6 = 0u;
-        ResetOwnedSectionBytes(
-            ownerState.state8Section0OverflowBuffer13f0,
-            ownerState.state8Section0OverflowLength13f4,
-            ownerState.section0Flag13f6);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
-        ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
-        ownerState.state8Section10ChunkBitmap = 0u;
-        ownerState.state8Section11Dword145c = 0u;
-        ownerState.state8Section11String1460.clear();
+        // anchor: launcher.exe:0x438a50 first-fragment reset
+        g_CurrentLoginMediator->state8PersistenceDataF1c = {};
+        std::fill(std::begin(g_CurrentLoginMediator->characterNameBufferF1c), std::end(g_CurrentLoginMediator->characterNameBufferF1c), '\0');
+        g_CurrentLoginMediator->characterReplyFieldF3c = 0u;
+        g_CurrentLoginMediator->characterReplyFieldF40 = 0u;
+        g_CurrentLoginMediator->characterReplyFieldF44 = 0x1000u;
+        std::fill(g_CurrentLoginMediator->characterFlagsF48.begin(), g_CurrentLoginMediator->characterFlagsF48.end(), 0u);
+        std::fill(g_CurrentLoginMediator->secondaryCharacterDataF68.begin(), g_CurrentLoginMediator->secondaryCharacterDataF68.end(), 0u);
+        std::fill(g_CurrentLoginMediator->characterRecordPointersF88.begin(), g_CurrentLoginMediator->characterRecordPointersF88.end(), 0u);
+        std::fill(g_CurrentLoginMediator->section0StringF8c.begin(), g_CurrentLoginMediator->section0StringF8c.end(), '\0');
+        std::fill(g_CurrentLoginMediator->section0StringFac.begin(), g_CurrentLoginMediator->section0StringFac.end(), '\0');
+        std::fill(g_CurrentLoginMediator->section0StringFcc.begin(), g_CurrentLoginMediator->section0StringFcc.end(), '\0');
+        std::fill(g_CurrentLoginMediator->state8Section0RawF88.begin(), g_CurrentLoginMediator->state8Section0RawF88.end(), 0u);
+        g_CurrentLoginMediator->replySectionData13cc = 0u;
+        g_CurrentLoginMediator->replySectionData13d0 = 0u;
+        g_CurrentLoginMediator->section0Flag13f6 = 0u;
+                if (g_CurrentLoginMediator->state8Section0OverflowBuffer13f0) {
+            std::free(g_CurrentLoginMediator->state8Section0OverflowBuffer13f0);
+            g_CurrentLoginMediator->state8Section0OverflowBuffer13f0 = nullptr;
+        }
+        g_CurrentLoginMediator->state8Section0OverflowLength13f4 = 0u;
+        g_CurrentLoginMediator->section0Flag13f6 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer13f8) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer13f8);
+            g_CurrentLoginMediator->allocatedBuffer13f8 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength13fc = 0u;
+        g_CurrentLoginMediator->flag13fe = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1400) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1400);
+            g_CurrentLoginMediator->allocatedBuffer1400 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1404 = 0u;
+        g_CurrentLoginMediator->flag1406 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1408) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1408);
+            g_CurrentLoginMediator->allocatedBuffer1408 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength140c = 0u;
+        g_CurrentLoginMediator->allocatedBufferFlag140e = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1410) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1410);
+            g_CurrentLoginMediator->allocatedBuffer1410 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1414 = 0u;
+        g_CurrentLoginMediator->flag1416 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1418) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1418);
+            g_CurrentLoginMediator->allocatedBuffer1418 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength141c = 0u;
+        g_CurrentLoginMediator->allocatedBufferFlag141e = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1420) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1420);
+            g_CurrentLoginMediator->allocatedBuffer1420 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1424 = 0u;
+        g_CurrentLoginMediator->allocatedBufferFlag1426 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1428) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1428);
+            g_CurrentLoginMediator->allocatedBuffer1428 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength142c = 0u;
+        g_CurrentLoginMediator->allocatedBufferFlag142e = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1430) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1430);
+            g_CurrentLoginMediator->allocatedBuffer1430 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1434 = 0u;
+        g_CurrentLoginMediator->flag1436 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1438) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1438);
+            g_CurrentLoginMediator->allocatedBuffer1438 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength143c = 0u;
+        g_CurrentLoginMediator->flag143e = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1440) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1440);
+            g_CurrentLoginMediator->allocatedBuffer1440 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1444 = 0u;
+        g_CurrentLoginMediator->flag1448 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer144c) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer144c);
+            g_CurrentLoginMediator->allocatedBuffer144c = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1450 = 0u;
+        g_CurrentLoginMediator->flag1452 = 0u;
+                if (g_CurrentLoginMediator->allocatedBuffer1454) {
+            std::free(g_CurrentLoginMediator->allocatedBuffer1454);
+            g_CurrentLoginMediator->allocatedBuffer1454 = nullptr;
+        }
+        g_CurrentLoginMediator->allocatedBufferLength1458 = 0u;
+        g_CurrentLoginMediator->flag145a = 0u;
+        g_CurrentLoginMediator->state8Section10ChunkBitmap = 0u;
+        g_CurrentLoginMediator->state8Section11Dword145c = 0u;
+        g_CurrentLoginMediator->state8Section11String1460.clear();
 
-        ownerState.characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
-        persistence.replyField20 = loadCharacterReplyEnvelope.field05;
+        g_CurrentLoginMediator->characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
+        g_CurrentLoginMediator->state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
 
-        const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
+        const Packet_AsAuthReply_0x4b5328* currentSlotRecord =
             g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
         if (currentSlotRecord == nullptr) {
             spdlog::info(
@@ -552,23 +437,23 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         if (currentSlotRecord->debugString14) {
             const size_t copyCount = std::min(
                 std::strlen(currentSlotRecord->debugString14),
-                sizeof(ownerState.characterNameBufferF1c) - 1u);
+                sizeof(g_CurrentLoginMediator->characterNameBufferF1c) - 1u);
             std::copy_n(
                 currentSlotRecord->debugString14,
                 copyCount,
-                ownerState.characterNameBufferF1c);
-            ownerState.characterNameBufferF1c[copyCount] = '\0';
+                g_CurrentLoginMediator->characterNameBufferF1c);
+            g_CurrentLoginMediator->characterNameBufferF1c[copyCount] = '\0';
             std::copy(
-                ownerState.characterNameBufferF1c,
-                ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
-                persistence.characterName00.begin());
+                g_CurrentLoginMediator->characterNameBufferF1c,
+                g_CurrentLoginMediator->characterNameBufferF1c + sizeof(g_CurrentLoginMediator->characterNameBufferF1c),
+                g_CurrentLoginMediator->state8PersistenceDataF1c.characterName00.begin());
         }
-        ownerState.characterReplyFieldF40 = currentSlotRecord->worldId24;
-        ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId24;
-        ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->packetType1a;
-        persistence.selectedWorldField24 = currentSlotRecord->worldId24;
-        persistence.secondary4c[0] = currentSlotRecord->worldId24;
-        persistence.secondary4c[1] = currentSlotRecord->packetType1a;
+        g_CurrentLoginMediator->characterReplyFieldF40 = currentSlotRecord->worldId24;
+        g_CurrentLoginMediator->secondaryCharacterDataF68[0] = currentSlotRecord->worldId24;
+        g_CurrentLoginMediator->secondaryCharacterDataF68[1] = currentSlotRecord->packetType1a;
+        g_CurrentLoginMediator->state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId24;
+        g_CurrentLoginMediator->state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId24;
+        g_CurrentLoginMediator->state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->packetType1a;
         usedCurrentSlotRecord = true;
     }
 
@@ -588,55 +473,90 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             if (loadCharacterReplyEnvelope.sectionData != nullptr) {
                 const size_t fixedPrefixBytes = std::min<size_t>(
                     loadCharacterReplyEnvelope.sectionByteCount,
-                    ownerState.characterFlagsF48.size() * sizeof(uint32_t));
+                    g_CurrentLoginMediator->characterFlagsF48.size() * sizeof(uint32_t));
                 if (fixedPrefixBytes != 0u) {
-                    std::memcpy(ownerState.characterFlagsF48.data(), loadCharacterReplyEnvelope.sectionData, fixedPrefixBytes);
-                    std::memcpy(persistence.header2c.data(), loadCharacterReplyEnvelope.sectionData, fixedPrefixBytes);
+                    std::memcpy(g_CurrentLoginMediator->characterFlagsF48.data(), loadCharacterReplyEnvelope.sectionData, fixedPrefixBytes);
+                    std::memcpy(g_CurrentLoginMediator->state8PersistenceDataF1c.header2c.data(), loadCharacterReplyEnvelope.sectionData, fixedPrefixBytes);
                 }
                 if (loadCharacterReplyEnvelope.sectionByteCount > 0x20u) {
-                    CopyBoundedRawBytes(
-                        ownerState.state8Section0RawF88.data(),
-                        ownerState.state8Section0RawF88.size(),
-                        loadCharacterReplyEnvelope.sectionData + 0x20u,
-                        loadCharacterReplyEnvelope.sectionByteCount - 0x20u);
-                    persistence.bodyWord6c = 0x1000u;
-                    std::fill(persistence.realFirstName70.begin(), persistence.realFirstName70.end(), '\0');
-                    std::fill(persistence.realLastName90.begin(), persistence.realLastName90.end(), '\0');
-                    std::fill(persistence.backgroundB0.begin(), persistence.backgroundB0.end(), '\0');
-                    persistence.replySectionData4b0 = 0u;
-                    persistence.replySectionData4b4 = 0u;
-                    persistence.tail4b8 = {1u};
-                    CopyBoundedRawBytes(
-                        reinterpret_cast<uint8_t*>(&persistence.bodyWord6c),
-                        CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize,
-                        loadCharacterReplyEnvelope.sectionData + 0x20u,
-                        loadCharacterReplyEnvelope.sectionByteCount - 0x20u);
+                    if (g_CurrentLoginMediator->state8Section0RawF88.size() != 0u) {
+                        std::memset(g_CurrentLoginMediator->state8Section0RawF88.data(), 0, g_CurrentLoginMediator->state8Section0RawF88.size());
+                        std::memcpy(
+                            g_CurrentLoginMediator->state8Section0RawF88.data(),
+                            loadCharacterReplyEnvelope.sectionData + 0x20u,
+                            std::min(
+                                g_CurrentLoginMediator->state8Section0RawF88.size(),
+                                loadCharacterReplyEnvelope.sectionByteCount - 0x20u));
+                    }
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.bodyWord6c = 0x1000u;
+                    std::fill(g_CurrentLoginMediator->state8PersistenceDataF1c.realFirstName70.begin(), g_CurrentLoginMediator->state8PersistenceDataF1c.realFirstName70.end(), '\0');
+                    std::fill(g_CurrentLoginMediator->state8PersistenceDataF1c.realLastName90.begin(), g_CurrentLoginMediator->state8PersistenceDataF1c.realLastName90.end(), '\0');
+                    std::fill(g_CurrentLoginMediator->state8PersistenceDataF1c.backgroundB0.begin(), g_CurrentLoginMediator->state8PersistenceDataF1c.backgroundB0.end(), '\0');
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.replySectionData4b0 = 0u;
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.replySectionData4b4 = 0u;
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.tail4b8 = {1u};
+                    if (CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize != 0u) {
+                        std::memset(
+                            reinterpret_cast<uint8_t*>(&g_CurrentLoginMediator->state8PersistenceDataF1c.bodyWord6c),
+                            0,
+                            CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize);
+                        std::memcpy(
+                            reinterpret_cast<uint8_t*>(&g_CurrentLoginMediator->state8PersistenceDataF1c.bodyWord6c),
+                            loadCharacterReplyEnvelope.sectionData + 0x20u,
+                            std::min(
+                                CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize,
+                                loadCharacterReplyEnvelope.sectionByteCount - 0x20u));
+                    }
                 }
                 if (loadCharacterReplyEnvelope.sectionByteCount >= 4u) {
-                    ownerState.characterRecordPointersF88[0] = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x00u);
+                    g_CurrentLoginMediator->characterRecordPointersF88[0] = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x00u);
                 }
                 if (loadCharacterReplyEnvelope.sectionByteCount > 0x444u) {
-                    ownerState.replySectionData13cc = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x444u);
+                    g_CurrentLoginMediator->replySectionData13cc = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x444u);
                 }
                 if (loadCharacterReplyEnvelope.sectionByteCount > 0x448u) {
-                    ownerState.replySectionData13d0 = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x448u);
+                    g_CurrentLoginMediator->replySectionData13d0 = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x448u);
                 }
-                CopyCStringIntoFixed(
-                    ownerState.section0StringF8c.data(),
-                    ownerState.section0StringF8c.size(),
-                    loadCharacterReplyEnvelope.sectionByteCount > 0x04u ? (loadCharacterReplyEnvelope.sectionData + 0x04u) : nullptr,
-                    loadCharacterReplyEnvelope.sectionByteCount > 0x04u ? loadCharacterReplyEnvelope.sectionByteCount - 0x04u : 0u);
-                CopyCStringIntoFixed(
-                    ownerState.section0StringFac.data(),
-                    ownerState.section0StringFac.size(),
-                    loadCharacterReplyEnvelope.sectionByteCount > 0x24u ? (loadCharacterReplyEnvelope.sectionData + 0x24u) : nullptr,
-                    loadCharacterReplyEnvelope.sectionByteCount > 0x24u ? loadCharacterReplyEnvelope.sectionByteCount - 0x24u : 0u);
-                CopyCStringIntoFixed(
-                    ownerState.section0StringFcc.data(),
-                    ownerState.section0StringFcc.size(),
-                    loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? (loadCharacterReplyEnvelope.sectionData + 0x44u) : nullptr,
-                    loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? loadCharacterReplyEnvelope.sectionByteCount - 0x44u : 0u);
-                if (loadCharacterReplyEnvelope.sectionByteCount > 0x485u && ownerState.state8Section0OverflowBuffer13f0 == nullptr) {
+                if (g_CurrentLoginMediator->section0StringF8c.size() != 0u) {
+                    std::fill(g_CurrentLoginMediator->section0StringF8c.data(), g_CurrentLoginMediator->section0StringF8c.data() + g_CurrentLoginMediator->section0StringF8c.size(), '\0');
+                    const uint8_t* section0StringF8cSrc = loadCharacterReplyEnvelope.sectionByteCount > 0x04u ? (loadCharacterReplyEnvelope.sectionData + 0x04u) : nullptr;
+                    const size_t section0StringF8cSrcAvail = loadCharacterReplyEnvelope.sectionByteCount > 0x04u ? loadCharacterReplyEnvelope.sectionByteCount - 0x04u : 0u;
+                    if (section0StringF8cSrc && section0StringF8cSrcAvail != 0u) {
+                        size_t copyLen = 0u;
+                        while (copyLen + 1u < g_CurrentLoginMediator->section0StringF8c.size() && copyLen < section0StringF8cSrcAvail && section0StringF8cSrc[copyLen] != '\0') {
+                            g_CurrentLoginMediator->section0StringF8c.data()[copyLen] = static_cast<char>(section0StringF8cSrc[copyLen]);
+                            ++copyLen;
+                        }
+                        g_CurrentLoginMediator->section0StringF8c.data()[copyLen] = '\0';
+                    }
+                }
+                if (g_CurrentLoginMediator->section0StringFac.size() != 0u) {
+                    std::fill(g_CurrentLoginMediator->section0StringFac.data(), g_CurrentLoginMediator->section0StringFac.data() + g_CurrentLoginMediator->section0StringFac.size(), '\0');
+                    const uint8_t* section0StringFacSrc = loadCharacterReplyEnvelope.sectionByteCount > 0x24u ? (loadCharacterReplyEnvelope.sectionData + 0x24u) : nullptr;
+                    const size_t section0StringFacSrcAvail = loadCharacterReplyEnvelope.sectionByteCount > 0x24u ? loadCharacterReplyEnvelope.sectionByteCount - 0x24u : 0u;
+                    if (section0StringFacSrc && section0StringFacSrcAvail != 0u) {
+                        size_t copyLen = 0u;
+                        while (copyLen + 1u < g_CurrentLoginMediator->section0StringFac.size() && copyLen < section0StringFacSrcAvail && section0StringFacSrc[copyLen] != '\0') {
+                            g_CurrentLoginMediator->section0StringFac.data()[copyLen] = static_cast<char>(section0StringFacSrc[copyLen]);
+                            ++copyLen;
+                        }
+                        g_CurrentLoginMediator->section0StringFac.data()[copyLen] = '\0';
+                    }
+                }
+                if (g_CurrentLoginMediator->section0StringFcc.size() != 0u) {
+                    std::fill(g_CurrentLoginMediator->section0StringFcc.data(), g_CurrentLoginMediator->section0StringFcc.data() + g_CurrentLoginMediator->section0StringFcc.size(), '\0');
+                    const uint8_t* section0StringFccSrc = loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? (loadCharacterReplyEnvelope.sectionData + 0x44u) : nullptr;
+                    const size_t section0StringFccSrcAvail = loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? loadCharacterReplyEnvelope.sectionByteCount - 0x44u : 0u;
+                    if (section0StringFccSrc && section0StringFccSrcAvail != 0u) {
+                        size_t copyLen = 0u;
+                        while (copyLen + 1u < g_CurrentLoginMediator->section0StringFcc.size() && copyLen < section0StringFccSrcAvail && section0StringFccSrc[copyLen] != '\0') {
+                            g_CurrentLoginMediator->section0StringFcc.data()[copyLen] = static_cast<char>(section0StringFccSrc[copyLen]);
+                            ++copyLen;
+                        }
+                        g_CurrentLoginMediator->section0StringFcc.data()[copyLen] = '\0';
+                    }
+                }
+                if (loadCharacterReplyEnvelope.sectionByteCount > 0x485u && g_CurrentLoginMediator->state8Section0OverflowBuffer13f0 == nullptr) {
                     const uint16_t overflowAppendLen =
                         static_cast<uint16_t>(loadCharacterReplyEnvelope.sectionByteCount - 0x485u);
                     void* const newBuffer = std::malloc(overflowAppendLen);
@@ -645,188 +565,186 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                             newBuffer,
                             loadCharacterReplyEnvelope.sectionData + 0x485u,
                             overflowAppendLen);
-                        ownerState.state8Section0OverflowBuffer13f0 = newBuffer;
-                        ownerState.state8Section0OverflowLength13f4 = overflowAppendLen;
+                        g_CurrentLoginMediator->state8Section0OverflowBuffer13f0 = newBuffer;
+                        g_CurrentLoginMediator->state8Section0OverflowLength13f4 = overflowAppendLen;
                     }
                 }
             }
-            persistence.section0OverflowBuffer4d4 = ownerState.state8Section0OverflowBuffer13f0;
-            persistence.section0OverflowLength4d8 = ownerState.state8Section0OverflowLength13f4;
-            ownerState.section0Flag13f6 = 1u;
-            persistence.section0PresentFlag4da = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0OverflowBuffer4d4 = g_CurrentLoginMediator->state8Section0OverflowBuffer13f0;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0OverflowLength4d8 = g_CurrentLoginMediator->state8Section0OverflowLength13f4;
+            g_CurrentLoginMediator->section0Flag13f6 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0PresentFlag4da = 1u;
             spdlog::info(
                 "CLTLoginState_State8_0x4b5104 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
-                ownerState.characterNameBufferF1c[0] ? std::string(ownerState.characterNameBufferF1c) : std::string("<empty>"),
-                ownerState.section0StringF8c[0] ? std::string(ownerState.section0StringF8c.data()) : std::string("<empty>"),
-                ownerState.section0StringFac[0] ? std::string(ownerState.section0StringFac.data()) : std::string("<empty>"),
-                ownerState.section0StringFcc[0] ? std::string(ownerState.section0StringFcc.data()) : std::string("<empty>"),
-                static_cast<unsigned>(ownerState.characterRecordPointersF88[0]),
-                static_cast<unsigned>(ownerState.replySectionData13cc),
-                static_cast<unsigned>(ownerState.replySectionData13d0));
-            LogState8PersistenceFamilySnapshot(ownerState, "section0", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, false);
+                g_CurrentLoginMediator->characterNameBufferF1c[0] ? std::string(g_CurrentLoginMediator->characterNameBufferF1c) : std::string("<empty>"),
+                g_CurrentLoginMediator->section0StringF8c[0] ? std::string(g_CurrentLoginMediator->section0StringF8c.data()) : std::string("<empty>"),
+                g_CurrentLoginMediator->section0StringFac[0] ? std::string(g_CurrentLoginMediator->section0StringFac.data()) : std::string("<empty>"),
+                g_CurrentLoginMediator->section0StringFcc[0] ? std::string(g_CurrentLoginMediator->section0StringFcc.data()) : std::string("<empty>"),
+                static_cast<unsigned>(g_CurrentLoginMediator->characterRecordPointersF88[0]),
+                static_cast<unsigned>(g_CurrentLoginMediator->replySectionData13cc),
+                static_cast<unsigned>(g_CurrentLoginMediator->replySectionData13d0));
             break;
         case 1u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength13fc;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength13fc;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer13f8
-                    ? std::realloc(ownerState.allocatedBuffer13f8, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer13f8
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer13f8, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer13f8 = newBuffer;
-                    ownerState.allocatedBufferLength13fc = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer13f8 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength13fc = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.flag13fe = 1u;
-            persistence.section01Buffer4dc = ownerState.allocatedBuffer13f8;
-            persistence.section01Length4e0 = ownerState.allocatedBufferLength13fc;
-            persistence.section01PresentFlag4e2 = 1u;
+            g_CurrentLoginMediator->flag13fe = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section01Buffer4dc = g_CurrentLoginMediator->allocatedBuffer13f8;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section01Length4e0 = g_CurrentLoginMediator->allocatedBufferLength13fc;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section01PresentFlag4e2 = 1u;
             break;
         case 2u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength1404;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength1404;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1400
-                    ? std::realloc(ownerState.allocatedBuffer1400, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1400
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1400, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1400 = newBuffer;
-                    ownerState.allocatedBufferLength1404 = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1400 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength1404 = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.flag1406 = 1u;
-            persistence.section02Buffer4e4 = ownerState.allocatedBuffer1400;
-            persistence.section02Length4e8 = ownerState.allocatedBufferLength1404;
-            persistence.section02PresentFlag4ea = 1u;
+            g_CurrentLoginMediator->flag1406 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section02Buffer4e4 = g_CurrentLoginMediator->allocatedBuffer1400;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section02Length4e8 = g_CurrentLoginMediator->allocatedBufferLength1404;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section02PresentFlag4ea = 1u;
             break;
         case 3u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength141c;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength141c;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1418
-                    ? std::realloc(ownerState.allocatedBuffer1418, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1418
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1418, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1418 = newBuffer;
-                    ownerState.allocatedBufferLength141c = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1418 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength141c = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.allocatedBufferFlag141e = 1u;
-            persistence.section03Buffer4fc = ownerState.allocatedBuffer1418;
-            persistence.section03Length500 = ownerState.allocatedBufferLength141c;
-            persistence.section03PresentFlag502 = 1u;
+            g_CurrentLoginMediator->allocatedBufferFlag141e = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section03Buffer4fc = g_CurrentLoginMediator->allocatedBuffer1418;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section03Length500 = g_CurrentLoginMediator->allocatedBufferLength141c;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section03PresentFlag502 = 1u;
             break;
         case 4u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength1424;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength1424;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1420
-                    ? std::realloc(ownerState.allocatedBuffer1420, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1420
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1420, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1420 = newBuffer;
-                    ownerState.allocatedBufferLength1424 = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1420 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength1424 = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.allocatedBufferFlag1426 = 1u;
-            persistence.section04Buffer504 = ownerState.allocatedBuffer1420;
-            persistence.section04Length508 = ownerState.allocatedBufferLength1424;
-            persistence.section04PresentFlag50a = 1u;
+            g_CurrentLoginMediator->allocatedBufferFlag1426 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section04Buffer504 = g_CurrentLoginMediator->allocatedBuffer1420;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section04Length508 = g_CurrentLoginMediator->allocatedBufferLength1424;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section04PresentFlag50a = 1u;
             break;
         case 5u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength142c;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength142c;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1428
-                    ? std::realloc(ownerState.allocatedBuffer1428, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1428
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1428, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1428 = newBuffer;
-                    ownerState.allocatedBufferLength142c = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1428 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength142c = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.allocatedBufferFlag142e = 1u;
-            persistence.section05Buffer50c = ownerState.allocatedBuffer1428;
-            persistence.section05Length510 = ownerState.allocatedBufferLength142c;
-            persistence.section05PresentFlag512 = 1u;
+            g_CurrentLoginMediator->allocatedBufferFlag142e = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section05Buffer50c = g_CurrentLoginMediator->allocatedBuffer1428;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section05Length510 = g_CurrentLoginMediator->allocatedBufferLength142c;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section05PresentFlag512 = 1u;
             break;
         case 6u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength140c;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength140c;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1408
-                    ? std::realloc(ownerState.allocatedBuffer1408, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1408
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1408, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1408 = newBuffer;
-                    ownerState.allocatedBufferLength140c = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1408 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength140c = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.allocatedBufferFlag140e = 1u;
-            persistence.section06Buffer4ec = ownerState.allocatedBuffer1408;
-            persistence.section06Length4f0 = ownerState.allocatedBufferLength140c;
-            persistence.section06PresentFlag4f2 = 1u;
+            g_CurrentLoginMediator->allocatedBufferFlag140e = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section06Buffer4ec = g_CurrentLoginMediator->allocatedBuffer1408;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section06Length4f0 = g_CurrentLoginMediator->allocatedBufferLength140c;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section06PresentFlag4f2 = 1u;
             break;
         case 7u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength1414;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength1414;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1410
-                    ? std::realloc(ownerState.allocatedBuffer1410, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1410
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1410, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1410 = newBuffer;
-                    ownerState.allocatedBufferLength1414 = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1410 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength1414 = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.flag1416 = 1u;
-            persistence.section07Buffer4f4 = ownerState.allocatedBuffer1410;
-            persistence.section07Length4f8 = ownerState.allocatedBufferLength1414;
-            persistence.section07PresentFlag4fa = 1u;
+            g_CurrentLoginMediator->flag1416 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section07Buffer4f4 = g_CurrentLoginMediator->allocatedBuffer1410;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section07Length4f8 = g_CurrentLoginMediator->allocatedBufferLength1414;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section07PresentFlag4fa = 1u;
             break;
         case 8u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength1444;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength1444;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1440
-                    ? std::realloc(ownerState.allocatedBuffer1440, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1440
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1440, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1440 = newBuffer;
-                    ownerState.allocatedBufferLength1444 = static_cast<uint32_t>(newLength);
+                    g_CurrentLoginMediator->allocatedBuffer1440 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength1444 = static_cast<uint32_t>(newLength);
                 }
             }
-            ownerState.flag1448 = 1u;
-            persistence.section08Buffer524 = ownerState.allocatedBuffer1440;
-            persistence.section08Length528 = ownerState.allocatedBufferLength1444;
-            persistence.section08PresentFlag52c = 1u;
+            g_CurrentLoginMediator->flag1448 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section08Buffer524 = g_CurrentLoginMediator->allocatedBuffer1440;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section08Length528 = g_CurrentLoginMediator->allocatedBufferLength1444;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section08PresentFlag52c = 1u;
             break;
         case 9u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength1450;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength1450;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer144c
-                    ? std::realloc(ownerState.allocatedBuffer144c, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer144c
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer144c, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer144c = newBuffer;
-                    ownerState.allocatedBufferLength1450 = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer144c = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength1450 = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.flag1452 = 1u;
-            persistence.section09Buffer530 = ownerState.allocatedBuffer144c;
-            persistence.section09Length534 = ownerState.allocatedBufferLength1450;
-            persistence.section09PresentFlag536 = 1u;
-            LogState8PersistenceFamilySnapshot(ownerState, "section9_clcfg1452", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, false);
+            g_CurrentLoginMediator->flag1452 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section09Buffer530 = g_CurrentLoginMediator->allocatedBuffer144c;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section09Length534 = g_CurrentLoginMediator->allocatedBufferLength1450;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section09PresentFlag536 = 1u;
             break;
         case 10u:
             // anchor: launcher.exe:0x43ffc6
@@ -836,12 +754,12 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             // - copy chunk bytes to `buffer + ((ordinal * 1000) - 1000)`
             // - mark that 1-based ordinal as seen in the helper-local bitset
             // - accumulate total materialized byte count in owner `+0x1458`
-            if (ownerState.allocatedBuffer1454 == nullptr) {
-                ownerState.allocatedBuffer1454 = std::malloc(0x7d00u);
-                ownerState.allocatedBufferLength1458 = 0u;
-                ownerState.state8Section10ChunkBitmap = 0u;
+            if (g_CurrentLoginMediator->allocatedBuffer1454 == nullptr) {
+                g_CurrentLoginMediator->allocatedBuffer1454 = std::malloc(0x7d00u);
+                g_CurrentLoginMediator->allocatedBufferLength1458 = 0u;
+                g_CurrentLoginMediator->state8Section10ChunkBitmap = 0u;
             }
-            if (ownerState.allocatedBuffer1454 != nullptr && loadCharacterReplyEnvelope.sectionData != nullptr) {
+            if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr && loadCharacterReplyEnvelope.sectionData != nullptr) {
                 if (loadCharacterReplyEnvelope.expectedSectionCount0b == 0u) {
                     spdlog::info(
                         "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage section0x0a invariant failed: packet byte +0x0b chunk ordinal is zero");
@@ -850,19 +768,19 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                     const size_t chunkOffset = static_cast<size_t>(chunkIndex) * 1000u;
                     if (chunkOffset + loadCharacterReplyEnvelope.sectionByteCount <= 0x7d00u) {
                         std::memcpy(
-                            static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + chunkOffset,
+                            static_cast<uint8_t*>(g_CurrentLoginMediator->allocatedBuffer1454) + chunkOffset,
                             loadCharacterReplyEnvelope.sectionData,
                             loadCharacterReplyEnvelope.sectionByteCount);
-                        StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).SetSeen(chunkIndex);
-                        ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
-                            ownerState.allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
+                        StateReplyChunkBitset_0x43c240(g_CurrentLoginMediator->state8Section10ChunkBitmap).SetSeen(chunkIndex);
+                        g_CurrentLoginMediator->allocatedBufferLength1458 = static_cast<uint16_t>(
+                            g_CurrentLoginMediator->allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
                     }
                 }
             }
-            ownerState.flag145a = 1u;
-            persistence.section0aChunkedBuffer538 = ownerState.allocatedBuffer1454;
-            persistence.section0aChunkedLength53c = ownerState.allocatedBufferLength1458;
-            persistence.section0aPresentFlag53e = 1u;
+            g_CurrentLoginMediator->flag145a = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0aChunkedBuffer538 = g_CurrentLoginMediator->allocatedBuffer1454;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0aChunkedLength53c = g_CurrentLoginMediator->allocatedBufferLength1458;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0aPresentFlag53e = 1u;
             break;
         case 11u:
             // anchor: launcher.exe:0x43f8c0 = CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect
@@ -870,67 +788,67 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             // - if byteCount > 4, store leading dword and assign range [data+4, data+byteCount)
             // - else zero dword and, if the current string is non-empty, write a terminating NUL at
             //   begin and collapse current back to begin
-            ownerState.state8Section11Dword145c = 0u;
+            g_CurrentLoginMediator->state8Section11Dword145c = 0u;
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount > 4u) {
-                ownerState.state8Section11Dword145c = ReadU32LE(loadCharacterReplyEnvelope.sectionData);
-                ownerState.state8Section11String1460.assign(
+                g_CurrentLoginMediator->state8Section11Dword145c = ReadU32LE(loadCharacterReplyEnvelope.sectionData);
+                g_CurrentLoginMediator->state8Section11String1460.assign(
                     reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + 4u),
                     reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + loadCharacterReplyEnvelope.sectionByteCount));
-            } else if (!ownerState.state8Section11String1460.empty()) {
-                ownerState.state8Section11String1460[0] = '\0';
-                ownerState.state8Section11String1460.resize(0u);
+            } else if (!g_CurrentLoginMediator->state8Section11String1460.empty()) {
+                g_CurrentLoginMediator->state8Section11String1460[0] = '\0';
+                g_CurrentLoginMediator->state8Section11String1460.resize(0u);
             } else {
-                ownerState.state8Section11String1460.clear();
+                g_CurrentLoginMediator->state8Section11String1460.clear();
             }
-            persistence.section11Dword540 = ownerState.state8Section11Dword145c;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section11Dword540 = g_CurrentLoginMediator->state8Section11Dword145c;
             {
-                char* const section11Begin = ownerState.state8Section11String1460.data();
-                persistence.section11StringBegin544 = section11Begin;
-                persistence.section11StringCurrent548 =
-                    section11Begin + ownerState.state8Section11String1460.size();
-                persistence.section11StringCapacity54c =
-                    section11Begin + ownerState.state8Section11String1460.capacity();
+                char* const section11Begin = g_CurrentLoginMediator->state8Section11String1460.data();
+                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringBegin544 = section11Begin;
+                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCurrent548 =
+                    section11Begin + g_CurrentLoginMediator->state8Section11String1460.size();
+                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCapacity54c =
+                    section11Begin + g_CurrentLoginMediator->state8Section11String1460.capacity();
             }
             spdlog::info(
                 "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage applied section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
-                static_cast<unsigned>(ownerState.state8Section11Dword145c),
-                static_cast<unsigned>(ownerState.state8Section11String1460.size()));
+                static_cast<unsigned>(g_CurrentLoginMediator->state8Section11Dword145c),
+                static_cast<unsigned>(g_CurrentLoginMediator->state8Section11String1460.size()));
             break;
         case 12u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength1434;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength1434;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1430
-                    ? std::realloc(ownerState.allocatedBuffer1430, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1430
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1430, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1430 = newBuffer;
-                    ownerState.allocatedBufferLength1434 = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1430 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength1434 = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.flag1436 = 1u;
-            persistence.section0cBuffer514 = ownerState.allocatedBuffer1430;
-            persistence.section0cLength518 = ownerState.allocatedBufferLength1434;
-            persistence.section0cPresentFlag51a = 1u;
+            g_CurrentLoginMediator->flag1436 = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0cBuffer514 = g_CurrentLoginMediator->allocatedBuffer1430;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0cLength518 = g_CurrentLoginMediator->allocatedBufferLength1434;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0cPresentFlag51a = 1u;
             break;
         case 13u:
             if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
-                const size_t oldLength = ownerState.allocatedBufferLength143c;
+                const size_t oldLength = g_CurrentLoginMediator->allocatedBufferLength143c;
                 const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
-                void* newBuffer = ownerState.allocatedBuffer1438
-                    ? std::realloc(ownerState.allocatedBuffer1438, newLength)
+                void* newBuffer = g_CurrentLoginMediator->allocatedBuffer1438
+                    ? std::realloc(g_CurrentLoginMediator->allocatedBuffer1438, newLength)
                     : std::malloc(newLength);
                 if (newBuffer != nullptr) {
                     std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
-                    ownerState.allocatedBuffer1438 = newBuffer;
-                    ownerState.allocatedBufferLength143c = static_cast<uint16_t>(newLength & 0xffffu);
+                    g_CurrentLoginMediator->allocatedBuffer1438 = newBuffer;
+                    g_CurrentLoginMediator->allocatedBufferLength143c = static_cast<uint16_t>(newLength & 0xffffu);
                 }
             }
-            ownerState.flag143e = 1u;
-            persistence.section0dBuffer51c = ownerState.allocatedBuffer1438;
-            persistence.section0dLength520 = ownerState.allocatedBufferLength143c;
-            persistence.section0dPresentFlag522 = 1u;
+            g_CurrentLoginMediator->flag143e = 1u;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0dBuffer51c = g_CurrentLoginMediator->allocatedBuffer1438;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0dLength520 = g_CurrentLoginMediator->allocatedBufferLength143c;
+            g_CurrentLoginMediator->state8PersistenceDataF1c.section0dPresentFlag522 = 1u;
             break;
         default:
             break;
@@ -948,11 +866,11 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  static_cast<unsigned>(loadCharacterReplyEnvelope.handoffWord09),
  static_cast<unsigned>(loadCharacterReplyEnvelope.expectedSectionCount0b),
  loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
- static_cast<unsigned>(ownerState.section0Flag13f6),
- static_cast<unsigned>(ownerState.flag145a),
- static_cast<unsigned>(ownerState.state8Section10ChunkBitmap));
+ static_cast<unsigned>(g_CurrentLoginMediator->section0Flag13f6),
+ static_cast<unsigned>(g_CurrentLoginMediator->flag145a),
+ static_cast<unsigned>(g_CurrentLoginMediator->state8Section10ChunkBitmap));
 
- // anchor: launcher.exe:0x4408ed - completion check
+ // anchor: launcher.exe:0x4408ed completion check
  // Exact `0x43f930` tail shape from Ghidra now tightened enough to keep literal here:
  // - byte `this+5` / our `replySectionsExpected_` is only latched when packet byte `+0x0c == 1`
  // - byte `this+4` / our `replySectionsSeen_` is then incremented for every accepted reply
@@ -973,28 +891,27 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  replySectionsSeen_,
  completed ? 1u : 0u,
  loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
- static_cast<unsigned>(ownerState.section0Flag13f6),
- static_cast<unsigned>(ownerState.flag145a),
- static_cast<unsigned>(ownerState.state8Section10ChunkBitmap));
+ static_cast<unsigned>(g_CurrentLoginMediator->section0Flag13f6),
+ static_cast<unsigned>(g_CurrentLoginMediator->flag145a),
+ static_cast<unsigned>(g_CurrentLoginMediator->state8Section10ChunkBitmap));
 
  if (completed) {
-        if (ownerState.allocatedBuffer1454 != nullptr) {
+        if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr) {
             size_t firstChunkIndex = 0u;
             while (firstChunkIndex < 32u &&
-                   !StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).HasSeen(firstChunkIndex)) {
+                   !StateReplyChunkBitset_0x43c240(g_CurrentLoginMediator->state8Section10ChunkBitmap).HasSeen(firstChunkIndex)) {
                 ++firstChunkIndex;
             }
             if (firstChunkIndex < 32u) {
                 std::memmove(
-                    ownerState.allocatedBuffer1454,
-                    static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + (firstChunkIndex * 1000u),
-                    ownerState.allocatedBufferLength1458);
+                    g_CurrentLoginMediator->allocatedBuffer1454,
+                    static_cast<uint8_t*>(g_CurrentLoginMediator->allocatedBuffer1454) + (firstChunkIndex * 1000u),
+                    g_CurrentLoginMediator->allocatedBufferLength1458);
             }
-            if (void* compacted = std::realloc(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458)) {
-                ownerState.allocatedBuffer1454 = compacted;
+            if (void* compacted = std::realloc(g_CurrentLoginMediator->allocatedBuffer1454, g_CurrentLoginMediator->allocatedBufferLength1458)) {
+                g_CurrentLoginMediator->allocatedBuffer1454 = compacted;
             }
         }
-        LogState8PersistenceFamilySnapshot(ownerState, "completed", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, true);
 
         if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
             nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
@@ -1008,7 +925,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             "ROUTE CHECKPOINT: late-login state8 complete -> state9 handoffWord=0x{:04x} currentState={}",
             loadCharacterReplyEnvelope.handoffWord09,
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-        // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
+            // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
         // Important recovered ordering detail from `0x41b450`:
         // - the helper9/state9 install itself immediately notifies the new helper through slot 3
         // - `0x439780` therefore runs before this later `PostEvent(0x0b)` tail
@@ -1026,7 +943,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             usedCurrentSlotRecord ? 1u : 0u);
         replySectionsSeen_ = 0;
         replySectionsExpected_ = 0;
-        ownerState.state8Section10ChunkBitmap = 0u;
+        g_CurrentLoginMediator->state8Section10ChunkBitmap = 0u;
     } else {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage routed state8 reply status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} seedCount={} firstFragment={} usedCurrentSlotRecord={}",

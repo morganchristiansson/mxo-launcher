@@ -405,7 +405,7 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
 // Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef
 // for internal message storage. This is the shared base pattern used by
 // CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
-// Note: Ghidra decompiler shows this as a component within Packet_MsClaimCharacterNameReply_0x4b5328.
+// Note: Ghidra decompiler shows this as a component within Packet_AsAuthReply_0x4b5328.
 // VTable methods (inherited by derived classes):
 // - +0x00: dtor / release retained outer message-ref (0x00443aa0)
 // - +0x04: stub returns 0 (0x00437b50)

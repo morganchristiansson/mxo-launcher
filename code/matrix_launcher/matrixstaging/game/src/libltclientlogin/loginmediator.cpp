@@ -624,7 +624,7 @@ const char* CLTLoginMediator::GetUsername() const {
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
 // Original body: direct field access without validation
-Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetAuthReplyPacketByIndex40(
+Packet_AsAuthReply_0x4b5328* CLTLoginMediator::GetAuthReplyPacketByIndex40(
     uint32_t selectionIndex) {
     const uint8_t slotIndex = static_cast<uint8_t>(selectionIndex & 0xffu);
     if (slotIndex != 0xffu) {
@@ -635,7 +635,7 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetAuthReplyPacketB
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
 // Original body: direct field access
-Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentAuthReplyPacket44() {
+Packet_AsAuthReply_0x4b5328* CLTLoginMediator::GetCurrentAuthReplyPacket44() {
     const uint8_t currentSlot = selectionRouteState684_.currentSlotOrSelectionIndex644_;
     if (currentSlot != 0xffu) {
         return &selectionRouteState684_.slotRecordTable04_[currentSlot];
@@ -645,7 +645,7 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentAuthReply
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
-    const Packet_MsClaimCharacterNameReply_0x4b5328* slotRecord =
+    const Packet_AsAuthReply_0x4b5328* slotRecord =
         const_cast<CLTLoginMediator*>(this)->GetCurrentAuthReplyPacket44();
     if (!slotRecord) {
         slotRecord = const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(0u);
@@ -1970,7 +1970,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 0x12000009u;
     }
 
-    const Packet_MsClaimCharacterNameReply_0x4b5328* currentSlotRecord =
+    const Packet_AsAuthReply_0x4b5328* currentSlotRecord =
         GetCurrentAuthReplyPacket44();
     if (!currentSlotRecord) {
         std::memset(outDwords, 0, 0x20u);
@@ -2694,7 +2694,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
             continue;
         }
 
-        const Packet_MsClaimCharacterNameReply_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
+        const Packet_AsAuthReply_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const StringTriple_0x403f90& route = selectionRouteState684_.routeHostStringTriples194_[i];
         const char* characterName = slotRecord.debugString14 ? slotRecord.debugString14 : "";
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";
