@@ -614,9 +614,12 @@ Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetSelectionDescrip
 // Static-RE shape:
 // - load owner byte `+0xcc8`
 // - forward that low byte into owner `+0x40`
+// Source fidelity note:
+// - `loginmediator_margin_route.cpp` already holds the clean direct-field reconstruction of this
+//   owner accessor as `GetCurrentSlotRecord()`
+// - reuse that exact helper here instead of the older scaffold-flavored current-slot accessor
 Packet_MsClaimCharacterNameReply_0x4b5328* CLTLoginMediator::GetCurrentSlotRecordObject44() {
-    return GetSelectionDescriptorObject40(
-        static_cast<uint32_t>(CurrentCharacterRouteIndexCc8Scaffold()));
+    return const_cast<Packet_MsClaimCharacterNameReply_0x4b5328*>(GetCurrentSlotRecord());
 }
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48
