@@ -50,6 +50,24 @@ namespace mxo::ltlogin {
 // ILTLoginMediator_0x4af2b8::~ILTLoginMediator_0x4af2b8() = default;
 
 namespace {
+char g_CLTLoginMediatorCharacterPersistenceDataEmptySection11Buffer[8] = {'\0'};
+}
+
+CLTLoginMediatorCharacterPersistenceData_0x41d900::CLTLoginMediatorCharacterPersistenceData_0x41d900() {
+    // anchor: launcher.exe:0x41d900
+    // Static-RE ctor summary:
+    // - seed field28/bodyWord6c to 0x1000
+    // - seed tail byte +0x4b8 to 1
+    // - point the section-11 small-string triple at an empty 8-byte buffer
+    field28_1000 = 0x1000;
+    bodyWord6c = 0x1000;
+    tail4b8 = {1u};
+    section11StringBegin544 = g_CLTLoginMediatorCharacterPersistenceDataEmptySection11Buffer;
+    section11StringCurrent548 = g_CLTLoginMediatorCharacterPersistenceDataEmptySection11Buffer;
+    section11StringCapacity54c = g_CLTLoginMediatorCharacterPersistenceDataEmptySection11Buffer + 8;
+}
+
+namespace {
 
 enum class MarginBootstrapPhase : uint32_t {
     kIdle = 0,
@@ -1068,7 +1086,7 @@ const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
         fmt::ptr(body),
         fmt::ptr(this),
         postAuthMarginLoadingState_0xf14.state8PersistenceDataF1c.bodyWord6c,
-        static_cast<unsigned>(CLTLoginMediatorCharacterPersistenceData::kBodySize));
+        static_cast<unsigned>(CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize));
     return body;
 }
 
@@ -1113,10 +1131,9 @@ uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
     return value;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-// +0xd0
+// anchor: launcher.exe:0x41f1b0 / vtable +0xd0
 RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11String1460() {
-    const CLTLoginMediatorCharacterPersistenceData& snapshot =
+    const CLTLoginMediatorCharacterPersistenceData_0x41d900& snapshot =
         postAuthMarginLoadingState_0xf14.state8PersistenceDataF1c;
     state8Section11String1460_.begin = snapshot.section11StringBegin544;
     state8Section11String1460_.current = snapshot.section11StringCurrent548;
@@ -1536,22 +1553,7 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
 
 // anchor: launcher.exe:0x41f2c0 slot +0x10c
 RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30() {
-    // Keep the wrapper-facing arg6 `+0x10c` small-string object explicit.
-    // Feed the callsite from the global-backed resolved margin host so the launcher config
-    // suffix (`g_marginServerDNSName`) is carried through the same route-text surface the
-    // original branch consumes.
-    const std::string routeDescriptor = ResolvedMarginHostName();
-    routeDescriptor30Owned_ = routeDescriptor;
-    routeDescriptor30_.begin = routeDescriptor30Owned_.c_str();
-    routeDescriptor30_.current = routeDescriptor30_.begin + routeDescriptor30Owned_.size();
-    routeDescriptor30_.capacity = routeDescriptor30_.current;
-
-    spdlog::info(
-        "CLTLoginMediator::GetRouteDescriptor30(+0x10c) -> begin={} current={} text='{}'",
-        fmt::ptr(routeDescriptor30_.begin),
-        fmt::ptr(routeDescriptor30_.current),
-        routeDescriptor30Owned_.empty() ? "<empty>" : routeDescriptor30Owned_.c_str());
-    return &routeDescriptor30_;
+    return BuildMediatorRouteDescriptor30AbiShim(*this);
 }
 
 // anchor: launcher.exe:0x41af50 +0x118

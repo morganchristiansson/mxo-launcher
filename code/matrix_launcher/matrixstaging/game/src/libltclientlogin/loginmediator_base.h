@@ -75,7 +75,7 @@ public:
 //   `Packet_MsClaimCharacterNameReply_0x4b5328 *` payload pointer for those slots
 struct RouteDescriptor30SmallStringLikeSketch {
     // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
-    // Wrapper-facing late-runtime object shape returned through arg6 `+0x10c`.
+    // ABI-compatibility wrapper object shape returned through arg6 `+0x10c`.
     // Current client-side evidence only consumes the first two dwords as a small-string
     // begin/current pair, but keep the third dword explicit because the original getter returns a
     // full 3-dword string-like object at owner `+0x30`.

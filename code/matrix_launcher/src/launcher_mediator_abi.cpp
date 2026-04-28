@@ -124,6 +124,26 @@ static_assert(sizeof(CurrentSlotRecord44ObjectSketch) == 0x1c);
 static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorSelectionDescriptor40{};
 static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorCurrentSlotRecord44{};
 static std::string g_MediatorCurrentSlotRecord44NameOwned;
+static std::string g_MediatorRouteDescriptor10cOwned;
+static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch g_MediatorRouteDescriptor10c{};
+
+namespace mxo::ltlogin {
+
+RouteDescriptor30SmallStringLikeSketch* BuildMediatorRouteDescriptor30AbiShim(
+    CLTLoginMediator& mediator) {
+    // anchor: launcher.exe:0x41f2c0 / owner vtable +0x10c
+    // ABI-only wrapper surface: the original getter returns owner `+0x30`, which the client then
+    // consumes as a 3-dword small-string-like object. Keep that compatibility object in the ABI
+    // shell instead of treating it as launcher-owned mediator state.
+    g_MediatorRouteDescriptor10cOwned = mediator.ResolvedMarginHostName();
+    g_MediatorRouteDescriptor10c.begin = g_MediatorRouteDescriptor10cOwned.c_str();
+    g_MediatorRouteDescriptor10c.current =
+        g_MediatorRouteDescriptor10c.begin + g_MediatorRouteDescriptor10cOwned.size();
+    g_MediatorRouteDescriptor10c.capacity = g_MediatorRouteDescriptor10c.current;
+    return &g_MediatorRouteDescriptor10c;
+}
+
+}  // namespace mxo::ltlogin
 
 static uint32_t __thiscall MediatorSelectionObject_Destroy(
     mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {

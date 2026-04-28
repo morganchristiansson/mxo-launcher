@@ -403,7 +403,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
                 persistence.tail4b8 = {1u};
                 const size_t bodyCopyBytes = std::min<size_t>(
                     loadCharacterReplyEnvelope.sectionByteCount,
-                    CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData::kBodySize);
+                    CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize);
                 if (bodyCopyBytes != 0u) {
                     std::memcpy(&persistence.bodyWord6c, loadCharacterReplyEnvelope.sectionData, bodyCopyBytes);
                 }

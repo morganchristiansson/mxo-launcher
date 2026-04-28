@@ -27,6 +27,7 @@ class CLTLoginState_State10_0x4b512c;
 class CLTLoginState_AuthenticatePending_0x4b5014;
 class CLTLoginState_WorldListPending_0x4b4fec;
 class CLTLoginMediator;
+class CLTLoginMediatorCharacterPersistenceData_0x41d900;
 
 // Fidelity note:
 // - active launcher.exe worker/queue paths are now modeled as direct-connection flows
@@ -92,6 +93,95 @@ struct LoginObserverTree674 {
 //   - keep launcher-owned auth/session state transitions here
 //   - do not collapse `LaunchPadClient`-style pre-game account/subscription handling into the
 //     direct auth TCP packet layer just because both live under `libltclientlogin`
+
+// Source implementation of the original shared owner-side class now named in Ghidra as
+// `CLTLoginMediatorCharacterPersistenceData_0x41d900`.
+// This is the canonical owner object behind the late getter family rooted at:
+// - `+0xbc -> +0xf48`
+// - `+0xc0 -> +0xf88`
+// - `+0xc4 -> +0x13f0/+0x13f4`
+// - `+0xf4 -> +0xf1c`
+#pragma pack(push, 1)
+class CLTLoginMediatorCharacterPersistenceData_0x41d900 {
+public:
+    static constexpr size_t kBodySize = 0x465;
+
+    CLTLoginMediatorCharacterPersistenceData_0x41d900();
+
+    std::array<char, 0x20> characterName00{};     // `+0x00`
+    uint32_t replyField20 = 0;                    // `+0x20`
+    uint32_t selectedWorldField24 = 0;            // `+0x24`
+    uint32_t field28_1000 = 0x1000;               // `+0x28`
+    std::array<uint32_t, 8> header2c{};           // `+0x2c .. +0x4b`
+    std::array<uint32_t, 8> secondary4c{};        // `+0x4c .. +0x6b`
+    uint32_t bodyWord6c = 0x1000;                 // `+0x6c`; ctor seeds this to `0x1000`
+    std::array<char, 0x20> realFirstName70{};     // `+0x70 .. +0x8f`
+    std::array<char, 0x20> realLastName90{};      // `+0x90 .. +0xaf`
+    std::array<char, 0x400> backgroundB0{};       // `+0xb0 .. +0x4af`
+    uint32_t replySectionData4b0 = 0;             // `+0x4b0`
+    uint32_t replySectionData4b4 = 0;             // `+0x4b4`
+    std::array<uint8_t, 0x19> tail4b8{{1u}};      // `+0x4b8 .. +0x4d0`; ctor seeds byte `+0x4b8 = 1`
+    std::array<uint8_t, 3> gap4d1{};              // `+0x4d1 .. +0x4d3`
+    void* section0OverflowBuffer4d4 = nullptr;    // `+0x4d4`
+    uint16_t section0OverflowLength4d8 = 0;       // `+0x4d8`
+    uint8_t section0PresentFlag4da = 0;           // `+0x4da`
+    uint8_t pad4db = 0;                           // `+0x4db`
+    void* section01Buffer4dc = nullptr;           // `+0x4dc`
+    uint16_t section01Length4e0 = 0;              // `+0x4e0`
+    uint8_t section01PresentFlag4e2 = 0;          // `+0x4e2`
+    uint8_t pad4e3 = 0;                           // `+0x4e3`
+    void* section02Buffer4e4 = nullptr;           // `+0x4e4`
+    uint16_t section02Length4e8 = 0;              // `+0x4e8`
+    uint8_t section02PresentFlag4ea = 0;          // `+0x4ea`
+    uint8_t pad4eb = 0;                           // `+0x4eb`
+    void* section06Buffer4ec = nullptr;           // `+0x4ec`
+    uint16_t section06Length4f0 = 0;              // `+0x4f0`
+    uint8_t section06PresentFlag4f2 = 0;          // `+0x4f2`
+    uint8_t pad4f3 = 0;                           // `+0x4f3`
+    void* section07Buffer4f4 = nullptr;           // `+0x4f4`
+    uint16_t section07Length4f8 = 0;              // `+0x4f8`
+    uint8_t section07PresentFlag4fa = 0;          // `+0x4fa`
+    uint8_t pad4fb = 0;                           // `+0x4fb`
+    void* section03Buffer4fc = nullptr;           // `+0x4fc`
+    uint16_t section03Length500 = 0;              // `+0x500`
+    uint8_t section03PresentFlag502 = 0;          // `+0x502`
+    uint8_t pad503 = 0;                           // `+0x503`
+    void* section04Buffer504 = nullptr;           // `+0x504`
+    uint16_t section04Length508 = 0;              // `+0x508`
+    uint8_t section04PresentFlag50a = 0;          // `+0x50a`
+    uint8_t pad50b = 0;                           // `+0x50b`
+    void* section05Buffer50c = nullptr;           // `+0x50c`
+    uint16_t section05Length510 = 0;              // `+0x510`
+    uint8_t section05PresentFlag512 = 0;          // `+0x512`
+    uint8_t pad513 = 0;                           // `+0x513`
+    void* section0cBuffer514 = nullptr;           // `+0x514`
+    uint16_t section0cLength518 = 0;              // `+0x518`
+    uint8_t section0cPresentFlag51a = 0;          // `+0x51a`
+    uint8_t pad51b = 0;                           // `+0x51b`
+    void* section0dBuffer51c = nullptr;           // `+0x51c`
+    uint16_t section0dLength520 = 0;              // `+0x520`
+    uint8_t section0dPresentFlag522 = 0;          // `+0x522`
+    uint8_t pad523 = 0;                           // `+0x523`
+    void* section08Buffer524 = nullptr;           // `+0x524`
+    uint32_t section08Length528 = 0;              // `+0x528`
+    uint8_t section08PresentFlag52c = 0;          // `+0x52c`
+    std::array<uint8_t, 3> pad52d{};              // `+0x52d .. +0x52f`
+    void* section09Buffer530 = nullptr;           // `+0x530`
+    uint16_t section09Length534 = 0;              // `+0x534`
+    uint8_t section09PresentFlag536 = 0;          // `+0x536`
+    uint8_t pad537 = 0;                           // `+0x537`
+    void* section0aChunkedBuffer538 = nullptr;    // `+0x538`
+    uint16_t section0aChunkedLength53c = 0;       // `+0x53c`
+    uint8_t section0aPresentFlag53e = 0;          // `+0x53e`
+    uint8_t pad53f = 0;                           // `+0x53f`
+    uint32_t section11Dword540 = 0;               // `+0x540`
+    char* section11StringBegin544 = nullptr;      // `+0x544`
+    char* section11StringCurrent548 = nullptr;    // `+0x548`
+    char* section11StringCapacity54c = nullptr;   // `+0x54c`
+};
+
+static_assert(sizeof(CLTLoginMediatorCharacterPersistenceData_0x41d900) == 0x550);
+#pragma pack(pop)
 
 class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     // Source-ownership split note:
@@ -302,93 +392,6 @@ public:
         std::array<uint32_t, 4> blockD70{};            // `+0xd70 .. +0xd7f`
     };
 
-    // Source implementation of the original shared owner-side class now named in Ghidra as
-    // `CLTLoginMediatorCharacterPersistenceData_0x41d900`.
-    // This is the canonical owner object behind the late getter family rooted at:
-    // - `+0xbc -> +0xf48`
-    // - `+0xc0 -> +0xf88`
-    // - `+0xc4 -> +0x13f0/+0x13f4`
-    // - `+0xf4 -> +0xf1c`
-#pragma pack(push, 1)
-    class CLTLoginMediatorCharacterPersistenceData {
-    public:
-        static constexpr size_t kBodySize = 0x465;
-
-        std::array<char, 0x20> characterName00{};     // `+0x00`
-        uint32_t replyField20 = 0;                    // `+0x20`
-        uint32_t selectedWorldField24 = 0;            // `+0x24`
-        uint32_t field28_1000 = 0x1000;               // `+0x28`
-        std::array<uint32_t, 8> header2c{};           // `+0x2c .. +0x4b`
-        std::array<uint32_t, 8> secondary4c{};        // `+0x4c .. +0x6b`
-        uint32_t bodyWord6c = 0x1000;                 // `+0x6c`; ctor seeds this to `0x1000`
-        std::array<char, 0x20> realFirstName70{};     // `+0x70 .. +0x8f`
-        std::array<char, 0x20> realLastName90{};      // `+0x90 .. +0xaf`
-        std::array<char, 0x400> backgroundB0{};       // `+0xb0 .. +0x4af`
-        uint32_t replySectionData4b0 = 0;             // `+0x4b0`
-        uint32_t replySectionData4b4 = 0;             // `+0x4b4`
-        std::array<uint8_t, 0x19> tail4b8{{1u}};      // `+0x4b8 .. +0x4d0`; ctor seeds byte `+0x4b8 = 1`
-        std::array<uint8_t, 3> gap4d1{};              // `+0x4d1 .. +0x4d3`
-        void* section0OverflowBuffer4d4 = nullptr;    // `+0x4d4`
-        uint16_t section0OverflowLength4d8 = 0;       // `+0x4d8`
-        uint8_t section0PresentFlag4da = 0;           // `+0x4da`
-        uint8_t pad4db = 0;                           // `+0x4db`
-        void* section01Buffer4dc = nullptr;           // `+0x4dc`
-        uint16_t section01Length4e0 = 0;              // `+0x4e0`
-        uint8_t section01PresentFlag4e2 = 0;          // `+0x4e2`
-        uint8_t pad4e3 = 0;                           // `+0x4e3`
-        void* section02Buffer4e4 = nullptr;           // `+0x4e4`
-        uint16_t section02Length4e8 = 0;              // `+0x4e8`
-        uint8_t section02PresentFlag4ea = 0;          // `+0x4ea`
-        uint8_t pad4eb = 0;                           // `+0x4eb`
-        void* section06Buffer4ec = nullptr;           // `+0x4ec`
-        uint16_t section06Length4f0 = 0;              // `+0x4f0`
-        uint8_t section06PresentFlag4f2 = 0;          // `+0x4f2`
-        uint8_t pad4f3 = 0;                           // `+0x4f3`
-        void* section07Buffer4f4 = nullptr;           // `+0x4f4`
-        uint16_t section07Length4f8 = 0;              // `+0x4f8`
-        uint8_t section07PresentFlag4fa = 0;          // `+0x4fa`
-        uint8_t pad4fb = 0;                           // `+0x4fb`
-        void* section03Buffer4fc = nullptr;           // `+0x4fc`
-        uint16_t section03Length500 = 0;              // `+0x500`
-        uint8_t section03PresentFlag502 = 0;          // `+0x502`
-        uint8_t pad503 = 0;                           // `+0x503`
-        void* section04Buffer504 = nullptr;           // `+0x504`
-        uint16_t section04Length508 = 0;              // `+0x508`
-        uint8_t section04PresentFlag50a = 0;          // `+0x50a`
-        uint8_t pad50b = 0;                           // `+0x50b`
-        void* section05Buffer50c = nullptr;           // `+0x50c`
-        uint16_t section05Length510 = 0;              // `+0x510`
-        uint8_t section05PresentFlag512 = 0;          // `+0x512`
-        uint8_t pad513 = 0;                           // `+0x513`
-        void* section0cBuffer514 = nullptr;           // `+0x514`
-        uint16_t section0cLength518 = 0;              // `+0x518`
-        uint8_t section0cPresentFlag51a = 0;          // `+0x51a`
-        uint8_t pad51b = 0;                           // `+0x51b`
-        void* section0dBuffer51c = nullptr;           // `+0x51c`
-        uint16_t section0dLength520 = 0;              // `+0x520`
-        uint8_t section0dPresentFlag522 = 0;          // `+0x522`
-        uint8_t pad523 = 0;                           // `+0x523`
-        void* section08Buffer524 = nullptr;           // `+0x524`
-        uint32_t section08Length528 = 0;              // `+0x528`
-        uint8_t section08PresentFlag52c = 0;          // `+0x52c`
-        std::array<uint8_t, 3> pad52d{};              // `+0x52d .. +0x52f`
-        void* section09Buffer530 = nullptr;           // `+0x530`
-        uint16_t section09Length534 = 0;              // `+0x534`
-        uint8_t section09PresentFlag536 = 0;          // `+0x536`
-        uint8_t pad537 = 0;                           // `+0x537`
-        void* section0aChunkedBuffer538 = nullptr;    // `+0x538`
-        uint16_t section0aChunkedLength53c = 0;       // `+0x53c`
-        uint8_t section0aPresentFlag53e = 0;          // `+0x53e`
-        uint8_t pad53f = 0;                           // `+0x53f`
-        uint32_t section11Dword540 = 0;               // `+0x540`
-        char* section11StringBegin544 = nullptr;      // `+0x544`
-        char* section11StringCurrent548 = nullptr;    // `+0x548`
-        char* section11StringCapacity54c = nullptr;   // `+0x54c`
-    };
-
-    static_assert(sizeof(CLTLoginMediatorCharacterPersistenceData) == 0x550);
-#pragma pack(pop)
-
     class PostAuthMarginLoadingState {
     public:
         // Source-owned owner layout projection over the original shared
@@ -396,7 +399,7 @@ public:
         // owner post-auth margin/loading block shared by the active state8 path and the later
         // state10/state11 path.
         // Current high-value field read:
-        // - `+0x108 .. +0x5d8` = earlier shared `CLTLoginMediatorCharacterPersistenceData`
+        // - `+0x108 .. +0x5d8` = earlier shared `CLTLoginMediatorCharacterPersistenceData_0x41d900`
         //   source block reused by the create-character / helper11 path
         //   - `characterName00` = owner `+0x108`
         //   - `selectedWorldField24` = owner `+0x12c`
@@ -408,7 +411,7 @@ public:
         //   - later state11 packet building still uses only the bounded prefix that fits the
         //     packet builder's own field limits
         // - `+0xf1c ...` = later load-character reply materialization area
-        CLTLoginMediatorCharacterPersistenceData createCharacterData108{}; // owner `+0x108 .. +0x5d8`
+        CLTLoginMediatorCharacterPersistenceData_0x41d900 createCharacterData108{}; // owner `+0x108 .. +0x5d8`
 
         // ========================================================================
         // Post-auth HandleLoadCharacterReply outputs (0x440320)
@@ -423,7 +426,7 @@ public:
 
         // Canonical owner `+0xf1c` object returned by the original `+0xf4/+0xbc/+0xc0/+0xc4`
         // getter family.
-        CLTLoginMediatorCharacterPersistenceData state8PersistenceDataF1c{}; // owner `+0xf1c .. +0x146b`
+        CLTLoginMediatorCharacterPersistenceData_0x41d900 state8PersistenceDataF1c{}; // owner `+0xf1c .. +0x146b`
 
         // Legacy decomposed mirrors still kept while neighboring source is migrated onto the
         // canonical `state8PersistenceDataF1c` object.
@@ -1173,7 +1176,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
     const char* ResolveMarginRouteDescriptor() const;                          // current best owner-side route-text resolver used to back arg6 `+0x10c`
     // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator_0x4af2b8.Default slot +0x10c
-    // Keep the wrapper-facing small-string object explicit instead of collapsing it into the
+    // Keep the ABI-compatibility small-string object explicit instead of collapsing it into the
     // owner-side route-text helper family.
     RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
     // anchor: launcher.exe:0x41af50 / ILTLoginMediator_0x4af2b8.Default slot +0x118
@@ -1511,8 +1514,6 @@ public:
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
-    std::string routeDescriptor30Owned_;
-    RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
     // - entries are 12-byte owned string-triples copied by `0x41f640`

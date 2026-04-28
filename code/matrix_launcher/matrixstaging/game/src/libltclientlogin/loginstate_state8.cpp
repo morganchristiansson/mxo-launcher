@@ -610,7 +610,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                     persistence.tail4b8 = {1u};
                     CopyBoundedRawBytes(
                         reinterpret_cast<uint8_t*>(&persistence.bodyWord6c),
-                        CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData::kBodySize,
+                        CLTLoginMediatorCharacterPersistenceData_0x41d900::kBodySize,
                         loadCharacterReplyEnvelope.sectionData + 0x20u,
                         loadCharacterReplyEnvelope.sectionByteCount - 0x20u);
                 }
