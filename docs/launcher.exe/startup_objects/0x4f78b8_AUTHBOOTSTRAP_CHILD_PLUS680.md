@@ -235,6 +235,13 @@ Current best read:
     launcher helper boundary for it
 
 Current tighter copied-block layout from static `0x448140 / 0x44add0 / 0x44aec0` plus live source logs:
+- source-side cleanup consequence from the latest fidelity pass:
+  - keep the incoming auth-message payload decode inline in `0x448140` / `0x444390`-mirroring code
+    instead of a source-only `ResolveIncomingAuthPayloadView(...)` helper
+  - keep the auth-reply parse-object copy/store inline in the raw `0x0b` branch instead of a
+    source-only `StoreAuthBootstrap680AuthReplyParseObjectFromIncomingMessage(...)` helper
+  - keep raw `0x0a` zero-IV Twofish + MD5 steps inline in the raw `0x09` branch instead of
+    source-only shared byte-crypto helpers
 - the rebuild tail now mirrors the recovered local-object flow more directly by constructing the
   modulus/public-exponent/private-exponent values as `CryptoPP::Integer` objects before storing
   them back into the child `0x4ba50c` big-int slots

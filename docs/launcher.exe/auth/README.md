@@ -103,7 +103,9 @@ Current evidence for that last point:
   - fidelity note from the `0x448140` pass:
     - raw `0x07` only leaves a reply-public-key snapshot alive on the success tail that immediately falls into raw `0x08`; replacement code should not preserve a failed/error `0x07` reply as if the original kept it around
     - raw `0x0a` is driven by child `+0x94/+0x98` feedback-transform objects, not by the generic `mxo::auth::BuildAuthChallengeResponsePacket(...)` helper
+    - replacement consequence: keep the raw `0x0a` digest / zero-IV Twofish decrypt+encrypt sequence inline in `HandleInboundAuthMessage` rather than routing it through source-only shared byte-crypto helpers
     - raw `0x0b` status handling keys off the parse/header status dword stored into child `+0xec`, not a replacement-side packet-length heuristic
+    - replacement consequence: keep the incoming-message payload decode and auth-reply parse-object store/copy steps inline in the anchored `0x444390 / 0x448140` family instead of hiding them behind source-only staging helpers
     - raw `0x0b` success-side private-exponent materialization likewise comes from child `+0x94` over the copied parse-object encrypted field, not from a generic shared decrypt helper
     - raw `0x0b` success-side copy-shadow adoption and `+0xb0/+0xc4/+0xd8` rebuild should stay inline in `AuthBootstrap680Child_0x441290::HandleInboundAuthMessage`, because `0x448140` does that work in-place instead of through a standalone launcher helper boundary
     - keep `mxo::auth::*` packet helpers as compatibility/runtime helpers, but do not let them erase the recovered child-field ownership when `0x448140` is the anchor

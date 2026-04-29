@@ -49,67 +49,6 @@ constexpr uint32_t kIncomingAuthMessageLocatorPayloadOffsetTable[7] = {
     0x10u,
 };
 
-// anchor family: launcher.exe:0x41bc20 / 0x41bbb0
-static bool ResolveIncomingAuthPayloadView(
-    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& incomingMessageRef,
-    const uint8_t** outPayloadBytes,
-    size_t* outPayloadByteCount) {
-    if (outPayloadBytes) {
-        *outPayloadBytes = nullptr;
-    }
-    if (outPayloadByteCount) {
-        *outPayloadByteCount = 0u;
-    }
-
-    const auto* messageStorage = incomingMessageRef.messageStorage0c;
-    if (!messageStorage) {
-        return false;
-    }
-
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return false;
-    }
-
-    const uint8_t* logicalPayloadBytes = payloadBytes;
-    if (incomingMessageRef.headerless10 != 0u) {
-        if (payloadByteCount < 2u) {
-            return false;
-        }
-
-        const uint8_t locatorByte0d = payloadBytes[1];
-        const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
-        const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
-        if (targetLocatorType == 0u || targetLocatorType > 6u ||
-            senderLocatorType == 0u || senderLocatorType > 6u) {
-            return false;
-        }
-
-        const size_t payloadOffset =
-            0x12u +
-            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
-            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
-        if (payloadOffset >= payloadByteCount) {
-            return false;
-        }
-        logicalPayloadBytes = payloadBytes + payloadOffset;
-    }
-
-    const size_t logicalPayloadOffset = static_cast<size_t>(logicalPayloadBytes - payloadBytes);
-    if (logicalPayloadOffset >= payloadByteCount) {
-        return false;
-    }
-
-    if (outPayloadBytes) {
-        *outPayloadBytes = logicalPayloadBytes;
-    }
-    if (outPayloadByteCount) {
-        *outPayloadByteCount = static_cast<size_t>(payloadByteCount) - logicalPayloadOffset;
-    }
-    return true;
-}
-
 // anchor: launcher.exe:DAT_004b6b38
 static constexpr std::array<uint8_t, 0x100u> kAuthBootstrap680PubkeyDatFallbackModulus = {
     0xc7u, 0x48u, 0x18u, 0xfdu, 0x48u, 0xdcu, 0x8fu, 0x4eu, 0xecu, 0x35u, 0xe1u, 0xcfu,
@@ -558,10 +497,45 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
         return false;
     }
 
-    const uint8_t* payloadBytes = nullptr;
-    size_t payloadByteCount = 0u;
-    if (!ResolveIncomingAuthPayloadView(*incomingAuthMessageRef, &payloadBytes, &payloadByteCount) ||
-        !payloadBytes || payloadByteCount == 0u) {
+    const auto* messageStorage = incomingAuthMessageRef->messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t incomingMessagePayloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const incomingMessagePayloadBytes = messageStorage->PayloadBase();
+    if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
+        return false;
+    }
+
+    const uint8_t* payloadBytes = incomingMessagePayloadBytes;
+    size_t payloadByteCount = incomingMessagePayloadByteCount;
+    if (incomingAuthMessageRef->headerless10 != 0u) {
+        if (incomingMessagePayloadByteCount < 2u) {
+            return false;
+        }
+
+        const uint8_t locatorByte0d = incomingMessagePayloadBytes[1];
+        const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
+        const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
+        if (targetLocatorType == 0u || targetLocatorType > 6u ||
+            senderLocatorType == 0u || senderLocatorType > 6u) {
+            return false;
+        }
+
+        const size_t payloadOffset =
+            0x12u +
+            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
+            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
+        if (payloadOffset >= incomingMessagePayloadByteCount) {
+            return false;
+        }
+
+        payloadBytes = incomingMessagePayloadBytes + payloadOffset;
+        payloadByteCount = static_cast<size_t>(incomingMessagePayloadByteCount) - payloadOffset;
+    }
+
+    if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }
 
@@ -640,43 +614,6 @@ static bool AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
             packetBodyBytes->size(),
             true);
     }
-    return true;
-}
-
-static bool StoreAuthBootstrap680AuthReplyParseObjectFromIncomingMessage(
-    CLTLoginMediator& /*mediator*/,
-    AuthBootstrap680Child_0x441290& child,
-    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
-    const uint8_t* payloadBytes,
-    size_t payloadByteCount) {
-    ResetAuthBootstrap680ReplyParseObject(child);
-
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return false;
-    }
-
-    AuthBootstrap680AuthReplyParseObjectF0Sketch sourceParseObject = {};
-    if (!AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
-            &sourceParseObject,
-            incomingAuthMessageRef)) {
-        return false;
-    }
-
-    child.authReplyParsePacketBodyBytesOwned_.assign(payloadBytes, payloadBytes + payloadByteCount);
-    child.authReplyParseObjectF0 = static_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(
-        std::malloc(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch)));
-    if (child.authReplyParseObjectF0 == nullptr) {
-        child.authReplyParsePacketBodyBytesOwned_.clear();
-        return false;
-    }
-    if (!AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
-            child.authReplyParseObjectF0,
-            sourceParseObject,
-            &child.authReplyParsePacketBodyBytesOwned_)) {
-        ResetAuthBootstrap680ReplyParseObject(child);
-        return false;
-    }
-
     return true;
 }
 
@@ -759,24 +696,6 @@ static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
     outObject->digits0c = ownedDigits->data();
     outObject->sign10 = 0u;
     return true;
-}
-
-static bool BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    std::vector<uint32_t>* ownedDigits,
-    const CryptoPP::Integer& value) {
-    if (!outObject || !ownedDigits || value.IsNegative()) {
-        return false;
-    }
-
-    const size_t encodedByteCount = static_cast<size_t>(value.MinEncodedSize());
-    std::vector<uint8_t> bigEndianBytes(encodedByteCount == 0u ? 1u : encodedByteCount, 0u);
-    value.Encode(bigEndianBytes.data(), bigEndianBytes.size());
-    return BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-        outObject,
-        ownedDigits,
-        bigEndianBytes.data(),
-        bigEndianBytes.size());
 }
 
 static CryptoPP::Integer AuthBootstrap680BigIntObjectToCryptoPPInteger(
@@ -1101,15 +1020,6 @@ static size_t SmallStringMirrorLength(const AuthBootstrap680SmallStringMirror& m
 
 static const char* SmallStringMirrorDataOrEmpty(const AuthBootstrap680SmallStringMirror& mirror) {
     return mirror.begin ? mirror.begin : "";
-}
-
-static uint32_t ReadAuthBootstrap680AuthReplyParseHeaderDword(
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
-    size_t headerOffset) {
-    if (!parseObject || !parseObject->replyHeader10) {
-        return 0u;
-    }
-    return ReadU32LE(parseObject->replyHeader10 + headerOffset);
 }
 
 }  // namespace
@@ -1702,10 +1612,45 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 // anchor: launcher.exe:0x448140
 uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessage) {
-    const uint8_t* payloadBytes = nullptr;
-    size_t payloadByteCount = 0u;
-    if (!ResolveIncomingAuthPayloadView(*incomingAuthMessage, &payloadBytes, &payloadByteCount) ||
-        !payloadBytes || payloadByteCount == 0u) {
+    const auto* incomingMessageStorage = incomingAuthMessage->messageStorage0c;
+    if (!incomingMessageStorage) {
+        return kAuthBootstrap680InboundUnhandled;
+    }
+
+    const uint16_t incomingMessagePayloadByteCount = incomingMessageStorage->PayloadByteCount();
+    const uint8_t* const incomingMessagePayloadBytes = incomingMessageStorage->PayloadBase();
+    if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
+        return kAuthBootstrap680InboundUnhandled;
+    }
+
+    const uint8_t* payloadBytes = incomingMessagePayloadBytes;
+    size_t payloadByteCount = incomingMessagePayloadByteCount;
+    if (incomingAuthMessage->headerless10 != 0u) {
+        if (incomingMessagePayloadByteCount < 2u) {
+            return kAuthBootstrap680InboundUnhandled;
+        }
+
+        const uint8_t locatorByte0d = incomingMessagePayloadBytes[1];
+        const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
+        const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
+        if (targetLocatorType == 0u || targetLocatorType > 6u ||
+            senderLocatorType == 0u || senderLocatorType > 6u) {
+            return kAuthBootstrap680InboundUnhandled;
+        }
+
+        const size_t payloadOffset =
+            0x12u +
+            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
+            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
+        if (payloadOffset >= incomingMessagePayloadByteCount) {
+            return kAuthBootstrap680InboundUnhandled;
+        }
+
+        payloadBytes = incomingMessagePayloadBytes + payloadOffset;
+        payloadByteCount = static_cast<size_t>(incomingMessagePayloadByteCount) - payloadOffset;
+    }
+
+    if (!payloadBytes || payloadByteCount == 0u) {
         return kAuthBootstrap680InboundUnhandled;
     }
 
@@ -1851,19 +1796,40 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 // This raw 0x0a path is inline in the child-side inbound handler, not a separate
                 // standalone launcher.exe helper. Keep the crypto/material assembly here so future
                 // fidelity passes can compare directly against the packet-object staging below.
-                if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
-                        cachedAuthChallengeCiphertextBytesOwned_,
-                        cachedAuthRequestBuildResult_.twofishKeyBytes,
-                        false,
-                        &decryptedChallengeBytes)) {
-                    spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext");
+                decryptedChallengeBytes.assign(
+                    cachedAuthChallengeCiphertextBytesOwned_.size(),
+                    0u);
+                if ((cachedAuthChallengeCiphertextBytesOwned_.size() % 16u) != 0u) {
+                    spdlog::error("launcher-owned auth rejected misaligned AS_AuthChallenge ciphertext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
-                if (!mxo::auth::internal::Md5DigestBytes(
-                        decryptedChallengeBytes,
-                        &processedChallengeMd5Bytes)) {
-                    spdlog::error("launcher-owned auth failed to hash AS_AuthChallenge plaintext");
-                    return kAuthBootstrap680InboundUnhandled;
+                if (!cachedAuthChallengeCiphertextBytesOwned_.empty()) {
+                    static constexpr uint8_t kZeroIv[16] = {0};
+                    try {
+                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption challengeCipher;
+                        challengeCipher.SetKeyWithIV(
+                            cachedAuthRequestBuildResult_.twofishKeyBytes.data(),
+                            cachedAuthRequestBuildResult_.twofishKeyBytes.size(),
+                            kZeroIv);
+                        challengeCipher.ProcessData(
+                            decryptedChallengeBytes.data(),
+                            cachedAuthChallengeCiphertextBytesOwned_.data(),
+                            cachedAuthChallengeCiphertextBytesOwned_.size());
+                    } catch (const CryptoPP::Exception&) {
+                        spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext");
+                        return kAuthBootstrap680InboundUnhandled;
+                    }
+                }
+
+                processedChallengeMd5Bytes.assign(16u, 0u);
+                {
+                    CryptoPP::Weak::MD5 challengeMd5;
+                    if (!decryptedChallengeBytes.empty()) {
+                        challengeMd5.Update(
+                            decryptedChallengeBytes.data(),
+                            decryptedChallengeBytes.size());
+                    }
+                    challengeMd5.Final(processedChallengeMd5Bytes.data());
                 }
 
                 std::vector<uint8_t> passwordBytes(password, password + std::strlen(password));
@@ -1925,13 +1891,27 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     paddingLengthField,
                     layout.paddingByte);
 
-                if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
-                        plaintextBytes,
-                        cachedAuthRequestBuildResult_.twofishKeyBytes,
-                        true,
-                        &ciphertextBytes)) {
-                    spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
+                if ((plaintextBytes.size() % 16u) != 0u) {
+                    spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
                     return kAuthBootstrap680InboundUnhandled;
+                }
+                ciphertextBytes.assign(plaintextBytes.size(), 0u);
+                if (!plaintextBytes.empty()) {
+                    static constexpr uint8_t kZeroIv[16] = {0};
+                    try {
+                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption responseCipher;
+                        responseCipher.SetKeyWithIV(
+                            cachedAuthRequestBuildResult_.twofishKeyBytes.data(),
+                            cachedAuthRequestBuildResult_.twofishKeyBytes.size(),
+                            kZeroIv);
+                        responseCipher.ProcessData(
+                            ciphertextBytes.data(),
+                            plaintextBytes.data(),
+                            plaintextBytes.size());
+                    } catch (const CryptoPP::Exception&) {
+                        spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
+                        return kAuthBootstrap680InboundUnhandled;
+                    }
                 }
 
                 Packet_AsAuthChallengeResponse_0x4b6cf4 plaintextPacket;
@@ -2002,18 +1982,37 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             }
 
             const uint32_t errorReplyStatus01 = ReadU32LE(payloadBytes + 0x01u);
-            const bool storedParseObjectF0 =
-                StoreAuthBootstrap680AuthReplyParseObjectFromIncomingMessage(
-                    *g_CurrentLoginMediator,
-                    *this,
-                    incomingAuthMessage,
+            ResetAuthBootstrap680ReplyParseObject(*this);
+
+            bool storedParseObjectF0 = false;
+            AuthBootstrap680AuthReplyParseObjectF0Sketch sourceParseObject = {};
+            if (AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
+                    &sourceParseObject,
+                    incomingAuthMessage)) {
+                authReplyParsePacketBodyBytesOwned_.assign(
                     payloadBytes,
-                    payloadByteCount);
+                    payloadBytes + payloadByteCount);
+                authReplyParseObjectF0 =
+                    static_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(
+                        std::malloc(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch)));
+                if (authReplyParseObjectF0 != nullptr) {
+                    storedParseObjectF0 =
+                        AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
+                            authReplyParseObjectF0,
+                            sourceParseObject,
+                            &authReplyParsePacketBodyBytesOwned_);
+                    if (!storedParseObjectF0) {
+                        ResetAuthBootstrap680ReplyParseObject(*this);
+                    }
+                } else {
+                    authReplyParsePacketBodyBytesOwned_.clear();
+                }
+            }
             const auto* parseObject = authReplyParseObjectF0;
 
             inboundAuthStatusEc =
-                storedParseObjectF0
-                    ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x01u)
+                (storedParseObjectF0 && parseObject != nullptr && parseObject->replyHeader10 != nullptr)
+                    ? ReadU32LE(parseObject->replyHeader10 + 0x01u)
                     : errorReplyStatus01;
 
             spdlog::debug(
@@ -2085,36 +2084,74 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             AuthBootstrap680BigIntObjects_0x4ba50c* const blockB0 = &modulusBigIntB0;
             AuthBootstrap680BigIntObjects_0x4ba50c* const blockC4 = &publicExponentBigIntC4;
             AuthBootstrap680BigIntObjects_0x4ba50c* const blockD8 = &privateExponentBigIntD8;
-            const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+
+            const size_t modulusByteCount =
+                std::max<size_t>(1u, static_cast<size_t>(modulusInteger.MinEncodedSize()));
+            std::vector<uint8_t> modulusBytes(modulusByteCount, 0u);
+            modulusInteger.Encode(modulusBytes.data(), modulusBytes.size());
+            const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
                 blockB0,
                 &modulusBigIntB0OwnedDigits_,
-                modulusInteger);
-            const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+                modulusBytes.data(),
+                modulusBytes.size());
+
+            const size_t publicExponentByteCount =
+                std::max<size_t>(1u, static_cast<size_t>(publicExponentInteger.MinEncodedSize()));
+            std::vector<uint8_t> publicExponentBytes(publicExponentByteCount, 0u);
+            publicExponentInteger.Encode(
+                publicExponentBytes.data(),
+                publicExponentBytes.size());
+            const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
                 blockC4,
                 &publicExponentBigIntC4OwnedDigits_,
-                publicExponentInteger);
+                publicExponentBytes.data(),
+                publicExponentBytes.size());
 
             std::vector<uint8_t> decryptedPrivateExponentBytes;
-            const bool decryptedPrivateExponent =
-                parseObject->encryptedPrivateExponentBytes24 != nullptr &&
-                mxo::auth::internal::TwofishCbcProcessWithIvNoPadding(
-                    std::vector<uint8_t>(
-                        parseObject->encryptedPrivateExponentBytes24,
-                        parseObject->encryptedPrivateExponentBytes24 +
-                            parseObject->encryptedPrivateExponentByteLength28),
-                    cachedAuthRequestBuildResult_.twofishKeyBytes,
-                    cachedAuthChallengeCiphertextBytesOwned_,
-                    false,
-                    &decryptedPrivateExponentBytes);
-            const bool builtBlockD8 =
-                decryptedPrivateExponent &&
-                decryptedPrivateExponentBytes.size() == 0x60u &&
-                BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+            bool decryptedPrivateExponent = false;
+            if (parseObject->encryptedPrivateExponentBytes24 != nullptr &&
+                cachedAuthRequestBuildResult_.twofishKeyBytes.size() == 16u &&
+                cachedAuthChallengeCiphertextBytesOwned_.size() == 16u &&
+                (parseObject->encryptedPrivateExponentByteLength28 % 16u) == 0u) {
+                decryptedPrivateExponentBytes.assign(
+                    parseObject->encryptedPrivateExponentByteLength28,
+                    0u);
+                decryptedPrivateExponent = true;
+                if (parseObject->encryptedPrivateExponentByteLength28 != 0u) {
+                    try {
+                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption privateExponentCipher;
+                        privateExponentCipher.SetKeyWithIV(
+                            cachedAuthRequestBuildResult_.twofishKeyBytes.data(),
+                            cachedAuthRequestBuildResult_.twofishKeyBytes.size(),
+                            cachedAuthChallengeCiphertextBytesOwned_.data());
+                        privateExponentCipher.ProcessData(
+                            decryptedPrivateExponentBytes.data(),
+                            parseObject->encryptedPrivateExponentBytes24,
+                            parseObject->encryptedPrivateExponentByteLength28);
+                    } catch (const CryptoPP::Exception&) {
+                        decryptedPrivateExponent = false;
+                        decryptedPrivateExponentBytes.clear();
+                    }
+                }
+            }
+
+            bool builtBlockD8 = false;
+            if (decryptedPrivateExponent && decryptedPrivateExponentBytes.size() == 0x60u) {
+                const CryptoPP::Integer privateExponentInteger(
+                    decryptedPrivateExponentBytes.data(),
+                    decryptedPrivateExponentBytes.size());
+                const size_t privateExponentByteCount =
+                    std::max<size_t>(1u, static_cast<size_t>(privateExponentInteger.MinEncodedSize()));
+                std::vector<uint8_t> privateExponentBytes(privateExponentByteCount, 0u);
+                privateExponentInteger.Encode(
+                    privateExponentBytes.data(),
+                    privateExponentBytes.size());
+                builtBlockD8 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
                     blockD8,
                     &privateExponentBigIntD8OwnedDigits_,
-                    CryptoPP::Integer(
-                        decryptedPrivateExponentBytes.data(),
-                        decryptedPrivateExponentBytes.size()));
+                    privateExponentBytes.data(),
+                    privateExponentBytes.size());
+            }
 
             spdlog::info(
                 "HandleInboundAuthMessage materialized child+0xf4/+0xb0/+0xc4/+0xd8 from raw0x0b authDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
