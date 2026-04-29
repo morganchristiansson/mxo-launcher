@@ -64,6 +64,76 @@ public:
     // virtual methods inherited from Packet_0x4af2a4
 };
 
+// anchor: launcher.exe:0x4b533c / vtable
+// anchor: launcher.exe:0x4399e0 / InitFromIncomingMessage
+// anchor: launcher.exe:0x43c310 / InitializeFromTempRecord
+// Recovered world-list packet/accessor object.
+//
+// Static-RE tightening from 0x4399e0 / 0x439b50 / 0x43c310 and the owner-side readers:
+// - this is a real `Packet_0x4af2a4` child that reuses the inherited packet envelope fields
+// - when used as a builder/reset object, `0x439b50` stamps payload opcode `0x35`
+//   (`AS_GetWorldListRequest`) into inherited `payloadAlias10`
+// - the mediator stores these as concrete packet-shaped descriptors under owner `+0xd84`
+//   and reads semantic fields decoded from payload offsets `+0x01..+0x1f`
+class Packet_WorldList_0x4b533c : public mxo::liblttcp::Packet_0x4af2a4 {
+public:
+    static constexpr uint8_t kPayloadTag35 = 0x35;
+    static constexpr size_t kFixedByteCount = 0x06;
+
+    // Recovered payload semantics from `0x43ded0` plus owner readers:
+    // - payload + 0x01 = world id word
+    // - payload + 0x03 = inline world-name string
+    // - payload + 0x17 = world status byte
+    // - payload + 0x18 = world type byte
+    // - payload + 0x19 = server-version dword
+    // - payload + 0x1d = server-language byte
+    // - payload + 0x1e = private flag byte
+    // - payload + 0x1f = population-level byte
+    uint16_t worldId01 = 0;
+    std::string inlineNamePlus03;
+    uint8_t status17 = 0;
+    uint8_t type18 = 0;
+    uint32_t serverVersion19 = 0;
+    uint8_t serverLanguage1d = 0;
+    uint8_t privateFlag1e = 0;
+    uint8_t populationLevel1f = 0;
+
+    ~Packet_WorldList_0x4b533c() override = default;
+
+    // anchor: launcher.exe:0x43ded0 / vtable +0x08
+    void DebugString(int /*formatType*/ = 2) override {}
+
+    // anchor: launcher.exe:0x439b50 / vtable +0x0c
+    void InitializePayloadSize() override {
+        payloadPtr04 = messageRef08 && messageRef08->messageStorage0c
+            ? reinterpret_cast<uint32_t>(messageRef08->messageStorage0c->PayloadBase())
+            : payloadPtr04;
+        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+
+        if (!messageRef08 || !messageRef08->messageStorage0c) {
+            return;
+        }
+
+        messageRef08->GrowPayloadByteCount(kFixedByteCount);
+        payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
+        payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
+
+        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        if (!payload) {
+            return;
+        }
+
+        payload[0] = kPayloadTag35;
+        *reinterpret_cast<uint32_t*>(payload + 0x01) = 0u;
+        payload[0x05] = 0u;
+    }
+
+    // anchor: launcher.exe:0x481760 / vtable +0x10
+    void* GetPayloadBase() override { return payloadAlias10; }
+};
+
+static_assert(sizeof(Packet_WorldList_0x4b533c) >= sizeof(mxo::liblttcp::Packet_0x4af2a4),
+              "Packet_WorldList_0x4b533c must retain the Packet_0x4af2a4 prefix");
 
 // Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
 // Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under

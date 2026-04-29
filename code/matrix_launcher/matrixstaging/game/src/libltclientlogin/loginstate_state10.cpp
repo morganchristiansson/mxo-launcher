@@ -276,7 +276,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
         return 0u;
     }
 
-    const CLTLoginMediator::WorldDescriptorState_0x4b533c& selectedWorldDescriptor =
+    const Packet_WorldList_0x4b533c& selectedWorldDescriptor =
         g_CurrentLoginMediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
 
     // anchor: launcher.exe:0x4401a0

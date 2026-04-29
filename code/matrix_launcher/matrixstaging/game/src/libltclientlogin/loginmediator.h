@@ -441,59 +441,6 @@ public:
         PersistedSelectionContext64c persistedSelectionContext64c_{};
     };
 
-    // anchor: launcher.exe:0x4b533c / vtable
-    // Inherits from Packet_0x4af2a4, then retables to own vtable in ctor.
-    // Methods: dtor (0x443aa0), debug (0x43ded0), reset (0x439a70)
-    class WorldDescriptorState_0x4b533c : public mxo::liblttcp::Packet_0x4af2a4 {
-    public:
-        // Current best source-owned mirror of the `0x14`-byte heap object allocated by the
-        // broader auth writer `0x43f300` and stored under owner `+0xd84[index]`.
-        // Concrete class/vtable family now recovered from the ctor/reset/debug path:
-        // - init from temp/source object: `0x43c310`
-        // - dtor: `0x443aa0`
-        // - debug printer: `0x43ded0`
-        // - payload reset/prepare: `0x439a70`
-        // Recovered payload semantics from `0x43ded0` plus owner readers:
-        // - `payload + 0x01` = world id word
-        // - `payload + 0x03` = inline world-name string
-        // - `payload + 0x17` = world status byte
-        // - `payload + 0x18` = world type byte
-        // - `payload + 0x19` = server-version dword
-        // - `payload + 0x1d` = server-language byte
-        // - `payload + 0x1e` = private flag byte
-        // - `payload + 0x1f` = population-level byte
-        // Important broader-writer relation from `0x43f300`:
-        // - this `+0xd84` world-descriptor table is built first from auth world data
-        // - later `+0x688` character-slot records are built from auth character data
-        // - then `+0x818` route-host strings are seeded by joining character `worldId24`
-        //   against descriptor `worldId01` and copying descriptor `inlineNamePlus03`
-        uint16_t worldId01 = 0;
-        std::string inlineNamePlus03;
-        uint8_t status17 = 0;
-        uint8_t type18 = 0;
-        uint32_t serverVersion19 = 0;
-        uint8_t serverLanguage1d = 0;
-        uint8_t privateFlag1e = 0;
-        uint8_t populationLevel1f = 0;
-
-        // Implement all virtual methods from parent Packet_0x4af2a4:
-        // slot0: dtor (inherits)
-        // slot1: stub returns 0
-        // anchor: launcher.exe:0x43ded0 / vtable +0x08
-        void DebugString(int /*formatType*/ = 2) override {}
-        // anchor: launcher.exe:0x439a70 / vtable +0x0c
-        void InitializePayloadSize() override {}
-        // anchor: launcher.exe:0x481760 / vtable +0x10
-        void* GetPayloadBase() override { return payloadAlias10; }
-        // Additional slots from WorldDescriptorState vtable:
-        // anchor: launcher.exe:0x43c350 / vtable +0x18
-        void* VtableSlot18() { return nullptr; }
-        // anchor: launcher.exe:0x439b50 / vtable +0x1c
-        void VtableSlot1c() {}
-        // anchor: launcher.exe:0x481760 / vtable +0x20
-        void* VtableSlot20() { return payloadAlias10; }
-    };
-
     CLTLoginMediator();
     ~CLTLoginMediator();
 
@@ -1402,7 +1349,9 @@ public:
 
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18
     // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
-    std::array<WorldDescriptorState_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
+    // Stored as concrete Packet_WorldList_0x4b533c packet/accessor objects rather than an inner
+    // mediator-only shim so the source follows the real Packet_0x4af2a4 inheritance model.
+    std::array<Packet_WorldList_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
     std::array<bool, kRecoveredWorldSlotCapacity> worldDescriptorValidD84_{};
     uint8_t worldDescriptorCountD80_ = 0;
 
