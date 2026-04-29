@@ -770,18 +770,19 @@ Key evidence:
 - `0x454ff0`
   - appends bytes to the tail node and allocates a new node when needed, matching `Put2()`
 
-So the source-side `AuthBootstrap680ByteQueueBoundary1c` should now be read as a
-**recovered `CryptoPP::ByteQueue` boundary**, not as a standalone node helper class.
-The source header now keeps only the queue-owned boundary fields:
-- `byteQueueVtable00`
-- `bufferedTransformationVtable04`
-- `nodeSize08`
-- `headNode0c` / `tailNode10`
-- `lazyPutbackStorage14` / `lazyPutbackLength18`
+Static RE still identifies the launcher member as an embedded **`CryptoPP::ByteQueue`** rather
+than a standalone node helper class.
 
-The old sketch-only `AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch` name has been retired
-from source in favor of the direct queue boundary representation, and no remaining auth-bootstrap
-source logic models the embedded object as a single node.
+Source now takes the more direct representation:
+- the old sketch-only `AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch` name is retired
+- the embedded queue member is modeled directly as `CryptoPP::ByteQueue`
+- the prior 0x1c queue-boundary offset/size asserts were pruned because source no longer depends on
+  reproducing the exact launcher ABI/layout for this third-party class member
+
+The important fidelity point remains semantic and boundary-oriented:
+- the linked 0x18-byte allocations are internal ByteQueueNode-like records owned by the queue
+- no remaining auth-bootstrap source logic models the embedded object as a single node
+- launcher anchors stay attached to the surrounding recovered filter boundary
 
 ### 2.8.2 `0x4b9c20` = old `CryptoPP::Filter` common base
 

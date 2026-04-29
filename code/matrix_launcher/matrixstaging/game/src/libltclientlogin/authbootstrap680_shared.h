@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <queue.h>
+
 #include "rsa.h"
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
@@ -45,32 +47,23 @@ struct AuthBootstrap680BigIntObjects_0x4ba50c {
 static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
 
 
-// Recovered `CryptoPP::ByteQueue` boundary.
-// anchor: launcher.exe:0x454f10
-// anchor: launcher.exe:0x455470
-// anchor: launcher.exe:0x455560
-// This 0x1c-byte object is the queue itself, not a single ByteQueueNode. The linked 0x18-byte
-// heap records are internal ByteQueueNode-like allocations owned by the queue.
-struct AuthBootstrap680ByteQueueBoundary1c {
-    uint32_t byteQueueVtable00 = 0u;
-    uint32_t bufferedTransformationVtable04 = 0u;
-    uint32_t nodeSize08 = 0u;
-    void* headNode0c = nullptr;
-    void* tailNode10 = nullptr;
-    uint32_t lazyPutbackStorage14 = 0u;
-    uint32_t lazyPutbackLength18 = 0u;
-};
-static_assert(sizeof(AuthBootstrap680ByteQueueBoundary1c) == 0x1cu);
 
 // Recovered per-chunk filter object built by raw `0x08` RSA encryptor vtable `+0x20`.
 // Best current match: old Crypto++ `PK_DefaultEncryptionFilter`
 // (`launcher.exe:0x438120 / 0x438320`).  The sibling vtable `0x004b4548` behaves like
 // `PK_DefaultDecryptionFilter` over the same `Filter` + `ByteQueue` base family.
+//
+// The launcher embeds a `ByteQueue` here, but source no longer needs to preserve the exact
+// launcher-side 0x1c queue layout/offsets. Model the member directly as `CryptoPP::ByteQueue`
+// while keeping the surrounding recovered helper boundary and anchors visible.
+// anchor: launcher.exe:0x454f10
+// anchor: launcher.exe:0x455470
+// anchor: launcher.exe:0x455560
 struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     std::array<uint8_t, 0x0c> reserved08To13{};
-    AuthBootstrap680ByteQueueBoundary1c byteQueue14{};
+    CryptoPP::ByteQueue byteQueue14{};
     uint32_t ctorArg30 = 0u;
     void* ctorOwnerWorker34 = nullptr;
     uint32_t reserved38 = 0u;
@@ -78,11 +71,6 @@ struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
     uint32_t ctorZeroTail40 = 0u;
     uint32_t ctorZeroTail44 = 0u;
 };
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, byteQueue14) == 0x14u);
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorArg30) == 0x30u);
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorOwnerWorker34) == 0x34u);
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorZeroTail40) == 0x40u);
-static_assert(sizeof(AuthBootstrap680Raw08PerChunkWorker48Sketch) == 0x48u);
 
 struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     uint32_t vtable00 = 0u;
