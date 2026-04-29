@@ -237,6 +237,11 @@ CLTLoginMediator::CLTLoginMediator()
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
+    for (Packet_WorldList_0x4b533c*& packet : worldListPacketsD84_) {
+        delete packet;
+        packet = nullptr;
+    }
+    worldListPacketCountD80_ = 0;
     selectionRouteState684_.DestroySelectionRouteState();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
@@ -1475,7 +1480,7 @@ const void* CLTLoginMediator::GetState8PersistenceF1c() const {
 // current helper/state id is >2; otherwise it returns 0.
 uint32_t CLTLoginMediator::GetWorldCount() const {
     const uint32_t stateId = currentState_ ? currentState_->GetStateId() : 0u;
-    const uint32_t worldCount = (stateId > 2u) ? static_cast<uint32_t>(worldDescriptorCountD80_) : 0u;
+    const uint32_t worldCount = (stateId > 2u) ? static_cast<uint32_t>(worldListPacketCountD80_) : 0u;
 
     spdlog::info(
         "CLTLoginMediator::GetWorldCount(+0xf8) -> {} [source={}]",
@@ -1494,7 +1499,7 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const char* worldName =
         (stateAllowsDescriptorRead && index <= 0xffu)
-            ? GetDescriptorInlineNameByIndex(static_cast<uint8_t>(index))
+            ? GetWorldListNameByIndex(static_cast<uint8_t>(index))
             : nullptr;
 
     spdlog::info(
@@ -1514,7 +1519,7 @@ uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t selectionGateByte100 =
         (stateAllowsDescriptorRead && index <= 0xffu)
-            ? GetDescriptorStatusByIndex(static_cast<uint8_t>(index))
+            ? GetWorldListStatusByIndex(static_cast<uint8_t>(index))
             : 0u;
 
     spdlog::info(
@@ -1532,7 +1537,7 @@ uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const
 uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t worldTypeByte = stateAllowsDescriptorRead
-        ? ((index <= 0xffu) ? GetDescriptorTypeByIndex(static_cast<uint8_t>(index)) : 0u)
+        ? ((index <= 0xffu) ? GetWorldListTypeByIndex(static_cast<uint8_t>(index)) : 0u)
         : 0u;
 
     spdlog::info(
@@ -1548,7 +1553,7 @@ uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
 uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const {
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t populationNibble = stateAllowsDescriptorRead
-        ? ((index <= 0xffu) ? GetDescriptorPopulationNibbleByIndex(static_cast<uint8_t>(index)) : 0u)
+        ? ((index <= 0xffu) ? GetWorldListPopulationByIndex(static_cast<uint8_t>(index)) : 0u)
         : 0u;
 
     spdlog::info(
@@ -1618,11 +1623,11 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
             return 1u;
     }
 
-    if (static_cast<uint32_t>(worldDescriptorCountD80_) < input.field24) {
+    if (static_cast<uint32_t>(worldListPacketCountD80_) < input.field24) {
         spdlog::info(
             "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120) rejected selector field12c=0x{:08x} upperBoundF8=0x{:02x}",
             static_cast<unsigned>(input.field24),
-            static_cast<unsigned>(worldDescriptorCountD80_));
+            static_cast<unsigned>(worldListPacketCountD80_));
         return 4u;
     }
 
@@ -2546,8 +2551,8 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 // fixed fallback values for wrapper-facing readers until the recovered owner fields are available.
 uint32_t CLTLoginMediator::SelectionWorldUpperBoundExclusive() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    if (stateCode >= 3u && worldDescriptorCountD80_ != 0u) {
-        return static_cast<uint32_t>(worldDescriptorCountD80_);
+    if (stateCode >= 3u && worldListPacketCountD80_ != 0u) {
+        return static_cast<uint32_t>(worldListPacketCountD80_);
     }
     return selectionSeed_.worldUpperBoundExclusive_;
 }

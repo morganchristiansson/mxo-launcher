@@ -73,7 +73,7 @@ public:
 // - this is a real `Packet_0x4af2a4` child that reuses the inherited packet envelope fields
 // - when used as a builder/reset object, `0x439b50` stamps payload opcode `0x35`
 //   (`AS_GetWorldListRequest`) into inherited `payloadAlias10`
-// - the mediator stores these as concrete packet-shaped descriptors under owner `+0xd84`
+// - the mediator stores pointers to these packet-shaped descriptors in a fixed 100-entry table under owner `+0xd84`
 //   and reads semantic fields decoded from payload offsets `+0x01..+0x1f`
 class Packet_WorldList_0x4b533c : public mxo::liblttcp::Packet_0x4af2a4 {
 public:

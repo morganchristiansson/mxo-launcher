@@ -966,14 +966,14 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     const char* LookupRouteHostPrefixBySlot(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2a0 / owner vtable +0xe4? / current slot-record payload reader
     uint8_t GetSlotRecordStatusByIndex(uint8_t slotIndex) const;
-    // anchor: launcher.exe:0x41b2e0 / owner vtable +0xfc
-    const char* GetDescriptorInlineNameByIndex(uint8_t slotIndex) const;
-    // anchor: launcher.exe:0x41b320 / owner vtable +0x100
-    uint8_t GetDescriptorStatusByIndex(uint8_t slotIndex) const;
-    // anchor: launcher.exe:0x41b360 / owner vtable +0x104
-    uint8_t GetDescriptorTypeByIndex(uint8_t slotIndex) const;
-    // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
-    uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
+    // anchor: launcher.exe:0x41b2e0 / owner helper over `mbr_0xd84[index]` packet payload +0x03
+    const char* GetWorldListNameByIndex(uint8_t slotIndex) const;
+    // anchor: launcher.exe:0x41b320 / owner helper over `mbr_0xd84[index]` packet payload +0x17
+    uint8_t GetWorldListStatusByIndex(uint8_t slotIndex) const;
+    // anchor: launcher.exe:0x41b360 / owner helper over `mbr_0xd84[index]` packet payload +0x18
+    uint8_t GetWorldListTypeByIndex(uint8_t slotIndex) const;
+    // anchor: launcher.exe:0x41b3a0 / owner helper over `mbr_0xd84[index]` packet payload +0x1f low nibble
+    uint8_t GetWorldListPopulationByIndex(uint8_t slotIndex) const;
 
     // Embedded owner `+0x684 .. +0xd7f` selection-route helper/class.
     // Current Ghidra class name is `CLTLoginMediatorSelectionRouteState_0x41dba0`, and the
@@ -1348,12 +1348,12 @@ public:
     uint8_t characterRouteIndexCc8 = 0;
 
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18
-    // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
-    // Stored as concrete Packet_WorldList_0x4b533c packet/accessor objects rather than an inner
-    // mediator-only shim so the source follows the real Packet_0x4af2a4 inheritance model.
-    std::array<Packet_WorldList_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
-    std::array<bool, kRecoveredWorldSlotCapacity> worldDescriptorValidD84_{};
-    uint8_t worldDescriptorCountD80_ = 0;
+    // launcher.exe:0x4f78b8 owner-side world-list packet pointer table (`+0xd84`).
+    // Static-RE from `0x41ee60` ctor plus owner readers `0x41b2e0/0x41b320/0x41b360/0x41b3a0` shows:
+    // - fixed 100-entry pointer table
+    // - count tracked separately at `+0xd80`
+    std::array<Packet_WorldList_0x4b533c*, kRecoveredWorldSlotCapacity> worldListPacketsD84_{};
+    uint8_t worldListPacketCountD80_ = 0;
 
     // Observer/listener state for late-login arg6 +0x170/+0x174 bridge:
     // - +0x170 (RegisterLoginObserver) inserts into owner `+0x674`

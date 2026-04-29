@@ -67,10 +67,10 @@ const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t des
     // - later `0x4401a0` indexes owner `+0xd84` using owner `+0x12c`
     // - current best read is therefore that the state4 case-10 branch forwards a
     //   world-descriptor index/selector here, not a direct world-id payload
-    if (descriptorIndex >= worldDescriptorCountD80_) {
+    if (descriptorIndex >= worldListPacketCountD80_) {
         return nullptr;
     }
-    return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
+    return GetWorldListNameByIndex(static_cast<uint8_t>(descriptorIndex));
 }
 
 // anchor: launcher.exe:0x41e500
@@ -260,42 +260,48 @@ uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
 }
 
 // anchor: launcher.exe:0x41b2e0
-const char* CLTLoginMediator::GetDescriptorInlineNameByIndex(uint8_t slotIndex) const {
-    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+const char* CLTLoginMediator::GetWorldListNameByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldListPacketCountD80_ || slotIndex >= worldListPacketsD84_.size()) {
         return nullptr;
     }
-    const Packet_WorldList_0x4b533c& slot = worldDescriptorsD84_[slotIndex];
-    return slot.inlineNamePlus03.empty() ? nullptr : slot.inlineNamePlus03.c_str();
+    const Packet_WorldList_0x4b533c* const slot = worldListPacketsD84_[slotIndex];
+    if (!slot) {
+        return nullptr;
+    }
+    return slot->inlineNamePlus03.empty() ? nullptr : slot->inlineNamePlus03.c_str();
 }
 
 // anchor: launcher.exe:0x41b320
 // Ghidra/disassembly correction:
 // - this owner reader returns descriptor payload byte `+0x17` (Status)
 // - earlier docs/source had an off-by-one stale guess that put Type here
-uint8_t CLTLoginMediator::GetDescriptorStatusByIndex(uint8_t slotIndex) const {
-    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+uint8_t CLTLoginMediator::GetWorldListStatusByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldListPacketCountD80_ || slotIndex >= worldListPacketsD84_.size()) {
         return 0;
     }
-    return worldDescriptorsD84_[slotIndex].status17;
+    const Packet_WorldList_0x4b533c* const slot = worldListPacketsD84_[slotIndex];
+    return slot ? slot->status17 : 0;
 }
 
 // anchor: launcher.exe:0x41b360
 // Ghidra/disassembly correction:
 // - this owner reader returns descriptor payload byte `+0x18` (Type)
 // - earlier docs/source had an off-by-one stale guess that put server-version low byte here
-uint8_t CLTLoginMediator::GetDescriptorTypeByIndex(uint8_t slotIndex) const {
-    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+uint8_t CLTLoginMediator::GetWorldListTypeByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldListPacketCountD80_ || slotIndex >= worldListPacketsD84_.size()) {
         return 0;
     }
-    return worldDescriptorsD84_[slotIndex].type18;
+    const Packet_WorldList_0x4b533c* const slot = worldListPacketsD84_[slotIndex];
+    return slot ? slot->type18 : 0;
 }
 
 // anchor: launcher.exe:0x41b3a0
-uint8_t CLTLoginMediator::GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const {
-    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+uint8_t CLTLoginMediator::GetWorldListPopulationByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldListPacketCountD80_ || slotIndex >= worldListPacketsD84_.size()) {
         return 0;
     }
-    const uint8_t value = worldDescriptorsD84_[slotIndex].populationLevel1f & 0x0f;
+    const Packet_WorldList_0x4b533c* const slot = worldListPacketsD84_[slotIndex];
+    const uint8_t value = slot ? (slot->populationLevel1f & 0x0f) : 0u;
     return (value >= 1u && value <= 3u) ? value : 0u;
 }
 

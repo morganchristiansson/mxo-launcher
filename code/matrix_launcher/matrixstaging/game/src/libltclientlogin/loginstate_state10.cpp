@@ -265,19 +265,19 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
         g_CurrentLoginMediator->createCharacterData108.selectedWorldField24;
     if (appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size() ||
         appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
-        selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldDescriptorCountD80_ ||
-        selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldDescriptorsD84_.size() ||
-        !g_CurrentLoginMediator->worldDescriptorValidD84_[selectedWorldDescriptorIndex]) {
+        selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldListPacketCountD80_ ||
+        selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldListPacketsD84_.size() ||
+        g_CurrentLoginMediator->worldListPacketsD84_[selectedWorldDescriptorIndex] == nullptr) {
         spdlog::warn(
             "DIAGNOSTIC: state10 raw-0x0b claim-name reply success could not append slot record appendedSlotIndex={} selectedWorldDescriptorIndex={} worldDescriptorCount=0x{:02x}",
             static_cast<unsigned>(appendedSlotIndex),
             static_cast<unsigned>(selectedWorldDescriptorIndex),
-            static_cast<unsigned>(g_CurrentLoginMediator->worldDescriptorCountD80_));
+            static_cast<unsigned>(g_CurrentLoginMediator->worldListPacketCountD80_));
         return 0u;
     }
 
     const Packet_WorldList_0x4b533c& selectedWorldDescriptor =
-        g_CurrentLoginMediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
+        *g_CurrentLoginMediator->worldListPacketsD84_[selectedWorldDescriptorIndex];
 
     // anchor: launcher.exe:0x4401a0
     // Exact success-side write order recovered from listing:
