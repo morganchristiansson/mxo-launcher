@@ -22,7 +22,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <fstream>
 #include <memory>
 #include <random>
 
@@ -1211,7 +1210,7 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_S
 }
 
 // anchor: launcher.exe:0x447dd0
-static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat_SOURCEOWNED(
+static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
     uint32_t replyPublicKeyId09,
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
@@ -1219,30 +1218,36 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat_SOURCEOWNED(
     std::vector<uint8_t> modulusBytes;
     std::vector<uint8_t> publicExponentBytes;
     if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &modulusBytes) ||
-        !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &publicExponentBytes)) {
+        !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &publicExponentBytes) ||
+        signatureBytes == nullptr) {
         return 0u;
     }
 
-    // The exact on-disk/sink semantics of `0x447dd0` are still being recovered, but static RE is
-    // clear that `0x447f50` always performs this post-rebuild pubkey.dat-side handoff before
-    // marking child+0xa0 ready. Keep that boundary explicit here instead of smearing it into the
-    // rebuild helper.
-    std::ofstream pubkeyDat("pubkey.dat", std::ios::binary | std::ios::app);
-    if (!pubkeyDat) {
-        return 0u;
-    }
-
-    pubkeyDat.write(reinterpret_cast<const char*>(&replyPublicKeyId09), sizeof(replyPublicKeyId09));
-    pubkeyDat.write(reinterpret_cast<const char*>(modulusBytes.data()),
-                    static_cast<std::streamsize>(modulusBytes.size()));
-    pubkeyDat.write(reinterpret_cast<const char*>(publicExponentBytes.data()),
-                    static_cast<std::streamsize>(publicExponentBytes.size()));
-    const uint8_t terminatorByte = 0u;
-    pubkeyDat.write(reinterpret_cast<const char*>(&terminatorByte), 1);
-    if (signatureBytes != nullptr) {
-        pubkeyDat.write(reinterpret_cast<const char*>(signatureBytes), 0x80);
-    }
-    return pubkeyDat ? 1u : 0u;
+    // `0x447dd0` constructs a launcher-owned output sink configured with:
+    // - OutputFileName = "pubkey.dat"
+    // - OutputBinaryMode = true
+    // It then serializes the reply-public-key record into that sink by emitting:
+    // - replyPublicKeyId09 via `0x437ef0`
+    // - modulus integer object via virtual `+0x08`
+    // - public exponent integer object via virtual `+0x08`
+    // - a trailing NUL byte via `0x444640`
+    // - a fixed 0x100-byte blob from `signatureBytes` via sink virtual `+0x14`
+    //
+    // The surrounding sink/file-object family is still unresolved, so keep the boundary explicit
+    // and model just the exact serialized record shape rather than pretending this helper is a
+    // direct std::ofstream append.
+    std::vector<uint8_t> serializedRecord;
+    serializedRecord.reserve(
+        sizeof(replyPublicKeyId09) + modulusBytes.size() + publicExponentBytes.size() + 1u + 0x100u);
+    serializedRecord.push_back(static_cast<uint8_t>(replyPublicKeyId09 & 0xffu));
+    serializedRecord.push_back(static_cast<uint8_t>((replyPublicKeyId09 >> 8u) & 0xffu));
+    serializedRecord.push_back(static_cast<uint8_t>((replyPublicKeyId09 >> 16u) & 0xffu));
+    serializedRecord.push_back(static_cast<uint8_t>((replyPublicKeyId09 >> 24u) & 0xffu));
+    serializedRecord.insert(serializedRecord.end(), modulusBytes.begin(), modulusBytes.end());
+    serializedRecord.insert(serializedRecord.end(), publicExponentBytes.begin(), publicExponentBytes.end());
+    serializedRecord.push_back(0u);
+    serializedRecord.insert(serializedRecord.end(), signatureBytes, signatureBytes + 0x100u);
+    return 1u;
 }
 
 // anchor: launcher.exe:0x445610
@@ -2510,7 +2515,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
             return rebuildResult;
         }
 
-        AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat_SOURCEOWNED(
+        AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
             replyPublicKeyId09,
             modulusInteger,
             publicExponentInteger,
