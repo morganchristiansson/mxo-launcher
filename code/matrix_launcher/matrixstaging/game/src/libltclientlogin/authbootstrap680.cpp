@@ -1361,6 +1361,15 @@ uint8_t AuthBootstrap680Child_0x441290::GetCrashReporterPromptForSecurId58() con
     return crashReporterPromptForSecurId104;
 }
 
+// anchor: launcher.exe:0x4433c0
+bool AuthBootstrap680Child_0x441290::State5ReplyCopyShadowMissingOrStale() const {
+    const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(authReplyCopyShadowF4);
+    if (copyShadow == nullptr) {
+        return true;
+    }
+    return copyShadow->IsFresh(static_cast<int>(authServerTimeBias80));
+}
+
 // anchor: launcher.exe:0x44add0
 bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
     // Ghidra: return (bool)('\x01' - ((uint)((int)time(NULL) - param_1) < this->mbr_0xac));

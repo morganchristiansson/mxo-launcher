@@ -226,6 +226,14 @@ public:
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;
     uint8_t GetCrashReporterPromptForSecurId58() const;
+
+    // anchor: launcher.exe:0x4433c0
+    // Ghidra currently misidentifies this tiny helper as `cls_0x4433c0::meth_0x4433c0`, but the
+    // sole caller (`0x439520`) loads ECX from mediator `+0x680` before calling it, so it belongs
+    // to the concrete auth/bootstrap child. Exact launcher behavior:
+    // - returns true when child `+0xf4` has no copied auth-reply shadow yet
+    // - otherwise delegates to `AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(child+0x80)`
+    bool State5ReplyCopyShadowMissingOrStale() const;
 };
 
 inline AuthBootstrap680Child_0x441290& AuthBootstrapChildFromWriteHelper(

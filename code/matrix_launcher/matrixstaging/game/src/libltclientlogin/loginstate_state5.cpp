@@ -82,16 +82,20 @@ void CLTLoginState_State5_0x4b5064::Slot3_BeginOrContinue(CLTLoginState* upstrea
         return;
     }
 
-    const auto* authReplyCopyShadowF4 =
-        static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(
-            g_CurrentLoginMediator->AuthBootstrapReplyCopyShadowF4Scaffold());
-    const bool replyCopyShadowStillValid = g_CurrentLoginMediator->HasValidState5ReplyCopyShadowF4Scaffold();
-    if (!replyCopyShadowStillValid) {
+    const auto* authBootstrapChild = g_CurrentLoginMediator->authBootstrapChild680_.get();
+    const auto* authReplyCopyShadowF4 = authBootstrapChild
+                                            ? static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(
+                                                  authBootstrapChild->authReplyCopyShadowF4)
+                                            : nullptr;
+    const bool replyCopyShadowMissingOrStale =
+        authBootstrapChild ? authBootstrapChild->State5ReplyCopyShadowMissingOrStale() : true;
+    if (replyCopyShadowMissingOrStale) {
         const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(2u);
         spdlog::info(
-            "CLTLoginState_State5_0x4b5064::Slot3_BeginOrContinue replyCopyShadowStillValid=0 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
+            "CLTLoginState_State5_0x4b5064::Slot3_BeginOrContinue replyCopyShadowMissingOrStale=1 cachedUpstream={} incomingUpstream={} authBootstrapChild680={} authReplyCopyShadowF4={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
             fmt::ptr(cachedUpstreamOrArg_0x4),
             fmt::ptr(upstreamOrArg),
+            fmt::ptr(authBootstrapChild),
             fmt::ptr(authReplyCopyShadowF4),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(switchDispatchResult));
@@ -101,9 +105,10 @@ void CLTLoginState_State5_0x4b5064::Slot3_BeginOrContinue(CLTLoginState* upstrea
     g_CurrentLoginMediator->PrepareState5MarginConnectionCopySend();
     g_CurrentLoginMediator->PostEvent(0x10u);
     spdlog::info(
-        "CLTLoginState_State5_0x4b5064::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} then PostEvent(0x10)",
+        "CLTLoginState_State5_0x4b5064::Slot3_BeginOrContinue replyCopyShadowMissingOrStale=0 cachedUpstream={} incomingUpstream={} authBootstrapChild680={} authReplyCopyShadowF4={} currentState={} then PostEvent(0x10)",
         fmt::ptr(cachedUpstreamOrArg_0x4),
         fmt::ptr(upstreamOrArg),
+        fmt::ptr(authBootstrapChild),
         fmt::ptr(authReplyCopyShadowF4),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     return;

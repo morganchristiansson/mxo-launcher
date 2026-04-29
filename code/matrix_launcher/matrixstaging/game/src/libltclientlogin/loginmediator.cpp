@@ -2647,34 +2647,6 @@ const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
                : nullptr;
 }
 
-bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
-    // Exact recovered gate split from `0x433c0 -> AuthBootstrapReplyCopyShadowF4_IsFresh`:
-    // - if child `+0xf4` is null, state5 slot3 takes the helper-state-2 branch
-    // - otherwise the copied `0x136` block stays usable only while
-    //   `(time(NULL) - child+0x80) < *(uint32_t*)(child+0xf4 + 0xac)`
-    //   where child `+0x80` is the server-time bias seeded by `0x448140`, so the left side is
-    //   effectively the current auth-server time
-    const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(
-        authBootstrapChild680_
-            ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authReplyCopyShadowF4
-            : nullptr);
-    if (copyShadow == nullptr) {
-        return false;
-    }
-
-    const uint32_t expiryTimeAc = ReadU32LE(copyShadow->signedData80.data() + 0x2cu);
-    const std::time_t now = std::time(nullptr);
-    const uint32_t authServerTimeBias80 =
-        authBootstrapChild680_
-            ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authServerTimeBias80
-            : 0u;
-    const uint32_t currentAuthServerTime =
-        (now > static_cast<std::time_t>(authServerTimeBias80))
-            ? static_cast<uint32_t>(now - static_cast<std::time_t>(authServerTimeBias80))
-            : 0u;
-    return currentAuthServerTime < expiryTimeAc;
-}
-
 // anchor: launcher.exe:0x41e760
 void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() const {
     const char* profileName = ownerAuthBootstrapSource94_.username00.data();
