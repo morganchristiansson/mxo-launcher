@@ -150,7 +150,6 @@ public:
  AuthBootstrap680ReplyAuthDataValidatorOwnedState replyAuthDataValidatorACOwnedState_{};
  std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterLarge> feedbackTransformLarge94Owned_{};
  std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterSmall> feedbackTransformSmall98Owned_{};
- std::unique_ptr<AuthBootstrap680AuthReplyParseObjectF0Sketch> authReplyParseObjectF0Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
  std::unique_ptr<AuthBootstrapReplyCopyShadowF4_0x44add0> authReplyCopyShadowF4Owned_{};
  std::vector<uint32_t> modulusBigIntB0OwnedDigits_{};

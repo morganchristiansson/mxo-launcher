@@ -484,8 +484,10 @@ static void ResetAuthBootstrap680AuthReplyParseAccessor(
 
 static void ResetAuthBootstrap680ReplyParseObject(
  AuthBootstrap680ChildBase_0x4b7134& child) {
-    child.authReplyParseObjectF0 = nullptr;
-    child.authReplyParseObjectF0Owned_.reset();
+    if (child.authReplyParseObjectF0 != nullptr) {
+        std::free(child.authReplyParseObjectF0);
+        child.authReplyParseObjectF0 = nullptr;
+    }
     child.authReplyParsePacketBodyBytesOwned_.clear();
 }
 
@@ -634,15 +636,19 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
     }
 
     child.authReplyParsePacketBodyBytesOwned_ = stagedBytes;
-    child.authReplyParseObjectF0Owned_ = std::make_unique<AuthBootstrap680AuthReplyParseObjectF0Sketch>();
+    child.authReplyParseObjectF0 = static_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(
+        std::malloc(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch)));
+    if (child.authReplyParseObjectF0 == nullptr) {
+        child.authReplyParsePacketBodyBytesOwned_.clear();
+        return false;
+    }
     if (!BuildAuthBootstrap680AuthReplyParseObjectFromPacketBody(
-            child.authReplyParseObjectF0Owned_.get(),
+            child.authReplyParseObjectF0,
             &child.authReplyParsePacketBodyBytesOwned_)) {
         ResetAuthBootstrap680ReplyParseObject(child);
         return false;
     }
 
-    child.authReplyParseObjectF0 = child.authReplyParseObjectF0Owned_.get();
     return true;
 }
 
@@ -1356,9 +1362,13 @@ void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
 
  // +0xf0: authReplyParseObjectF0 - call dtor(1) if non-null
  if (authReplyParseObjectF0 != nullptr) {
- // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
+ // `0x444900` calls the `+0xf0` object destructor wrapper, which ultimately frees the
+ // tracked heap allocation backing the copied `0x8c` parse shell. Source now matches that
+ // raw child-owned storage shape even though the parse body itself is still rebuilt locally.
+ std::free(authReplyParseObjectF0);
  authReplyParseObjectF0 = nullptr;
  }
+ authReplyParsePacketBodyBytesOwned_.clear();
 }
 
 const mxo::auth::AuthReply& AuthBootstrap680Child_0x441290::CachedAuthReply_SOURCEOWNED() const {
