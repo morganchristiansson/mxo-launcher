@@ -25,18 +25,53 @@ static uint32_t ReadU32LEState2(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[3]) << 24u);
 }
 
-static const uint8_t* AuthBootstrap680WorldTempRecordByIndex(
-    const Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
+static const uint8_t* AuthBootstrap680SelectWorldTempRecordByIndex(
+    Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
     size_t index) {
     if (!parseObject || !parseObject->worldTempRecords44 ||
         index >= parseObject->worldTempRecordCount48) {
         return nullptr;
     }
-    return parseObject->worldTempRecords44 + index * 0x20u;
+
+    const uint8_t* const worldRecord = parseObject->worldTempRecords44 + index * 0x20u;
+    parseObject->currentWorldTempRecord6c = worldRecord;
+    if (worldRecord != nullptr) {
+        const_cast<uint8_t*>(worldRecord)[0x16u] = 0u;
+    }
+    return worldRecord;
 }
 
-static const uint8_t* AuthBootstrap680CharacterTempRecordByIndex(
-    const Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
+static Packet_WorldList_0x4b533c* AuthBootstrap680InitializeWorldDescriptorFromSelectedTempRecord(
+    Packet_WorldList_0x4b533c* descriptor,
+    Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject) {
+    if (!descriptor || !parseObject || !parseObject->currentWorldTempRecord6c) {
+        return nullptr;
+    }
+
+    descriptor->payloadPtr04 = reinterpret_cast<uint32_t>(parseObject->worldDescriptorAccessor5c.packetBody04);
+    descriptor->messageRef08 =
+        static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(
+            parseObject->worldDescriptorAccessor5c.incomingMessage08);
+    if (descriptor->messageRef08) {
+        descriptor->messageRef08->AddRef();
+    }
+    descriptor->createRefParam0c = parseObject->worldDescriptorAccessor5c.resolveFields0c;
+    descriptor->payloadAlias10 = const_cast<uint8_t*>(parseObject->currentWorldTempRecord6c);
+
+    const uint8_t* const worldRecord = parseObject->currentWorldTempRecord6c;
+    descriptor->worldId01 = ReadU16LEState2(worldRecord + 0x01u);
+    descriptor->inlineNamePlus03 = reinterpret_cast<const char*>(worldRecord + 0x03u);
+    descriptor->status17 = worldRecord[0x17u];
+    descriptor->type18 = worldRecord[0x18u];
+    descriptor->serverVersion19 = ReadU32LEState2(worldRecord + 0x19u);
+    descriptor->serverLanguage1d = worldRecord[0x1du];
+    descriptor->privateFlag1e = worldRecord[0x1eu];
+    descriptor->populationLevel1f = worldRecord[0x1fu];
+    return descriptor;
+}
+
+static const uint8_t* AuthBootstrap680SelectCharacterTempRecordByIndex(
+    Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
     size_t index,
     const char** outHandleText,
     uint16_t* outHandleLength) {
@@ -52,11 +87,14 @@ static const uint8_t* AuthBootstrap680CharacterTempRecordByIndex(
     }
 
     const uint8_t* const record = parseObject->characterTempRecords3c + index * 0x0eu;
+    parseObject->currentCharacterTempRecord80 = record;
     const uint16_t handleOffset = ReadU16LEState2(record + 1u);
     if (handleOffset != 0u) {
         uint8_t* const mutableHandleLengthBytes = const_cast<uint8_t*>(record + handleOffset);
         const uint16_t handleLength = ReadU16LEState2(mutableHandleLengthBytes);
         char* const handleText = reinterpret_cast<char*>(mutableHandleLengthBytes + 2u);
+        parseObject->currentCharacterHandle84 = reinterpret_cast<const uint8_t*>(handleText);
+        parseObject->currentCharacterHandleByteLength88 = handleLength;
         if (handleLength != 0u) {
             handleText[handleLength - 1u] = '\0';
         }
@@ -66,8 +104,38 @@ static const uint8_t* AuthBootstrap680CharacterTempRecordByIndex(
         if (outHandleLength) {
             *outHandleLength = handleLength;
         }
+    } else {
+        parseObject->currentCharacterHandle84 = nullptr;
+        parseObject->currentCharacterHandleByteLength88 = 0u;
     }
     return record;
+}
+
+static Packet_AsAuthReply_0x4b5328* AuthBootstrap680InitializeSlotRecordFromSelectedTempRecord(
+    Packet_AsAuthReply_0x4b5328* slotRecord,
+    Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject) {
+    if (!slotRecord || !parseObject || !parseObject->currentCharacterTempRecord80) {
+        return nullptr;
+    }
+
+    slotRecord->payloadPtr04 = reinterpret_cast<uint32_t>(parseObject->slotRecordAccessor70.packetBody04);
+    slotRecord->messageRef08 =
+        static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(
+            parseObject->slotRecordAccessor70.incomingMessage08);
+    if (slotRecord->messageRef08) {
+        slotRecord->messageRef08->AddRef();
+    }
+    slotRecord->createRefParam0c = parseObject->slotRecordAccessor70.resolveFields0c;
+    slotRecord->payloadAlias10 = const_cast<uint8_t*>(parseObject->currentCharacterTempRecord80);
+    slotRecord->debugString14 = reinterpret_cast<const char*>(parseObject->currentCharacterHandle84);
+    slotRecord->payloadSize18 = parseObject->currentCharacterHandleByteLength88;
+
+    const uint8_t* const record = parseObject->currentCharacterTempRecord80;
+    slotRecord->characterIdLow1c = ReadU32LEState2(record + 0x03u);
+    slotRecord->characterIdHigh20 = ReadU32LEState2(record + 0x07u);
+    slotRecord->packetType1a = record[0x0bu];
+    slotRecord->worldId24 = ReadU16LEState2(record + 0x0cu);
+    return slotRecord;
 }
 
 }  // namespace
@@ -238,9 +306,10 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // - validates status/type inline with `AuthReplyWorldStatus_IsValid` /
                 //   `AuthReplyWorldType_IsValid`
                 //
-                // Source keeps the same ownership/resulting state but inlines the per-entry copy +
-                // normalization that `0x43f300` performs while materializing the owner `+0xd84`
-                // world-descriptor table and `+0xd80` count mirror.
+                // Source now follows the original helper split more closely:
+                // - select `currentWorldTempRecord6c` from the shared raw0x0b parse packet
+                // - materialize each owner `+0xd84` entry as a `Packet_WorldList_0x4b533c`
+                //   initialized from the parse object's world-descriptor accessor family
                 for (Packet_WorldList_0x4b533c*& packet : g_CurrentLoginMediator->worldListPacketsD84_) {
                     delete packet;
                     packet = nullptr;
@@ -254,7 +323,9 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                             : 0u);
                     for (size_t i = 0; i < worldCount; ++i) {
                         const uint8_t* const worldRecord =
-                            AuthBootstrap680WorldTempRecordByIndex(parseObject, i);
+                            AuthBootstrap680SelectWorldTempRecordByIndex(
+                                const_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(parseObject),
+                                i);
                         if (!worldRecord) {
                             break;
                         }
@@ -288,15 +359,15 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         if (!descriptor) {
                             break;
                         }
+                        if (!AuthBootstrap680InitializeWorldDescriptorFromSelectedTempRecord(
+                                descriptor,
+                                const_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(parseObject))) {
+                            delete descriptor;
+                            break;
+                        }
                         g_CurrentLoginMediator->worldListPacketsD84_[i] = descriptor;
-                        descriptor->worldId01 = worldId;
-                        descriptor->inlineNamePlus03 = worldName;
                         descriptor->status17 = normalizedStatus;
                         descriptor->type18 = normalizedType;
-                        descriptor->serverVersion19 = ReadU32LEState2(worldRecord + 0x19u);
-                        descriptor->serverLanguage1d = worldRecord[0x1du];
-                        descriptor->privateFlag1e = worldRecord[0x1eu];
-                        descriptor->populationLevel1f = worldRecord[0x1fu];
                         ++g_CurrentLoginMediator->worldListPacketCountD80_;
                     }
                 }
@@ -321,10 +392,11 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // - validate slot status inline and force invalid values to `7`
                 // - walk owner `+0xd84` and seed `+0x818` when worldId matches
                 //
-                // Source again keeps the same resulting owner state while inlining the per-slot
-                // copy + normalization that `0x43f300` performs for the selection-route table and
-                // route-host seeding by matching each slot's worldId against the recovered world
-                // descriptors.
+                // Source again keeps the same resulting owner state while now reusing the more
+                // faithful packet family split from `0x43f300`:
+                // - select `currentCharacterTempRecord80/currentCharacterHandle84`
+                // - initialize each owner slot entry as a `Packet_AsAuthReply_0x4b5328`
+                // - then normalize status / seed route-host strings by matching world ids
                 {
                     g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
                     const size_t characterCount = std::min(
@@ -338,8 +410,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         const char* handleText = "";
                         uint16_t handleLength = 0u;
                         const uint8_t* const characterRecord =
-                            AuthBootstrap680CharacterTempRecordByIndex(
-                                parseObject,
+                            AuthBootstrap680SelectCharacterTempRecordByIndex(
+                                const_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(parseObject),
                                 i,
                                 &handleText,
                                 &handleLength);
@@ -350,7 +422,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         const uint8_t normalizedStatus = (rawStatus <= 6u) ? rawStatus : 7u;
                         const uint32_t characterIdLow = ReadU32LEState2(characterRecord + 0x03u);
                         const uint32_t characterIdHigh = ReadU32LEState2(characterRecord + 0x07u);
-                        const uint16_t worldId = ReadU16LEState2(characterRecord + 0x0cu);
                         if (normalizedStatus != rawStatus) {
                             const unsigned long long characterId =
                                 static_cast<unsigned long long>(characterIdLow) |
@@ -364,12 +435,13 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
 
                         auto& slotRecord = g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
                         slotRecord = {};
-                        slotRecord.debugString14 = handleText;
                         (void)handleLength;
-                        slotRecord.characterIdLow1c = characterIdLow;
-                        slotRecord.characterIdHigh20 = characterIdHigh;
+                        if (!AuthBootstrap680InitializeSlotRecordFromSelectedTempRecord(
+                                &slotRecord,
+                                const_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(parseObject))) {
+                            break;
+                        }
                         slotRecord.packetType1a = normalizedStatus;
-                        slotRecord.worldId24 = worldId;
                         g_CurrentLoginMediator->selectionRouteState684_.slotRecordValid04_[i] = true;
 
                         int matchedWorldIndex = -1;
