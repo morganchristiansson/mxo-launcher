@@ -49,24 +49,16 @@ constexpr uint32_t kIncomingAuthMessageLocatorPayloadOffsetTable[7] = {
     0x10u,
 };
 
-struct IncomingAuthPayloadViewScaffold {
-    const uint8_t* payloadBytes = nullptr;
-    size_t payloadByteCount = 0u;
-    uint8_t rawCode = 0u;
-    bool headerless = false;
-    bool usedHeaderlessLocatorDecode = false;
-};
-
 // anchor family: launcher.exe:0x41bc20 / 0x41bbb0
-static bool ResolveIncomingAuthMessageCodePointerScaffold(
+static bool ResolveIncomingAuthPayloadView(
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& incomingMessageRef,
-    const uint8_t** outMessageCodePointer,
-    bool* outUsedHeaderlessLocatorDecode) {
-    if (outMessageCodePointer) {
-        *outMessageCodePointer = nullptr;
+    const uint8_t** outPayloadBytes,
+    size_t* outPayloadByteCount) {
+    if (outPayloadBytes) {
+        *outPayloadBytes = nullptr;
     }
-    if (outUsedHeaderlessLocatorDecode) {
-        *outUsedHeaderlessLocatorDecode = false;
+    if (outPayloadByteCount) {
+        *outPayloadByteCount = 0u;
     }
 
     const auto* messageStorage = incomingMessageRef.messageStorage0c;
@@ -80,84 +72,41 @@ static bool ResolveIncomingAuthMessageCodePointerScaffold(
         return false;
     }
 
-    if (incomingMessageRef.headerless10 == 0u) {
-        if (outMessageCodePointer) {
-            *outMessageCodePointer = payloadBytes;
+    const uint8_t* logicalPayloadBytes = payloadBytes;
+    if (incomingMessageRef.headerless10 != 0u) {
+        if (payloadByteCount < 2u) {
+            return false;
         }
-        return true;
+
+        const uint8_t locatorByte0d = payloadBytes[1];
+        const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
+        const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
+        if (targetLocatorType == 0u || targetLocatorType > 6u ||
+            senderLocatorType == 0u || senderLocatorType > 6u) {
+            return false;
+        }
+
+        const size_t payloadOffset =
+            0x12u +
+            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
+            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
+        if (payloadOffset >= payloadByteCount) {
+            return false;
+        }
+        logicalPayloadBytes = payloadBytes + payloadOffset;
     }
 
-    if (outUsedHeaderlessLocatorDecode) {
-        *outUsedHeaderlessLocatorDecode = true;
-    }
-    if (payloadByteCount < 2u) {
-        return false;
-    }
-
-    const uint8_t locatorByte0d = payloadBytes[1];
-    const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
-    const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
-    if (targetLocatorType == 0u || targetLocatorType > 6u ||
-        senderLocatorType == 0u || senderLocatorType > 6u) {
-        return false;
-    }
-
-    const size_t payloadOffset =
-        0x12u +
-        static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
-        static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
-    if (payloadOffset >= payloadByteCount) {
-        return false;
-    }
-
-    if (outMessageCodePointer) {
-        *outMessageCodePointer = payloadBytes + payloadOffset;
-    }
-    return true;
-}
-
-static bool BuildIncomingAuthPayloadViewScaffold(
-    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
-    IncomingAuthPayloadViewScaffold* outView) {
-    if (outView) {
-        *outView = {};
-    }
-    if (!incomingAuthMessageRef || !outView) {
-        return false;
-    }
-
-    const auto* messageStorage = incomingAuthMessageRef->messageStorage0c;
-    if (!messageStorage) {
-        return false;
-    }
-
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return false;
-    }
-
-    const uint8_t* logicalPayloadBytes = nullptr;
-    bool usedHeaderlessLocatorDecode = false;
-    if (!ResolveIncomingAuthMessageCodePointerScaffold(
-            *incomingAuthMessageRef,
-            &logicalPayloadBytes,
-            &usedHeaderlessLocatorDecode) ||
-        !logicalPayloadBytes) {
-        return false;
-    }
-
-    const size_t logicalPayloadOffset =
-        static_cast<size_t>(logicalPayloadBytes - payloadBytes);
+    const size_t logicalPayloadOffset = static_cast<size_t>(logicalPayloadBytes - payloadBytes);
     if (logicalPayloadOffset >= payloadByteCount) {
         return false;
     }
 
-    outView->payloadBytes = logicalPayloadBytes;
-    outView->payloadByteCount = static_cast<size_t>(payloadByteCount) - logicalPayloadOffset;
-    outView->rawCode = logicalPayloadBytes[0];
-    outView->headerless = (incomingAuthMessageRef->headerless10 != 0u);
-    outView->usedHeaderlessLocatorDecode = usedHeaderlessLocatorDecode;
+    if (outPayloadBytes) {
+        *outPayloadBytes = logicalPayloadBytes;
+    }
+    if (outPayloadByteCount) {
+        *outPayloadByteCount = static_cast<size_t>(payloadByteCount) - logicalPayloadOffset;
+    }
     return true;
 }
 
@@ -609,14 +558,16 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
         return false;
     }
 
-    IncomingAuthPayloadViewScaffold incomingPayload = {};
-    if (!BuildIncomingAuthPayloadViewScaffold(incomingAuthMessageRef, &incomingPayload)) {
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!ResolveIncomingAuthPayloadView(*incomingAuthMessageRef, &payloadBytes, &payloadByteCount) ||
+        !payloadBytes || payloadByteCount == 0u) {
         return false;
     }
 
     *outParseObject = {};
     outParseObject->vtable00 = 0x004b6c74u;
-    outParseObject->packetBody04 = incomingPayload.payloadBytes;
+    outParseObject->packetBody04 = payloadBytes;
     outParseObject->incomingMessage08 =
         const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef);
     outParseObject->resolveFields0c = 1u;
@@ -645,7 +596,7 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
     } else {
         AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
             outParseObject,
-            incomingPayload.payloadByteCount,
+            payloadByteCount,
             true);
     }
     return true;
@@ -692,14 +643,15 @@ static bool AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
     return true;
 }
 
-static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
+static bool StoreAuthBootstrap680AuthReplyParseObjectFromIncomingMessage(
     CLTLoginMediator& /*mediator*/,
     AuthBootstrap680Child_0x441290& child,
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
-    const std::vector<uint8_t>& stagedBytes) {
+    const uint8_t* payloadBytes,
+    size_t payloadByteCount) {
     ResetAuthBootstrap680ReplyParseObject(child);
 
-    if (stagedBytes.empty()) {
+    if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }
 
@@ -710,7 +662,7 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
         return false;
     }
 
-    child.authReplyParsePacketBodyBytesOwned_ = stagedBytes;
+    child.authReplyParsePacketBodyBytesOwned_.assign(payloadBytes, payloadBytes + payloadByteCount);
     child.authReplyParseObjectF0 = static_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(
         std::malloc(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch)));
     if (child.authReplyParseObjectF0 == nullptr) {
@@ -1672,14 +1624,13 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
 // not a newly claimed standalone launcher method.
 void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& mediator,
-    const mxo::auth::AuthReply& reply) {
+    CLTLoginMediator& mediator) {
     (void)mediator;
 
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
     ResetAuthBootstrap680ReplyMaterialization(child);
 
-    if (reply.isErrorReply || !reply.valid) {
+    if (parseObject == nullptr) {
         return;
     }
 
@@ -1693,33 +1644,16 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
 
     // Prefer the exact copied parse-object auth-data field recovered from
     // `0x443470 / 0x448140`: that `0x136` span is the original child `+0xf4` material.
-    if (parseObject != nullptr && parseObject->authDataBytes1c != nullptr &&
+    if (parseObject->authDataBytes1c != nullptr &&
         parseObject->authDataByteLength20 == sizeof(copyShadow)) {
         std::copy_n(
             parseObject->authDataBytes1c,
             sizeof(copyShadow),
             reinterpret_cast<uint8_t*>(&copyShadow));
-    } else if (reply.authDataBytes.size() == sizeof(copyShadow)) {
-        std::copy(
-            reply.authDataBytes.begin(),
-            reply.authDataBytes.end(),
-            reinterpret_cast<uint8_t*>(&copyShadow));
     } else {
-        if (reply.authSignatureBytes.size() != copyShadow.authSignature00.size() ||
-            reply.signedData.rawBytes.size() != copyShadow.signedData80.size()) {
-            std::free(child.authReplyCopyShadowF4);
-            child.authReplyCopyShadowF4 = nullptr;
-            return;
-        }
-
-        std::copy(
-            reply.authSignatureBytes.begin(),
-            reply.authSignatureBytes.end(),
-            copyShadow.authSignature00.begin());
-        std::copy(
-            reply.signedData.rawBytes.begin(),
-            reply.signedData.rawBytes.end(),
-            copyShadow.signedData80.begin());
+        std::free(child.authReplyCopyShadowF4);
+        child.authReplyCopyShadowF4 = nullptr;
+        return;
     }
 
     AuthBootstrap680BigIntObjects_0x4ba50c* blockB0 = &child.modulusBigIntB0;
@@ -1738,7 +1672,12 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
 
     std::vector<uint8_t> decryptedPrivateExponentBytes;
     const bool decryptedPrivateExponent = mxo::auth::DecryptAuthReplyPrivateExponent(
-        reply,
+        parseObject->encryptedPrivateExponentBytes24 != nullptr
+            ? std::vector<uint8_t>(
+                  parseObject->encryptedPrivateExponentBytes24,
+                  parseObject->encryptedPrivateExponentBytes24 +
+                      parseObject->encryptedPrivateExponentByteLength28)
+            : std::vector<uint8_t>{},
         child.cachedAuthRequestBuildResult_.twofishKeyBytes,
         child.cachedAuthChallengeCiphertextBytesOwned_,
         &decryptedPrivateExponentBytes);
@@ -1754,8 +1693,8 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     spdlog::info(
         "AuthBootstrap680MaterializeReplyCopyShadowScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
         static_cast<unsigned>(sizeof(copyShadow)),
-        static_cast<unsigned>(reply.authDataBytes.size()),
-        static_cast<unsigned>(parseObject ? parseObject->authDataByteLength20 : 0u),
+        static_cast<unsigned>(parseObject->authDataByteLength20),
+        static_cast<unsigned>(parseObject->authDataByteLength20),
         BuildHexPreview(
             copyShadow.authSignature00.data(),
             16u,
@@ -1848,20 +1787,14 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 // anchor: launcher.exe:0x448140
 uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessage) {
-    IncomingAuthPayloadViewScaffold incomingPayload = {};
-    if (!BuildIncomingAuthPayloadViewScaffold(
-            incomingAuthMessage,
-            &incomingPayload)) {
-        stagedIncomingAuthPacketBytesOwned_.clear();
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!ResolveIncomingAuthPayloadView(*incomingAuthMessage, &payloadBytes, &payloadByteCount) ||
+        !payloadBytes || payloadByteCount == 0u) {
         return kAuthBootstrap680InboundUnhandled;
     }
 
-    stagedIncomingAuthPacketBytesOwned_.assign(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadBytes + incomingPayload.payloadByteCount);
-    const std::vector<uint8_t>& stagedBytes = stagedIncomingAuthPacketBytesOwned_;
-
-    const uint8_t rawCode = incomingPayload.rawCode;
+    const uint8_t rawCode = payloadBytes[0];
     switch (rawCode) {
         case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
             // anchor: launcher.exe:0x4484d3 / 0x443910
@@ -1875,7 +1808,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const uint8_t* const replyPayloadBytes =
                 static_cast<const uint8_t*>(incomingReplyPacket.payloadAlias10);
-            if (!replyPayloadBytes || stagedBytes.size() < 14u ||
+            if (!replyPayloadBytes || payloadByteCount < 14u ||
                 replyPayloadBytes[0] != CLTLoginMediator::kAuthRawCodeGetPublicKeyReply) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
                 return kAuthBootstrap680InboundUnhandled;
@@ -1886,13 +1819,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             const uint32_t replyPublicKeyId09 = ReadU32LE(replyPayloadBytes + 0x09u);
             const uint8_t replyKeySize0d = replyPayloadBytes[0x0du];
             const uint8_t replyPublicExponentByte0f =
-                (stagedBytes.size() >= 16u) ? replyPayloadBytes[0x0fu] : 0u;
+                (payloadByteCount >= 16u) ? replyPayloadBytes[0x0fu] : 0u;
             const uint16_t replyModulusLength12 =
-                (stagedBytes.size() >= 20u) ? ReadU16LE(replyPayloadBytes + 0x12u) : 0u;
+                (payloadByteCount >= 20u) ? ReadU16LE(replyPayloadBytes + 0x12u) : 0u;
             uint16_t replySignatureLength = 0u;
             const bool hasEmbeddedPublicKey = AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
                 replyPayloadBytes,
-                stagedBytes.size(),
+                payloadByteCount,
                 nullptr,
                 nullptr,
                 nullptr,
@@ -1900,60 +1833,28 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 nullptr,
                 &replySignatureLength);
 
-            const std::vector<uint8_t> cachedPublicKeyReplyPayloadBytesBeforeUpdate =
-                cachedGetPublicKeyReplyPayloadBytesOwned_;
-            const uint8_t* cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr =
-                cachedPublicKeyReplyPayloadBytesBeforeUpdate.empty()
-                    ? nullptr
-                    : cachedPublicKeyReplyPayloadBytesBeforeUpdate.data();
             inboundAuthStatusEc = replyStatus01;
             if (replyStatus01 != 0u) {
-                cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
                 return kAuthBootstrap680InboundGetPublicKeyReplyError;
             }
 
             authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(replyCurrentTime05));
-            const uint32_t workerResult = HandleGetPublicKeyReply(incomingReplyPacket, stagedBytes.size());
+            const uint32_t workerResult = HandleGetPublicKeyReply(incomingReplyPacket, payloadByteCount);
             if (workerResult != 0u) {
                 inboundAuthStatusEc = workerResult;
-            }
-
-            // anchor: launcher.exe:0x44850a / 0x448548
-            // The original 0x07 path only persists the refreshed cached reply on the success tail.
-            // If the public-key worker fails, control returns 5 immediately instead of keeping a
-            // partially updated reply/cached-key bridge alive for a later raw 0x08 send.
-            const bool cachedReplyHadEmbeddedPublicKey =
-                AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
-                    cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr,
-                    cachedPublicKeyReplyPayloadBytesBeforeUpdate.size(),
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr);
-            const bool reusedCachedEmbeddedPublicKey =
-                !hasEmbeddedPublicKey &&
-                cachedReplyHadEmbeddedPublicKey &&
-                cachedPublicKeyReplyPayloadBytesBeforeUpdate.size() >= 14u &&
-                ReadU32LE(cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr + 0x09u) == replyPublicKeyId09 &&
-                currentPublicKeyId9C == replyPublicKeyId09;
-            if (workerResult == 0u) {
-                cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
-                if (reusedCachedEmbeddedPublicKey) {
-                    cachedGetPublicKeyReplyPayloadBytesOwned_ =
-                        cachedPublicKeyReplyPayloadBytesBeforeUpdate;
-                    AuthBootstrap680_PatchCachedGetPublicKeyReplyHeader(
-                        &cachedGetPublicKeyReplyPayloadBytesOwned_,
-                        replyStatus01,
-                        replyCurrentTime05,
-                        replyPublicKeyId09);
-                }
+            } else {
+                // anchor: launcher.exe:0x448548
+                // The original child falls straight from the successful `0x447f50` worker rebuild
+                // into `0x4474f0`. The replacement keeps this one source-owned payload snapshot
+                // only so `SendAuthRequest()` can recover the same reply-public-key header bytes.
+                cachedGetPublicKeyReplyPayloadBytesOwned_.assign(
+                    payloadBytes,
+                    payloadBytes + payloadByteCount);
             }
 
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={} reusedCachedEmbeddedPublicKey={} workerResult=0x{:08x} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} helper={} module={} childBase={}",
+                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={} workerResult=0x{:08x} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} helper={} module={} childBase={}",
                 static_cast<unsigned>(replyStatus01),
                 static_cast<unsigned>(replyCurrentTime05),
                 static_cast<unsigned>(replyPublicKeyId09),
@@ -1962,7 +1863,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 static_cast<unsigned>(replySignatureLength),
                 static_cast<unsigned>(replyPublicExponentByte0f),
                 hasEmbeddedPublicKey ? 1u : 0u,
-                reusedCachedEmbeddedPublicKey ? 1u : 0u,
                 static_cast<unsigned>(workerResult),
                 fmt::ptr(lazyPubkeyDatValidatorA4),
                 fmt::ptr(raw08PublicKeyWorkerA8),
@@ -1992,14 +1892,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const uint8_t* const challengePayloadBytes =
                 static_cast<const uint8_t*>(incomingChallengePacket.payloadAlias10);
-            if (!challengePayloadBytes || stagedBytes.size() != 17u || challengePayloadBytes[0] != 0x09u) {
+            if (!challengePayloadBytes || payloadByteCount != 17u || challengePayloadBytes[0] != 0x09u) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
                 return kAuthBootstrap680InboundUnhandled;
             }
 
             cachedAuthChallengeCiphertextBytesOwned_.assign(
                 challengePayloadBytes + 1u,
-                challengePayloadBytes + stagedBytes.size());
+                challengePayloadBytes + payloadByteCount);
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
                 cachedAuthChallengeCiphertextBytesOwned_.size());
@@ -2181,27 +2081,25 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         }
 
         case 0x0bu: {
-            mxo::auth::AuthReply reply;
-            if (!mxo::auth::ParseAuthReplyPayload(
-                    stagedBytes.data(),
-                    stagedBytes.size(),
-                    &reply)) {
+            if (payloadByteCount < 11u || payloadBytes[0] != 0x0bu) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
                 return kAuthBootstrap680InboundUnhandled;
             }
 
+            const uint32_t errorReplyStatus01 = ReadU32LE(payloadBytes + 0x01u);
             const bool storedParseObjectF0 =
-                StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
+                StoreAuthBootstrap680AuthReplyParseObjectFromIncomingMessage(
                     *g_CurrentLoginMediator,
                     *this,
                     incomingAuthMessage,
-                    stagedBytes);
+                    payloadBytes,
+                    payloadByteCount);
             const auto* parseObject = authReplyParseObjectF0;
 
             inboundAuthStatusEc =
                 storedParseObjectF0
                     ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x01u)
-                    : (reply.isErrorReply ? reply.errorCode : 0u);
+                    : errorReplyStatus01;
 
             spdlog::debug(
                 "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage stored child+0xf0 parse copy={} status=0x{:08x} authDataLen=0x{:04x} encryptedPrivateExponentLen=0x{:04x} characterCount={} worldCount={} replyString1dLen=0x{:04x}",
@@ -2213,14 +2111,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 static_cast<unsigned>(parseObject ? parseObject->worldTempRecordCount48 : 0u),
                 static_cast<unsigned>(parseObject ? parseObject->replyString1dByteLength58 : 0u));
 
-            if (reply.isErrorReply) {
+            if (inboundAuthStatusEc != 0u) {
                 return kAuthBootstrap680InboundAuthReplyError;
             }
 
             const uint16_t authDataByteLength =
-                parseObject ? parseObject->authDataByteLength20
-                            : static_cast<uint16_t>(reply.authDataBytes.size());
-            if (!reply.valid || !reply.signedData.valid ||
+                parseObject ? parseObject->authDataByteLength20 : 0u;
+            if (!storedParseObjectF0 || parseObject == nullptr ||
                 authDataByteLength != sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) ||
                 replyAuthDataValidatorAC == nullptr) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
@@ -2232,11 +2129,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 std::copy_n(
                     parseObject->authDataBytes1c,
                     sizeof(copyShadowCandidate),
-                    reinterpret_cast<uint8_t*>(&copyShadowCandidate));
-            } else if (reply.authDataBytes.size() == sizeof(copyShadowCandidate)) {
-                std::copy(
-                    reply.authDataBytes.begin(),
-                    reply.authDataBytes.end(),
                     reinterpret_cast<uint8_t*>(&copyShadowCandidate));
             } else {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
@@ -2251,7 +2143,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            AuthBootstrap680MaterializeReplyCopyShadowScaffold(*this, *g_CurrentLoginMediator, reply);
+            AuthBootstrap680MaterializeReplyCopyShadowScaffold(*this, *g_CurrentLoginMediator);
             return kAuthBootstrap680InboundAuthReplySuccess;
         }
 

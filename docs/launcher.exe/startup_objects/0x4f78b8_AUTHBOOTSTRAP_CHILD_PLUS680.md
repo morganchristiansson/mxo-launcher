@@ -149,6 +149,9 @@ Tightened `0x448140` follow-on control-flow consequence:
 - after a raw `0x07` success, `0x448140` returns `4` immediately when `reply.status > 0`
 - it returns `5` immediately when `0x447f50` reports a worker/setup failure
 - only the success tail falls through to a raw `0x08` send attempt
+- replacement consequence for the source-owned cached reply bridge: persist the raw `0x07` payload
+  only on that success tail, because the original does **not** keep an error/partial-worker reply
+  alive before returning `4` or `5`
 - that success tail returns `1` after issuing the send attempt; it does **not** branch on the
   `0x4474f0` send result before handing control back to the outer state machine
 
@@ -218,6 +221,9 @@ Current best combined read:
 
 Current best read:
 - `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
+- on the raw `0x0b` path it first adopts the parse-object status dword at header offset `+0x01`
+  into child `+0xec`; non-zero status returns `3` directly instead of keying that branch off a
+  replacement-side packet-length heuristic
 - on the raw `0x0b` success path it validates an auth-data field length of `0x136`
 - validation runs through child `+0xac` and the time-delta/cached state behind child `+0x80`
 - then it heap-copies that `0x136` auth-data field into child `+0xf4`
