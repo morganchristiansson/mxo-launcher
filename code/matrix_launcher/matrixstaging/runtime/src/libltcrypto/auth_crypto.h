@@ -392,19 +392,17 @@ bool ParseAuthChallengePayload(
     AuthChallenge* outChallenge);
 
 // Raw 0x0a / AS_AuthChallengeResponse build anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`
+// - concrete owner-side inline continuation lives in:
+//   - launcher.exe:0x44831c..0x448467 inside
+//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
 // - later challenge/material continuation anchor:
 //   - launcher.exe:0x429b0
-// - exact original raw 0x0a builder/send VA: [not yet isolated]
-bool BuildAuthChallengeResponsePacket(
-    const std::vector<uint8_t>& encryptedChallengeBytes,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    const std::string& password,
-    const std::string& soePassword,
-    const AuthChallengeResponseLayout& layout,
-    FrameMode frameMode,
-    AuthChallengeResponseBuildResult* outResult);
+//
+// Important fidelity note:
+// - the current static-RE does NOT justify a standalone public launcher-style helper boundary for
+//   raw 0x0a packet building
+// - keep the orchestration/material assembly in the anchored owner path unless a real shared
+//   original function boundary is recovered later
 
 // Raw 0x0b / AS_AuthReply parse anchors:
 // - source file anchor:

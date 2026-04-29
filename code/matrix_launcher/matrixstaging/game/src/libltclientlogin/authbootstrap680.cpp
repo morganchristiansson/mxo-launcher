@@ -1886,15 +1886,100 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
                 mxo::auth::AuthChallengeResponseLayout layout;
                 mxo::auth::AuthChallengeResponseBuildResult buildResult;
-                if (!mxo::auth::BuildAuthChallengeResponsePacket(
+                buildResult.encryptedChallengeBytes = challenge.encryptedChallengeBytes;
+
+                // anchor: launcher.exe:0x44831c..0x448467
+                // This raw 0x0a path is inline in the child-side inbound handler, not a separate
+                // standalone launcher.exe helper. Keep the crypto/material assembly here so future
+                // fidelity passes can compare directly against the packet-object staging below.
+                if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
                         challenge.encryptedChallengeBytes,
                         child.cachedAuthRequestBuildResult_.twofishKeyBytes,
-                        password,
-                        soePassword,
-                        layout,
-                        mxo::auth::kFrameModeAuto,
-                        &buildResult)) {
-                    spdlog::error("launcher-owned auth failed to build AS_AuthChallengeResponse");
+                        false,
+                        &buildResult.decryptedChallengeBytes)) {
+                    spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+                if (!mxo::auth::internal::Md5DigestBytes(
+                        buildResult.decryptedChallengeBytes,
+                        &buildResult.processedChallengeMd5Bytes)) {
+                    spdlog::error("launcher-owned auth failed to hash AS_AuthChallenge plaintext");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                std::vector<uint8_t> passwordBytes(password, password + std::strlen(password));
+                if (layout.includePasswordNullTerminator) {
+                    passwordBytes.push_back(0u);
+                }
+                std::vector<uint8_t> soePasswordBytes(
+                    soePassword,
+                    soePassword + std::strlen(soePassword));
+                if (layout.includeSoePasswordNullTerminator) {
+                    soePasswordBytes.push_back(0u);
+                }
+                if (passwordBytes.size() > 0xffffu || soePasswordBytes.size() > 0xffffu) {
+                    spdlog::error("launcher-owned auth rejected oversized raw0x0a password field");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                buildResult.passwordLengthField = static_cast<uint16_t>(passwordBytes.size());
+                buildResult.soePasswordLengthField = static_cast<uint16_t>(soePasswordBytes.size());
+                const uint16_t unknown2 = layout.usePasswordLengthForUnknown2
+                    ? buildResult.passwordLengthField
+                    : layout.unknown2;
+                const uint16_t unknown3 = layout.useSoePasswordLengthForUnknown3
+                    ? buildResult.soePasswordLengthField
+                    : layout.unknown3;
+
+                const size_t plaintextSizeWithoutPadding =
+                    1u +
+                    buildResult.processedChallengeMd5Bytes.size() +
+                    2u + 2u + 2u +
+                    2u + passwordBytes.size() +
+                    2u + soePasswordBytes.size() +
+                    2u;
+                buildResult.paddingLengthField =
+                    static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
+
+                buildResult.plaintextBytes.clear();
+                buildResult.plaintextBytes.reserve(
+                    plaintextSizeWithoutPadding + buildResult.paddingLengthField);
+                buildResult.plaintextBytes.push_back(layout.plaintextLeadingByte);
+                buildResult.plaintextBytes.insert(
+                    buildResult.plaintextBytes.end(),
+                    buildResult.processedChallengeMd5Bytes.begin(),
+                    buildResult.processedChallengeMd5Bytes.end());
+                mxo::auth::internal::AppendU16LE(&buildResult.plaintextBytes, layout.unknown1);
+                mxo::auth::internal::AppendU16LE(&buildResult.plaintextBytes, unknown2);
+                mxo::auth::internal::AppendU16LE(&buildResult.plaintextBytes, unknown3);
+                mxo::auth::internal::AppendU16LE(
+                    &buildResult.plaintextBytes,
+                    buildResult.passwordLengthField);
+                buildResult.plaintextBytes.insert(
+                    buildResult.plaintextBytes.end(),
+                    passwordBytes.begin(),
+                    passwordBytes.end());
+                mxo::auth::internal::AppendU16LE(
+                    &buildResult.plaintextBytes,
+                    buildResult.soePasswordLengthField);
+                buildResult.plaintextBytes.insert(
+                    buildResult.plaintextBytes.end(),
+                    soePasswordBytes.begin(),
+                    soePasswordBytes.end());
+                mxo::auth::internal::AppendU16LE(
+                    &buildResult.plaintextBytes,
+                    buildResult.paddingLengthField);
+                buildResult.plaintextBytes.insert(
+                    buildResult.plaintextBytes.end(),
+                    buildResult.paddingLengthField,
+                    layout.paddingByte);
+
+                if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
+                        buildResult.plaintextBytes,
+                        child.cachedAuthRequestBuildResult_.twofishKeyBytes,
+                        true,
+                        &buildResult.ciphertextBytes)) {
+                    spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
 

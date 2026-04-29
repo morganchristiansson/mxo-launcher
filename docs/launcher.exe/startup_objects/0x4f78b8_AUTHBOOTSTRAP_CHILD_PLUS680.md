@@ -198,6 +198,9 @@ Current best combined read:
   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
 - the narrowed raw-`0x0a` builder/send at `0x44831c..0x448467` is inline inside that child helper,
   not a separate launcher mediator method
+- current source now mirrors that by keeping the raw-`0x0a` crypto/material assembly in
+  `AuthBootstrap680Child_0x441290::HandleInboundAuthMessage` instead of routing through a
+  source-only standalone `BuildAuthChallengeResponsePacket` boundary
 - the inline `0x4483ce` padding write uses the direct expression `0x20 - (len & 0x0f)` before
   forwarding that value into the packet builder's padding setter; current source should preserve
   that exact arithmetic instead of normalizing the aligned case back to zero
