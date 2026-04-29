@@ -491,51 +491,6 @@ static void ResetAuthBootstrap680ReplyParseObject(
     child.authReplyParsePacketBodyBytesOwned_.clear();
 }
 
-static void TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-    std::vector<uint8_t>& packetBodyBytes,
-    size_t replyHeaderOffset,
-    bool zeroTerminateLastByte,
-    const uint8_t** outFieldBytes,
-    uint16_t* outFieldLength) {
-    if (outFieldBytes) {
-        *outFieldBytes = nullptr;
-    }
-    if (outFieldLength) {
-        *outFieldLength = 0u;
-    }
-    if (packetBodyBytes.empty() || replyHeaderOffset + 2u > packetBodyBytes.size()) {
-        return;
-    }
-
-    const uint16_t fieldOffset = ReadU16LE(packetBodyBytes.data() + replyHeaderOffset);
-    if (fieldOffset == 0u) {
-        return;
-    }
-
-    const size_t lengthOffset = static_cast<size_t>(fieldOffset);
-    if (lengthOffset + 2u > packetBodyBytes.size()) {
-        return;
-    }
-
-    const uint16_t fieldLength = ReadU16LE(packetBodyBytes.data() + lengthOffset);
-    const size_t fieldDataOffset = lengthOffset + 2u;
-    const size_t fieldDataEnd = fieldDataOffset + static_cast<size_t>(fieldLength);
-    if (fieldDataEnd > packetBodyBytes.size()) {
-        return;
-    }
-
-    if (zeroTerminateLastByte && fieldLength != 0u) {
-        packetBodyBytes[fieldDataEnd - 1u] = 0u;
-    }
-
-    if (outFieldBytes) {
-        *outFieldBytes = packetBodyBytes.data() + fieldDataOffset;
-    }
-    if (outFieldLength) {
-        *outFieldLength = fieldLength;
-    }
-}
-
 // anchor: launcher.exe:0x4436b0 = Packet_AsGetPublicKeyRequest_0x4b6c74::FUN_004436b0
 // Ghidra may show a bogus free-function/int-parameter signature here, but assembly proves this is
 // an ECX-receiver helper over the larger `0x4b6c74` auth-reply parse shell. Keep the source split
@@ -1452,7 +1407,7 @@ AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {
  string1C = {};
 
  // Erase owned state from global map
- 
+
 }
 
 // anchor: launcher.exe:0x444900
@@ -1622,7 +1577,7 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
     (void)mediator;
-    
+
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
     ResetAuthBootstrap680ReplyMaterialization(child);
 
@@ -1799,7 +1754,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     auto* const module = owner08;
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
     auto& child = *this;
-    
+
 
     IncomingAuthPayloadViewScaffold incomingPayload = {};
     if (!BuildIncomingAuthPayloadViewScaffold(
@@ -1841,20 +1796,26 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 child.inboundAuthStatusEc = workerResult;
             }
 
-            mxo::auth::GetPublicKeyReply effectiveReplyForSend = reply;
+            // anchor: launcher.exe:0x44850a / 0x448548
+            // The original 0x07 path only persists the refreshed cached reply on the success tail.
+            // If the public-key worker fails, control returns 5 immediately instead of keeping a
+            // partially updated reply/cached-key bridge alive for a later raw 0x08 send.
             const bool reusedCachedEmbeddedPublicKey =
                 !reply.hasEmbeddedPublicKey &&
                 cachedPublicKeyReplyBeforeUpdate.valid &&
                 cachedPublicKeyReplyBeforeUpdate.hasEmbeddedPublicKey &&
                 cachedPublicKeyReplyBeforeUpdate.publicKeyId == reply.publicKeyId &&
                 currentPublicKeyId9C == reply.publicKeyId;
-            if (reusedCachedEmbeddedPublicKey) {
-                effectiveReplyForSend = cachedPublicKeyReplyBeforeUpdate;
-                effectiveReplyForSend.status = reply.status;
-                effectiveReplyForSend.currentTime = reply.currentTime;
-                effectiveReplyForSend.publicKeyId = reply.publicKeyId;
+            if (workerResult == 0u) {
+                mxo::auth::GetPublicKeyReply effectiveReplyForSend = reply;
+                if (reusedCachedEmbeddedPublicKey) {
+                    effectiveReplyForSend = cachedPublicKeyReplyBeforeUpdate;
+                    effectiveReplyForSend.status = reply.status;
+                    effectiveReplyForSend.currentTime = reply.currentTime;
+                    effectiveReplyForSend.publicKeyId = reply.publicKeyId;
+                }
+                child.cachedGetPublicKeyReply_ = effectiveReplyForSend;
             }
-            child.cachedGetPublicKeyReply_ = effectiveReplyForSend;
 
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={} reusedCachedEmbeddedPublicKey={} workerResult=0x{:08x} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} helper={} module={} childBase={}",
@@ -1879,9 +1840,11 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundGetPublicKeyWorkerError;
             }
 
-            return SendAuthRequest() != 0u
-                ? kAuthBootstrap680InboundHandledContinueWaiting
-                : kAuthBootstrap680InboundGetPublicKeyWorkerError;
+            // anchor: launcher.exe:0x448548
+            // The recovered launcher tail ignores the raw 0x08 send result here: it issues the
+            // send attempt and still returns 1 so the outer auth state machine keeps waiting.
+            SendAuthRequest();
+            return kAuthBootstrap680InboundHandledContinueWaiting;
         }
 
         case 0x09u: {
@@ -1950,10 +1913,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextPacket.ReserveFieldLength(0x20u);
 
                 const size_t plaintextLen = buildResult.plaintextBytes.size();
-                uint16_t paddingBytes = static_cast<uint16_t>(0x20u - (plaintextLen & 0x0fu));
-                if (paddingBytes == 0x20u) {
-                    paddingBytes = 0u;
-                }
+                // anchor: launcher.exe:0x4483ce
+                // The launcher computes `0x20 - (len & 0x0f)` directly and forwards that raw
+                // value to `Packet_AsAuthChallengeResponse_0x4b6cf4::SetPadding`, even when the
+                // low nibble is already zero.
+                const uint16_t paddingBytes =
+                    static_cast<uint16_t>(0x20u - (plaintextLen & 0x0fu));
                 plaintextPacket.SetPadding(paddingBytes);
 
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
@@ -2158,7 +2123,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
 uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
     auto& child = *this;
-    
+
     const mxo::auth::GetPublicKeyReply& reply = child.cachedGetPublicKeyReply_;
     if (!reply.valid || !reply.hasEmbeddedPublicKey) {
         spdlog::warn(
@@ -2351,7 +2316,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
 uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     const mxo::auth::GetPublicKeyReply& reply) {
     auto& child = *this;
-    
+
 
     ResetAuthBootstrap680ReplyPublicKeyWorkers(child);
     currentPublicKeyId9C = reply.publicKeyId;

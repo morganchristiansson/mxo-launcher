@@ -145,6 +145,13 @@ Current best read:
   - rebuilds child `+0xac`
 - and finally `0x447f50` sets byte `+0xa0 = 1`
 
+Tightened `0x448140` follow-on control-flow consequence:
+- after a raw `0x07` success, `0x448140` returns `4` immediately when `reply.status > 0`
+- it returns `5` immediately when `0x447f50` reports a worker/setup failure
+- only the success tail falls through to a raw `0x08` send attempt
+- that success tail returns `1` after issuing the send attempt; it does **not** branch on the
+  `0x4474f0` send result before handing control back to the outer state machine
+
 That is the key current reason the later `0x448050` branch chooses raw `0x08` instead of raw
 `0x06`.
 
@@ -191,6 +198,9 @@ Current best combined read:
   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
 - the narrowed raw-`0x0a` builder/send at `0x44831c..0x448467` is inline inside that child helper,
   not a separate launcher mediator method
+- the inline `0x4483ce` padding write uses the direct expression `0x20 - (len & 0x0f)` before
+  forwarding that value into the packet builder's padding setter; current source should preserve
+  that exact arithmetic instead of normalizing the aligned case back to zero
 - but the `0x4429b0 / 0x441470` path is now tightened further as a **neighboring margin-connection
   object** path:
   - `0x4429b0 = CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse` is reached from
