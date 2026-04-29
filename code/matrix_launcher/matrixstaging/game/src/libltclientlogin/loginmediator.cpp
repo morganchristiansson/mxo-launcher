@@ -57,7 +57,7 @@ namespace {
 char g_CLTLoginMediatorCharacterPersistenceDataEmptySection11Buffer[8] = {'\0'};
 }
 
-int StringTriple_0x403f90::CompareNoCase(const char* other) const {
+int BasicString_0x403f90::CompareNoCase(const char* other) const {
 #if defined(_WIN32)
     return _stricmp(begin ? begin : "", other ? other : "");
 #else
@@ -164,8 +164,8 @@ static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
 // anchor: launcher.exe:0x41dba0 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0 ctor
 CLTLoginMediator::CLTLoginMediatorSelectionRouteState::CLTLoginMediatorSelectionRouteState() {
     slotRecordCount00_ = 0;
-    for (size_t i = 0; i < routeHostStringTriples194_.size(); ++i) {
-        routeHostStringTriples194_[i].Clear();
+    for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
+        routeHostStrings194_[i].Clear();
     }
     for (size_t i = 0; i < slotRecordTable04_.size(); ++i) {
         slotRecordTable04_[i] = {};
@@ -181,7 +181,7 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::ResetSelectionRouteS
     for (size_t i = 0; i < activeCount; ++i) {
         slotRecordTable04_[i] = {};
         slotRecordValid04_[i] = false;
-        routeHostStringTriples194_[i].Clear();
+        routeHostStrings194_[i].Clear();
     }
     slotRecordCount00_ = 0;
     currentSlotOrSelectionIndex644_ = 0xffu;
@@ -190,8 +190,8 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::ResetSelectionRouteS
 // anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
 void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRouteState() {
     ResetSelectionRouteState();
-    for (size_t i = 0; i < routeHostStringTriples194_.size(); ++i) {
-        routeHostStringTriples194_[i].ReleaseStorage();
+    for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
+        routeHostStrings194_[i].ReleaseStorage();
         slotRecordTable04_[i] = {};
         slotRecordValid04_[i] = false;
     }
@@ -1360,14 +1360,14 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
     for (size_t i = slotIndex; i + 1u < static_cast<size_t>(selectionRouteState684_.slotRecordCount00_); ++i) {
         selectionRouteState684_.slotRecordTable04_[i] = selectionRouteState684_.slotRecordTable04_[i + 1u];
         selectionRouteState684_.slotRecordValid04_[i] = selectionRouteState684_.slotRecordValid04_[i + 1u];
-        selectionRouteState684_.routeHostStringTriples194_[i] =
-            selectionRouteState684_.routeHostStringTriples194_[i + 1u];
+        selectionRouteState684_.routeHostStrings194_[i] =
+            selectionRouteState684_.routeHostStrings194_[i + 1u];
     }
 
     const size_t tailIndex = static_cast<size_t>(selectionRouteState684_.slotRecordCount00_);
     selectionRouteState684_.slotRecordTable04_[tailIndex] = {};
     selectionRouteState684_.slotRecordValid04_[tailIndex] = false;
-    selectionRouteState684_.routeHostStringTriples194_[tailIndex].Clear();
+    selectionRouteState684_.routeHostStrings194_[tailIndex].Clear();
 
     PersistCharactersIniFromRecoveredAuthStateScaffold();
 
@@ -2233,7 +2233,7 @@ void CLTLoginMediator::FreeLateEntryList1470StorageScaffold() {
     lateEntryList1470_.capacity = nullptr;
 }
 
-// anchor: launcher.exe:0x407dd0 = StringTriple_AssignFromRange
+// anchor: launcher.exe:0x407dd0 = recovered basic-string assign-from-range helper
 // Narrow source-owned bridge over the original per-entry assignment helper.
 static bool LateEntryList1470AssignFromRangeScaffold(
     LateEntryList1470EntrySketch* destination,
@@ -2448,11 +2448,11 @@ void CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     }
 
     // Original reads string directly from +0x18 - in original this is the owner session token string
-    // that gets cleared after copy. In our layout, there's a StringTriple at +0x18.
+    // that gets cleared after copy. In our layout, there's a basic-string helper at +0x18.
     // For fidelity, we read from the original location and copy to gameSessionId664_ (+0x664).
-    // Note: The original launcher uses StringTriple_AssignFromRange for the copy.
+    // Note: The original launcher uses the `0x407dd0` assign-from-range helper for the copy.
 
-    // Access +0x18 string: in original this is a StringTriple (session token from auth)
+    // Access +0x18 string: in original this is a recovered basic-string helper (session token from auth)
     // We'll read what's at +0x18 and treat it as a string.
     // Current best mirror: the owner session token from auth bootstrap at owner+0x94+0x60
     // But for exact static-RE fidelity, read directly from +0x18 as the original does.
@@ -2666,7 +2666,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         }
 
         const Packet_AsAuthReply_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
-        const StringTriple_0x403f90& route = selectionRouteState684_.routeHostStringTriples194_[i];
+        const BasicString_0x403f90& route = selectionRouteState684_.routeHostStrings194_[i];
         const char* characterName = slotRecord.debugString14 ? slotRecord.debugString14 : "";
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";
         std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);

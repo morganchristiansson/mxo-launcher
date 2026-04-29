@@ -152,20 +152,25 @@ struct RouteDescriptor30SmallStringLikeSketch {
     const char* capacity = nullptr;
 };
 
-class StringTriple_0x403f90 : public RouteDescriptor30SmallStringLikeSketch {
+// Source-owned mirror of the recovered launcher string helper family.
+//
+// Ghidra evidence currently points at a `std::basic_string<char>`-like helper with the concrete
+// recovered 12-byte `begin/current/capacity` view rooted at `0x403f90`. Keep this wrapper distinct
+// from raw `std::string` so anchored helper boundaries still map cleanly back to launcher.exe.
+class BasicString_0x403f90 : public RouteDescriptor30SmallStringLikeSketch {
 public:
     // anchor: launcher.exe:0x403f20
-    StringTriple_0x403f90() { SyncFromOwned(); }
+    BasicString_0x403f90() { SyncFromOwned(); }
 
-    // anchor: launcher.exe:0x403f20 = cls_0x403f90::ResetAndAssignCString
+    // anchor: launcher.exe:0x403f20 = recovered basic_string reset/assign helper
     void* ResetAndAssignCString(const char* text) {
         owned_ = text ? text : "";
         SyncFromOwned();
         return this;
     }
 
-    // anchor: launcher.exe:0x403dc0 = StringTriple_0x403f90::meth_0x403dc0
-    StringTriple_0x403f90* meth_0x403dc0(const char* sourceBegin, const char* sourceEnd) {
+    // anchor: launcher.exe:0x403dc0 = recovered append-range helper (Ghidra old name: meth_0x403dc0)
+    BasicString_0x403f90* AppendRange(const char* sourceBegin, const char* sourceEnd) {
         if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
             return this;
         }
@@ -174,8 +179,8 @@ public:
         return this;
     }
 
-    // anchor: launcher.exe:0x407dd0 = cls_0x403f90::StringTriple_AssignFromRange
-    StringTriple_0x403f90* AssignFromRange(const char* sourceBegin, const char* sourceEnd) {
+    // anchor: launcher.exe:0x407dd0 = recovered basic_string assign-from-range helper
+    BasicString_0x403f90* AssignFromRange(const char* sourceBegin, const char* sourceEnd) {
         if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
             Clear();
             return this;
@@ -218,6 +223,7 @@ private:
         capacity = current;
     }
 
+    // Source-owned backing store; the exposed pointer triple above mirrors the launcher helper view.
     std::string owned_;
 };
 

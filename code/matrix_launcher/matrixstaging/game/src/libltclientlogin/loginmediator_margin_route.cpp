@@ -6,18 +6,18 @@
 namespace mxo::ltlogin {
 namespace {
 
-// anchor: launcher.exe:0x4043b0 = StringTriple_0x403f90_ConcatInto
+// anchor: launcher.exe:0x4043b0 = recovered basic_string concat helper
 // Conservative recovered helper shape shared across multiple callsites:
 // - append the full range of lhs then rhs into a temporary string-family object
-// - materialize the output as a fresh `StringTriple_0x403f90`
-static StringTriple_0x403f90* StringTriple_0x403f90_ConcatInto(
-    StringTriple_0x403f90& out,
-    const StringTriple_0x403f90& lhs,
-    const StringTriple_0x403f90& rhs) {
-    StringTriple_0x403f90 local_20;
+// - materialize the output as a fresh `BasicString_0x403f90`
+static BasicString_0x403f90* BasicString_0x403f90_ConcatInto(
+    BasicString_0x403f90& out,
+    const BasicString_0x403f90& lhs,
+    const BasicString_0x403f90& rhs) {
+    BasicString_0x403f90 local_20;
     local_20.Clear();
-    local_20.meth_0x403dc0(lhs.begin, lhs.current);
-    local_20.meth_0x403dc0(rhs.begin, rhs.current);
+    local_20.AppendRange(lhs.begin, lhs.current);
+    local_20.AppendRange(rhs.begin, rhs.current);
     out.ResetAndAssignCString(local_20.begin);
     return &out;
 }
@@ -125,14 +125,14 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         }
 
         // Original reads global pointer slot `DAT_004d6814` and passes it as arg2 to
-        // `0x403f20 = StringTriple_0x403f90::ResetAndAssignCString`. Current static evidence only
+        // `0x403f20 = recovered basic_string reset/assign helper`. Current static evidence only
         // shows a read and the pointed-at bytes are zero, so model the second concatenation input
         // as empty until a real initializer/write is recovered.
-        StringTriple_0x403f90 rebuiltAddressListInput;
-        (void)StringTriple_0x403f90_ConcatInto(
+        BasicString_0x403f90 rebuiltAddressListInput;
+        (void)BasicString_0x403f90_ConcatInto(
             rebuiltAddressListInput,
             routeDescriptor30_,
-            StringTriple_0x403f90{});
+            BasicString_0x403f90{});
 
         if (const char* const rebuiltBegin = rebuiltAddressListInput.BeginOrNull();
             rebuiltBegin != nullptr) {
@@ -236,7 +236,7 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
     if (slotIndex >= 100u) {
         return nullptr;
     }
-    const StringTriple_0x403f90& slot = selectionRouteState684_.routeHostStringTriples194_[slotIndex];
+    const BasicString_0x403f90& slot = selectionRouteState684_.routeHostStrings194_[slotIndex];
     return slot.BeginOrNull();
 }
 

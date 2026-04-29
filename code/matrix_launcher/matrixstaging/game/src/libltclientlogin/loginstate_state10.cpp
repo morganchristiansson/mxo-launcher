@@ -264,7 +264,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     const uint32_t selectedWorldDescriptorIndex =
         g_CurrentLoginMediator->createCharacterData108.selectedWorldField24;
     if (appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size() ||
-        appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
+        appendedSlotIndex >= g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_.size() ||
         selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldListPacketCountD80_ ||
         selectedWorldDescriptorIndex >= g_CurrentLoginMediator->worldListPacketsD84_.size() ||
         g_CurrentLoginMediator->worldListPacketsD84_[selectedWorldDescriptorIndex] == nullptr) {
@@ -283,7 +283,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Exact success-side write order recovered from listing:
     // 1. store initialized slot record at +0x688[currentCount]  (0x440228)
     // 2. copy selected descriptor inline name into +0x818[currentCount]  (0x44022c-0x44024d)
-    //    via CopyInlineNameToString(0x43d430) + StringTriple_AssignFromRange(0x407dd0)
+    //    via CopyInlineNameToString(0x43d430) + the `0x407dd0` basic-string assign-from-range helper
     // 3. free temp inline-name copy string  (0x440252-0x440265)
     // 4. set +0x644 = currentCount  (0x440268-0x44026a)
     // 5. increment +0x00 (count)  (0x440270-0x440272)
@@ -294,7 +294,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     //
     // Note: original has no slotRecordValid04_ write — just the pointer store at 0x440228.
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
-    g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].Assign(
+    g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[appendedSlotIndex].Assign(
         selectedWorldDescriptor.inlineNamePlus03);
     g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
