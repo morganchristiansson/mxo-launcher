@@ -1316,15 +1316,99 @@ std::string AuthBootstrap680Child_0x441290::CopyReplyString54_SOURCEOWNED() cons
     return std::string(replyStringBegin, replyStringLength);
 }
 
+static bool AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+    const uint8_t* payloadBytes,
+    size_t payloadByteCount,
+    const uint8_t** outModulusBytes,
+    size_t* outModulusByteCount,
+    uint8_t* outPublicExponentByte,
+    const uint8_t** outSignatureBytes,
+    size_t* outSignatureByteCount,
+    uint16_t* outSignatureLength) {
+    if (outModulusBytes) {
+        *outModulusBytes = nullptr;
+    }
+    if (outModulusByteCount) {
+        *outModulusByteCount = 0u;
+    }
+    if (outPublicExponentByte) {
+        *outPublicExponentByte = 0u;
+    }
+    if (outSignatureBytes) {
+        *outSignatureBytes = nullptr;
+    }
+    if (outSignatureByteCount) {
+        *outSignatureByteCount = 0u;
+    }
+    if (outSignatureLength) {
+        *outSignatureLength = 0u;
+    }
+
+    if (!payloadBytes || payloadByteCount < 20u) {
+        return false;
+    }
+
+    const uint8_t publicExponentByte = payloadBytes[0x0fu];
+    const uint16_t modulusLength = ReadU16LE(payloadBytes + 0x12u);
+    const size_t modulusStart = 20u;
+    const size_t modulusEnd = modulusStart + static_cast<size_t>(modulusLength);
+    if (publicExponentByte == 0u || modulusLength == 0u || modulusEnd + 2u > payloadByteCount) {
+        return false;
+    }
+
+    const uint16_t signatureLength = ReadU16LE(payloadBytes + modulusEnd);
+    const size_t signatureStart = modulusEnd + 2u;
+    const size_t signatureEnd = signatureStart + static_cast<size_t>(signatureLength);
+    if (signatureEnd > payloadByteCount) {
+        return false;
+    }
+
+    if (outModulusBytes) {
+        *outModulusBytes = payloadBytes + modulusStart;
+    }
+    if (outModulusByteCount) {
+        *outModulusByteCount = modulusLength;
+    }
+    if (outPublicExponentByte) {
+        *outPublicExponentByte = publicExponentByte;
+    }
+    if (outSignatureBytes) {
+        *outSignatureBytes = payloadBytes + signatureStart;
+    }
+    if (outSignatureByteCount) {
+        *outSignatureByteCount = signatureLength;
+    }
+    if (outSignatureLength) {
+        *outSignatureLength = signatureLength;
+    }
+    return true;
+}
+
+static void AuthBootstrap680_PatchCachedGetPublicKeyReplyHeader(
+    std::vector<uint8_t>* cachedPayloadBytes,
+    uint32_t status01,
+    uint32_t currentTime05,
+    uint32_t publicKeyId09) {
+    if (!cachedPayloadBytes || cachedPayloadBytes->size() < 14u) {
+        return;
+    }
+
+    uint8_t* payloadBytes = cachedPayloadBytes->data();
+    std::memcpy(payloadBytes + 0x01u, &status01, sizeof(status01));
+    std::memcpy(payloadBytes + 0x05u, &currentTime05, sizeof(currentTime05));
+    std::memcpy(payloadBytes + 0x09u, &publicKeyId09, sizeof(publicKeyId09));
+}
+
 // anchor: launcher.exe:0x468f80
 static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
     AuthBootstrap680ChildBase_0x4b7134& child,
-    const mxo::auth::GetPublicKeyReply& reply) {
+    const uint8_t* replyPayloadBytes,
+    size_t replyPayloadByteCount) {
     if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation != 0u) {
         return true;
     }
 
-        if (child.lazyPubkeyDatValidatorA4 == nullptr || !child.lazyPubkeyDatValidatorA4OwnedState_.object) {
+    if (child.lazyPubkeyDatValidatorA4 == nullptr || !child.lazyPubkeyDatValidatorA4OwnedState_.object) {
         child.lazyPubkeyDatValidatorA4OwnedState_.object =
             std::make_unique<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch>();
         if (!child.lazyPubkeyDatValidatorA4OwnedState_.object->ConstructFromReplyPublicKey(
@@ -1341,20 +1425,34 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_S
     if (child.lazyPubkeyDatValidatorA4 == nullptr) {
         return false;
     }
-    if (reply.modulusBytes.size() != 0x80u || reply.signatureBytes.empty() ||
-        reply.publicExponentByte == 0u) {
+
+    const uint8_t* modulusBytes = nullptr;
+    size_t modulusByteCount = 0u;
+    uint8_t publicExponentByte = 0u;
+    const uint8_t* signatureBytes = nullptr;
+    size_t signatureByteCount = 0u;
+    if (!AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+            replyPayloadBytes,
+            replyPayloadByteCount,
+            &modulusBytes,
+            &modulusByteCount,
+            &publicExponentByte,
+            &signatureBytes,
+            &signatureByteCount,
+            nullptr) ||
+        modulusByteCount != 0x80u || signatureByteCount == 0u) {
         return false;
     }
 
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
-    std::copy(reply.modulusBytes.begin(), reply.modulusBytes.end(), signedReplyPublicKeyBytes.begin());
-    signedReplyPublicKeyBytes.back() = reply.publicExponentByte;
+    std::copy_n(modulusBytes, modulusByteCount, signedReplyPublicKeyBytes.begin());
+    signedReplyPublicKeyBytes.back() = publicExponentByte;
     return child.lazyPubkeyDatValidatorA4->VerifySignatureRecoveredFinalizeScaffold(
         child.lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
-        reply.signatureBytes.data(),
-        reply.signatureBytes.size());
+        signatureBytes,
+        signatureByteCount);
 }
 
 // anchor: launcher.exe:0x445610
@@ -1790,52 +1888,40 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundUnhandled;
             }
 
-            mxo::auth::GetPublicKeyReply reply;
-            reply.valid = true;
-            reply.payloadLength = static_cast<uint32_t>(stagedBytes.size());
-            reply.payloadBytes = stagedBytes;
-            reply.status = ReadU32LE(replyPayloadBytes + 0x01u);
-            reply.currentTime = ReadU32LE(replyPayloadBytes + 0x05u);
-            reply.publicKeyId = ReadU32LE(replyPayloadBytes + 0x09u);
-            reply.keySize = replyPayloadBytes[0x0du];
-            reply.tailBytes.assign(stagedBytes.begin() + 14, stagedBytes.end());
+            const uint32_t replyStatus01 = ReadU32LE(replyPayloadBytes + 0x01u);
+            const uint32_t replyCurrentTime05 = ReadU32LE(replyPayloadBytes + 0x05u);
+            const uint32_t replyPublicKeyId09 = ReadU32LE(replyPayloadBytes + 0x09u);
+            const uint8_t replyKeySize0d = replyPayloadBytes[0x0du];
+            const uint8_t replyPublicExponentByte0f =
+                (stagedBytes.size() >= 16u) ? replyPayloadBytes[0x0fu] : 0u;
+            const uint16_t replyModulusLength12 =
+                (stagedBytes.size() >= 20u) ? ReadU16LE(replyPayloadBytes + 0x12u) : 0u;
+            uint16_t replySignatureLength = 0u;
+            const bool hasEmbeddedPublicKey = AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+                replyPayloadBytes,
+                stagedBytes.size(),
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                &replySignatureLength);
 
-            if (stagedBytes.size() >= 20u) {
-                reply.reservedByte = replyPayloadBytes[0x0eu];
-                reply.publicExponentByte = replyPayloadBytes[0x0fu];
-                reply.unknownWord = ReadU16LE(replyPayloadBytes + 0x10u);
-                reply.modulusLength = ReadU16LE(replyPayloadBytes + 0x12u);
-
-                const size_t modulusStart = 20u;
-                const size_t modulusEnd = modulusStart + reply.modulusLength;
-                if (reply.modulusLength != 0u && modulusEnd + 2u <= stagedBytes.size()) {
-                    reply.modulusBytes.assign(
-                        stagedBytes.begin() + static_cast<std::ptrdiff_t>(modulusStart),
-                        stagedBytes.begin() + static_cast<std::ptrdiff_t>(modulusEnd));
-                    reply.signatureLength = ReadU16LE(replyPayloadBytes + modulusEnd);
-                    const size_t signatureStart = modulusEnd + 2u;
-                    const size_t signatureEnd = signatureStart + reply.signatureLength;
-                    if (signatureEnd <= stagedBytes.size()) {
-                        reply.signatureBytes.assign(
-                            stagedBytes.begin() + static_cast<std::ptrdiff_t>(signatureStart),
-                            stagedBytes.begin() + static_cast<std::ptrdiff_t>(signatureEnd));
-                        reply.hasEmbeddedPublicKey =
-                            !reply.modulusBytes.empty() && reply.publicExponentByte != 0u;
-                    }
-                }
-            }
-
-            const mxo::auth::GetPublicKeyReply cachedPublicKeyReplyBeforeUpdate =
-                child.cachedGetPublicKeyReply_;
-            child.inboundAuthStatusEc = reply.status;
-            if (reply.status != 0u) {
-                child.cachedGetPublicKeyReply_ = reply;
+            const std::vector<uint8_t> cachedPublicKeyReplyPayloadBytesBeforeUpdate =
+                child.cachedGetPublicKeyReplyPayloadBytesOwned_;
+            const uint8_t* cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr =
+                cachedPublicKeyReplyPayloadBytesBeforeUpdate.empty()
+                    ? nullptr
+                    : cachedPublicKeyReplyPayloadBytesBeforeUpdate.data();
+            child.inboundAuthStatusEc = replyStatus01;
+            if (replyStatus01 != 0u) {
+                child.cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
                 return kAuthBootstrap680InboundGetPublicKeyReplyError;
             }
 
             child.authServerTimeBias80 = static_cast<uint32_t>(
-                std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
-            const uint32_t workerResult = HandleGetPublicKeyReply(reply);
+                std::time(nullptr) - static_cast<std::time_t>(replyCurrentTime05));
+            const uint32_t workerResult = HandleGetPublicKeyReply(incomingReplyPacket, stagedBytes.size());
             if (workerResult != 0u) {
                 child.inboundAuthStatusEc = workerResult;
             }
@@ -1844,33 +1930,45 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             // The original 0x07 path only persists the refreshed cached reply on the success tail.
             // If the public-key worker fails, control returns 5 immediately instead of keeping a
             // partially updated reply/cached-key bridge alive for a later raw 0x08 send.
+            const bool cachedReplyHadEmbeddedPublicKey =
+                AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+                    cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr,
+                    cachedPublicKeyReplyPayloadBytesBeforeUpdate.size(),
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr);
             const bool reusedCachedEmbeddedPublicKey =
-                !reply.hasEmbeddedPublicKey &&
-                cachedPublicKeyReplyBeforeUpdate.valid &&
-                cachedPublicKeyReplyBeforeUpdate.hasEmbeddedPublicKey &&
-                cachedPublicKeyReplyBeforeUpdate.publicKeyId == reply.publicKeyId &&
-                currentPublicKeyId9C == reply.publicKeyId;
+                !hasEmbeddedPublicKey &&
+                cachedReplyHadEmbeddedPublicKey &&
+                cachedPublicKeyReplyPayloadBytesBeforeUpdate.size() >= 14u &&
+                ReadU32LE(cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr + 0x09u) == replyPublicKeyId09 &&
+                currentPublicKeyId9C == replyPublicKeyId09;
             if (workerResult == 0u) {
-                mxo::auth::GetPublicKeyReply effectiveReplyForSend = reply;
+                child.cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
                 if (reusedCachedEmbeddedPublicKey) {
-                    effectiveReplyForSend = cachedPublicKeyReplyBeforeUpdate;
-                    effectiveReplyForSend.status = reply.status;
-                    effectiveReplyForSend.currentTime = reply.currentTime;
-                    effectiveReplyForSend.publicKeyId = reply.publicKeyId;
+                    child.cachedGetPublicKeyReplyPayloadBytesOwned_ =
+                        cachedPublicKeyReplyPayloadBytesBeforeUpdate;
+                    AuthBootstrap680_PatchCachedGetPublicKeyReplyHeader(
+                        &child.cachedGetPublicKeyReplyPayloadBytesOwned_,
+                        replyStatus01,
+                        replyCurrentTime05,
+                        replyPublicKeyId09);
                 }
-                child.cachedGetPublicKeyReply_ = effectiveReplyForSend;
             }
 
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={} reusedCachedEmbeddedPublicKey={} workerResult=0x{:08x} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} helper={} module={} childBase={}",
-                static_cast<unsigned>(reply.status),
-                static_cast<unsigned>(reply.currentTime),
-                static_cast<unsigned>(reply.publicKeyId),
-                static_cast<unsigned>(reply.keySize),
-                static_cast<unsigned>(reply.modulusLength),
-                static_cast<unsigned>(reply.signatureLength),
-                static_cast<unsigned>(reply.publicExponentByte),
-                reply.hasEmbeddedPublicKey ? 1u : 0u,
+                static_cast<unsigned>(replyStatus01),
+                static_cast<unsigned>(replyCurrentTime05),
+                static_cast<unsigned>(replyPublicKeyId09),
+                static_cast<unsigned>(replyKeySize0d),
+                static_cast<unsigned>(replyModulusLength12),
+                static_cast<unsigned>(replySignatureLength),
+                static_cast<unsigned>(replyPublicExponentByte0f),
+                hasEmbeddedPublicKey ? 1u : 0u,
                 reusedCachedEmbeddedPublicKey ? 1u : 0u,
                 static_cast<unsigned>(workerResult),
                 fmt::ptr(child.lazyPubkeyDatValidatorA4),
@@ -2253,8 +2351,20 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
     auto& child = *this;
 
-    const mxo::auth::GetPublicKeyReply& reply = child.cachedGetPublicKeyReply_;
-    if (!reply.valid || !reply.hasEmbeddedPublicKey) {
+    const uint8_t* const replyPayloadBytes =
+        child.cachedGetPublicKeyReplyPayloadBytesOwned_.empty()
+            ? nullptr
+            : child.cachedGetPublicKeyReplyPayloadBytesOwned_.data();
+    const size_t replyPayloadByteCount = child.cachedGetPublicKeyReplyPayloadBytesOwned_.size();
+    if (!AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+            replyPayloadBytes,
+            replyPayloadByteCount,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr)) {
         spdlog::warn(
             "AuthBootstrap680_SendAuthRequest missing cached valid embedded-public-key reply at child-owned state while authRequestReadyA0=0x{:02x}",
             static_cast<unsigned>(authRequestReadyA0));
@@ -2274,7 +2384,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
         return 0u;
     }
 
-    currentPublicKeyId9C = reply.publicKeyId;
+    currentPublicKeyId9C = ReadU32LE(replyPayloadBytes + 0x09u);
 
     FillAuthBootstrap680Field54SeedBytesScaffold(child.feedbackSeedHelper54, feedbackSeed84);
     ResetAuthBootstrap680FeedbackTransforms(child);
@@ -2305,7 +2415,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
     blobLayout.embeddedTime = static_cast<uint32_t>(std::time(nullptr));
 
     mxo::auth::AuthRequestLayout requestLayout;
-    requestLayout.publicKeyId = reply.publicKeyId;
+    requestLayout.publicKeyId = ReadU32LE(replyPayloadBytes + 0x09u);
     requestLayout.loginType = static_cast<uint8_t>(child.loginType28 & 0xffu);
     requestLayout.keyConfigMd5.assign(block30.begin(), block30.end());
     requestLayout.uiConfigMd5.assign(block40.begin(), block40.end());
@@ -2421,9 +2531,9 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
     if (sendResult != 0u) {
         spdlog::info(
             "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId={} loginType={} keySize={} blobLen={} raw08WorkerExpectedBlobLen={} usernameLengthField={} usedChildRaw08PublicKeyWorker={} keyConfigMd5Len={} uiConfigMd5Len={} childSendTarget50={} childRaw08PublicKeyWorkerA8={} childString04Len={} childString10Len={} childString1CLen={} feedbackSeed84='{}' helper54NextBufferedByte28=0x{:08x}",
-            static_cast<unsigned>(reply.publicKeyId),
+            static_cast<unsigned>(ReadU32LE(replyPayloadBytes + 0x09u)),
             static_cast<unsigned>(requestLayout.loginType),
-            static_cast<unsigned>(reply.keySize),
+            static_cast<unsigned>(replyPayloadBytes[0x0du]),
             static_cast<unsigned>(buildResult.blobCiphertextBytes.size()),
             static_cast<unsigned>(raw08WorkerExpectedBlobLen),
             static_cast<unsigned>(buildResult.usernameLengthField),
@@ -2443,20 +2553,35 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
 
 // anchor: launcher.exe:0x447780
 uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
-    const mxo::auth::GetPublicKeyReply& reply) {
+    const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket,
+    size_t replyPayloadByteCount) {
     auto& child = *this;
 
+    const uint8_t* modulusBytes = nullptr;
+    size_t modulusByteCount = 0u;
+    uint8_t publicExponentByte = 0u;
+    if (!AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+            static_cast<const uint8_t*>(replyPacket.payloadAlias10),
+            replyPayloadByteCount,
+            &modulusBytes,
+            &modulusByteCount,
+            &publicExponentByte,
+            nullptr,
+            nullptr,
+            nullptr)) {
+        return 1u;
+    }
 
     ResetAuthBootstrap680ReplyPublicKeyWorkers(child);
-    currentPublicKeyId9C = reply.publicKeyId;
+    currentPublicKeyId9C = ReadU32LE(static_cast<const uint8_t*>(replyPacket.payloadAlias10) + 0x09u);
 
     child.raw08PublicKeyWorkerA8OwnedState_.object =
         std::make_unique<AuthBootstrap680Raw08PublicKeyWorkerA8Sketch>();
     if (child.raw08PublicKeyWorkerA8OwnedState_.object->ConstructFromReplyPublicKey(
             &child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
-            reply.modulusBytes.data(),
-            reply.modulusBytes.size(),
-            reply.publicExponentByte)) {
+            modulusBytes,
+            modulusByteCount,
+            publicExponentByte)) {
         child.raw08PublicKeyWorkerA8 = child.raw08PublicKeyWorkerA8OwnedState_.object.get();
     } else {
         child.raw08PublicKeyWorkerA8OwnedState_.object.reset();
@@ -2466,9 +2591,9 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
         std::make_unique<AuthBootstrap680ReplyAuthDataValidatorACSketch>();
     if (child.replyAuthDataValidatorACOwnedState_.object->ConstructFromReplyPublicKey(
             &child.replyAuthDataValidatorACOwnedState_.publicKeyPair0c,
-            reply.modulusBytes.data(),
-            reply.modulusBytes.size(),
-            reply.publicExponentByte)) {
+            modulusBytes,
+            modulusByteCount,
+            publicExponentByte)) {
         child.replyAuthDataValidatorAC = child.replyAuthDataValidatorACOwnedState_.object.get();
     } else {
         child.replyAuthDataValidatorACOwnedState_.object.reset();
@@ -2481,37 +2606,60 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
 
 // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
 uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
-    const mxo::auth::GetPublicKeyReply& reply) {
+    const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket,
+    size_t replyPayloadByteCount) {
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
     auto& child = *this;
 
-    if (reply.publicKeyId == currentPublicKeyId9C) {
+    const uint8_t* const replyPayloadBytes =
+        static_cast<const uint8_t*>(replyPacket.payloadAlias10);
+    const uint32_t replyPublicKeyId09 = ReadU32LE(replyPayloadBytes + 0x09u);
+
+    const uint8_t* modulusBytes = nullptr;
+    size_t modulusByteCount = 0u;
+    uint8_t publicExponentByte = 0u;
+    const uint8_t* signatureBytes = nullptr;
+    size_t signatureByteCount = 0u;
+    const bool hasEmbeddedPublicKey = AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
+        replyPayloadBytes,
+        replyPayloadByteCount,
+        &modulusBytes,
+        &modulusByteCount,
+        &publicExponentByte,
+        &signatureBytes,
+        &signatureByteCount,
+        nullptr);
+
+    if (replyPublicKeyId09 == currentPublicKeyId9C) {
         authRequestReadyA0 = 1u;
         return 0u;
     }
 
     if (g_SkipAuthPublicKeyReplyValidation == 0u) {
-        if (!reply.hasEmbeddedPublicKey || reply.modulusBytes.size() != 0x80u || reply.publicExponentByte == 0u) {
+        if (!hasEmbeddedPublicKey || modulusByteCount != 0x80u || publicExponentByte == 0u) {
             authRequestReadyA0 = 0u;
             return 1u;
         }
     } else {
-        if (!reply.hasEmbeddedPublicKey || reply.modulusBytes.empty() || reply.publicExponentByte == 0u) {
+        if (!hasEmbeddedPublicKey || modulusByteCount == 0u || publicExponentByte == 0u) {
             authRequestReadyA0 = 0u;
             return 1u;
         }
         spdlog::info(
             "DIAGNOSTIC: skipping AS_GetPublicKeyReply modulus size validation (g_SkipAuthPublicKeyReplyValidation=1) modulusBytes={}",
-            reply.modulusBytes.size());
+            modulusByteCount);
     }
     const bool lazyPubkeyDatValidatorAccepted =
-        AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(child, reply);
+        AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
+            child,
+            replyPayloadBytes,
+            replyPayloadByteCount);
     if (!lazyPubkeyDatValidatorAccepted) {
         authRequestReadyA0 = 0u;
         return 1u;
     }
 
-    const uint32_t rebuildResult = RebuildReplyPublicKeyWorkers(reply);
+    const uint32_t rebuildResult = RebuildReplyPublicKeyWorkers(replyPacket, replyPayloadByteCount);
     if (rebuildResult != 0u) {
         authRequestReadyA0 = 0u;
         return rebuildResult;
@@ -2520,13 +2668,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
     authRequestReadyA0 = 1u;
     spdlog::info(
         "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply rebuilt child+0xa8/+0xac from raw0x07 publicKeyId={} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} modulusLen={} signatureLen={} exponentByte=0x{:02x} helper={} module={} childBase={}",
-        static_cast<unsigned>(reply.publicKeyId),
+        static_cast<unsigned>(replyPublicKeyId09),
         fmt::ptr(child.lazyPubkeyDatValidatorA4),
         fmt::ptr(child.raw08PublicKeyWorkerA8),
         fmt::ptr(child.replyAuthDataValidatorAC),
-        static_cast<unsigned>(reply.modulusBytes.size()),
-        static_cast<unsigned>(reply.signatureBytes.size()),
-        static_cast<unsigned>(reply.publicExponentByte),
+        static_cast<unsigned>(modulusByteCount),
+        static_cast<unsigned>(signatureByteCount),
+        static_cast<unsigned>(publicExponentByte),
         fmt::ptr(this),
         fmt::ptr(owner08),
         fmt::ptr(childBase));

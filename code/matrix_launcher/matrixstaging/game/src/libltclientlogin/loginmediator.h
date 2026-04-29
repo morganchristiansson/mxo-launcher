@@ -1443,7 +1443,6 @@ public:
     bool authGetPublicKeyRequestSent_;
     bool authRequestSent_;
     bool authChallengeResponseSent_;
-    mxo::auth::GetPublicKeyReply lastAuthPublicKeyReply_;
     mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
     mxo::auth::AuthChallenge lastAuthChallenge_;
     // Replacement-only compatibility auth payload copy:

@@ -221,7 +221,6 @@ CLTLoginMediator::CLTLoginMediator()
       authGetPublicKeyRequestSent_(false),
       authRequestSent_(false),
       authChallengeResponseSent_(false),
-      lastAuthPublicKeyReply_(),
       lastAuthRequestBuildResult_(),
       lastAuthChallenge_(),
       lastAuthConnectStatus_(0),

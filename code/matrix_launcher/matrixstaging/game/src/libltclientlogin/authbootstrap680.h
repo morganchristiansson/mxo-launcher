@@ -22,6 +22,7 @@ class FeedbackSizeTransformAdapterSmall;
 namespace mxo::ltlogin {
 
 class CLTLoginMediator;
+class Packet_AsGetPublicKeyReply_0x4b6ca4;
 
 struct AuthBootstrap680RsaPublicKeyPairOwnedState {
     std::vector<uint32_t> modulus08OwnedDigits;
@@ -155,7 +156,7 @@ public:
  std::vector<uint32_t> publicExponentBigIntC4OwnedDigits_{};
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
  std::vector<uint8_t> stagedIncomingAuthPacketBytesOwned_{};
- mxo::auth::GetPublicKeyReply cachedGetPublicKeyReply_{};
+ std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
  mxo::auth::AuthRequestBuildResult cachedAuthRequestBuildResult_{};
  mxo::auth::AuthChallenge cachedAuthChallenge_{};
 
@@ -205,7 +206,6 @@ public:
 
     // Source-owned compatibility accessors for code that still needs recovered auth payloads
     // after `0x448140` finishes. Keep these out of the mirrored child layout.
-    const mxo::auth::GetPublicKeyReply& CachedGetPublicKeyReply_SOURCEOWNED() const;
     const mxo::auth::AuthChallenge& CachedAuthChallenge_SOURCEOWNED() const;
 
     // anchor: launcher.exe:0x448050
@@ -232,8 +232,12 @@ public:
     // write-helper prefix in the symbol names, but the callsites and ECX setup point at the
     // owner `+0x680` auth child.
     uint32_t SendAuthRequest();
-    uint32_t RebuildReplyPublicKeyWorkers(const mxo::auth::GetPublicKeyReply& reply);
-    uint32_t HandleGetPublicKeyReply(const mxo::auth::GetPublicKeyReply& reply);
+    uint32_t RebuildReplyPublicKeyWorkers(
+        const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket,
+        size_t replyPayloadByteCount);
+    uint32_t HandleGetPublicKeyReply(
+        const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket,
+        size_t replyPayloadByteCount);
 
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;

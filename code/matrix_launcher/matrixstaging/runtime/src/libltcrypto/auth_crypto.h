@@ -45,41 +45,6 @@ struct FramedPacket {
     std::vector<uint8_t> bytes;
 };
 
-struct GetPublicKeyReply {
-    bool valid;
-    bool hasEmbeddedPublicKey;
-    uint32_t payloadLength;
-    uint32_t status;
-    uint32_t currentTime;
-    uint32_t publicKeyId;
-    uint8_t keySize;
-    uint8_t reservedByte;
-    uint8_t publicExponentByte;
-    uint16_t unknownWord;
-    uint16_t modulusLength;
-    uint16_t signatureLength;
-    std::vector<uint8_t> headerBytes;
-    std::vector<uint8_t> payloadBytes;
-    std::vector<uint8_t> bytes;
-    std::vector<uint8_t> tailBytes;
-    std::vector<uint8_t> modulusBytes;
-    std::vector<uint8_t> signatureBytes;
-
-    GetPublicKeyReply()
-        : valid(false),
-          hasEmbeddedPublicKey(false),
-          payloadLength(0),
-          status(0),
-          currentTime(0),
-          publicKeyId(0),
-          keySize(0),
-          reservedByte(0),
-          publicExponentByte(0),
-          unknownWord(0),
-          modulusLength(0),
-          signatureLength(0) {}
-};
-
 struct AuthBlobLayout {
     uint8_t leadingByte;
     uint32_t rsaMethod;
