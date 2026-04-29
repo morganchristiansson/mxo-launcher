@@ -2434,7 +2434,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     return 0u;
 }
 
-// anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
+// anchor: launcher.exe:0x447f50
 uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
     const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket) {
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
@@ -2442,89 +2442,55 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
 
     const uint8_t* const replyPayloadBytes =
         static_cast<const uint8_t*>(replyPacket.payloadAlias10);
-    size_t replyPayloadByteCount = 0x12u;
-    if (replyPacket.debugString14 != nullptr && replyPacket.payloadSize18 != 0u) {
-        const auto* modulusFieldBytes =
-            reinterpret_cast<const uint8_t*>(replyPacket.debugString14);
-        if (modulusFieldBytes >= replyPayloadBytes) {
-            replyPayloadByteCount = std::max(
-                replyPayloadByteCount,
-                static_cast<size_t>(modulusFieldBytes - replyPayloadBytes) +
-                    static_cast<size_t>(replyPacket.payloadSize18));
-        }
-    }
-    if (replyPacket.characterIdLow1c != 0u && replyPacket.characterIdHigh20 != 0u) {
-        const auto* signatureFieldBytes =
-            reinterpret_cast<const uint8_t*>(replyPacket.characterIdLow1c);
-        if (signatureFieldBytes >= replyPayloadBytes) {
-            replyPayloadByteCount = std::max(
-                replyPayloadByteCount,
-                static_cast<size_t>(signatureFieldBytes - replyPayloadBytes) +
-                    static_cast<size_t>(replyPacket.characterIdHigh20));
-        }
+    if (!replyPayloadBytes) {
+        return 1u;
     }
 
     const uint32_t replyPublicKeyId09 = ReadU32LE(replyPayloadBytes + 0x09u);
-
-    const uint8_t* modulusBytes = nullptr;
-    size_t modulusByteCount = 0u;
-    uint8_t publicExponentByte = 0u;
-    const uint8_t* signatureBytes = nullptr;
-    size_t signatureByteCount = 0u;
-    const bool hasEmbeddedPublicKey = AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
-        replyPayloadBytes,
-        replyPayloadByteCount,
-        &modulusBytes,
-        &modulusByteCount,
-        &publicExponentByte,
-        &signatureBytes,
-        &signatureByteCount,
-        nullptr);
-
-    if (replyPublicKeyId09 == currentPublicKeyId9C) {
-        authRequestReadyA0 = 1u;
-        return 0u;
+    if (replyPayloadBytes[0x01u] >= 1u) {
+        return replyPayloadBytes[0x01u];
     }
 
-    if (g_SkipAuthPublicKeyReplyValidation == 0u) {
-        if (!hasEmbeddedPublicKey || modulusByteCount != 0x80u || publicExponentByte == 0u) {
+    if (replyPublicKeyId09 != currentPublicKeyId9C) {
+        const uint8_t* const modulusBytes =
+            reinterpret_cast<const uint8_t*>(replyPacket.debugString14);
+        const size_t modulusByteCount = static_cast<size_t>(replyPacket.payloadSize18);
+        const uint8_t publicExponentByte = replyPayloadBytes[0x0fu];
+        const uint8_t* const signatureBytes =
+            reinterpret_cast<const uint8_t*>(replyPacket.characterIdLow1c);
+        const size_t signatureByteCount = static_cast<size_t>(replyPacket.characterIdHigh20);
+
+        const uint32_t rebuildResult = RebuildReplyPublicKeyWorkers(
+            replyPublicKeyId09,
+            modulusBytes,
+            modulusByteCount,
+            publicExponentByte,
+            signatureBytes,
+            signatureByteCount);
+        if (rebuildResult != 0u) {
             authRequestReadyA0 = 0u;
-            return 1u;
+            return rebuildResult;
         }
-    } else {
-        if (!hasEmbeddedPublicKey || modulusByteCount == 0u || publicExponentByte == 0u) {
-            authRequestReadyA0 = 0u;
-            return 1u;
-        }
+
+        // anchor: launcher.exe:0x447dd0
+        // The original immediately passes the rebuilt modulus/exponent/signature tuple into an
+        // internal pubkey.dat/debug-sink helper here before marking child+0xa0 ready. The current
+        // source-owned replacement keeps only the worker rebuild plus payload snapshot path.
         spdlog::info(
-            "DIAGNOSTIC: skipping AS_GetPublicKeyReply modulus size validation (g_SkipAuthPublicKeyReplyValidation=1) modulusBytes={}",
-            modulusByteCount);
-    }
-    const uint32_t rebuildResult = RebuildReplyPublicKeyWorkers(
-        replyPublicKeyId09,
-        modulusBytes,
-        modulusByteCount,
-        publicExponentByte,
-        signatureBytes,
-        signatureByteCount);
-    if (rebuildResult != 0u) {
-        authRequestReadyA0 = 0u;
-        return rebuildResult;
+            "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply rebuilt child+0xa4/+0xa8/+0xac from raw0x07 publicKeyId={} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} modulusLen={} signatureLen={} exponentByte=0x{:02x} helper={} module={} childBase={}",
+            static_cast<unsigned>(replyPublicKeyId09),
+            fmt::ptr(child.lazyPubkeyDatValidatorA4),
+            fmt::ptr(child.raw08PublicKeyWorkerA8),
+            fmt::ptr(child.replyAuthDataValidatorAC),
+            static_cast<unsigned>(modulusByteCount),
+            static_cast<unsigned>(signatureByteCount),
+            static_cast<unsigned>(publicExponentByte),
+            fmt::ptr(this),
+            fmt::ptr(owner08),
+            fmt::ptr(childBase));
     }
 
     authRequestReadyA0 = 1u;
-    spdlog::info(
-        "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply rebuilt child+0xa4/+0xa8/+0xac from raw0x07 publicKeyId={} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} modulusLen={} signatureLen={} exponentByte=0x{:02x} helper={} module={} childBase={}",
-        static_cast<unsigned>(replyPublicKeyId09),
-        fmt::ptr(child.lazyPubkeyDatValidatorA4),
-        fmt::ptr(child.raw08PublicKeyWorkerA8),
-        fmt::ptr(child.replyAuthDataValidatorAC),
-        static_cast<unsigned>(modulusByteCount),
-        static_cast<unsigned>(signatureByteCount),
-        static_cast<unsigned>(publicExponentByte),
-        fmt::ptr(this),
-        fmt::ptr(owner08),
-        fmt::ptr(childBase));
     return 0u;
 }
 
