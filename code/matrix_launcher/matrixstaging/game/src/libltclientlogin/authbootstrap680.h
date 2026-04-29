@@ -22,9 +22,10 @@ namespace mxo::ltlogin {
 class CLTLoginMediator;
 class Packet_AsGetPublicKeyReply_0x4b6ca4;
 
+// Direct Crypto++ public-key material owned by the launcher-side wrappers.
+// The raw leaf sketch fields remain only as recovered layout mirrors.
 struct AuthBootstrap680RsaPublicKeyPairOwnedState {
-    std::vector<uint32_t> modulus08OwnedDigits;
-    std::vector<uint32_t> exponent1cOwnedDigits;
+    CryptoPP::RSA::PublicKey publicKey;
     std::vector<uint8_t> modulusBytes;
     std::vector<uint8_t> exponentBytes;
 };
@@ -123,9 +124,9 @@ public:
  uint32_t currentPublicKeyId9C = 0; // original child `+0x9c`
  uint8_t authRequestReadyA0 = 0; // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
  std::array<uint8_t, 3> paddingA1ToA3{}; // original child `+0xa1 .. +0xa3`
- AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` validator family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
- AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780` and consumed by `0x4474f0` through `0x468ea0/0x468f00`
- AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780` and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
+ AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` validator family built by `0x447260/0x447c10`, now backed by a direct `CryptoPP::RSA::PublicKey` and consulted by `0x447780 -> 0x468f80`
+ AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780`, now backed by a direct `CryptoPP::RSA::PublicKey`, and consumed by `0x4474f0` through `0x468ea0/0x468f00`
+ AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780`, now backed by a direct `CryptoPP::RSA::PublicKey`, and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
 
  // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
  // explicit as the same three adjacent `0x14`-byte big-int objects the launcher ctor seeds with

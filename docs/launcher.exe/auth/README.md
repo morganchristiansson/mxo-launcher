@@ -253,6 +253,8 @@ The key practical integration rules are:
 3. preserve reply-derived RSA key usage for `0x08`
 4. preserve the current `0x09 -> 0x0A -> 0x0B` handling shape
 5. keep the probe runnable as the fastest auth regression harness while launcher integration progresses
+6. keep the `+0xa8` encryptor and `+0xa4/+0xac` validators as thin wrappers around direct
+   `CryptoPP::RSA::PublicKey`-backed Crypto++ classes, not source-owned crypto engines
 
 ## Launcher integration milestone in `resurrections.exe` (2026-03-13)
 

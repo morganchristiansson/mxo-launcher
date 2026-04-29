@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "rsa.h"
+
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
 
 namespace mxo::ltlogin {

@@ -290,6 +290,10 @@ Current source direction:
 
 - uses **`CryptoPP::RSAES_OAEP_SHA_Decryptor` directly** for the actual decryptor subobject
 - uses **`CryptoPP::RSA::PrivateKey` directly** for the loaded bootstrap key state
+- uses **direct `CryptoPP::RSA::PublicKey` + on-demand `CryptoPP::RSAES_OAEP_SHA_Encryptor`** for
+  the recovered raw `0x08` worker family
+- uses **direct `CryptoPP::RSA::PublicKey` + verifier-side PKCS#1 v1.5 / MD5 checks** for the
+  recovered `+0xa4/+0xac` validator family
 - uses **`CryptoPP::Integer` directly** for big-int semantics
 - uses **`CryptoPP::OldRandomPool` directly** for the recovered RNG helper family
 - keeps small launcher wrappers only for the preserved launcher entrypoints / boundaries:

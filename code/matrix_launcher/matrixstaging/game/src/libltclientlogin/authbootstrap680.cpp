@@ -149,30 +149,26 @@ static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
         return;
     }
 
-    ownedState->modulus08OwnedDigits.clear();
-    ownedState->exponent1cOwnedDigits.clear();
+    ownedState->publicKey = CryptoPP::RSA::PublicKey();
     ownedState->modulusBytes.clear();
     ownedState->exponentBytes.clear();
 }
 
 // anchor: launcher.exe:0x4420f0
 static void ResetAuthBootstrap680RsaPublicKeyPairSubobject(
-    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch* outSubobject,
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    if (!outSubobject || !ownedState) {
+    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch* outSubobject) {
+    if (!outSubobject) {
         return;
     }
 
     outSubobject->vtable00 = 0x004b6680u;
     outSubobject->helperVtable04 = 0x004b66acu;
-    ResetAuthBootstrap680BigIntObject(&outSubobject->modulus08, &ownedState->modulus08OwnedDigits);
-    ResetAuthBootstrap680BigIntObject(&outSubobject->exponent1c, &ownedState->exponent1cOwnedDigits);
+    outSubobject->modulus08 = {};
+    outSubobject->exponent1c = {};
     outSubobject->helperThunk30 = 0x004b630cu;
     outSubobject->helperThunk34 = 0x004b6348u;
     outSubobject->helperThunk38 = 0x004b6454u;
     outSubobject->helperVtable3c = 0x004b66a0u;
-    ownedState->modulusBytes.clear();
-    ownedState->exponentBytes.clear();
 }
 
 // anchor: launcher.exe:0x447120 / 0x447020
@@ -186,20 +182,14 @@ static bool BuildAuthBootstrap680RsaPublicKeyPairSubobjectFromReplyPublicKey(
         return false;
     }
 
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(outSubobject, ownedState);
-    if (!BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-            &outSubobject->modulus08,
-            &ownedState->modulus08OwnedDigits,
-            modulusBytes,
-            modulusByteCount)) {
-        ResetAuthBootstrap680RsaPublicKeyPairSubobject(outSubobject, ownedState);
-        return false;
-    }
-    if (!BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
-            &outSubobject->exponent1c,
-            &ownedState->exponent1cOwnedDigits,
-            exponentByte)) {
-        ResetAuthBootstrap680RsaPublicKeyPairSubobject(outSubobject, ownedState);
+    ResetAuthBootstrap680RsaPublicKeyPairSubobject(outSubobject);
+
+    try {
+        ownedState->publicKey.Initialize(
+            CryptoPP::Integer(modulusBytes, modulusByteCount),
+            CryptoPP::Integer(&exponentByte, 1u));
+    } catch (const CryptoPP::Exception&) {
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
 
@@ -218,7 +208,7 @@ static void ResetAuthBootstrap680Raw08PublicKeyWorkerA8(
     outWorker->vtable00 = 0x004b75e4u;
     outWorker->helperVtable04 = 0x004b7610u;
     outWorker->helperVtable08 = 0x004b7138u;
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outWorker->publicKeyPair0c, ownedState);
+    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outWorker->publicKeyPair0c);
     outWorker->helperThunk4c = 0x004b75e0u;
     outWorker->helperThunk50 = 0x004b6300u;
     outWorker->helperThunk54 = 0x004b3e18u;
@@ -235,7 +225,7 @@ static void ResetAuthBootstrap680ReplyAuthDataValidatorAC(
     outValidator->vtable00 = 0x004b7580u;
     outValidator->helperVtable04 = 0x004b75ccu;
     outValidator->helperVtable08 = 0x004b7440u;
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outValidator->publicKeyPair0c, ownedState);
+    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outValidator->publicKeyPair0c);
     outValidator->helperThunk4c = 0x004b73c0u;
     outValidator->helperThunk50 = 0x004b6c44u;
 }
@@ -734,15 +724,6 @@ static CryptoPP::Integer AuthBootstrap680BigIntObjectToCryptoPPInteger(
     return CryptoPP::Integer(bigEndianBytes.data(), bigEndianBytes.size());
 }
 
-static bool BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-    CryptoPP::RSA::PublicKey* outPublicKey) {
-    return mxo::auth::internal::BuildPublicKeyFromBytes(
-        ownedState.modulusBytes,
-        ownedState.exponentBytes,
-        outPublicKey);
-}
-
 // anchor: launcher.exe:0x468f80 / 0x44aec0 / 0x467ee0 / 0x4680a0 / 0x468e20
 // Static RE now closes the common validator-family finalize path tightly enough to mirror the real
 // launcher call shape instead of a generic RSA-signature guess:
@@ -780,11 +761,7 @@ static bool VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
         0x86u, 0xf7u, 0x0du, 0x02u, 0x05u, 0x05u, 0x00u, 0x04u, 0x10u,
     };
 
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
-        return false;
-    }
-
+    const CryptoPP::RSA::PublicKey& publicKey = ownedState.publicKey;
     const CryptoPP::Integer& modulus = publicKey.GetModulus();
     const size_t modulusBitCount = static_cast<size_t>(modulus.BitCount());
     if (modulusBitCount == 0u) {
@@ -885,11 +862,7 @@ static size_t QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(
 static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     size_t plaintextByteCount) {
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
-        return 0u;
-    }
-
+    const CryptoPP::RSA::PublicKey& publicKey = ownedState.publicKey;
     CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
     const size_t maxPlaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
     const size_t ciphertextChunkByteCount =
@@ -915,22 +888,13 @@ uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryEncryptedOutputLengt
 
 uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryCiphertextChunkByteCountScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const {
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
-        return 0u;
-    }
     return static_cast<uint32_t>(
-        QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey));
+        QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(ownedState.publicKey));
 }
 
 uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryPlaintextChunkByteCountScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const {
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
-        return 0u;
-    }
-
-    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
+    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
     return static_cast<uint32_t>(encryptor.FixedMaxPlaintextLength());
 }
 
@@ -944,12 +908,8 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextChunkScaffold
         return false;
     }
 
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
-        return false;
-    }
-
     try {
+        const CryptoPP::RSA::PublicKey& publicKey = ownedState.publicKey;
         CryptoPP::AutoSeededRandomPool rng;
         CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
         const size_t ciphertextChunkByteCount =
