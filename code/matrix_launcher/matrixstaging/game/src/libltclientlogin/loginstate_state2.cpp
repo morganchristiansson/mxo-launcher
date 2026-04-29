@@ -241,11 +241,14 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // Source keeps the same ownership/resulting state but inlines the per-entry copy +
                 // normalization that `0x43f300` performs while materializing the owner `+0xd84`
                 // world-descriptor table and `+0xd80` count mirror.
-                g_CurrentLoginMediator->worldDescriptorValidD84_.fill(false);
-                g_CurrentLoginMediator->worldDescriptorCountD80_ = 0;
+                for (Packet_WorldList_0x4b533c*& packet : g_CurrentLoginMediator->worldListPacketsD84_) {
+                    delete packet;
+                    packet = nullptr;
+                }
+                g_CurrentLoginMediator->worldListPacketCountD80_ = 0;
                 {
                     const size_t worldCount = std::min(
-                        g_CurrentLoginMediator->worldDescriptorsD84_.size(),
+                        g_CurrentLoginMediator->worldListPacketsD84_.size(),
                         parseObject != nullptr
                             ? static_cast<size_t>(parseObject->worldTempRecordCount48)
                             : 0u);
@@ -281,17 +284,20 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                                 static_cast<unsigned>(rawType));
                         }
 
-                        auto& descriptor = g_CurrentLoginMediator->worldDescriptorsD84_[i];
-                        descriptor.worldId01 = worldId;
-                        descriptor.inlineNamePlus03 = worldName;
-                        descriptor.status17 = normalizedStatus;
-                        descriptor.type18 = normalizedType;
-                        descriptor.serverVersion19 = ReadU32LEState2(worldRecord + 0x19u);
-                        descriptor.serverLanguage1d = worldRecord[0x1du];
-                        descriptor.privateFlag1e = worldRecord[0x1eu];
-                        descriptor.populationLevel1f = worldRecord[0x1fu];
-                        g_CurrentLoginMediator->worldDescriptorValidD84_[i] = true;
-                        ++g_CurrentLoginMediator->worldDescriptorCountD80_;
+                        Packet_WorldList_0x4b533c* descriptor = new Packet_WorldList_0x4b533c();
+                        if (!descriptor) {
+                            break;
+                        }
+                        g_CurrentLoginMediator->worldListPacketsD84_[i] = descriptor;
+                        descriptor->worldId01 = worldId;
+                        descriptor->inlineNamePlus03 = worldName;
+                        descriptor->status17 = normalizedStatus;
+                        descriptor->type18 = normalizedType;
+                        descriptor->serverVersion19 = ReadU32LEState2(worldRecord + 0x19u);
+                        descriptor->serverLanguage1d = worldRecord[0x1du];
+                        descriptor->privateFlag1e = worldRecord[0x1eu];
+                        descriptor->populationLevel1f = worldRecord[0x1fu];
+                        ++g_CurrentLoginMediator->worldListPacketCountD80_;
                     }
                 }
                 {
@@ -368,21 +374,26 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
 
                         int matchedWorldIndex = -1;
                         for (size_t worldIndex = 0;
-                             worldIndex < g_CurrentLoginMediator->worldDescriptorsD84_.size();
+                             worldIndex < g_CurrentLoginMediator->worldListPacketCountD80_ &&
+                             worldIndex < g_CurrentLoginMediator->worldListPacketsD84_.size();
                              ++worldIndex) {
-                            if (g_CurrentLoginMediator->worldDescriptorValidD84_[worldIndex] &&
-                                g_CurrentLoginMediator->worldDescriptorsD84_[worldIndex].worldId01 ==
-                                    slotRecord.worldId24) {
+                            Packet_WorldList_0x4b533c* const worldPacket =
+                                g_CurrentLoginMediator->worldListPacketsD84_[worldIndex];
+                            if (worldPacket != nullptr &&
+                                worldPacket->worldId01 == slotRecord.worldId24) {
                                 matchedWorldIndex = static_cast<int>(worldIndex);
                                 break;
                             }
                         }
                         if (matchedWorldIndex >= 0) {
                             // anchor: launcher.exe:0x43f74a
-                            g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[i]
-                                .Assign(g_CurrentLoginMediator->worldDescriptorsD84_[static_cast<size_t>(
-                                                                                      matchedWorldIndex)]
-                                            .inlineNamePlus03);
+                            Packet_WorldList_0x4b533c* const matchedWorldPacket =
+                                g_CurrentLoginMediator->worldListPacketsD84_[static_cast<size_t>(
+                                    matchedWorldIndex)];
+                            if (matchedWorldPacket != nullptr) {
+                                g_CurrentLoginMediator->selectionRouteState684_.routeHostStringTriples194_[i]
+                                    .Assign(matchedWorldPacket->inlineNamePlus03);
+                            }
                         }
                     }
                 }
