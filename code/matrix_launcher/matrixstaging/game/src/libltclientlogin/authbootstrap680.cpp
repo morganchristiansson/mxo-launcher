@@ -616,7 +616,7 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
 //   signature bytes
 //
 // Source keeps the boundary separation visible even though the temporary worker struct is gone:
-// - outer object: `RSASSA_PKCS1v15_MD5_Verifier`-compatible validator family
+// - outer object: `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
 // - temporary object: MD5-backed `PK_MessageAccumulator` semantics
 //
 // The remaining helper below is therefore a source-local mirror of the concrete launcher chain
@@ -790,7 +790,7 @@ static bool EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
 
         // Preserve the raw-0x08 layering recovered from launcher.exe even though we no longer keep
         // a dedicated `0x48` helper layout struct in source:
-        // - outer worker family here is the `RSAES_OAEP_SHA_Encryptor`-compatible object
+        // - outer worker family here is `CryptoPP::RSAES_OAEP_SHA_Encryptor`
         // - inner per-chunk helper is the old `PK_DefaultEncryptionFilter`
         // - that helper owns a `ByteQueue` plaintext accumulator with `NodeSize = 0x100`
         //
@@ -1192,21 +1192,18 @@ AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {
  feedbackTransformSmall98 = nullptr;
  }
 
- // +0xa4: lazyPubkeyDatValidatorA4 - call dtor(1) if non-null
+ // +0xa4: lazyPubkeyDatValidatorA4 - original calls dtor(1) on the verifier-family object
  if (lazyPubkeyDatValidatorA4 != nullptr) {
- // lazyPubkeyDatValidatorA4->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
  lazyPubkeyDatValidatorA4 = nullptr;
  }
 
- // +0xa8: raw08PublicKeyWorkerA8 - call dtor(1) if non-null
+ // +0xa8: raw08PublicKeyWorkerA8 - original calls dtor(1) on the encryptor-family object
  if (raw08PublicKeyWorkerA8 != nullptr) {
- // raw08PublicKeyWorkerA8->~AuthBootstrap680Raw08PublicKeyWorkerA8Sketch();
  raw08PublicKeyWorkerA8 = nullptr;
  }
 
- // +0xac: replyAuthDataValidatorAC - call dtor(1) if non-null
+ // +0xac: replyAuthDataValidatorAC - original calls dtor(1) on the verifier-family object
  if (replyAuthDataValidatorAC != nullptr) {
- // replyAuthDataValidatorAC->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
  replyAuthDataValidatorAC = nullptr;
  }
 

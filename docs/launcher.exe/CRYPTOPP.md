@@ -167,73 +167,20 @@ This class family is strongly identified as **old Crypto++ `RSAES<OAEP<SHA1>>::D
 
 ---
 
-### 2.5 Encryptor counterpart — `0x4b75e4` = `CryptoPP::RSAES_OAEP_SHA_Encryptor`-compatible
+### 2.5 Encryptor counterpart — `0x4b75e4`
 
-**Confidence: HIGH for the exact scheme; MEDIUM-HIGH for the precise old-template spelling**
-
-The raw `0x08` reply-public-key worker rebuilt at child `+0xa8` is now best read as the launcher's
-**public-key encryptor half** of the same OAEP/SHA1 RSA family:
-
-- ctor `0x447120`
-- intermediate ctor-state vtable `0x004b74a8`
-- final leaf vtable `0x004b75e4`
-- output-sizing helper `0x468ea0`
-- chunked encrypt loop `0x468f00`
-- per-chunk encrypt virtual `0x468280`
-
-Best current modern Crypto++ equivalent:
-
-- `CryptoPP::RSAES_OAEP_SHA_Encryptor`
-- more explicitly: `PK_FinalTemplate<TF_EncryptorImpl<TF_CryptoSchemeOptions<RSAES<OAEP<SHA1> >, RSA, OAEP<SHA1>>>>`
-
-Why this mapping is now strong:
-
-1. **Scheme match from call sites**
-   - `0x4474f0` uses child `+0xa8` only on the outbound raw `0x08 / AS_AuthRequest` path
-   - `0x468ea0` computes the encrypted output length from RSA modulus bytes and plaintext chunk
-     bytes, matching `TF_EncryptorBase::FixedCiphertextLength()` / `FixedMaxPlaintextLength()`-style
-     behavior
-   - `0x468f00` then loops over plaintext chunks and calls worker vtable `+0x1c` once per chunk,
-     exactly what we expect from an OAEP/RSA encryptor wrapper over a public key
-
-2. **Key material shape matches `RSA::PublicKey` / `RSAFunction`**
-   - ctor `0x447120` deep-copies only **two** Crypto++ integer objects:
-     - destination `this+0x14` from ctor arg2
-     - destination `this+0x28` from ctor arg3
-   - that is exactly the public-key pair `(n, e)` shape of `CryptoPP::RSAFunction`
-   - no private-key fields (`d/p/q/dp/dq/u`) are present here, so this is not the decryptor or
-     `InvertibleRSAFunction` family
-
-3. **Constructor shape matches `PK_FinalTemplate<...Encryptor...>` multiple inheritance**
-   - `0x447120` performs staged retabling at several offsets (`+0x00/+0x08/+0x4c/+0x50/+0x54/+0x58`)
-   - it first installs the 11-slot ctor-state vtable `0x004b74a8`, then rewrites the primary leaf
-     vtable to `0x004b75e4`
-   - both tables share the hot encrypt-side entries (`+0x1c = 0x468280`, `+0x20 = 0x4382c0`), which
-     is exactly what we would expect from an intermediate-to-final retable within the same Crypto++
-     encryptor family rather than from two unrelated launcher-local helper classes
-   - this is the smell expected from old MSVC codegen for Crypto++'s layered template hierarchy:
-     `PK_FinalTemplate` → `TF_EncryptorImpl` → `TF_EncryptorBase` with embedded key material and
-     secondary interface slices
-
-4. **Explicit adjustor thunk evidence**
-   - `0x446d80` does:
-     - call `~cls_0x4b74a8((this-0x50), flag)`
-   - `0x4471f0` does:
-     - `sub ecx, 0x50`
-     - `jmp 0x447880`
-   - those are classic non-primary-base `this` adjustor thunks and strongly support the view that
-     the worker object is not a flat launcher-local struct but a real Crypto++ MI object family
-
-5. **The public-key-only ctor arguments line up with Crypto++ constructor sugar**
-   - modern Crypto++ exposes `PK_FinalTemplate(const T1&, const T2&)` which forwards to
-     `AccessKey().Initialize(v1, v2)`
-   - the older launcher build appears to inline that into direct bigint deep-copy work in
-     `0x447120`, but the semantic surface is the same: construct an RSA OAEP encryptor from `(n, e)`
-
-Practical static-RE consequence:
-- child `+0xa8` should no longer be treated as just a generic "reply-public-key worker"
-- the strongest current class-equivalent reading is **RSAES OAEP SHA-1 encryptor over an embedded
-  RSA public key**, with old-MSVC multiple-inheritance thunks still visible in the layout
+| VTable / Function | Crypto++ class / method |
+|---|---|
+| `0x004b74a8` | ctor-state `CryptoPP::RSAES_OAEP_SHA_Encryptor` family vtable |
+| `0x004b75e4` | `CryptoPP::RSAES_OAEP_SHA_Encryptor` |
+| `0x447120` | construct-from-public-key |
+| `0x468ea0` | query encrypted output length |
+| `0x468f00` | encrypt into packet builder / chunk loop |
+| `0x468280` | encrypt one plaintext chunk |
+| `0x4382c0` | create inner `CryptoPP::PK_DefaultEncryptionFilter` |
+| `0x447880` | dtor / leaf teardown |
+| `0x4471f0` | adjustor thunk to leaf dtor (`this -= 0x50`) |
+| `0x446d80` | adjustor thunk to ctor-state dtor (`this -= 0x50`) |
 
 ### 2.5.1 Exact public-key base class under the `0x4b659c` / `0x4b6680` family
 
@@ -316,43 +263,16 @@ This is the preferred fidelity tradeoff:
 
 ### 2.6 Integer / big-int family — `0x4ba50c`
 
-**Confidence: HIGH**
-
-`CBootstrapBigInt_0x4ba50c` is very likely an old **`CryptoPP::Integer`** family object.
-
-This is not just because RSA key state stores several `0x14`-byte big-int subobjects. The class
-behavior itself matches old Crypto++ integer machinery:
-
-- default ctor `0x45d000` initializes a zero-valued digit array
-- copy ctor `0x45d090` normalizes/copies digit capacity and digit words
-- word ctor `0x45d340` constructs from a scalar value
-- byte-reader ctor `0x45f940` imports from a source object
-- raw-byte ctor `0x461ee0` imports from raw bytes + length + flags
-- vtable `0x4ba50c` has import/export methods matching `ASN1Object`-style integer I/O
-
-Important vtable slots:
-
-| Slot | Address | Best interpretation |
-|------|---------|---------------------|
-| `+0x00` | `0x441610/0x45d040` | destructor / deleting destructor |
-| `+0x04` | `0x45e030` | import / BER-like decode path |
-| `+0x08` | `0x45fca0` | export / DER-like encode path |
-| `+0x0c` | `0x4413a0` | wrapper forwarding one encode form to another |
-
-Best current interpretation:
-- **static-RE**: this is an actual Crypto++ integer-family class, most likely old `CryptoPP::Integer`
-- **source**: keep it only as a recovered **raw boundary object** where launcher.exe really passes
-  the exact `0x14`-byte shape around at bootstrap seams
-
-Current source direction after the messaging-layer cleanup pass:
-- internal semantic work now uses **direct `CryptoPP::Integer`**
-- the old source-side stand-in **`CBootstrapBigInt_0x4ba50c` has been removed**
-- preserved child-layout/raw-copy code still keeps the launcher-owned `0x14` object bytes where
-  the original auth-bootstrap child really stores adjacent `0xb0/0xc4/0xd8` integer objects
-- the `0x443340 -> 0x443220 -> 0x465d70` margin-bootstrap-prep path now converts those raw child
-  objects once, then stays on direct `CryptoPP::Integer` / `CryptoPP::RSA::PrivateKey`
-- post-reconstruction capacity introspection now computes the original rounded word-capacity from
-  `CryptoPP::Integer` directly instead of materializing source-only fake big-int objects
+| VTable / Function | Crypto++ class / method |
+|---|---|
+| `0x004ba50c` | `CryptoPP::Integer` |
+| `0x45d000` | `CryptoPP::Integer::Integer()` |
+| `0x45d090` | `CryptoPP::Integer::Integer(const CryptoPP::Integer&)` |
+| `0x45d340` | `CryptoPP::Integer::Integer(word32)` |
+| `0x45e030` | `CryptoPP::Integer::BERDecode(CryptoPP::BufferedTransformation&)` |
+| `0x45f940` | `CryptoPP::Integer::Decode(CryptoPP::BufferedTransformation&, size_t, CryptoPP::Signedness)` |
+| `0x45fca0` | `CryptoPP::Integer::DEREncode(CryptoPP::BufferedTransformation&) const` |
+| `0x461ee0` | `CryptoPP::Integer::Integer(const CryptoPP::byte*, size_t, CryptoPP::Signedness)` |
 
 ---
 
@@ -368,7 +288,7 @@ Yes for several of them — and this should be stated explicitly.
 | `0x4b68a8` | old `CryptoPP::RandomPool` family (`CryptoPP::OldRandomPool` in modern tree) | **Actually Crypto++** |
 | `0x4b41e0` | `CryptoPP::BufferedTransformation` interface slice | **Actually Crypto++ interface/base** |
 | `0x4bace0` | `CryptoPP::RandomNumberGenerator` interface slice | **Actually Crypto++ interface/base** |
-| `0x4ba50c` / `CBootstrapBigInt_0x4ba50c` | old `CryptoPP::Integer` family object | **Actually Crypto++ or so close that source should treat it that way** |
+| `0x4ba50c` | old `CryptoPP::Integer` family object | **Actually Crypto++** |
 | `0x4b659c` / `cls_0x4b659c` | `CryptoPP::InvertibleRSAFunction`-equivalent key state | **Actually Crypto++ semantics** |
 | `0x4b69b4` | `CryptoPP::RSAES_OAEP_SHA_Decryptor` | **Actually Crypto++** |
 | `0x4ba258` | SHA1 hash context/base | **Very likely actual Crypto++ SHA1-family code** |
@@ -412,7 +332,7 @@ remaining the top-level mapping/index.
 | `0x4b68a8` vtable at `wrapper+4` | `CryptoPP::RandomPool` (old; `OldRandomPool` in 8.9.0) | **High** | Pool size 384, two-buffer design, MS CAPI seeding |
 | `0x4b41e0` vtable at `wrapper+8` | `CryptoPP::BufferedTransformation` | **Medium-High** | Filter-pipeline interface for old RandomPool |
 | `0x4bace0` transient vtable | `CryptoPP::RandomNumberGenerator` interface slice | **Medium** | Pure interface used during construction |
-| `0x4ba50c` vtable / `CBootstrapBigInt_0x4ba50c` | `CryptoPP::Integer` family object | **High** | import/export + ctor family match old integer machinery |
+| `0x4ba50c` vtable | `CryptoPP::Integer` | **High** | import/export + ctor family match old integer machinery |
 | `0x4b6778` vtable | `CryptoPP::InvertibleRSAFunction` / `TF_DecryptorBase` | **Medium-High** | vbptr + adjustor thunks match MI hierarchy |
 | `0x4b69b4` vtable | `CryptoPP::RSAES<OAEP<SHA1>>::Decryptor` (`RSAES_OAEP_SHA_Decryptor`) | **Medium-High** | Inherits from `0x4b6778`, `PerformRSADecryption` matches `Decrypt` |
 | `0x4ba258` | `CryptoPP::SHA1` base/hash context | **High** | SHA1 IV and algorithm layout match |
@@ -649,6 +569,9 @@ section factual and address-oriented.
 | `0x468520` | load signature into temporary accumulator |
 | `0x467ee0` | finalize/verify on temporary accumulator |
 | `0x467f70` | fill temporary-accumulator result pair |
+| `0x4474c0` | dtor / leaf teardown |
+| `0x4470e0` | adjustor thunk to leaf dtor (`this -= 0x50`) |
+| `0x446d70` | adjustor thunk to related verifier-family dtor (`this -= 0x50`) |
 
 #### `0x004b7668` = `CryptoPP::PK_MessageAccumulatorImpl<MD5>`-like leaf
 
