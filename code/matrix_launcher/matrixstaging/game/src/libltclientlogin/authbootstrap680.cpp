@@ -1264,21 +1264,6 @@ static bool AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
     return true;
 }
 
-static void AuthBootstrap680_PatchCachedGetPublicKeyReplyHeader(
-    std::vector<uint8_t>* cachedPayloadBytes,
-    uint32_t status01,
-    uint32_t currentTime05,
-    uint32_t publicKeyId09) {
-    if (!cachedPayloadBytes || cachedPayloadBytes->size() < 14u) {
-        return;
-    }
-
-    uint8_t* payloadBytes = cachedPayloadBytes->data();
-    std::memcpy(payloadBytes + 0x01u, &status01, sizeof(status01));
-    std::memcpy(payloadBytes + 0x05u, &currentTime05, sizeof(currentTime05));
-    std::memcpy(payloadBytes + 0x09u, &publicKeyId09, sizeof(publicKeyId09));
-}
-
 // anchor: launcher.exe:0x468f80
 static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
     AuthBootstrap680ChildBase_0x4b7134& child,

@@ -122,48 +122,6 @@ inline uint32_t ReadU32LE(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[3]) << 24u);
 }
 
-inline uint64_t ReadU64LE(const uint8_t* bytes) {
-    return static_cast<uint64_t>(ReadU32LE(bytes)) |
-           (static_cast<uint64_t>(ReadU32LE(bytes + 4u)) << 32u);
-}
-
-inline std::string TrimFixedCString(const uint8_t* bytes, size_t size) {
-    size_t length = 0u;
-    while (length < size && bytes[length] != 0u) {
-        ++length;
-    }
-    return std::string(reinterpret_cast<const char*>(bytes), length);
-}
-
-inline bool ParseMxoStringAtOffset(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    size_t offset,
-    MxoString* outString) {
-    if (!payloadBytes || !outString || offset + 2u > payloadSize) {
-        return false;
-    }
-
-    MxoString value;
-    value.length = ReadU16LE(payloadBytes + offset);
-    const size_t stringStart = offset + 2u;
-    const size_t stringEnd = stringStart + value.length;
-    if (stringEnd > payloadSize) {
-        return false;
-    }
-
-    value.rawBytes.assign(payloadBytes + offset, payloadBytes + stringEnd);
-    size_t textSize = value.length;
-    if (textSize != 0u && payloadBytes[stringStart + textSize - 1u] == 0u) {
-        --textSize;
-    }
-    value.text.assign(
-        reinterpret_cast<const char*>(payloadBytes + stringStart),
-        textSize);
-    *outString = value;
-    return true;
-}
-
 // Shared `FeedbackSize` / `AssemblyTwofish` helper family
 // --------------------------------------------------------
 // Source-owned C++ mirror of the static-RE-closed launcher helper rooted at:
