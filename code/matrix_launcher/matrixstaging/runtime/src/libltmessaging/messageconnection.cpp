@@ -490,21 +490,25 @@ CMessageConnectionMessageRef_0x4ba23c* CMessageConnectionMessageRefOutputBuffer:
 void CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
-    hasConfiguredFeedbackTransform =
-        feedbackTransform.FeedbackSizeTransformAdapter_ConstructLarge(
+    try {
+        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption feedbackTransform;
+        feedbackTransform.SetKeyWithIV(
             associatedSeedBytes.data(),
-            static_cast<uint32_t>(associatedSeedBytes.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
-            0u);
+            associatedSeedBytes.size(),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
+        hasConfiguredFeedbackTransform = true;
+    } catch (const CryptoPP::Exception&) {
+        hasConfiguredFeedbackTransform = false;
+    }
 }
 
 // anchor: launcher.exe:0x44d500
 bool CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::TryTransform(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
-    // Source still keeps the confirmed packet semantic at the worker boundary here, but the
-    // recovered large/decrypting `FeedbackSize` adapter constructed by `0x44d910` is now held as a
-    // real object alongside that packet-level behavior instead of being collapsed away entirely.
+    // Source still keeps the confirmed packet semantic at the worker boundary here while the old
+    // large/decrypting adapter identity has been flattened away; only the seed-driven direct
+    // Crypto++ behavior remains relevant.
     if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         return false;
     }
@@ -535,21 +539,25 @@ bool CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::TryTransform(
 void CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
-    hasConfiguredFeedbackTransform =
-        feedbackTransform.FeedbackSizeTransformAdapter_ConstructSmall(
+    try {
+        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
+        feedbackTransform.SetKeyWithIV(
             associatedSeedBytes.data(),
-            static_cast<uint32_t>(associatedSeedBytes.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
-            0u);
+            associatedSeedBytes.size(),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
+        hasConfiguredFeedbackTransform = true;
+    } catch (const CryptoPP::Exception&) {
+        hasConfiguredFeedbackTransform = false;
+    }
 }
 
 // anchor: launcher.exe:0x44d390
 bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
-    // Source still keeps the confirmed packet semantic at the worker boundary here, but the
-    // recovered small/encrypting `FeedbackSize` adapter constructed by `0x44d820` is now held as a
-    // real object alongside that packet-level behavior instead of being collapsed away entirely.
+    // Source still keeps the confirmed packet semantic at the worker boundary here while the old
+    // small/encrypting adapter identity has been flattened away; only the seed-driven direct
+    // Crypto++ behavior remains relevant.
     if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         spdlog::debug("TryTransform: no outputBuffer or no hasConfiguredFeedbackTransform");
         return false;

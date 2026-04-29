@@ -875,13 +875,11 @@ class CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0 {
 public:
     // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
     // by `0x44d910`.
-    // Original shape is the larger `FeedbackSizeTransformAdapter_ConstructLarge` branch reused by
-    // the auth-bootstrap transform family. Source now keeps that recovered large/decrypting
-    // `AssemblyTwofish` adapter object explicit instead of collapsing this worker down to raw seed
-    // bytes only. `0x44d500` then wraps each stored worker in a `StreamTransformationFilter` and
-    // passes a copied `LTTCPEndpointKey_0x44b070` peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`.
+    // Original shape is the larger/decrypting CBC Twofish branch reused by the auth-bootstrap
+    // transform family. Safe flattening step 2 keeps only the stored 16-byte seed plus configured
+    // flag here; the direct Crypto++ CBC object is created transiently where needed instead of
+    // being preserved as a fake launcher-local adapter member.
     std::array<uint8_t, 16> associatedSeedBytes{};
-    mxo::auth::internal::FeedbackSizeTransformAdapterLarge feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
@@ -894,13 +892,11 @@ class CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8 {
 public:
     // Source-owned real C++ mirror of the embedded write-side transform worker rooted at helper
     // `+0x0c` by `0x44d820` / worker vtable `0x004b86a8`.
-    // Original shape is the smaller `FeedbackSizeTransformAdapter_ConstructSmall` branch.
-    // Source now keeps that recovered small/encrypting `AssemblyTwofish` adapter object explicit
-    // instead of only caching the 16-byte seed. `0x44d250` then resolves the parameter block fed
-    // into `0x44c750 = CPacketEncryptor_EncryptPacket`, while the helper also snapshots
-    // `configuredConnection10->+0x24 = LTTCPEndpointKey_0x44b070` for the same packet-crypto family.
+    // Original shape is the smaller/encrypting CBC Twofish branch.
+    // Safe flattening step 2 keeps only the stored 16-byte seed plus configured flag here; the
+    // direct Crypto++ CBC object is created transiently where needed instead of being preserved as
+    // a fake launcher-local adapter member.
     std::array<uint8_t, 16> associatedSeedBytes{};
-    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
