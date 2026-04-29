@@ -679,281 +679,76 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
 
 ---
 
-### 2.7 Verifier counterpart — `0x4b7580` = `CryptoPP::RSASSA_PKCS1v15_MD5_Verifier`-compatible
+### 2.7 Implemented verifier / filter / accumulator mappings
 
-**Confidence: HIGH for the exact scheme; MEDIUM-HIGH for the precise old-template spelling**
+These auth-bootstrap Crypto++ classes are now treated as implemented/proven in source. Keep this
+section factual and address-oriented.
 
-The validator family used at child `+0xa4` and `+0xac` is now best read as the launcher's
-**public-key verifier half** of the RSA PKCS#1 v1.5 / MD5 signature family:
+#### `0x004b7580` = `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
 
-- ctor `0x447020 = AuthBootstrap680ReplyAuthDataValidator_ConstructFromReplyPublicKey`
-- lazy fallback-key builder `0x447260 = AuthBootstrap680_CreateLazyPubkeyDatState`
-- final leaf vtable `0x004b7580`
-- algorithm-name body `0x446f30 = AuthBootstrap680Validator_BuildRsaMd5Pkcs1NameBody`
-- MD5 DigestInfo prefix getter `0x445410 = AuthBootstrap680Validator_GetMd5DigestInfoPrefixPair`
+| Address | Mapped name |
+|---|---|
+| `0x447020` | verifier construct-from-public-key |
+| `0x447260` | lazy fallback-key verifier builder |
+| `0x446f30` | `AlgorithmName()` body for `RSA/EMSA-PKCS1-v1_5(MD5)` |
+| `0x445410` | MD5 `DigestInfo` prefix getter |
+| `0x4472f0` | temporary accumulator create |
+| `0x468520` | load signature into temporary accumulator |
+| `0x467ee0` | finalize/verify on temporary accumulator |
+| `0x467f70` | fill temporary-accumulator result pair |
 
-Best current modern Crypto++ equivalent:
+#### `0x004b7668` = `CryptoPP::PK_MessageAccumulatorImpl<MD5>`-like leaf
 
-- `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
-- equivalently: `PK_FinalTemplate<TF_VerifierImpl<TF_SignatureSchemeOptions<RSASS<PKCS1v15, Weak1::MD5>, RSA, PKCS1v15_SignatureMessageEncodingMethod, Weak1::MD5>>>`
+| Address | Mapped name |
+|---|---|
+| `0x4472f0` | complete-object create/finalize |
+| `0x447340` | `Update()` |
+| `0x447380` | `AccessHash()` |
 
-Why this mapping is now strong:
+#### `0x004b76b0` = `CryptoPP::PK_MessageAccumulatorBase` ctor-state vtable
 
-1. **Public-key-only constructor shape**
-   - `0x447020` deep-copies only two `CryptoPP::Integer`-like objects:
-     - destination `this+0x14` from ctor arg1
-     - destination `this+0x28` from ctor arg2
-   - just like the raw `0x08` encryptor family, this exactly matches an embedded RSA public key
-     `(n, e)` rather than a private-key family
+| Address | Mapped name |
+|---|---|
+| `0x447390` | base construct |
+| `0x447340` | `Update()` |
+| `0x447380` | `AccessHash()` slot on finalized leaf family |
 
-2. **Exact algorithm-name evidence**
-   - vtable `+0x08` reaches `0x446f10`, which wraps `0x446f30`
-   - `0x446f30` concatenates:
-     - `"RSA"`
-     - `"/"`
-     - `"EMSA-PKCS1-v1_5"`
-     - `"("`
-     - `"MD5"`
-     - `")"`
-   - that gives the exact Crypto++-style scheme name:
-     - `RSA/EMSA-PKCS1-v1_5(MD5)`
-   - this is verifier-side naming, not encryptor-side naming
+#### `0x004ba110` = `CryptoPP::ByteQueue`
 
-3. **Exact DigestInfo prefix evidence**
-   - `0x445410` returns `(ptr=0x004baefc, len=0x12)`
-   - the validator finalize path uses that pair as the fixed MD5 `DigestInfo` prefix before the
-     caller digest bytes are compared against the RSA-decoded representative
-   - that is the canonical PKCS#1 v1.5 signature verification shape for MD5
+| Address | Mapped name |
+|---|---|
+| `0x454f10` | ctor |
+| `0x455400` | destroy nodes |
+| `0x455470` | reset queue |
+| `0x455520` | isolated initialize |
+| `0x455560` | dtor |
+| `0x454a70` | `CurrentSize()` |
+| `0x454ff0` | `Put2()` |
 
-4. **Vtable behavior matches verifier-style helpers**
-   - `+0x1c` allocates a temporary worker
-   - `+0x20` loads signature bytes into that worker
-   - `+0x28` finalizes and returns a boolean verification result
-   - `+0x2c` is the wrapper that performs the whole verify flow on caller bytes + signature
-   - those slots look like a launcher-visible decomposition of verifier-side work, not an encryptor
-     or decryptor API
+#### `0x004b4478` = `CryptoPP::PK_DefaultEncryptionFilter`
 
-5. **Constructor-phase retabling and thunks again show old MSVC Crypto++ MI**
-   - `0x447020` installs staged tables `0x004b73c8` -> `0x004b7450` -> final `0x004b7580`
-   - it also installs a secondary adjustor thunk through `0x004b741c`
-   - that is the same overall smell as the raw `0x08` encryptor family, but now on the verifier side
+| Address | Mapped name |
+|---|---|
+| `0x438120` | ctor |
+| `0x438180` | dtor |
+| `0x438320` | `Put2()` |
 
-Practical static-RE consequence:
-- child `+0xa4` and `+0xac` should now be treated as **Crypto++ verifier-family objects over an
-  embedded RSA public key**, not just as launcher-local validation helpers
-- the strongest current class-equivalent reading is **RSASSA PKCS#1 v1.5 MD5 verifier** with
-  old-MSVC multiple-inheritance construction tables still visible
+#### `0x004b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
 
-## 2.8 Raw `0x08` helper stack closure: `ByteQueue` + `PK_Default*Filter`
+| Address | Mapped name |
+|---|---|
+| `0x438210` | dtor |
+| `0x438430` | `Put2()` |
 
-### 2.8.1 `0x4ba110` = `CryptoPP::ByteQueue`
+#### `0x004b75e4` = `CryptoPP::RSAES_OAEP_SHA_Encryptor`
 
-**Confidence: HIGH**
-
-The object previously tracked as a ByteQueueNode-like helper is better identified as the full
-**`CryptoPP::ByteQueue`** object itself. The linked 0x18-byte heap chunks are the internal
-`ByteQueueNode` allocations owned by that queue.
-
-Key evidence:
-- ctor `0x454f10`
-  - stores a caller-supplied node size
-  - allocates an initial 0x18-byte node record plus node buffer
-  - sets both head and tail to that first node
-- destroy helper `0x455400` and dtor `0x455560`
-  - walk the linked list, zero/free each node buffer, then free each node object
-- reset path `0x455470`
-  - destroys all nodes and recreates a fresh one-head/one-tail queue
-- isolated init `0x455520`
-  - reads the **`"NodeSize"`** parameter and resets the queue
-- `0x454a70`
-  - sums `(tail - head)` over nodes and adds the lazy tail length, matching `CurrentSize()`
-- `0x454ff0`
-  - appends bytes to the tail node and allocates a new node when needed, matching `Put2()`
-
-Static RE still identifies the launcher member as an embedded **`CryptoPP::ByteQueue`** rather
-than a standalone node helper class.
-
-Source now takes the more direct representation:
-- the old sketch-only `AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch` name is retired
-- the embedded queue member is modeled directly as `CryptoPP::ByteQueue`
-- the prior 0x1c queue-boundary offset/size asserts were pruned because source no longer depends on
-  reproducing the exact launcher ABI/layout for this third-party class member
-
-The important fidelity point remains semantic and boundary-oriented:
-- the linked 0x18-byte allocations are internal ByteQueueNode-like records owned by the queue
-- no remaining auth-bootstrap source logic models the embedded object as a single node
-- launcher anchors stay attached to the surrounding recovered filter boundary
-
-### 2.8.2 `0x4b9c20` = old `CryptoPP::Filter` common base
-
-**Confidence: MEDIUM-HIGH**
-
-Ctor `0x453570` stores one attachment-like constructor argument, installs the
-`CryptoPP::BufferedTransformation` secondary slice, and leaves the object in the exact role we
-expect from the common **Crypto++ `Filter` attachment base** reused by the default public-key
-filters.
-
-Why this is the right level:
-- the object has **no ByteQueue of its own**
-- the vtable methods at `0x453640 / 0x453690 / 0x453710` behave like shared
-  initialize/flush/message-series plumbing
-- both `0x4b4478` and `0x4b4548` construct this base first, exactly like old
-  `PK_DefaultEncryptionFilter` / `PK_DefaultDecryptionFilter` would through
-  `Unflushable<Filter>`
-
-So `0x4b9c20` is best described as the **old Crypto++ Filter-family common base**, not a
-launcher-specific helper shell.
-
-### 2.8.3 `0x4b4478` = `CryptoPP::PK_DefaultEncryptionFilter`
-
-**Confidence: HIGH**
-
-Ctor `0x438120`:
-- constructs the `0x4b9c20` common filter base
-- constructs `0x4ba110` at `this+0x14` with node size `0x100`
-- installs final vtable `0x004b4478`
-
-The message-end path at `0x438320` matches modern Crypto++
-`PK_DefaultEncryptionFilter::Put2` in `cryptlib.cpp`:
-- accumulate plaintext in the embedded `ByteQueue`
-- on `messageEnd`, compute plaintext length from that queue
-- ask the owner encryptor for ciphertext output size
-- drain the queue into a temporary buffer
-- run encryptor-side RSA/OAEP encryption
-- emit the ciphertext through the filter output path
-
-That is a direct semantic match for **`PK_DefaultEncryptionFilter`**.
-
-### 2.8.4 `0x4b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
-
-**Confidence: HIGH**
-
-The sibling vtable at `0x004b4548` differs mainly in the final leaf slot and the message-end path
-at `0x438430`.
-
-That routine matches modern Crypto++ **`PK_DefaultDecryptionFilter::Put2`**:
-- accumulate ciphertext bytes in the embedded `ByteQueue`
-- on `messageEnd`, compute ciphertext length from the queue
-- ask the owner decryptor for maximum plaintext length
-- drain the queue into a temporary ciphertext buffer
-- call the owner decryptor
-- store the returned decode result (`isValidCoding`, `messageLength`-style fields)
-- emit only the decoded plaintext length on success
-
-So `0x4b4548` is best read as **`PK_DefaultDecryptionFilter`**, i.e. the decrypt-side sibling of
-`0x4b4478`.
-
-### 2.8.5 Practical auth-bootstrap consequence
-
-The raw `0x08` helper stack is no longer an open identification problem:
-- `0x4ba110` = `ByteQueue`
-- `0x4b9c20` = old `Filter` common base
-- `0x4b4478` = `PK_DefaultEncryptionFilter`
-- `0x4b4548` = `PK_DefaultDecryptionFilter`
-
-This means the auth-bootstrap source/docs should treat that stack as **old Crypto++ default PK
-filter plumbing** surrounding the already-identified RSAES-OAEP encryptor / decryptor families,
-rather than as a launcher-owned bespoke helper family.
-
-Current source direction after the cleanup pass:
-- the old source-only `AuthBootstrap680Raw08PerChunkWorker48Sketch` has been removed
-- the outer raw-`0x08` worker remains modeled as the `RSAES_OAEP_SHA_Encryptor`-compatible family
-- the inner per-chunk helper is now represented directly by `EncryptPlaintextChunkScaffold()`
-  comments + code that preserve the recovered `PK_DefaultEncryptionFilter` boundary semantics:
-  - construct/use a `ByteQueue` plaintext accumulator
-  - drain it at message-end
-  - emit ciphertext through a `PK_EncryptorFilter`-equivalent step
-- launcher anchors for `0x438120 / 0x438320 / 0x4382c0` now live on that helper body instead of on
-  a dead layout sketch
-
-## 6.2 Validator temporary worker closure: `PK_MessageAccumulatorBase` / `PK_MessageAccumulatorImpl<MD5>`
-
-**Confidence: MEDIUM-HIGH**
-
-The worker allocated from validator slot `+0x1c` is now better understood as a real Crypto++
-verifier-accumulator family object rather than as a launcher-only scratch shell.
-
-Best current read:
-- `0x447390` = base-ish accumulator ctor
-- `0x4472f0` = complete-object factory / leaf finisher
-- semantic family = **old `CryptoPP::PK_MessageAccumulatorBase` with a derived
-  `PK_MessageAccumulatorImpl<MD5>`-like leaf**
-
-### 6.2.1 Construction shape
-
-`0x4472f0 = AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker`:
-- allocates `0x84` bytes
-- calls `0x447390 = AuthBootstrap680ValidatorTemporaryWorker_Construct`
-- constructs hash object at `this+0x60` via `0x43d410`
-- then rewrites the primary vfptr to final vtable `0x004b7668`
-
-`0x447390` itself:
-- calls the root/base ctor
-- installs ctor-state vtable `0x004b76b0`
-- zeroes worker fields
-- default-constructs two adjacent `CryptoPP::Integer`-family subobjects at `+0x34` and `+0x48`
-- seeds byte `+0x5c = 1`
-
-This is a **mild staged-retable smell**, but not the strong old-MSVC multi-inheritance /
-adjustor-thunk pattern seen on the outer RSA verifier/encryptor families.
-
-### 6.2.2 `0x447340` strongly matches `PK_MessageAccumulatorBase::Update`
-
-`0x447340 = AuthBootstrap680ValidatorTemporaryWorker_UpdateDigestMaybeClearReadyFlag`:
-- calls worker vtable `+0x44`
-- receives the hash object at `this+0x60`
-- calls that hash object's update slot with caller bytes
-- updates byte `this+0x5c` so it stays `1` only if it was already `1` and `length == 0`, else clears
-
-That matches modern Crypto++ `PK_MessageAccumulatorBase::Update()` almost exactly:
-
-```cpp
-AccessHash().Update(input, length);
-m_empty = m_empty && length == 0;
-```
-
-So the strongest current field interpretation is:
-- `worker +0x5c` = **`m_empty`-style accumulator flag**
-- worker vtable `+0x44` = **`AccessHash()`-style accessor**
-
-### 6.2.3 `0x447380` strongly matches `AccessHash()`
-
-`0x447380 = AuthBootstrap680ValidatorTemporaryWorker_GetDigestObject60` simply returns:
-- `this + 0x60`
-
-That is exactly the shape expected from a derived
-`PK_MessageAccumulatorImpl<HASH>::AccessHash()` implementation where the hash object is embedded in
-place.
-
-### 6.2.4 Embedded hash object is MD5-family
-
-The object constructed at worker `+0x60` through `0x43d410` is the recovered MD5-family object used
-by this validator path. In the live verifier flow:
-- outer validator naming proves `RSA/EMSA-PKCS1-v1_5(MD5)`
-- slot `+0x3c / 0x445410` returns the fixed MD5 `DigestInfo` prefix
-- the worker-local hash reached through `+0x44` feeds the expected PKCS#1 v1.5 MD5 comparison path
-
-So the leaf object finalized at `0x4472f0` is best described as an
-**MD5-backed Crypto++ verification accumulator**.
-
-### 6.2.5 Practical source/doc consequence
-
-The old source-side `AuthBootstrap680ValidatorTemporaryWorker84Sketch` has now been removed.
-The strongest current interpretation is:
-- **base semantics:** `CryptoPP::PK_MessageAccumulatorBase`
-- **leaf semantics:** `CryptoPP::PK_MessageAccumulatorImpl<MD5>` (old-version equivalent)
-- **usage context:** temporary accumulator created by the
-  `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` family
-
-Current source direction after the cleanup pass:
-- the outer validator remains modeled as the `RSASSA_PKCS1v15_MD5_Verifier`-compatible family
-- the temporary object is treated as real accumulator semantics rather than as a launcher-owned
-  `0x84` field layout
-- launcher anchors for `0x4472f0 / 0x447390 / 0x447340 / 0x447380 / 0x468520 / 0x467ee0` now live
-  on the verifier helper/orchestration comments in `authbootstrap680.cpp`
-
-The remaining launcher-owned pieces are the outer orchestration around allocation, signature
-loading, and final compare wiring — not the accumulator semantics themselves.
+| Address | Mapped name |
+|---|---|
+| `0x447120` | construct-from-public-key |
+| `0x468ea0` | query encrypted output length |
+| `0x468f00` | encrypt into packet builder / chunk loop |
+| `0x468280` | encrypt one plaintext chunk |
+| `0x4382c0` | create inner `PK_DefaultEncryptionFilter` |
 
 ## 7. Open questions / negative results
 
