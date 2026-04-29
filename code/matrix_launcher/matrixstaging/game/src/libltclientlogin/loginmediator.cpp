@@ -2588,17 +2588,6 @@ const char* CLTLoginMediator::MappedSelectionName() const {
     return selectionSeed_.mappedSelectionName_.c_str();
 }
 
-const char* CLTLoginMediator::MappedVariantName() const {
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t variantIndex = selectionSeed_.selectedVariantIndexHigh8_;
-    if (stateCode >= 3u && variantIndex < 100u) {
-        if (const char* selectionName = LookupSlotRecordHeapStringByIndex(static_cast<uint8_t>(variantIndex))) {
-            return selectionName;
-        }
-    }
-    return selectionSeed_.mappedVariantName_.c_str();
-}
-
 bool CLTLoginMediator::VariantIndexMatchesSelection(uint32_t variantIndex) const {
     return variantIndex == selectionSeed_.selectedVariantIndexHigh8_;
 }
@@ -2639,12 +2628,6 @@ void CLTLoginMediator::PrepareState5MarginConnectionCopySend() {
         AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_))
         .PrepareState5MarginConnectionCopySend(*marginConnection);
     marginConnection->SendStoredBootstrapReplyCopy98();
-}
-
-const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
-    return authBootstrapChild680_
-               ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_).authReplyCopyShadowF4
-               : nullptr;
 }
 
 // anchor: launcher.exe:0x41e760

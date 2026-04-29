@@ -865,7 +865,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     uint32_t SelectedVariantIndexHigh8() const;
     uint32_t SelectedVariantState() const;
     const char* MappedSelectionName() const;
-    const char* MappedVariantName() const;
     bool VariantIndexMatchesSelection(uint32_t variantIndex) const;
     uint32_t ExpectedSelectionDescriptorScratchRequest() const;
     bool SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
@@ -1177,7 +1176,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
     void PrepareState5MarginConnectionCopySend();
-    const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
 
 private:
     void MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input);
