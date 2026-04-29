@@ -620,6 +620,71 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
 
 ---
 
+### 2.7 Verifier counterpart — `0x4b7580` = `CryptoPP::RSASSA_PKCS1v15_MD5_Verifier`-compatible
+
+**Confidence: HIGH for the exact scheme; MEDIUM-HIGH for the precise old-template spelling**
+
+The validator family used at child `+0xa4` and `+0xac` is now best read as the launcher's
+**public-key verifier half** of the RSA PKCS#1 v1.5 / MD5 signature family:
+
+- ctor `0x447020 = AuthBootstrap680ReplyAuthDataValidator_ConstructFromReplyPublicKey`
+- lazy fallback-key builder `0x447260 = AuthBootstrap680_CreateLazyPubkeyDatState`
+- final leaf vtable `0x004b7580`
+- algorithm-name body `0x446f30 = AuthBootstrap680Validator_BuildRsaMd5Pkcs1NameBody`
+- MD5 DigestInfo prefix getter `0x445410 = AuthBootstrap680Validator_GetMd5DigestInfoPrefixPair`
+
+Best current modern Crypto++ equivalent:
+
+- `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
+- equivalently: `PK_FinalTemplate<TF_VerifierImpl<TF_SignatureSchemeOptions<RSASS<PKCS1v15, Weak1::MD5>, RSA, PKCS1v15_SignatureMessageEncodingMethod, Weak1::MD5>>>`
+
+Why this mapping is now strong:
+
+1. **Public-key-only constructor shape**
+   - `0x447020` deep-copies only two `CryptoPP::Integer`-like objects:
+     - destination `this+0x14` from ctor arg1
+     - destination `this+0x28` from ctor arg2
+   - just like the raw `0x08` encryptor family, this exactly matches an embedded RSA public key
+     `(n, e)` rather than a private-key family
+
+2. **Exact algorithm-name evidence**
+   - vtable `+0x08` reaches `0x446f10`, which wraps `0x446f30`
+   - `0x446f30` concatenates:
+     - `"RSA"`
+     - `"/"`
+     - `"EMSA-PKCS1-v1_5"`
+     - `"("`
+     - `"MD5"`
+     - `")"`
+   - that gives the exact Crypto++-style scheme name:
+     - `RSA/EMSA-PKCS1-v1_5(MD5)`
+   - this is verifier-side naming, not encryptor-side naming
+
+3. **Exact DigestInfo prefix evidence**
+   - `0x445410` returns `(ptr=0x004baefc, len=0x12)`
+   - the validator finalize path uses that pair as the fixed MD5 `DigestInfo` prefix before the
+     caller digest bytes are compared against the RSA-decoded representative
+   - that is the canonical PKCS#1 v1.5 signature verification shape for MD5
+
+4. **Vtable behavior matches verifier-style helpers**
+   - `+0x1c` allocates a temporary worker
+   - `+0x20` loads signature bytes into that worker
+   - `+0x28` finalizes and returns a boolean verification result
+   - `+0x2c` is the wrapper that performs the whole verify flow on caller bytes + signature
+   - those slots look like a launcher-visible decomposition of verifier-side work, not an encryptor
+     or decryptor API
+
+5. **Constructor-phase retabling and thunks again show old MSVC Crypto++ MI**
+   - `0x447020` installs staged tables `0x004b73c8` -> `0x004b7450` -> final `0x004b7580`
+   - it also installs a secondary adjustor thunk through `0x004b741c`
+   - that is the same overall smell as the raw `0x08` encryptor family, but now on the verifier side
+
+Practical static-RE consequence:
+- child `+0xa4` and `+0xac` should now be treated as **Crypto++ verifier-family objects over an
+  embedded RSA public key**, not just as launcher-local validation helpers
+- the strongest current class-equivalent reading is **RSASSA PKCS#1 v1.5 MD5 verifier** with
+  old-MSVC multiple-inheritance construction tables still visible
+
 ## 7. Open questions / negative results
 
 - **Exact Crypto++ version** — the launcher was likely built against 5.1.x or 5.2.x.
