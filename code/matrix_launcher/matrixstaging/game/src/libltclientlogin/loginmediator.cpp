@@ -1999,14 +1999,13 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
     const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(marginTwofishKey.data());
 
-    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
-    if (!mxo::auth::internal::ConfigureFeedbackSizeTransform(
-            &feedbackTransform,
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransformAdapter;
+    if (!feedbackTransformAdapter.FeedbackSizeTransformAdapter_ConstructSmall(
             marginTwofishKey.data(),
             static_cast<uint32_t>(marginTwofishKey.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data()) ||
-        !mxo::auth::internal::ProcessFeedbackSizeTransform(
-            &feedbackTransform,
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u) ||
+        !feedbackTransformAdapter.FeedbackSizeTransformAdapter_TransformBuffer(
             outDwords + 4,
             transformInput.data(),
             16u)) {

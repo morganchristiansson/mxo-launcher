@@ -875,13 +875,13 @@ class CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0 {
 public:
     // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
     // by `0x44d910`.
-    // Original shape is the larger `0x446d90` decrypting CBC Twofish branch reused by the
-    // auth-bootstrap transform family. Source now stores the direct Crypto++ CBC decryptor object
-    // instead of a source-owned adapter shell. `0x44d500` then wraps each stored worker in a
-    // `StreamTransformationFilter` and passes a copied `LTTCPEndpointKey_0x44b070` peer block into
-    // `0x44bca0 = CPacketDecryptor_DecryptPacket`.
+    // Original shape is the larger `FeedbackSizeTransformAdapter_ConstructLarge` branch reused by
+    // the auth-bootstrap transform family. Source now keeps that recovered large/decrypting
+    // `AssemblyTwofish` adapter object explicit instead of collapsing this worker down to raw seed
+    // bytes only. `0x44d500` then wraps each stored worker in a `StreamTransformationFilter` and
+    // passes a copied `LTTCPEndpointKey_0x44b070` peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`.
     std::array<uint8_t, 16> associatedSeedBytes{};
-    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption feedbackTransform;
+    mxo::auth::internal::FeedbackSizeTransformAdapterLarge feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
@@ -894,12 +894,13 @@ class CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8 {
 public:
     // Source-owned real C++ mirror of the embedded write-side transform worker rooted at helper
     // `+0x0c` by `0x44d820` / worker vtable `0x004b86a8`.
-    // Original shape is the smaller `0x41df60` encrypting CBC Twofish branch.
-    // Source now stores the direct Crypto++ CBC encryptor object instead of a source-owned adapter
-    // shell while the helper still snapshots `configuredConnection10->+0x24 = LTTCPEndpointKey_0x44b070`
-    // for the same packet-crypto family.
+    // Original shape is the smaller `FeedbackSizeTransformAdapter_ConstructSmall` branch.
+    // Source now keeps that recovered small/encrypting `AssemblyTwofish` adapter object explicit
+    // instead of only caching the 16-byte seed. `0x44d250` then resolves the parameter block fed
+    // into `0x44c750 = CPacketEncryptor_EncryptPacket`, while the helper also snapshots
+    // `configuredConnection10->+0x24 = LTTCPEndpointKey_0x44b070` for the same packet-crypto family.
     std::array<uint8_t, 16> associatedSeedBytes{};
-    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
@@ -1081,8 +1082,8 @@ public:
     mxo::ltlogin::AuthBootstrap680Field54HelperSketch feedbackSeedHelper54{};
     uint32_t authServerTimeBias80 = 0;
     std::array<uint8_t, 16> feedbackSeed84{};
-    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption* feedbackTransformLarge94 = nullptr;
-    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption* feedbackTransformSmall98 = nullptr;
+    mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr;
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr;
     uint32_t currentPublicKeyId9C = 0;
     uint8_t authRequestReadyA0 = 0;
     std::array<uint8_t, 3> paddingA1ToA3{};

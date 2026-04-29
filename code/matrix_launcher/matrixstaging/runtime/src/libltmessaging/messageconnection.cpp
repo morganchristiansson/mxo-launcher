@@ -491,11 +491,11 @@ void CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
     hasConfiguredFeedbackTransform =
-        mxo::auth::internal::ConfigureFeedbackSizeTransform(
-            &feedbackTransform,
+        feedbackTransform.FeedbackSizeTransformAdapter_ConstructLarge(
             associatedSeedBytes.data(),
             static_cast<uint32_t>(associatedSeedBytes.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u);
 }
 
 // anchor: launcher.exe:0x44d500
@@ -503,8 +503,8 @@ bool CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::TryTransform(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
     // Source still keeps the confirmed packet semantic at the worker boundary here, but the
-    // recovered large/decrypting CBC Twofish object constructed by `0x44d910` is now held directly
-    // alongside that packet-level behavior.
+    // recovered large/decrypting `FeedbackSize` adapter constructed by `0x44d910` is now held as a
+    // real object alongside that packet-level behavior instead of being collapsed away entirely.
     if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         return false;
     }
@@ -536,11 +536,11 @@ void CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
     hasConfiguredFeedbackTransform =
-        mxo::auth::internal::ConfigureFeedbackSizeTransform(
-            &feedbackTransform,
+        feedbackTransform.FeedbackSizeTransformAdapter_ConstructSmall(
             associatedSeedBytes.data(),
             static_cast<uint32_t>(associatedSeedBytes.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u);
 }
 
 // anchor: launcher.exe:0x44d390
@@ -548,8 +548,8 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
     // Source still keeps the confirmed packet semantic at the worker boundary here, but the
-    // recovered small/encrypting CBC Twofish object constructed by `0x44d820` is now held directly
-    // alongside that packet-level behavior.
+    // recovered small/encrypting `FeedbackSize` adapter constructed by `0x44d820` is now held as a
+    // real object alongside that packet-level behavior instead of being collapsed away entirely.
     if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         spdlog::debug("TryTransform: no outputBuffer or no hasConfiguredFeedbackTransform");
         return false;

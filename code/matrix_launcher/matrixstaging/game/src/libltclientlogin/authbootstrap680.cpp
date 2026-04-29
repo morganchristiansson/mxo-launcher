@@ -1313,13 +1313,15 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_S
 // anchor: launcher.exe:0x445610
 // Base dtor handles +0x00..+0xf4 (validators, helpers, big-ints, parse objects, copy shadow)
 AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {
- // +0x94: feedbackTransformLarge94 - original points at the large/decrypting CBC Twofish object
+ // +0x94: feedbackTransformLarge94 - call dtor(1) if non-null
  if (feedbackTransformLarge94 != nullptr) {
+ // feedbackTransformLarge94->~FeedbackSizeTransformAdapterLarge();
  feedbackTransformLarge94 = nullptr;
  }
 
- // +0x98: feedbackTransformSmall98 - original points at the small/encrypting CBC Twofish object
+ // +0x98: feedbackTransformSmall98 - call dtor(1) if non-null
  if (feedbackTransformSmall98 != nullptr) {
+ // feedbackTransformSmall98->~FeedbackSizeTransformAdapterSmall();
  feedbackTransformSmall98 = nullptr;
  }
 
@@ -2278,23 +2280,23 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     ResetAuthBootstrap680FeedbackTransforms(child);
 
     auto feedbackTransformLarge94 =
-        std::make_unique<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption>();
-    if (mxo::auth::internal::ConfigureFeedbackSizeTransform(
-            feedbackTransformLarge94.get(),
+        std::make_unique<mxo::auth::internal::FeedbackSizeTransformAdapterLarge>();
+    if (feedbackTransformLarge94->FeedbackSizeTransformAdapter_ConstructLarge(
             feedbackSeed84.data(),
             static_cast<uint32_t>(feedbackSeed84.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data())) {
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u)) {
         child.feedbackTransformLarge94 = feedbackTransformLarge94.get();
         child.feedbackTransformLarge94Owned_ = std::move(feedbackTransformLarge94);
     }
 
     auto feedbackTransformSmall98 =
-        std::make_unique<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption>();
-    if (mxo::auth::internal::ConfigureFeedbackSizeTransform(
-            feedbackTransformSmall98.get(),
+        std::make_unique<mxo::auth::internal::FeedbackSizeTransformAdapterSmall>();
+    if (feedbackTransformSmall98->FeedbackSizeTransformAdapter_ConstructSmall(
             feedbackSeed84.data(),
             static_cast<uint32_t>(feedbackSeed84.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data())) {
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u)) {
         child.feedbackTransformSmall98 = feedbackTransformSmall98.get();
         child.feedbackTransformSmall98Owned_ = std::move(feedbackTransformSmall98);
     }

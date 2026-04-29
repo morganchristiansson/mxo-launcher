@@ -8,6 +8,11 @@
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
 
+namespace mxo::auth::internal {
+class FeedbackSizeTransformAdapterLarge;
+class FeedbackSizeTransformAdapterSmall;
+}
+
 namespace mxo::ltlogin {
 
 struct AuthBootstrap680RsaPublicKeyPairOwnedState;
