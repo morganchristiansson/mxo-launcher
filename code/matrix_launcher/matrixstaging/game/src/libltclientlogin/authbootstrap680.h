@@ -229,11 +229,14 @@ public:
     // owner `+0x680` auth child.
     uint32_t SendAuthRequest();
     uint32_t RebuildReplyPublicKeyWorkers(
-        const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket,
-        size_t replyPayloadByteCount);
+        uint32_t replyPublicKeyId09,
+        const uint8_t* modulusBytes,
+        size_t modulusByteCount,
+        uint8_t publicExponentByte,
+        const uint8_t* signatureBytes,
+        size_t signatureByteCount);
     uint32_t HandleGetPublicKeyReply(
-        const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket,
-        size_t replyPayloadByteCount);
+        const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket);
 
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;
