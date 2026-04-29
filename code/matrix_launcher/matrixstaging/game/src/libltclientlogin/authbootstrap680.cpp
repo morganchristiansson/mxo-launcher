@@ -536,48 +536,108 @@ static void TryResolveAuthBootstrap680ReplyLengthPrefixedField(
     }
 }
 
-static void TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-    const uint8_t* packetBodyBytes,
-    size_t packetBodyByteCount,
-    size_t replyHeaderOffset,
-    const uint8_t** outFieldBytes,
-    uint16_t* outFieldLength) {
-    if (outFieldBytes) {
-        *outFieldBytes = nullptr;
-    }
-    if (outFieldLength) {
-        *outFieldLength = 0u;
-    }
-    if (!packetBodyBytes || packetBodyByteCount == 0u ||
-        replyHeaderOffset + 2u > packetBodyByteCount) {
+// anchor: launcher.exe:0x4436b0
+static void ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(
+    AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject) {
+    if (!parseObject || !parseObject->replyHeader10) {
         return;
     }
 
-    const uint16_t fieldOffset = ReadU16LE(packetBodyBytes + replyHeaderOffset);
-    if (fieldOffset == 0u) {
-        return;
-    }
-
-    const size_t lengthOffset = static_cast<size_t>(fieldOffset);
-    if (lengthOffset + 2u > packetBodyByteCount) {
-        return;
-    }
-
-    const uint16_t fieldLength = ReadU16LE(packetBodyBytes + lengthOffset);
-    const size_t fieldDataOffset = lengthOffset + 2u;
-    const size_t fieldDataEnd = fieldDataOffset + static_cast<size_t>(fieldLength);
-    if (fieldDataEnd > packetBodyByteCount) {
-        return;
-    }
-
-    if (outFieldBytes) {
-        *outFieldBytes = packetBodyBytes + fieldDataOffset;
-    }
-    if (outFieldLength) {
-        *outFieldLength = fieldLength;
-    }
+    uint8_t* const replyHeader = const_cast<uint8_t*>(parseObject->replyHeader10);
+    replyHeader[0x00u] = 0x0bu;
+    *reinterpret_cast<uint32_t*>(replyHeader + 0x01u) = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x05u) = 0u;
+    parseObject->stringField05Bytes14 = nullptr;
+    parseObject->stringField05Length18 = 0u;
+    *reinterpret_cast<uint32_t*>(replyHeader + 0x07u) = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x0bu) = 0u;
+    parseObject->authDataBytes1c = nullptr;
+    parseObject->authDataByteLength20 = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x0du) = 0u;
+    parseObject->encryptedPrivateExponentBytes24 = nullptr;
+    parseObject->encryptedPrivateExponentByteLength28 = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x0fu) = 0u;
+    parseObject->opaqueField0fBytes2c = nullptr;
+    parseObject->opaqueField0fByteLength30 = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x11u) = 0u;
+    parseObject->opaqueField11Bytes34 = nullptr;
+    parseObject->opaqueField11ByteLength38 = 0u;
+    *reinterpret_cast<uint32_t*>(replyHeader + 0x15u) = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x19u) = 0u;
+    parseObject->characterTempRecords3c = nullptr;
+    parseObject->characterTempRecordCount40 = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x1bu) = 0u;
+    parseObject->worldTempRecords44 = nullptr;
+    parseObject->worldTempRecordCount48 = 0u;
+    *reinterpret_cast<uint16_t*>(replyHeader + 0x1du) = 0u;
+    parseObject->replyString1dBytes54 = nullptr;
+    parseObject->replyString1dByteLength58 = 0u;
 }
 
+// anchor: launcher.exe:0x443470
+static void ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
+    AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
+    size_t packetBodyByteCount,
+    bool zeroTerminateStrings) {
+    if (!parseObject || !parseObject->replyHeader10) {
+        return;
+    }
+
+    const uint8_t* const packetBody = parseObject->replyHeader10;
+    auto resolveField = [&](size_t replyHeaderOffset,
+                            bool zeroTerminateLastByte,
+                            const uint8_t** outFieldBytes,
+                            uint16_t* outFieldLength) {
+        if (outFieldBytes) {
+            *outFieldBytes = nullptr;
+        }
+        if (outFieldLength) {
+            *outFieldLength = 0u;
+        }
+        if (replyHeaderOffset + 2u > packetBodyByteCount) {
+            return;
+        }
+
+        const uint16_t fieldOffset = ReadU16LE(packetBody + replyHeaderOffset);
+        if (fieldOffset == 0u) {
+            return;
+        }
+
+        const size_t lengthOffset = static_cast<size_t>(fieldOffset);
+        if (lengthOffset + 2u > packetBodyByteCount) {
+            return;
+        }
+
+        const uint16_t fieldLength = ReadU16LE(packetBody + lengthOffset);
+        const size_t fieldDataOffset = lengthOffset + 2u;
+        const size_t fieldDataEnd = fieldDataOffset + static_cast<size_t>(fieldLength);
+        if (fieldDataEnd > packetBodyByteCount) {
+            return;
+        }
+
+        if (zeroTerminateStrings && zeroTerminateLastByte && fieldLength != 0u) {
+            const_cast<uint8_t*>(packetBody)[fieldDataEnd - 1u] = 0u;
+        }
+        if (outFieldBytes) {
+            *outFieldBytes = packetBody + fieldDataOffset;
+        }
+        if (outFieldLength) {
+            *outFieldLength = fieldLength;
+        }
+    };
+
+    resolveField(0x05u, true, &parseObject->stringField05Bytes14, &parseObject->stringField05Length18);
+    resolveField(0x0bu, false, &parseObject->authDataBytes1c, &parseObject->authDataByteLength20);
+    resolveField(0x0du, false, &parseObject->encryptedPrivateExponentBytes24, &parseObject->encryptedPrivateExponentByteLength28);
+    resolveField(0x0fu, false, &parseObject->opaqueField0fBytes2c, &parseObject->opaqueField0fByteLength30);
+    resolveField(0x11u, false, &parseObject->opaqueField11Bytes34, &parseObject->opaqueField11ByteLength38);
+    resolveField(0x13u, false, &parseObject->characterTempRecords3c, &parseObject->characterTempRecordCount40);
+    resolveField(0x19u, false, &parseObject->worldTempRecords44, &parseObject->worldTempRecordCount48);
+    resolveField(0x1bu, false, &parseObject->opaqueField1bBytes4c, &parseObject->opaqueField1bByteLength50);
+    resolveField(0x1du, true, &parseObject->replyString1dBytes54, &parseObject->replyString1dByteLength58);
+}
+
+// anchor: launcher.exe:0x444390
 static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessage(
     AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef) {
@@ -593,7 +653,8 @@ static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessag
     *outParseObject = {};
     outParseObject->vtable00 = 0x004b6c74u;
     outParseObject->packetBody04 = incomingPayload.payloadBytes;
-    outParseObject->incomingMessage08 = const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef);
+    outParseObject->incomingMessage08 =
+        const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef);
     outParseObject->resolveFields0c = 1u;
     outParseObject->replyHeader10 = outParseObject->packetBody04;
 
@@ -610,60 +671,19 @@ static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessag
         outParseObject->resolveFields0c);
     outParseObject->slotRecordAccessor70.incomingMessage08 = outParseObject->incomingMessage08;
 
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x05u,
-        &outParseObject->stringField05Bytes14,
-        &outParseObject->stringField05Length18);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x0bu,
-        &outParseObject->authDataBytes1c,
-        &outParseObject->authDataByteLength20);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x0du,
-        &outParseObject->encryptedPrivateExponentBytes24,
-        &outParseObject->encryptedPrivateExponentByteLength28);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x0fu,
-        &outParseObject->opaqueField0fBytes2c,
-        &outParseObject->opaqueField0fByteLength30);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x11u,
-        &outParseObject->opaqueField11Bytes34,
-        &outParseObject->opaqueField11ByteLength38);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x13u,
-        &outParseObject->characterTempRecords3c,
-        &outParseObject->characterTempRecordCount40);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x19u,
-        &outParseObject->worldTempRecords44,
-        &outParseObject->worldTempRecordCount48);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x1bu,
-        &outParseObject->opaqueField1bBytes4c,
-        &outParseObject->opaqueField1bByteLength50);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
-        incomingPayload.payloadBytes,
-        incomingPayload.payloadByteCount,
-        0x1du,
-        &outParseObject->replyString1dBytes54,
-        &outParseObject->replyString1dByteLength58);
+    outParseObject->currentWorldTempRecord6c = nullptr;
+    outParseObject->currentCharacterTempRecord80 = nullptr;
+    outParseObject->currentCharacterHandle84 = nullptr;
+    outParseObject->currentCharacterHandleByteLength88 = 0u;
+
+    if (outParseObject->resolveFields0c == 0u) {
+        ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(outParseObject);
+    } else {
+        ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
+            outParseObject,
+            incomingPayload.payloadByteCount,
+            true);
+    }
     return true;
 }
 
@@ -695,64 +715,14 @@ static bool CopyAuthBootstrap680AuthReplyParseObjectToOwnedPacketBody(
         outParseObject->packetBody04,
         outParseObject->resolveFields0c);
 
-    if (packetBodyBytes->empty()) {
-        return true;
+    if (outParseObject->resolveFields0c == 0u) {
+        ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(outParseObject);
+    } else {
+        ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
+            outParseObject,
+            packetBodyBytes->size(),
+            true);
     }
-
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x05u,
-        true,
-        &outParseObject->stringField05Bytes14,
-        &outParseObject->stringField05Length18);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x0bu,
-        false,
-        &outParseObject->authDataBytes1c,
-        &outParseObject->authDataByteLength20);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x0du,
-        false,
-        &outParseObject->encryptedPrivateExponentBytes24,
-        &outParseObject->encryptedPrivateExponentByteLength28);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x0fu,
-        false,
-        &outParseObject->opaqueField0fBytes2c,
-        &outParseObject->opaqueField0fByteLength30);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x11u,
-        false,
-        &outParseObject->opaqueField11Bytes34,
-        &outParseObject->opaqueField11ByteLength38);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x13u,
-        false,
-        &outParseObject->characterTempRecords3c,
-        &outParseObject->characterTempRecordCount40);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x19u,
-        false,
-        &outParseObject->worldTempRecords44,
-        &outParseObject->worldTempRecordCount48);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x1bu,
-        false,
-        &outParseObject->opaqueField1bBytes4c,
-        &outParseObject->opaqueField1bByteLength50);
-    TryResolveAuthBootstrap680ReplyLengthPrefixedField(
-        *packetBodyBytes,
-        0x1du,
-        true,
-        &outParseObject->replyString1dBytes54,
-        &outParseObject->replyString1dByteLength58);
     return true;
 }
 
