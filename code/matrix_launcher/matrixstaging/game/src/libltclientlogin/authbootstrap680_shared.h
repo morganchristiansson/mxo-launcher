@@ -45,22 +45,29 @@ struct AuthBootstrap680BigIntObjects_0x4ba50c {
 static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
 
 
+// Recovered `CryptoPP::ByteQueue` layout (`launcher.exe:0x454f10 / 0x455560`).
+// The queue owns a linked list of launcher-tracked ByteQueueNode allocations; this 0x1c-byte
+// object is the queue wrapper itself, not a single node.
 struct AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     uint32_t nodeSize08 = 0u;
-    void* heapNode0c = nullptr;
-    void* heapNode10 = nullptr;
-    uint32_t reserved14 = 0u;
-    uint32_t pendingByteCount18 = 0u;
+    void* headNode0c = nullptr;
+    void* tailNode10 = nullptr;
+    uint32_t lazyString14 = 0u;
+    uint32_t lazyLength18 = 0u;
 };
 static_assert(sizeof(AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch) == 0x1cu);
 
+// Recovered per-chunk filter object built by raw `0x08` RSA encryptor vtable `+0x20`.
+// Best current match: old Crypto++ `PK_DefaultEncryptionFilter`
+// (`launcher.exe:0x438120 / 0x438320`).  The sibling vtable `0x004b4548` behaves like
+// `PK_DefaultDecryptionFilter` over the same `Filter` + `ByteQueue` base family.
 struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     std::array<uint8_t, 0x0c> reserved08To13{};
-    AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch nodeBufferHelper14{};
+    AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch byteQueue14{};
     uint32_t ctorArg30 = 0u;
     void* ctorOwnerWorker34 = nullptr;
     uint32_t reserved38 = 0u;
@@ -68,7 +75,7 @@ struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
     uint32_t ctorZeroTail40 = 0u;
     uint32_t ctorZeroTail44 = 0u;
 };
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, nodeBufferHelper14) == 0x14u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, byteQueue14) == 0x14u);
 static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorArg30) == 0x30u);
 static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorOwnerWorker34) == 0x34u);
 static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorZeroTail40) == 0x40u);
@@ -158,6 +165,11 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
 using AuthBootstrap680LazyPubkeyDatValidatorA4Sketch =
     AuthBootstrap680ReplyAuthDataValidatorACSketch;
 
+// Launcher-owned wrapper around embedded Crypto++ RNG / BufferedTransformation slices.
+// Final ctor state from `launcher.exe:0x4686e0` is:
+// - `+0x00 = 0x004b695c` launcher wrapper vtable
+// - `+0x04 = 0x004b68a8` old `CryptoPP::RandomPool` / modern `OldRandomPool`
+// - `+0x08 = 0x004b41e0` `CryptoPP::BufferedTransformation`
 struct AuthBootstrap680Field54HelperSketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;

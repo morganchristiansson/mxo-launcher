@@ -465,6 +465,10 @@ remaining the top-level mapping/index.
 | `0x4ba258` | `CryptoPP::SHA1` base/hash context | **High** | SHA1 IV and algorithm layout match |
 | `0x4ba7d8` | `CryptoPP::SHA1` init/specialization layer | **High** | wraps/initializes the SHA1 base context |
 | `0x4baed8` | `CryptoPP::MicrosoftCryptoProvider`-like helper | **Medium** | used in RandomPool seeding path |
+| `0x4ba110` | `CryptoPP::ByteQueue` | **High** | owns linked 0x18-byte ByteQueueNode allocations; `NodeSize` init + queue semantics match |
+| `0x4b9c20` | old `CryptoPP::Filter` common base | **Medium-High** | shared initialize/flush/message-series plumbing reused by PK default filters |
+| `0x4b4478` | `CryptoPP::PK_DefaultEncryptionFilter` | **High** | message-end path matches `m_plaintextQueue -> Encrypt -> output` |
+| `0x4b4548` | `CryptoPP::PK_DefaultDecryptionFilter` | **High** | message-end path matches `m_ciphertextQueue -> Decrypt -> output` |
 | `0x4b00b0` / `FeedbackSizeTransformAdapter_0x4b00b0` | `CryptoPP::CBC_Encryption`-compatible mode object | **Medium-High** | two block-sized SecByteBlock-like buffers; process row matches CBC encrypt semantics |
 | `0x4b7500` / `FeedbackSizeTransformAdapterLarge_0x4b7500` | `CryptoPP::CBC_Decryption`-compatible mode object | **Medium-High** | inherits from `0x4b00b0`; adds third temp buffer; process row matches CBC decrypt semantics |
 | `0x4b9fa0` | 45-entry temp vtable set during RNG ctor | **Medium** | Intermediate base before MI resolution; not in final object |
@@ -740,7 +744,113 @@ Practical static-RE consequence:
 - the strongest current class-equivalent reading is **RSASSA PKCS#1 v1.5 MD5 verifier** with
   old-MSVC multiple-inheritance construction tables still visible
 
+## 2.8 Raw `0x08` helper stack closure: `ByteQueue` + `PK_Default*Filter`
+
+### 2.8.1 `0x4ba110` = `CryptoPP::ByteQueue`
+
+**Confidence: HIGH**
+
+The object previously tracked as a ByteQueueNode-like helper is better identified as the full
+**`CryptoPP::ByteQueue`** object itself. The linked 0x18-byte heap chunks are the internal
+`ByteQueueNode` allocations owned by that queue.
+
+Key evidence:
+- ctor `0x454f10`
+  - stores a caller-supplied node size
+  - allocates an initial 0x18-byte node record plus node buffer
+  - sets both head and tail to that first node
+- destroy helper `0x455400` and dtor `0x455560`
+  - walk the linked list, zero/free each node buffer, then free each node object
+- reset path `0x455470`
+  - destroys all nodes and recreates a fresh one-head/one-tail queue
+- isolated init `0x455520`
+  - reads the **`"NodeSize"`** parameter and resets the queue
+- `0x454a70`
+  - sums `(tail - head)` over nodes and adds the lazy tail length, matching `CurrentSize()`
+- `0x454ff0`
+  - appends bytes to the tail node and allocates a new node when needed, matching `Put2()`
+
+So the source-side `AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch` should now be read as
+**recovered `CryptoPP::ByteQueue` layout**, not as a standalone node helper class.
+
+### 2.8.2 `0x4b9c20` = old `CryptoPP::Filter` common base
+
+**Confidence: MEDIUM-HIGH**
+
+Ctor `0x453570` stores one attachment-like constructor argument, installs the
+`CryptoPP::BufferedTransformation` secondary slice, and leaves the object in the exact role we
+expect from the common **Crypto++ `Filter` attachment base** reused by the default public-key
+filters.
+
+Why this is the right level:
+- the object has **no ByteQueue of its own**
+- the vtable methods at `0x453640 / 0x453690 / 0x453710` behave like shared
+  initialize/flush/message-series plumbing
+- both `0x4b4478` and `0x4b4548` construct this base first, exactly like old
+  `PK_DefaultEncryptionFilter` / `PK_DefaultDecryptionFilter` would through
+  `Unflushable<Filter>`
+
+So `0x4b9c20` is best described as the **old Crypto++ Filter-family common base**, not a
+launcher-specific helper shell.
+
+### 2.8.3 `0x4b4478` = `CryptoPP::PK_DefaultEncryptionFilter`
+
+**Confidence: HIGH**
+
+Ctor `0x438120`:
+- constructs the `0x4b9c20` common filter base
+- constructs `0x4ba110` at `this+0x14` with node size `0x100`
+- installs final vtable `0x004b4478`
+
+The message-end path at `0x438320` matches modern Crypto++
+`PK_DefaultEncryptionFilter::Put2` in `cryptlib.cpp`:
+- accumulate plaintext in the embedded `ByteQueue`
+- on `messageEnd`, compute plaintext length from that queue
+- ask the owner encryptor for ciphertext output size
+- drain the queue into a temporary buffer
+- run encryptor-side RSA/OAEP encryption
+- emit the ciphertext through the filter output path
+
+That is a direct semantic match for **`PK_DefaultEncryptionFilter`**.
+
+### 2.8.4 `0x4b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
+
+**Confidence: HIGH**
+
+The sibling vtable at `0x004b4548` differs mainly in the final leaf slot and the message-end path
+at `0x438430`.
+
+That routine matches modern Crypto++ **`PK_DefaultDecryptionFilter::Put2`**:
+- accumulate ciphertext bytes in the embedded `ByteQueue`
+- on `messageEnd`, compute ciphertext length from the queue
+- ask the owner decryptor for maximum plaintext length
+- drain the queue into a temporary ciphertext buffer
+- call the owner decryptor
+- store the returned decode result (`isValidCoding`, `messageLength`-style fields)
+- emit only the decoded plaintext length on success
+
+So `0x4b4548` is best read as **`PK_DefaultDecryptionFilter`**, i.e. the decrypt-side sibling of
+`0x4b4478`.
+
+### 2.8.5 Practical auth-bootstrap consequence
+
+The raw `0x08` helper stack is no longer an open identification problem:
+- `0x4ba110` = `ByteQueue`
+- `0x4b9c20` = old `Filter` common base
+- `0x4b4478` = `PK_DefaultEncryptionFilter`
+- `0x4b4548` = `PK_DefaultDecryptionFilter`
+
+This means the auth-bootstrap source/docs should treat that stack as **old Crypto++ default PK
+filter plumbing** surrounding the already-identified RSAES-OAEP encryptor / decryptor families,
+rather than as a launcher-owned bespoke helper family.
+
 ## 7. Open questions / negative results
+
+- The validator temporary worker at child `+0x84` is still best treated as a launcher-owned
+  verifier-side temporary object, even though it internally uses already-identified Crypto++
+  pieces.
+
+- The auth-reply parse accessor/object sketches remain launcher-owned packet shells.
 
 - **Exact Crypto++ version** — the launcher was likely built against 5.1.x or 5.2.x.
   The `OldRandomPool` in 8.9.0 is a faithful reproduction, but slot-level vtable offsets
