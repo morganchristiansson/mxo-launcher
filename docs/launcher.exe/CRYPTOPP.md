@@ -430,17 +430,26 @@ multiple-inheritance / holder/subobject complexity. Treat the CBC mapping as **s
 identification**, not proof that the launcher’s exact original source used a simple two-class
 hand-written hierarchy.
 
-### 4.6 Replacement consequence
+### 4.6 Source implementation status / replacement consequence
 
-These objects are **not** faithfully modeled by a simple source-owned helper that merely stores key
-bytes and IV bytes and then directly runs a modern `CryptoPP::CBC_Mode<CryptoPP::Twofish>` object as
-if that were the whole original class.
+The current source has now moved to the preferred fidelity tradeoff for this family:
+- keep the launcher-facing wrapper/boundary names
+  - `FeedbackSizeTransformAdapter_ConstructSmall` (`0x41df60`)
+  - `FeedbackSizeTransformAdapter_ConstructLarge` (`0x446d90`)
+  - `FeedbackSizeTransformAdapter_TransformBuffer` (`0x44b570`)
+- back those wrappers with the **real Crypto++ CBC Twofish classes**
+  - small -> `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption`
+  - large -> `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption`
+- reinitialize the CBC object from the stored key/IV for each transform call so the configured-IV
+  call pattern matches the launcher usage already recovered in auth bootstrap and margin paths
 
-Current practical rule:
-- keep the known-working direct Twofish challenge path where live auth requires it
-- preserve the recovered object ownership/inheritance notes here
-- do not claim the current source implementation of the `0x4b00b0/0x4b7500` family is already a
-  faithful reimplementation of the original launcher class semantics
+What still remains true:
+- the original launcher object family almost certainly had older Crypto++ holder / MI / internal
+  buffer semantics that are richer than a modern minimal wrapper
+- the Ghidra-side inheritance notes (`0x4b00b0` base, `0x4b7500` derived) should still be preserved
+  in comments/docs where object layout matters
+- if future static-RE closes more of the old Crypto++ internal holder layers, source can be refined
+  again without changing the launcher-facing method boundaries
 
 ---
 

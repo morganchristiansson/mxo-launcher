@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <memory>
 
 #ifndef CRYPTOPP_ENABLE_NAMESPACE_WEAK
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
@@ -124,61 +125,32 @@ inline uint32_t ReadU32LE(const uint8_t* bytes) {
 
 // Shared `FeedbackSize` / `AssemblyTwofish` helper family
 // --------------------------------------------------------
-// Source-owned C++ mirror of the static-RE-closed launcher helper rooted at:
-// - launcher.exe:0x41df60 = FeedbackSizeTransformAdapter_ConstructSmall
-// - launcher.exe:0x446d90 = FeedbackSizeTransformAdapter_ConstructLarge
-// - launcher.exe:0x44b570 = FeedbackSizeTransformAdapter_TransformBuffer
-// - launcher.exe:0x41c750 = zero + tracked-free helper used by the adapter dtors
+// Static-RE now identifies the launcher-side helper pair as real Crypto++ CBC wrappers:
+// - small constructor path `0x41df60` -> encrypting `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption`
+//   (Ghidra vftable anchor `CBC_Encryption_0x4b00b0`)
+// - large constructor path `0x446d90` -> decrypting `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption`
+//   (Ghidra vftable anchor `CBC_Decryption_0x4b7500`)
 //
-// Current strongest static read:
-// - small constructor paths (`0x41df60`) are the encrypting `AssemblyTwofish` worker family used by
-//   state9 callback blob filling, auth-bootstrap send-side field `+0x98`, and margin write-helper
-//   setup
-// - large constructor paths (`0x446d90`) are the decrypting sibling used by auth-bootstrap field
-//   `+0x94` and margin read-helper worker setup
-// - both variants configure a 16-byte `AssemblyTwofish` state around a 16-byte source block and a
-//   caller-provided `IV` byte span; all currently recovered callers pass a zero IV block
-// - `0x44b570` then walks the caller span in 16-byte chunks with 4-byte-alignment scratch handling
-//
-// The original helper alloc/free pair (`0x41d2e0` / `0x41c750`) dispatch into tracked fixed-size
-// bins for `<0x11`, `<0x21`, `<0x281`, `<0x501`, and `<0x1001` before falling back to the general
-// tracked heap. Source keeps the same thresholds/comments and exact zero-before-free behavior, but
-// uses `malloc/free` as the backing storage until the allocator family itself is source-owned.
+// Source keeps the recovered launcher-facing adapter method names/boundaries, but the adapter
+// internals now hold and configure the real Crypto++ CBC objects instead of a source-owned CBC
+// reimplementation.
 inline const std::array<uint8_t, 16>& FeedbackSizeTransformAdapterZeroIv() {
     // anchors: launcher.exe:DAT_004d4d50 / DAT_004f7c2c / DAT_004f7f88
     static const std::array<uint8_t, 16> kZeroIv = {};
     return kZeroIv;
 }
 
-inline uint8_t* FeedbackSizeTransformAdapter_TrackedAllocateBuffer(uint32_t byteCount) {
-    // anchor: launcher.exe:0x41d2e0
-    if (byteCount == 0u) {
-        return nullptr;
-    }
-    return static_cast<uint8_t*>(std::malloc(byteCount));
-}
-
-inline void FeedbackSizeTransformAdapter_SecureFreeTrackedBuffer(void* storage, uint32_t byteCount) {
-    // anchor: launcher.exe:0x41c750
-    if (!storage || byteCount == 0u) {
-        return;
-    }
-
-    std::memset(storage, 0, byteCount);
-    std::free(storage);
-}
-
-
-class FeedbackSizeTransformAdapterCommon {
+template <typename TransformT>
+class FeedbackSizeTransformAdapterBase {
 public:
-    FeedbackSizeTransformAdapterCommon() = default;
+    FeedbackSizeTransformAdapterBase() = default;
 
-    FeedbackSizeTransformAdapterCommon(const FeedbackSizeTransformAdapterCommon& other) {
+    FeedbackSizeTransformAdapterBase(const FeedbackSizeTransformAdapterBase& other) {
         CopyFrom(other);
     }
 
-    FeedbackSizeTransformAdapterCommon& operator=(
-        const FeedbackSizeTransformAdapterCommon& other) {
+    FeedbackSizeTransformAdapterBase& operator=(
+        const FeedbackSizeTransformAdapterBase& other) {
         if (this != &other) {
             Reset();
             CopyFrom(other);
@@ -186,31 +158,17 @@ public:
         return *this;
     }
 
-    FeedbackSizeTransformAdapterCommon(FeedbackSizeTransformAdapterCommon&& other) noexcept {
-        MoveFrom(&other);
-    }
+    FeedbackSizeTransformAdapterBase(FeedbackSizeTransformAdapterBase&& other) noexcept = default;
+    FeedbackSizeTransformAdapterBase& operator=(
+        FeedbackSizeTransformAdapterBase&& other) noexcept = default;
 
-    FeedbackSizeTransformAdapterCommon& operator=(
-        FeedbackSizeTransformAdapterCommon&& other) noexcept {
-        if (this != &other) {
-            Reset();
-            MoveFrom(&other);
-        }
-        return *this;
-    }
-
-    ~FeedbackSizeTransformAdapterCommon() {
+    ~FeedbackSizeTransformAdapterBase() {
         Reset();
     }
 
     uint32_t QueryBlockByteCount10() const {
         // anchors: launcher.exe:0x420320 / 0x41d6e0
         return 16u;
-    }
-
-    uint32_t QueryAlignmentQuantum() const {
-        // anchors: launcher.exe:0x4686b0 / 0x44b570
-        return 4u;
     }
 
     bool FeedbackSizeTransformAdapter_TransformBuffer(
@@ -223,75 +181,32 @@ public:
             return false;
         }
 
-        if (workingBuffer14_ == nullptr || scratchBuffer20_ == nullptr ||
-            (decryptLarge59_ && swapBuffer2c_ == nullptr)) {
-            return false;
-        }
-
-        uint8_t* destinationCursor = static_cast<uint8_t*>(destinationBytes);
-        const uint8_t* sourceCursor = static_cast<const uint8_t*>(sourceBytes);
-        const uint32_t blockByteCount = QueryBlockByteCount10();
-        const uintptr_t alignmentMask = QueryAlignmentQuantum() - 1u;
-
         try {
-            if (!decryptLarge59_) {
-                CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption cipher;
-                cipher.SetKeyWithIV(keyBytes38_.data(), keyBytes38_.size(), ivBytes48_.data());
-                for (uint32_t remaining = byteCount; remaining != 0u; remaining -= blockByteCount) {
-                    const bool sourceAligned =
-                        ((reinterpret_cast<uintptr_t>(sourceCursor) & alignmentMask) == 0u);
-                    const bool destinationAligned =
-                        ((reinterpret_cast<uintptr_t>(destinationCursor) & alignmentMask) == 0u);
+            // Reinitialize per call so the CBC chain always starts from the configured IV, which
+            // matches the prior source behavior and the launcher call pattern that treats the
+            // adapter as a reusable configured object rather than a continuously-advanced stream.
+            transform58_ = std::make_unique<TransformT>();
+            transform58_->SetKeyWithIV(
+                keyBytes38_.data(),
+                keyBytes38_.size(),
+                ivBytes48_.data());
 
-                    const uint8_t* transformInput = sourceCursor;
-                    if (!sourceAligned) {
-                        std::memcpy(workingBuffer14_, sourceCursor, blockByteCount);
-                        transformInput = workingBuffer14_;
-                    }
-
-                    uint8_t* transformOutput = destinationCursor;
-                    if (!destinationAligned || destinationCursor == sourceCursor) {
-                        transformOutput = scratchBuffer20_;
-                    }
-
-                    cipher.ProcessData(transformOutput, transformInput, blockByteCount);
-                    if (transformOutput != destinationCursor) {
-                        std::memcpy(destinationCursor, transformOutput, blockByteCount);
-                    }
-
-                    sourceCursor += blockByteCount;
-                    destinationCursor += blockByteCount;
-                }
-                return true;
+            const uint8_t* transformInput = static_cast<const uint8_t*>(sourceBytes);
+            std::vector<uint8_t> overlapScratch;
+            const uint8_t* destinationBegin = static_cast<const uint8_t*>(destinationBytes);
+            const uint8_t* destinationEnd = destinationBegin + byteCount;
+            const bool overlaps =
+                (transformInput < destinationEnd) &&
+                (destinationBegin < (transformInput + byteCount));
+            if (overlaps) {
+                overlapScratch.assign(transformInput, transformInput + byteCount);
+                transformInput = overlapScratch.data();
             }
 
-            CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption cipher;
-            cipher.SetKeyWithIV(keyBytes38_.data(), keyBytes38_.size(), ivBytes48_.data());
-            for (uint32_t remaining = byteCount; remaining != 0u; remaining -= blockByteCount) {
-                const bool sourceAligned =
-                    ((reinterpret_cast<uintptr_t>(sourceCursor) & alignmentMask) == 0u);
-                const bool destinationAligned =
-                    ((reinterpret_cast<uintptr_t>(destinationCursor) & alignmentMask) == 0u);
-
-                const uint8_t* transformInput = sourceCursor;
-                if (!sourceAligned || destinationCursor == sourceCursor) {
-                    std::memcpy(swapBuffer2c_, sourceCursor, blockByteCount);
-                    transformInput = swapBuffer2c_;
-                }
-
-                uint8_t* transformOutput = destinationCursor;
-                if (!destinationAligned || destinationCursor == sourceCursor) {
-                    transformOutput = scratchBuffer20_;
-                }
-
-                cipher.ProcessData(transformOutput, transformInput, blockByteCount);
-                if (transformOutput != destinationCursor) {
-                    std::memcpy(destinationCursor, transformOutput, blockByteCount);
-                }
-
-                sourceCursor += blockByteCount;
-                destinationCursor += blockByteCount;
-            }
+            transform58_->ProcessData(
+                static_cast<CryptoPP::byte*>(destinationBytes),
+                reinterpret_cast<const CryptoPP::byte*>(transformInput),
+                byteCount);
             return true;
         } catch (const CryptoPP::Exception&) {
             return false;
@@ -302,8 +217,7 @@ protected:
     bool ConstructCommon(
         const void* sourceBytes,
         uint32_t sourceByteCount,
-        const void* ivBytes,
-        bool decryptLarge) {
+        const void* ivBytes) {
         Reset();
         if (!sourceBytes || !ivBytes || sourceByteCount < 16u) {
             return false;
@@ -312,117 +226,51 @@ protected:
         std::memcpy(keyBytes38_.data(), sourceBytes, keyBytes38_.size());
         std::memcpy(ivBytes48_.data(), ivBytes, ivBytes48_.size());
 
-        configured58_ = true;
-        decryptLarge59_ = decryptLarge;
-        rounds5a_ = 16u; // recovered `Rounds` query default consumed by the helper family
-
-        workingBufferByteCount10_ = QueryBlockByteCount10();
-        workingBuffer14_ = FeedbackSizeTransformAdapter_TrackedAllocateBuffer(workingBufferByteCount10_);
-        scratchByteCount1c_ = QueryBlockByteCount10();
-        scratchBuffer20_ = FeedbackSizeTransformAdapter_TrackedAllocateBuffer(scratchByteCount1c_);
-        if (decryptLarge59_) {
-            swapByteCount28_ = QueryBlockByteCount10();
-            swapBuffer2c_ = FeedbackSizeTransformAdapter_TrackedAllocateBuffer(swapByteCount28_);
-        }
-
-        if (workingBuffer14_ == nullptr || scratchBuffer20_ == nullptr ||
-            (decryptLarge59_ && swapBuffer2c_ == nullptr)) {
+        try {
+            transform58_ = std::make_unique<TransformT>();
+            transform58_->SetKeyWithIV(
+                keyBytes38_.data(),
+                keyBytes38_.size(),
+                ivBytes48_.data());
+            configured58_ = true;
+            rounds5a_ = 16u; // recovered `Rounds` query default consumed by the helper family
+            return true;
+        } catch (const CryptoPP::Exception&) {
             Reset();
             return false;
         }
-
-        std::memset(workingBuffer14_, 0, workingBufferByteCount10_);
-        std::memset(scratchBuffer20_, 0, scratchByteCount1c_);
-        if (swapBuffer2c_ != nullptr) {
-            std::memset(swapBuffer2c_, 0, swapByteCount28_);
-        }
-        return true;
     }
 
 private:
     void Reset() {
         // anchor: launcher.exe:0x41e010 / 0x41e4b0
-        FeedbackSizeTransformAdapter_SecureFreeTrackedBuffer(scratchBuffer20_, scratchByteCount1c_);
-        FeedbackSizeTransformAdapter_SecureFreeTrackedBuffer(workingBuffer14_, workingBufferByteCount10_);
-        FeedbackSizeTransformAdapter_SecureFreeTrackedBuffer(swapBuffer2c_, swapByteCount28_);
-
-        workingBufferByteCount10_ = 0u;
-        workingBuffer14_ = nullptr;
-        scratchByteCount1c_ = 0u;
-        scratchBuffer20_ = nullptr;
-        swapByteCount28_ = 0u;
-        swapBuffer2c_ = nullptr;
+        transform58_.reset();
         keyBytes38_.fill(0u);
         ivBytes48_.fill(0u);
         configured58_ = false;
-        decryptLarge59_ = false;
         rounds5a_ = 0u;
     }
 
-    void CopyFrom(const FeedbackSizeTransformAdapterCommon& other) {
+    void CopyFrom(const FeedbackSizeTransformAdapterBase& other) {
         if (!other.configured58_) {
             return;
         }
-        if (!ConstructCommon(
-                other.keyBytes38_.data(),
-                static_cast<uint32_t>(other.keyBytes38_.size()),
-                other.ivBytes48_.data(),
-                other.decryptLarge59_)) {
-            return;
-        }
-
-        if (workingBuffer14_ && other.workingBuffer14_) {
-            std::memcpy(workingBuffer14_, other.workingBuffer14_, workingBufferByteCount10_);
-        }
-        if (scratchBuffer20_ && other.scratchBuffer20_) {
-            std::memcpy(scratchBuffer20_, other.scratchBuffer20_, scratchByteCount1c_);
-        }
-        if (swapBuffer2c_ && other.swapBuffer2c_) {
-            std::memcpy(swapBuffer2c_, other.swapBuffer2c_, swapByteCount28_);
-        }
+        (void)ConstructCommon(
+            other.keyBytes38_.data(),
+            static_cast<uint32_t>(other.keyBytes38_.size()),
+            other.ivBytes48_.data());
         rounds5a_ = other.rounds5a_;
     }
 
-    void MoveFrom(FeedbackSizeTransformAdapterCommon* other) {
-        workingBufferByteCount10_ = other->workingBufferByteCount10_;
-        workingBuffer14_ = other->workingBuffer14_;
-        scratchByteCount1c_ = other->scratchByteCount1c_;
-        scratchBuffer20_ = other->scratchBuffer20_;
-        swapByteCount28_ = other->swapByteCount28_;
-        swapBuffer2c_ = other->swapBuffer2c_;
-        keyBytes38_ = other->keyBytes38_;
-        ivBytes48_ = other->ivBytes48_;
-        configured58_ = other->configured58_;
-        decryptLarge59_ = other->decryptLarge59_;
-        rounds5a_ = other->rounds5a_;
-
-        other->workingBufferByteCount10_ = 0u;
-        other->workingBuffer14_ = nullptr;
-        other->scratchByteCount1c_ = 0u;
-        other->scratchBuffer20_ = nullptr;
-        other->swapByteCount28_ = 0u;
-        other->swapBuffer2c_ = nullptr;
-        other->keyBytes38_.fill(0u);
-        other->ivBytes48_.fill(0u);
-        other->configured58_ = false;
-        other->decryptLarge59_ = false;
-        other->rounds5a_ = 0u;
-    }
-
-    uint32_t workingBufferByteCount10_ = 0u; // launcher adapter `+0x10`
-    uint8_t* workingBuffer14_ = nullptr;      // launcher adapter `+0x14`
-    uint32_t scratchByteCount1c_ = 0u;       // launcher adapter `+0x1c`
-    uint8_t* scratchBuffer20_ = nullptr;     // launcher adapter `+0x20`
-    uint32_t swapByteCount28_ = 0u;          // launcher large-adapter `+0x28`
-    uint8_t* swapBuffer2c_ = nullptr;        // launcher large-adapter `+0x2c`
-    std::array<uint8_t, 16> keyBytes38_{};   // launcher inner `AssemblyTwofish` seed bytes
-    std::array<uint8_t, 16> ivBytes48_{};    // launcher named parameter `IV`
+    std::array<uint8_t, 16> keyBytes38_{};  // launcher inner `AssemblyTwofish` seed bytes
+    std::array<uint8_t, 16> ivBytes48_{};   // launcher named parameter `IV`
+    std::unique_ptr<TransformT> transform58_;
     bool configured58_ = false;
-    bool decryptLarge59_ = false;
     uint8_t rounds5a_ = 0u;
 };
 
-class FeedbackSizeTransformAdapterSmall final : public FeedbackSizeTransformAdapterCommon {
+class FeedbackSizeTransformAdapterSmall final
+    : public FeedbackSizeTransformAdapterBase<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> {
 public:
     bool FeedbackSizeTransformAdapter_ConstructSmall(
         const void* sourceBytes,
@@ -430,11 +278,12 @@ public:
         const void* ivBytes,
         uint32_t /*unusedZero*/) {
         // anchor: launcher.exe:0x41df60
-        return ConstructCommon(sourceBytes, sourceByteCount, ivBytes, /*decryptLarge=*/false);
+        return ConstructCommon(sourceBytes, sourceByteCount, ivBytes);
     }
 };
 
-class FeedbackSizeTransformAdapterLarge final : public FeedbackSizeTransformAdapterCommon {
+class FeedbackSizeTransformAdapterLarge final
+    : public FeedbackSizeTransformAdapterBase<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption> {
 public:
     bool FeedbackSizeTransformAdapter_ConstructLarge(
         const void* sourceBytes,
@@ -442,7 +291,7 @@ public:
         const void* ivBytes,
         uint32_t /*unusedZero*/) {
         // anchor: launcher.exe:0x446d90
-        return ConstructCommon(sourceBytes, sourceByteCount, ivBytes, /*decryptLarge=*/true);
+        return ConstructCommon(sourceBytes, sourceByteCount, ivBytes);
     }
 };
 
