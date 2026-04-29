@@ -357,54 +357,6 @@ static void FillAuthBootstrap680Field54SeedBytesScaffold(
 constexpr uint16_t kAuthBootstrap680Raw08PlaintextFixedByteCount = 0x1bu;
 constexpr uint16_t kAuthBootstrap680Raw08RequestFixedByteCount = 0x28u;
 
-static uint8_t* ResetRecoveredPacketBuilderPayload(
-    mxo::liblttcp::Packet_0x4af2a4& packet,
-    uint16_t fixedPayloadByteCount) {
-    if (!packet.messageRef08 || !packet.messageRef08->messageStorage0c) {
-        packet.payloadPtr04 = 0u;
-        packet.payloadAlias10 = nullptr;
-        packet.debugString14 = nullptr;
-        packet.payloadSize18 = 0u;
-        return nullptr;
-    }
-
-    auto* const messageStorage = packet.messageRef08->messageStorage0c;
-    messageStorage->ResetPayloadByteCount(0u);
-    messageStorage->GrowPayloadByteCount(fixedPayloadByteCount);
-
-    uint8_t* const payloadBase = messageStorage->PayloadBase();
-    packet.payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
-    packet.payloadAlias10 = payloadBase;
-    packet.debugString14 = nullptr;
-    packet.payloadSize18 = 0u;
-    if (payloadBase != nullptr) {
-        std::memset(payloadBase, 0, fixedPayloadByteCount);
-    }
-    return payloadBase;
-}
-
-static uint16_t ReserveRecoveredLengthPrefixedTailAtOffset(
-    mxo::liblttcp::Packet_0x4af2a4& packet,
-    size_t payloadOffsetFieldOffset,
-    uint16_t contentByteCount) {
-    if (!packet.messageRef08 || !packet.messageRef08->messageStorage0c ||
-        packet.payloadAlias10 == nullptr) {
-        return 0u;
-    }
-
-    auto* const messageStorage = packet.messageRef08->messageStorage0c;
-    uint8_t* const payloadBase = static_cast<uint8_t*>(packet.payloadAlias10);
-    uint8_t* const reservationHeader = payloadBase + messageStorage->PayloadByteCount();
-    messageStorage->GrowPayloadByteCount(static_cast<uint16_t>(contentByteCount + 2u));
-
-    *reinterpret_cast<uint16_t*>(reservationHeader) = contentByteCount;
-    *reinterpret_cast<uint16_t*>(payloadBase + payloadOffsetFieldOffset) =
-        static_cast<uint16_t>(reservationHeader - payloadBase);
-    packet.debugString14 = reinterpret_cast<const char*>(reservationHeader + 2u);
-    packet.payloadSize18 = contentByteCount;
-    return contentByteCount;
-}
-
 static void ResetAuthBootstrap680AuthReplyParseAccessor(
     AuthBootstrap680AuthReplyParseAccessor10Sketch* outAccessor,
     uint32_t vtable,
@@ -2303,14 +2255,24 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     // - outbound builder: fixed 0x28-byte prefix with a length-prefixed ciphertext tail offset at
     //   payload `+0x06`
     Packet_AsGetPublicKeyReply_0x4b6ca4 plaintextAuthBlob;
-    uint8_t* const plaintextPayload =
-        ResetRecoveredPacketBuilderPayload(
-            plaintextAuthBlob,
-            kAuthBootstrap680Raw08PlaintextFixedByteCount);
+    if (!plaintextAuthBlob.messageRef08 || !plaintextAuthBlob.messageRef08->messageStorage0c) {
+        spdlog::error("launcher-owned auth failed to initialize recovered 0x4474f0 plaintext packet builder");
+        return;
+    }
+    auto* const plaintextMessageStorage = plaintextAuthBlob.messageRef08->messageStorage0c;
+    plaintextMessageStorage->ResetPayloadByteCount(0u);
+    plaintextMessageStorage->GrowPayloadByteCount(kAuthBootstrap680Raw08PlaintextFixedByteCount);
+
+    uint8_t* const plaintextPayload = plaintextMessageStorage->PayloadBase();
+    plaintextAuthBlob.payloadPtr04 = reinterpret_cast<uint32_t>(plaintextPayload);
+    plaintextAuthBlob.payloadAlias10 = plaintextPayload;
+    plaintextAuthBlob.debugString14 = nullptr;
+    plaintextAuthBlob.payloadSize18 = 0u;
     if (plaintextPayload == nullptr) {
         spdlog::error("launcher-owned auth failed to initialize recovered 0x4474f0 plaintext packet builder");
         return;
     }
+    std::memset(plaintextPayload, 0, kAuthBootstrap680Raw08PlaintextFixedByteCount);
 
     plaintextPayload[0] = 0x00u;
     *reinterpret_cast<uint32_t*>(plaintextPayload + 0x01u) = currentPublicKeyId9C;
@@ -2320,11 +2282,14 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
 
     const uint16_t usernameLengthField =
         static_cast<uint16_t>(std::strlen(username) + 1u);
-    if (ReserveRecoveredLengthPrefixedTailAtOffset(plaintextAuthBlob, 0x05u, usernameLengthField) !=
-        usernameLengthField) {
-        spdlog::error("launcher-owned auth failed to reserve recovered 0x4474f0 username tail");
-        return;
-    }
+    uint8_t* const plaintextReservationHeader =
+        plaintextPayload + plaintextMessageStorage->PayloadByteCount();
+    plaintextMessageStorage->GrowPayloadByteCount(static_cast<uint16_t>(usernameLengthField + 2u));
+    *reinterpret_cast<uint16_t*>(plaintextReservationHeader) = usernameLengthField;
+    *reinterpret_cast<uint16_t*>(plaintextPayload + 0x05u) =
+        static_cast<uint16_t>(plaintextReservationHeader - plaintextPayload);
+    plaintextAuthBlob.debugString14 = reinterpret_cast<const char*>(plaintextReservationHeader + 2u);
+    plaintextAuthBlob.payloadSize18 = usernameLengthField;
     if (plaintextAuthBlob.debugString14 == nullptr) {
         spdlog::error("launcher-owned auth lost recovered 0x4474f0 username tail pointer");
         return;
@@ -2349,14 +2314,24 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     }
 
     Packet_AsGetPublicKeyReply_0x4b6ca4 authRequestPacket;
-    uint8_t* const authRequestPayload =
-        ResetRecoveredPacketBuilderPayload(
-            authRequestPacket,
-            kAuthBootstrap680Raw08RequestFixedByteCount);
+    if (!authRequestPacket.messageRef08 || !authRequestPacket.messageRef08->messageStorage0c) {
+        spdlog::error("launcher-owned auth failed to initialize recovered 0x4474f0 outbound packet builder");
+        return;
+    }
+    auto* const authRequestMessageStorage = authRequestPacket.messageRef08->messageStorage0c;
+    authRequestMessageStorage->ResetPayloadByteCount(0u);
+    authRequestMessageStorage->GrowPayloadByteCount(kAuthBootstrap680Raw08RequestFixedByteCount);
+
+    uint8_t* const authRequestPayload = authRequestMessageStorage->PayloadBase();
+    authRequestPacket.payloadPtr04 = reinterpret_cast<uint32_t>(authRequestPayload);
+    authRequestPacket.payloadAlias10 = authRequestPayload;
+    authRequestPacket.debugString14 = nullptr;
+    authRequestPacket.payloadSize18 = 0u;
     if (authRequestPayload == nullptr) {
         spdlog::error("launcher-owned auth failed to initialize recovered 0x4474f0 outbound packet builder");
         return;
     }
+    std::memset(authRequestPayload, 0, kAuthBootstrap680Raw08RequestFixedByteCount);
 
     authRequestPayload[0] = 0x08u;
     *reinterpret_cast<uint32_t*>(authRequestPayload + 0x01u) = currentPublicKeyId9C;
@@ -2364,13 +2339,16 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     std::memcpy(authRequestPayload + 0x08u, block30.data(), block30.size());
     std::memcpy(authRequestPayload + 0x18u, block40.data(), block40.size());
 
-    if (ReserveRecoveredLengthPrefixedTailAtOffset(
-            authRequestPacket,
-            0x06u,
-            static_cast<uint16_t>(raw08WorkerExpectedBlobLen)) != raw08WorkerExpectedBlobLen) {
-        spdlog::error("launcher-owned auth failed to reserve recovered 0x4474f0 ciphertext tail");
-        return;
-    }
+    uint8_t* const authRequestReservationHeader =
+        authRequestPayload + authRequestMessageStorage->PayloadByteCount();
+    authRequestMessageStorage->GrowPayloadByteCount(
+        static_cast<uint16_t>(raw08WorkerExpectedBlobLen + 2u));
+    *reinterpret_cast<uint16_t*>(authRequestReservationHeader) =
+        static_cast<uint16_t>(raw08WorkerExpectedBlobLen);
+    *reinterpret_cast<uint16_t*>(authRequestPayload + 0x06u) =
+        static_cast<uint16_t>(authRequestReservationHeader - authRequestPayload);
+    authRequestPacket.debugString14 = reinterpret_cast<const char*>(authRequestReservationHeader + 2u);
+    authRequestPacket.payloadSize18 = static_cast<uint16_t>(raw08WorkerExpectedBlobLen);
     if (authRequestPacket.debugString14 == nullptr) {
         spdlog::error("launcher-owned auth lost recovered 0x4474f0 ciphertext tail pointer");
         return;
