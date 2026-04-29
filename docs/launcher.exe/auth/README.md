@@ -102,6 +102,7 @@ Current evidence for that last point:
     - the current explicit state8 existing-character auth bridge remains a replacement-side exception, not proof of original ownership
   - fidelity note from the `0x448140` pass:
     - raw `0x07` only leaves a reply-public-key snapshot alive on the success tail that immediately falls into raw `0x08`; replacement code should not preserve a failed/error `0x07` reply as if the original kept it around
+    - the `0x447780` rebuild family owns the lazy `pubkey.dat` validation plus child `+0x9c/+0xa8/+0xac` refresh; `0x4474f0` should then consume that prepared child state directly rather than reparsing a cached raw `0x07` payload
     - raw `0x0a` is driven by child `+0x94/+0x98` feedback-transform objects, not by the generic `mxo::auth::BuildAuthChallengeResponsePacket(...)` helper
     - replacement consequence: keep the raw `0x0a` digest / zero-IV Twofish decrypt+encrypt sequence inline in `HandleInboundAuthMessage` rather than routing it through source-only shared byte-crypto helpers
     - raw `0x0b` status handling keys off the parse/header status dword stored into child `+0xec`, not a replacement-side packet-length heuristic

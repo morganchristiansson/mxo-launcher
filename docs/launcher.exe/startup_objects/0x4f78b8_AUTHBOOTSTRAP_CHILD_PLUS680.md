@@ -143,6 +143,8 @@ Current best read:
   - stores the current key id at child `+0x9c`
   - rebuilds child `+0xa8`
   - rebuilds child `+0xac`
+  - updates child `+0x9c`
+  - runs the lazy `pubkey.dat` validator path through child `+0xa4` as part of the rebuild family
 - and finally `0x447f50` sets byte `+0xa0 = 1`
 
 Tightened `0x448140` follow-on control-flow consequence:
@@ -166,6 +168,10 @@ Current best read:
   - child `+0x9c` as public-key id
   - child `+0x30 .. +0x4f` as two fixed 16-byte blocks
   - child `+0x50` as the send target
+- source consequence from the latest fidelity pass:
+  - do not invent a source-only dependency on a cached raw `0x07` payload here; the recovered
+    `0x4474f0` body consumes child state (`+0x9c`, `+0xa8`, `+0x54`, `+0x84..+0x98`) directly
+    after the earlier `0x447f50/0x447780` rebuild chain has prepared it
 - send step itself is again the direct virtual call through child `+0x50` slot `+0x24`
 - the same path also allocates/rebuilds helper objects at:
   - child `+0x94`
