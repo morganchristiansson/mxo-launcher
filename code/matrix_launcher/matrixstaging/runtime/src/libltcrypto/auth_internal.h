@@ -125,15 +125,13 @@ inline uint32_t ReadU32LE(const uint8_t* bytes) {
 
 // Shared `FeedbackSize` / `AssemblyTwofish` helper family
 // --------------------------------------------------------
-// Static-RE now identifies the launcher-side helper pair as real Crypto++ CBC wrappers:
-// - small constructor path `0x41df60` -> encrypting `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption`
-//   (Ghidra vftable anchor `CBC_Encryption_0x4b00b0`)
-// - large constructor path `0x446d90` -> decrypting `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption`
-//   (Ghidra vftable anchor `CBC_Decryption_0x4b7500`)
+// Static-RE now identifies the launcher-side helper pair as direct Crypto++ CBC objects:
+// - small constructor path `0x41df60` -> `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption`
+// - large constructor path `0x446d90` -> `CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption`
+// - shared transform row `0x44b570` -> direct `ProcessData(...)` over a configured CBC object
 //
-// Source keeps the recovered launcher-facing adapter method names/boundaries, but the adapter
-// internals now hold and configure the real Crypto++ CBC objects instead of a source-owned CBC
-// reimplementation.
+// Source therefore uses the Crypto++ classes directly and preserves the launcher method boundaries
+// with helper functions instead of source-owned adapter class shells.
 inline const std::array<uint8_t, 16>& FeedbackSizeTransformAdapterZeroIv() {
     // anchors: launcher.exe:DAT_004d4d50 / DAT_004f7c2c / DAT_004f7f88
     static const std::array<uint8_t, 16> kZeroIv = {};
@@ -141,158 +139,59 @@ inline const std::array<uint8_t, 16>& FeedbackSizeTransformAdapterZeroIv() {
 }
 
 template <typename TransformT>
-class FeedbackSizeTransformAdapterBase {
-public:
-    FeedbackSizeTransformAdapterBase() = default;
-
-    FeedbackSizeTransformAdapterBase(const FeedbackSizeTransformAdapterBase& other) {
-        CopyFrom(other);
+inline bool ConfigureFeedbackSizeTransform(
+    TransformT* transform,
+    const void* sourceBytes,
+    uint32_t sourceByteCount,
+    const void* ivBytes) {
+    if (!transform || !sourceBytes || !ivBytes || sourceByteCount < 16u) {
+        return false;
     }
 
-    FeedbackSizeTransformAdapterBase& operator=(
-        const FeedbackSizeTransformAdapterBase& other) {
-        if (this != &other) {
-            Reset();
-            CopyFrom(other);
-        }
-        return *this;
+    try {
+        transform->SetKeyWithIV(
+            static_cast<const CryptoPP::byte*>(sourceBytes),
+            sourceByteCount,
+            static_cast<const CryptoPP::byte*>(ivBytes));
+        return true;
+    } catch (const CryptoPP::Exception&) {
+        return false;
+    }
+}
+
+template <typename TransformT>
+inline bool ProcessFeedbackSizeTransform(
+    TransformT* transform,
+    void* destinationBytes,
+    const void* sourceBytes,
+    uint32_t byteCount) {
+    // anchor: launcher.exe:0x44b570
+    if (!transform || !destinationBytes || !sourceBytes || byteCount == 0u ||
+        (byteCount % 16u) != 0u) {
+        return false;
     }
 
-    FeedbackSizeTransformAdapterBase(FeedbackSizeTransformAdapterBase&& other) noexcept = default;
-    FeedbackSizeTransformAdapterBase& operator=(
-        FeedbackSizeTransformAdapterBase&& other) noexcept = default;
-
-    ~FeedbackSizeTransformAdapterBase() {
-        Reset();
-    }
-
-    uint32_t QueryBlockByteCount10() const {
-        // anchors: launcher.exe:0x420320 / 0x41d6e0
-        return 16u;
-    }
-
-    bool FeedbackSizeTransformAdapter_TransformBuffer(
-        void* destinationBytes,
-        const void* sourceBytes,
-        uint32_t byteCount) {
-        // anchor: launcher.exe:0x44b570
-        if (!configured58_ || !destinationBytes || !sourceBytes || byteCount == 0u ||
-            (byteCount % QueryBlockByteCount10()) != 0u) {
-            return false;
-        }
-
-        try {
-            // Reinitialize per call so the CBC chain always starts from the configured IV, which
-            // matches the prior source behavior and the launcher call pattern that treats the
-            // adapter as a reusable configured object rather than a continuously-advanced stream.
-            transform58_ = std::make_unique<TransformT>();
-            transform58_->SetKeyWithIV(
-                keyBytes38_.data(),
-                keyBytes38_.size(),
-                ivBytes48_.data());
-
-            const uint8_t* transformInput = static_cast<const uint8_t*>(sourceBytes);
-            std::vector<uint8_t> overlapScratch;
-            const uint8_t* destinationBegin = static_cast<const uint8_t*>(destinationBytes);
-            const uint8_t* destinationEnd = destinationBegin + byteCount;
-            const bool overlaps =
-                (transformInput < destinationEnd) &&
-                (destinationBegin < (transformInput + byteCount));
-            if (overlaps) {
-                overlapScratch.assign(transformInput, transformInput + byteCount);
-                transformInput = overlapScratch.data();
-            }
-
-            transform58_->ProcessData(
-                static_cast<CryptoPP::byte*>(destinationBytes),
-                reinterpret_cast<const CryptoPP::byte*>(transformInput),
-                byteCount);
-            return true;
-        } catch (const CryptoPP::Exception&) {
-            return false;
-        }
-    }
-
-protected:
-    bool ConstructCommon(
-        const void* sourceBytes,
-        uint32_t sourceByteCount,
-        const void* ivBytes) {
-        Reset();
-        if (!sourceBytes || !ivBytes || sourceByteCount < 16u) {
-            return false;
+    try {
+        const uint8_t* transformInput = static_cast<const uint8_t*>(sourceBytes);
+        std::vector<uint8_t> overlapScratch;
+        const uint8_t* destinationBegin = static_cast<const uint8_t*>(destinationBytes);
+        const uint8_t* destinationEnd = destinationBegin + byteCount;
+        const bool overlaps =
+            (transformInput < destinationEnd) &&
+            (destinationBegin < (transformInput + byteCount));
+        if (overlaps) {
+            overlapScratch.assign(transformInput, transformInput + byteCount);
+            transformInput = overlapScratch.data();
         }
 
-        std::memcpy(keyBytes38_.data(), sourceBytes, keyBytes38_.size());
-        std::memcpy(ivBytes48_.data(), ivBytes, ivBytes48_.size());
-
-        try {
-            transform58_ = std::make_unique<TransformT>();
-            transform58_->SetKeyWithIV(
-                keyBytes38_.data(),
-                keyBytes38_.size(),
-                ivBytes48_.data());
-            configured58_ = true;
-            rounds5a_ = 16u; // recovered `Rounds` query default consumed by the helper family
-            return true;
-        } catch (const CryptoPP::Exception&) {
-            Reset();
-            return false;
-        }
+        transform->ProcessData(
+            static_cast<CryptoPP::byte*>(destinationBytes),
+            reinterpret_cast<const CryptoPP::byte*>(transformInput),
+            byteCount);
+        return true;
+    } catch (const CryptoPP::Exception&) {
+        return false;
     }
-
-private:
-    void Reset() {
-        // anchor: launcher.exe:0x41e010 / 0x41e4b0
-        transform58_.reset();
-        keyBytes38_.fill(0u);
-        ivBytes48_.fill(0u);
-        configured58_ = false;
-        rounds5a_ = 0u;
-    }
-
-    void CopyFrom(const FeedbackSizeTransformAdapterBase& other) {
-        if (!other.configured58_) {
-            return;
-        }
-        (void)ConstructCommon(
-            other.keyBytes38_.data(),
-            static_cast<uint32_t>(other.keyBytes38_.size()),
-            other.ivBytes48_.data());
-        rounds5a_ = other.rounds5a_;
-    }
-
-    std::array<uint8_t, 16> keyBytes38_{};  // launcher inner `AssemblyTwofish` seed bytes
-    std::array<uint8_t, 16> ivBytes48_{};   // launcher named parameter `IV`
-    std::unique_ptr<TransformT> transform58_;
-    bool configured58_ = false;
-    uint8_t rounds5a_ = 0u;
-};
-
-class FeedbackSizeTransformAdapterSmall final
-    : public FeedbackSizeTransformAdapterBase<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> {
-public:
-    bool FeedbackSizeTransformAdapter_ConstructSmall(
-        const void* sourceBytes,
-        uint32_t sourceByteCount,
-        const void* ivBytes,
-        uint32_t /*unusedZero*/) {
-        // anchor: launcher.exe:0x41df60
-        return ConstructCommon(sourceBytes, sourceByteCount, ivBytes);
-    }
-};
-
-class FeedbackSizeTransformAdapterLarge final
-    : public FeedbackSizeTransformAdapterBase<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption> {
-public:
-    bool FeedbackSizeTransformAdapter_ConstructLarge(
-        const void* sourceBytes,
-        uint32_t sourceByteCount,
-        const void* ivBytes,
-        uint32_t /*unusedZero*/) {
-        // anchor: launcher.exe:0x446d90
-        return ConstructCommon(sourceBytes, sourceByteCount, ivBytes);
-    }
-};
+}
 
 }  // namespace mxo::auth::internal

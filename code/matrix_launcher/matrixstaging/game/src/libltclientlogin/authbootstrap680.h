@@ -7,16 +7,14 @@
 #include <string>
 #include <vector>
 
+#include <modes.h>
+#include <twofish.h>
+
 #include "authbootstrap680_shared.h"
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
 
 namespace mxo::liblttcp {
 class CMarginConnection_0x4aff38;
-}
-
-namespace mxo::auth::internal {
-class FeedbackSizeTransformAdapterLarge;
-class FeedbackSizeTransformAdapterSmall;
 }
 
 namespace mxo::ltlogin {
@@ -120,8 +118,8 @@ public:
 
  uint32_t authServerTimeBias80 = 0; // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0` / `AuthBootstrapReplyCopyShadowF4_IsFresh` / `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` use it to reconstruct current auth-server time
  std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; helper-generated seed block from child `+0x54`, later reused by the `0x4474f0` transform-worker setup
- mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr; // original child `+0x94`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructLarge`
- mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr; // original child `+0x98`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructSmall`
+ CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption* feedbackTransformLarge94 = nullptr; // original child `+0x94`; allocated in `0x4474f0` through the recovered large/decrypting CBC Twofish ctor path `0x446d90`
+ CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption* feedbackTransformSmall98 = nullptr; // original child `+0x98`; allocated in `0x4474f0` through the recovered small/encrypting CBC Twofish ctor path `0x41df60`
  uint32_t currentPublicKeyId9C = 0; // original child `+0x9c`
  uint8_t authRequestReadyA0 = 0; // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
  std::array<uint8_t, 3> paddingA1ToA3{}; // original child `+0xa1 .. +0xa3`
@@ -149,8 +147,8 @@ public:
  AuthBootstrap680LazyPubkeyDatValidatorOwnedState lazyPubkeyDatValidatorA4OwnedState_{};
  AuthBootstrap680Raw08PublicKeyWorkerOwnedState raw08PublicKeyWorkerA8OwnedState_{};
  AuthBootstrap680ReplyAuthDataValidatorOwnedState replyAuthDataValidatorACOwnedState_{};
- std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterLarge> feedbackTransformLarge94Owned_{};
- std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterSmall> feedbackTransformSmall98Owned_{};
+ std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption> feedbackTransformLarge94Owned_{};
+ std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> feedbackTransformSmall98Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
  std::vector<uint32_t> modulusBigIntB0OwnedDigits_{};
  std::vector<uint32_t> publicExponentBigIntC4OwnedDigits_{};
