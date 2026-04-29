@@ -34,8 +34,12 @@
 #include "loginstate.h"
 #include "../../../../src/launcher_mediator_abi.h"
 #include "authbootstrap680.h"
+#include "../../../runtime/src/libltcrypto/auth_internal.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
 #include "../../../runtime/src/libltnet/sys/pc/pcsocket.h"
+
+#include <modes.h>
+#include <twofish.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -1999,16 +2003,25 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
     const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(marginTwofishKey.data());
 
-    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransformAdapter;
-    if (!feedbackTransformAdapter.FeedbackSizeTransformAdapter_ConstructSmall(
+    // anchor: launcher.exe:0x41df60 / 0x44b570
+    // Safe flattening step 1: this is a local one-shot transform site, so we can use the direct
+    // Crypto++ CBC Twofish encryptor without disturbing any recovered embedded object layout.
+    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
+    bool transformOk = false;
+    try {
+        feedbackTransform.SetKeyWithIV(
             marginTwofishKey.data(),
             static_cast<uint32_t>(marginTwofishKey.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
-            0u) ||
-        !feedbackTransformAdapter.FeedbackSizeTransformAdapter_TransformBuffer(
-            outDwords + 4,
-            transformInput.data(),
-            16u)) {
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
+        feedbackTransform.ProcessData(
+            reinterpret_cast<CryptoPP::byte*>(outDwords + 4),
+            reinterpret_cast<const CryptoPP::byte*>(transformInput.data()),
+            16u);
+        transformOk = true;
+    } catch (const CryptoPP::Exception&) {
+        transformOk = false;
+    }
+    if (!transformOk) {
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
             "CLTLoginMediator::FillState9CallbackBlob18c Twofish block transform failed ownerF18=0x{:08x}",
