@@ -1847,26 +1847,19 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 
 // anchor: launcher.exe:0x448140
 uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
-    void* incomingAuthMessage) {
-    auto* const mediator = g_CurrentLoginMediator;
-    auto* const module = owner08;
-    auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
-    auto& child = *this;
-    auto* const incomingAuthMessageRef =
-        static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage);
-
+    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessage) {
     IncomingAuthPayloadViewScaffold incomingPayload = {};
     if (!BuildIncomingAuthPayloadViewScaffold(
-            incomingAuthMessageRef,
+            incomingAuthMessage,
             &incomingPayload)) {
-        child.stagedIncomingAuthPacketBytesOwned_.clear();
+        stagedIncomingAuthPacketBytesOwned_.clear();
         return kAuthBootstrap680InboundUnhandled;
     }
 
-    child.stagedIncomingAuthPacketBytesOwned_.assign(
+    stagedIncomingAuthPacketBytesOwned_.assign(
         incomingPayload.payloadBytes,
         incomingPayload.payloadBytes + incomingPayload.payloadByteCount);
-    const std::vector<uint8_t>& stagedBytes = child.stagedIncomingAuthPacketBytesOwned_;
+    const std::vector<uint8_t>& stagedBytes = stagedIncomingAuthPacketBytesOwned_;
 
     const uint8_t rawCode = incomingPayload.rawCode;
     switch (rawCode) {
@@ -1877,7 +1870,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             // that here instead of bouncing through the lower-level shared parser helper.
             Packet_AsGetPublicKeyReply_0x4b6ca4 incomingReplyPacket;
             incomingReplyPacket.InitFromIncomingMessage(
-                const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef),
+                const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
                 true);
 
             const uint8_t* const replyPayloadBytes =
@@ -1908,22 +1901,22 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 &replySignatureLength);
 
             const std::vector<uint8_t> cachedPublicKeyReplyPayloadBytesBeforeUpdate =
-                child.cachedGetPublicKeyReplyPayloadBytesOwned_;
+                cachedGetPublicKeyReplyPayloadBytesOwned_;
             const uint8_t* cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr =
                 cachedPublicKeyReplyPayloadBytesBeforeUpdate.empty()
                     ? nullptr
                     : cachedPublicKeyReplyPayloadBytesBeforeUpdate.data();
-            child.inboundAuthStatusEc = replyStatus01;
+            inboundAuthStatusEc = replyStatus01;
             if (replyStatus01 != 0u) {
-                child.cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
+                cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
                 return kAuthBootstrap680InboundGetPublicKeyReplyError;
             }
 
-            child.authServerTimeBias80 = static_cast<uint32_t>(
+            authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(replyCurrentTime05));
             const uint32_t workerResult = HandleGetPublicKeyReply(incomingReplyPacket, stagedBytes.size());
             if (workerResult != 0u) {
-                child.inboundAuthStatusEc = workerResult;
+                inboundAuthStatusEc = workerResult;
             }
 
             // anchor: launcher.exe:0x44850a / 0x448548
@@ -1947,12 +1940,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 ReadU32LE(cachedPublicKeyReplyPayloadBytesBeforeUpdatePtr + 0x09u) == replyPublicKeyId09 &&
                 currentPublicKeyId9C == replyPublicKeyId09;
             if (workerResult == 0u) {
-                child.cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
+                cachedGetPublicKeyReplyPayloadBytesOwned_ = stagedBytes;
                 if (reusedCachedEmbeddedPublicKey) {
-                    child.cachedGetPublicKeyReplyPayloadBytesOwned_ =
+                    cachedGetPublicKeyReplyPayloadBytesOwned_ =
                         cachedPublicKeyReplyPayloadBytesBeforeUpdate;
                     AuthBootstrap680_PatchCachedGetPublicKeyReplyHeader(
-                        &child.cachedGetPublicKeyReplyPayloadBytesOwned_,
+                        &cachedGetPublicKeyReplyPayloadBytesOwned_,
                         replyStatus01,
                         replyCurrentTime05,
                         replyPublicKeyId09);
@@ -1971,12 +1964,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 hasEmbeddedPublicKey ? 1u : 0u,
                 reusedCachedEmbeddedPublicKey ? 1u : 0u,
                 static_cast<unsigned>(workerResult),
-                fmt::ptr(child.lazyPubkeyDatValidatorA4),
-                fmt::ptr(child.raw08PublicKeyWorkerA8),
-                fmt::ptr(child.replyAuthDataValidatorAC),
+                fmt::ptr(lazyPubkeyDatValidatorA4),
+                fmt::ptr(raw08PublicKeyWorkerA8),
+                fmt::ptr(replyAuthDataValidatorAC),
                 fmt::ptr(this),
-                fmt::ptr(module),
-                fmt::ptr(childBase));
+                fmt::ptr(owner08),
+                fmt::ptr(this));
 
             if (workerResult != 0u) {
                 return kAuthBootstrap680InboundGetPublicKeyWorkerError;
@@ -1995,7 +1988,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             // consumes the 16-byte encrypted challenge inline from payload+1.
             Packet_AsAuthChallenge_0x4b6ce0 incomingChallengePacket;
             incomingChallengePacket.InitFromIncomingMessage(
-                const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef));
+                const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage));
 
             const uint8_t* const challengePayloadBytes =
                 static_cast<const uint8_t*>(incomingChallengePacket.payloadAlias10);
@@ -2004,54 +1997,56 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundUnhandled;
             }
 
-            child.cachedAuthChallengeCiphertextBytesOwned_.assign(
+            cachedAuthChallengeCiphertextBytesOwned_.assign(
                 challengePayloadBytes + 1u,
                 challengePayloadBytes + stagedBytes.size());
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
-                child.cachedAuthChallengeCiphertextBytesOwned_.size());
+                cachedAuthChallengeCiphertextBytesOwned_.size());
 
             {
-                const char* password = SmallStringMirrorDataOrEmpty(child.string10);
-                const char* soePassword = SmallStringMirrorDataOrEmpty(child.string1C);
-                if (SmallStringMirrorLength(child.string10) == 0u) {
+                const char* password = SmallStringMirrorDataOrEmpty(string10);
+                const char* soePassword = SmallStringMirrorDataOrEmpty(string1C);
+                if (SmallStringMirrorLength(string10) == 0u) {
                     spdlog::error(
                         "launcher-owned auth received AS_AuthChallenge but child+0x10 password data is empty");
                     return kAuthBootstrap680InboundUnhandled;
                 }
-                if (SmallStringMirrorLength(child.string1C) == 0u) {
+                if (SmallStringMirrorLength(string1C) == 0u) {
                     spdlog::warn(
                         "launcher-owned auth raw0x0a using empty child+0x1c secondary password/station field while preserving the recovered 0x44831c field mapping");
                 }
-                if (child.cachedAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
+                if (cachedAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
                     spdlog::error("launcher-owned auth missing Twofish key from AS_AuthRequest build result");
                     return kAuthBootstrap680InboundUnhandled;
                 }
-                if (!child.sendTarget50) {
+                if (!sendTarget50) {
                     spdlog::warn(
                         "AuthBootstrap680 raw0x0a challenge-response missing child+0x50 send target; refusing less-faithful fallback path");
                     return kAuthBootstrap680InboundUnhandled;
                 }
 
                 mxo::auth::AuthChallengeResponseLayout layout;
-                mxo::auth::AuthChallengeResponseBuildResult buildResult;
-                buildResult.encryptedChallengeBytes = child.cachedAuthChallengeCiphertextBytesOwned_;
+                std::vector<uint8_t> decryptedChallengeBytes;
+                std::vector<uint8_t> processedChallengeMd5Bytes;
+                std::vector<uint8_t> plaintextBytes;
+                std::vector<uint8_t> ciphertextBytes;
 
                 // anchor: launcher.exe:0x44831c..0x448467
                 // This raw 0x0a path is inline in the child-side inbound handler, not a separate
                 // standalone launcher.exe helper. Keep the crypto/material assembly here so future
                 // fidelity passes can compare directly against the packet-object staging below.
                 if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
-                        child.cachedAuthChallengeCiphertextBytesOwned_,
-                        child.cachedAuthRequestBuildResult_.twofishKeyBytes,
+                        cachedAuthChallengeCiphertextBytesOwned_,
+                        cachedAuthRequestBuildResult_.twofishKeyBytes,
                         false,
-                        &buildResult.decryptedChallengeBytes)) {
+                        &decryptedChallengeBytes)) {
                     spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
                 if (!mxo::auth::internal::Md5DigestBytes(
-                        buildResult.decryptedChallengeBytes,
-                        &buildResult.processedChallengeMd5Bytes)) {
+                        decryptedChallengeBytes,
+                        &processedChallengeMd5Bytes)) {
                     spdlog::error("launcher-owned auth failed to hash AS_AuthChallenge plaintext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
@@ -2071,63 +2066,55 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     return kAuthBootstrap680InboundUnhandled;
                 }
 
-                buildResult.passwordLengthField = static_cast<uint16_t>(passwordBytes.size());
-                buildResult.soePasswordLengthField = static_cast<uint16_t>(soePasswordBytes.size());
+                const uint16_t passwordLengthField = static_cast<uint16_t>(passwordBytes.size());
+                const uint16_t soePasswordLengthField = static_cast<uint16_t>(soePasswordBytes.size());
                 const uint16_t unknown2 = layout.usePasswordLengthForUnknown2
-                    ? buildResult.passwordLengthField
+                    ? passwordLengthField
                     : layout.unknown2;
                 const uint16_t unknown3 = layout.useSoePasswordLengthForUnknown3
-                    ? buildResult.soePasswordLengthField
+                    ? soePasswordLengthField
                     : layout.unknown3;
 
                 const size_t plaintextSizeWithoutPadding =
                     1u +
-                    buildResult.processedChallengeMd5Bytes.size() +
+                    processedChallengeMd5Bytes.size() +
                     2u + 2u + 2u +
                     2u + passwordBytes.size() +
                     2u + soePasswordBytes.size() +
                     2u;
-                buildResult.paddingLengthField =
+                const uint16_t paddingLengthField =
                     static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
 
-                buildResult.plaintextBytes.clear();
-                buildResult.plaintextBytes.reserve(
-                    plaintextSizeWithoutPadding + buildResult.paddingLengthField);
-                buildResult.plaintextBytes.push_back(layout.plaintextLeadingByte);
-                buildResult.plaintextBytes.insert(
-                    buildResult.plaintextBytes.end(),
-                    buildResult.processedChallengeMd5Bytes.begin(),
-                    buildResult.processedChallengeMd5Bytes.end());
-                mxo::auth::internal::AppendU16LE(&buildResult.plaintextBytes, layout.unknown1);
-                mxo::auth::internal::AppendU16LE(&buildResult.plaintextBytes, unknown2);
-                mxo::auth::internal::AppendU16LE(&buildResult.plaintextBytes, unknown3);
-                mxo::auth::internal::AppendU16LE(
-                    &buildResult.plaintextBytes,
-                    buildResult.passwordLengthField);
-                buildResult.plaintextBytes.insert(
-                    buildResult.plaintextBytes.end(),
+                plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
+                plaintextBytes.push_back(layout.plaintextLeadingByte);
+                plaintextBytes.insert(
+                    plaintextBytes.end(),
+                    processedChallengeMd5Bytes.begin(),
+                    processedChallengeMd5Bytes.end());
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, layout.unknown1);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, unknown2);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, unknown3);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
+                plaintextBytes.insert(
+                    plaintextBytes.end(),
                     passwordBytes.begin(),
                     passwordBytes.end());
-                mxo::auth::internal::AppendU16LE(
-                    &buildResult.plaintextBytes,
-                    buildResult.soePasswordLengthField);
-                buildResult.plaintextBytes.insert(
-                    buildResult.plaintextBytes.end(),
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
+                plaintextBytes.insert(
+                    plaintextBytes.end(),
                     soePasswordBytes.begin(),
                     soePasswordBytes.end());
-                mxo::auth::internal::AppendU16LE(
-                    &buildResult.plaintextBytes,
-                    buildResult.paddingLengthField);
-                buildResult.plaintextBytes.insert(
-                    buildResult.plaintextBytes.end(),
-                    buildResult.paddingLengthField,
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, paddingLengthField);
+                plaintextBytes.insert(
+                    plaintextBytes.end(),
+                    paddingLengthField,
                     layout.paddingByte);
 
                 if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
-                        buildResult.plaintextBytes,
-                        child.cachedAuthRequestBuildResult_.twofishKeyBytes,
+                        plaintextBytes,
+                        cachedAuthRequestBuildResult_.twofishKeyBytes,
                         true,
-                        &buildResult.ciphertextBytes)) {
+                        &ciphertextBytes)) {
                     spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
@@ -2135,10 +2122,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 Packet_AsAuthChallengeResponse_0x4b6cf4 plaintextPacket;
                 plaintextPacket.ResetAndInitialize();
 
-                if (buildResult.processedChallengeMd5Bytes.size() >= 16u) {
+                if (processedChallengeMd5Bytes.size() >= 16u) {
                     uint8_t* payload = static_cast<uint8_t*>(plaintextPacket.payloadAlias10);
                     if (payload) {
-                        std::copy_n(buildResult.processedChallengeMd5Bytes.begin(), 16u, payload + 1u);
+                        std::copy_n(processedChallengeMd5Bytes.begin(), 16u, payload + 1u);
                     }
                 }
 
@@ -2146,7 +2133,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextPacket.AppendPassword(soePassword);
                 plaintextPacket.ReserveFieldLength(0x20u);
 
-                const size_t plaintextLen = buildResult.plaintextBytes.size();
+                const size_t plaintextLen = plaintextBytes.size();
                 // anchor: launcher.exe:0x4483ce
                 // The launcher computes `0x20 - (len & 0x0f)` directly and forwards that raw
                 // value to `Packet_AsAuthChallengeResponse_0x4b6cf4::SetPadding`, even when the
@@ -2158,35 +2145,35 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
                 encryptedPacket.InitializePayloadSize();
                 encryptedPacket.ReserveLengthPrefixedTail(
-                    static_cast<uint16_t>(buildResult.ciphertextBytes.size()));
-                if (buildResult.ciphertextBytes.size() != 0u && encryptedPacket.debugString14 != nullptr) {
+                    static_cast<uint16_t>(ciphertextBytes.size()));
+                if (ciphertextBytes.size() != 0u && encryptedPacket.debugString14 != nullptr) {
                     std::memcpy(
                         const_cast<char*>(encryptedPacket.debugString14),
-                        buildResult.ciphertextBytes.data(),
-                        buildResult.ciphertextBytes.size());
+                        ciphertextBytes.data(),
+                        ciphertextBytes.size());
                 }
 
-                auto* sendTarget = static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(child.sendTarget50);
+                auto* sendTarget = static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(sendTarget50);
                 sendTarget->SendPacketMessageRef(*encryptedPacket.messageRef08);
 
                 const uint32_t sendResult = 1u;
 
                 spdlog::debug(
                     "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage observed raw0x0a send using Packet_AsAuthChallengeResponse_0x4b6cf4 + Packet_AsAuthChallengeResponse_0x4b6d08 decryptedChallengeBytes={} processedChallengeMd5Bytes={}",
-                    static_cast<unsigned>(buildResult.decryptedChallengeBytes.size()),
-                    static_cast<unsigned>(buildResult.processedChallengeMd5Bytes.size()));
+                    static_cast<unsigned>(decryptedChallengeBytes.size()),
+                    static_cast<unsigned>(processedChallengeMd5Bytes.size()));
                 spdlog::info(
                     "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
-                    static_cast<unsigned>(buildResult.passwordLengthField),
-                    static_cast<unsigned>(buildResult.soePasswordLengthField),
-                    static_cast<unsigned>(buildResult.plaintextBytes.size()),
-                    static_cast<unsigned>(buildResult.ciphertextBytes.size()),
-                    static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
-                    static_cast<unsigned>(SmallStringMirrorLength(child.string1C)),
-                    fmt::ptr(child.sendTarget50),
+                    static_cast<unsigned>(passwordLengthField),
+                    static_cast<unsigned>(soePasswordLengthField),
+                    static_cast<unsigned>(plaintextBytes.size()),
+                    static_cast<unsigned>(ciphertextBytes.size()),
+                    static_cast<unsigned>(SmallStringMirrorLength(string10)),
+                    static_cast<unsigned>(SmallStringMirrorLength(string1C)),
+                    fmt::ptr(sendTarget50),
                     fmt::ptr(this),
-                    fmt::ptr(module),
-                    fmt::ptr(childBase));
+                    fmt::ptr(owner08),
+                    fmt::ptr(this));
                 return sendResult != 0u
                     ? kAuthBootstrap680InboundHandledContinueWaiting
                     : kAuthBootstrap680InboundUnhandled;
@@ -2205,13 +2192,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const bool storedParseObjectF0 =
                 StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
-                    *mediator,
-                    child,
-                    static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
+                    *g_CurrentLoginMediator,
+                    *this,
+                    incomingAuthMessage,
                     stagedBytes);
-            const auto* parseObject = child.authReplyParseObjectF0;
+            const auto* parseObject = authReplyParseObjectF0;
 
-            child.inboundAuthStatusEc =
+            inboundAuthStatusEc =
                 storedParseObjectF0
                     ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x01u)
                     : (reply.isErrorReply ? reply.errorCode : 0u);
@@ -2219,7 +2206,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             spdlog::debug(
                 "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage stored child+0xf0 parse copy={} status=0x{:08x} authDataLen=0x{:04x} encryptedPrivateExponentLen=0x{:04x} characterCount={} worldCount={} replyString1dLen=0x{:04x}",
                 storedParseObjectF0 ? 1u : 0u,
-                static_cast<unsigned>(child.inboundAuthStatusEc),
+                static_cast<unsigned>(inboundAuthStatusEc),
                 static_cast<unsigned>(parseObject ? parseObject->authDataByteLength20 : 0u),
                 static_cast<unsigned>(parseObject ? parseObject->encryptedPrivateExponentByteLength28 : 0u),
                 static_cast<unsigned>(parseObject ? parseObject->characterTempRecordCount40 : 0u),
@@ -2235,7 +2222,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                             : static_cast<uint16_t>(reply.authDataBytes.size());
             if (!reply.valid || !reply.signedData.valid ||
                 authDataByteLength != sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) ||
-                child.replyAuthDataValidatorAC == nullptr) {
+                replyAuthDataValidatorAC == nullptr) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
@@ -2257,14 +2244,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const bool replyAuthDataValidatorAccepted =
                 copyShadowCandidate.VerifyWithValidator(
-                    child.replyAuthDataValidatorACOwnedState_.object.get(),
-                    child.replyAuthDataValidatorACOwnedState_.publicKeyPair0c,
-                    child.authServerTimeBias80);
+                    replyAuthDataValidatorACOwnedState_.object.get(),
+                    replyAuthDataValidatorACOwnedState_.publicKeyPair0c,
+                    authServerTimeBias80);
             if (!replyAuthDataValidatorAccepted) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            AuthBootstrap680MaterializeReplyCopyShadowScaffold(child, *mediator, reply);
+            AuthBootstrap680MaterializeReplyCopyShadowScaffold(*this, *g_CurrentLoginMediator, reply);
             return kAuthBootstrap680InboundAuthReplySuccess;
         }
 

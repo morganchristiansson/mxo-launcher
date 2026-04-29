@@ -172,7 +172,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
     // - this state2 body only switches on that child method's return code to drive owner `+0x80`,
     //   helper-switch, and event/error flow
     const uint32_t childResult =
-        g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(workItem);
+        g_CurrentLoginMediator->authBootstrapChild680_->HandleInboundAuthMessage(
+            static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem));
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(

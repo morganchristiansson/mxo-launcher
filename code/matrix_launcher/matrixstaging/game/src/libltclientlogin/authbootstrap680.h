@@ -216,7 +216,8 @@ public:
     // Sole direct caller is `0x43f321`, which loads ECX from owner `+0x680` before the CALL.
     // Keep this on the concrete auth bootstrap child even though the field layout is inherited
     // through the stream-packet write-helper base.
-    uint32_t HandleInboundAuthMessage(void* incomingAuthMessage);
+    uint32_t HandleInboundAuthMessage(
+        const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessage);
 
     // anchor: launcher.exe:0x447eb0
     // The state2 ready-side dispatcher calls this directly on the owner `+0x680` auth child when
