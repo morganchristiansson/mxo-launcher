@@ -1612,51 +1612,77 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 // anchor: launcher.exe:0x448140
 uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessage) {
-    const auto* incomingMessageStorage = incomingAuthMessage->messageStorage0c;
-    if (!incomingMessageStorage) {
+    if (!incomingAuthMessage || !incomingAuthMessage->messageStorage0c) {
         return kAuthBootstrap680InboundUnhandled;
     }
 
-    const uint16_t incomingMessagePayloadByteCount = incomingMessageStorage->PayloadByteCount();
-    const uint8_t* const incomingMessagePayloadBytes = incomingMessageStorage->PayloadBase();
-    if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
-        return kAuthBootstrap680InboundUnhandled;
-    }
+    // anchor: launcher.exe:0x44814e..0x448171 / 0x41bc20
+    // The recovered child dispatches on the shared message-code decoder first, then materializes
+    // the narrower stack packet/parse helpers only for raw 0x07/0x09/0x0b.
+    const uint16_t incomingMessageCode = mxo::liblttcp::CMessageConnectionMessageRef_DecodeMessageCode(
+        const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage));
 
-    const uint8_t* payloadBytes = incomingMessagePayloadBytes;
-    size_t payloadByteCount = incomingMessagePayloadByteCount;
-    if (incomingAuthMessage->headerless10 != 0u) {
-        if (incomingMessagePayloadByteCount < 2u) {
-            return kAuthBootstrap680InboundUnhandled;
+    auto computeEffectivePayloadSpan = [&](const uint8_t** outPayloadBytes,
+                                           size_t* outPayloadByteCount) -> bool {
+        if (!outPayloadBytes || !outPayloadByteCount) {
+            return false;
         }
 
-        const uint8_t locatorByte0d = incomingMessagePayloadBytes[1];
-        const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
-        const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
-        if (targetLocatorType == 0u || targetLocatorType > 6u ||
-            senderLocatorType == 0u || senderLocatorType > 6u) {
-            return kAuthBootstrap680InboundUnhandled;
+        const auto* incomingMessageStorage = incomingAuthMessage->messageStorage0c;
+        if (!incomingMessageStorage) {
+            return false;
         }
 
-        const size_t payloadOffset =
-            0x12u +
-            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
-            static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
-        if (payloadOffset >= incomingMessagePayloadByteCount) {
-            return kAuthBootstrap680InboundUnhandled;
+        const uint16_t incomingMessagePayloadByteCount = incomingMessageStorage->PayloadByteCount();
+        const uint8_t* const incomingMessagePayloadBytes = incomingMessageStorage->PayloadBase();
+        if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
+            return false;
         }
 
-        payloadBytes = incomingMessagePayloadBytes + payloadOffset;
-        payloadByteCount = static_cast<size_t>(incomingMessagePayloadByteCount) - payloadOffset;
-    }
+        const uint8_t* payloadBytes = incomingMessagePayloadBytes;
+        size_t payloadByteCount = incomingMessagePayloadByteCount;
+        if (incomingAuthMessage->headerless10 != 0u) {
+            if (incomingMessagePayloadByteCount < 2u) {
+                return false;
+            }
 
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return kAuthBootstrap680InboundUnhandled;
-    }
+            const uint8_t locatorByte0d = incomingMessagePayloadBytes[1];
+            const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
+            const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
+            if (targetLocatorType == 0u || targetLocatorType > 6u ||
+                senderLocatorType == 0u || senderLocatorType > 6u) {
+                return false;
+            }
 
-    const uint8_t rawCode = payloadBytes[0];
-    switch (rawCode) {
+            const size_t payloadOffset =
+                0x12u +
+                static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
+                static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
+            if (payloadOffset >= incomingMessagePayloadByteCount) {
+                return false;
+            }
+
+            payloadBytes = incomingMessagePayloadBytes + payloadOffset;
+            payloadByteCount = static_cast<size_t>(incomingMessagePayloadByteCount) - payloadOffset;
+        }
+
+        if (!payloadBytes || payloadByteCount == 0u) {
+            return false;
+        }
+
+        *outPayloadBytes = payloadBytes;
+        *outPayloadByteCount = payloadByteCount;
+        return true;
+    };
+
+    switch (incomingMessageCode) {
         case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
+            const uint8_t* payloadBytes = nullptr;
+            size_t payloadByteCount = 0u;
+            if (!computeEffectivePayloadSpan(&payloadBytes, &payloadByteCount)) {
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
             // anchor: launcher.exe:0x4484d3 / 0x443910
             // The recovered raw 0x07 path materializes the local packet parse accessor on-stack
             // and then reads fixed fields directly from the packet body rooted at +0x10. Mirror
@@ -1743,6 +1769,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         }
 
         case 0x09u: {
+            const uint8_t* payloadBytes = nullptr;
+            size_t payloadByteCount = 0u;
+            if (!computeEffectivePayloadSpan(&payloadBytes, &payloadByteCount)) {
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
             // anchor: launcher.exe:0x443d90 / 0x44831c
             // The recovered raw 0x09 path materializes the local packet parse accessor and then
             // consumes the 16-byte encrypted challenge inline from payload+1.
@@ -1976,7 +2008,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         }
 
         case 0x0bu: {
-            if (payloadByteCount < 11u || payloadBytes[0] != 0x0bu) {
+            const uint8_t* payloadBytes = nullptr;
+            size_t payloadByteCount = 0u;
+            if (!computeEffectivePayloadSpan(&payloadBytes, &payloadByteCount) ||
+                payloadByteCount < 11u || payloadBytes[0] != 0x0bu) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
                 return kAuthBootstrap680InboundUnhandled;
             }
