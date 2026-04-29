@@ -3,7 +3,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "authbootstrap680_shared.h"
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
@@ -20,6 +22,33 @@ class FeedbackSizeTransformAdapterSmall;
 namespace mxo::ltlogin {
 
 class CLTLoginMediator;
+
+struct AuthBootstrap680RsaPublicKeyPairOwnedState {
+    std::vector<uint32_t> modulus08OwnedDigits;
+    std::vector<uint32_t> exponent1cOwnedDigits;
+    std::vector<uint8_t> modulusBytes;
+    std::vector<uint8_t> exponentBytes;
+};
+
+struct AuthBootstrap680Field54HelperOwnedState {
+    std::vector<uint8_t> bufferedOutput14;
+    std::vector<uint8_t> scratchPrefix20;
+};
+
+struct AuthBootstrap680LazyPubkeyDatValidatorOwnedState {
+    std::unique_ptr<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch> object;
+    AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
+};
+
+struct AuthBootstrap680Raw08PublicKeyWorkerOwnedState {
+    std::unique_ptr<AuthBootstrap680Raw08PublicKeyWorkerA8Sketch> object;
+    AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
+};
+
+struct AuthBootstrap680ReplyAuthDataValidatorOwnedState {
+    std::unique_ptr<AuthBootstrap680ReplyAuthDataValidatorACSketch> object;
+    AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
+};
 
 // anchor: launcher.exe:0x4b7134 / vtable 0x004b7134
 // Base class containing fields +0x00 through +0xf4
@@ -112,6 +141,26 @@ public:
  uint32_t inboundAuthStatusEc = 1; // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
  AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
  AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`
+
+ // Source-owned trailing storage used to back the recovered child pointers/byte spans above.
+ // Keep this tail explicit so we do not need a separate per-child side map.
+ AuthBootstrap680Field54HelperOwnedState field54HelperOwnedState_{};
+ AuthBootstrap680LazyPubkeyDatValidatorOwnedState lazyPubkeyDatValidatorA4OwnedState_{};
+ AuthBootstrap680Raw08PublicKeyWorkerOwnedState raw08PublicKeyWorkerA8OwnedState_{};
+ AuthBootstrap680ReplyAuthDataValidatorOwnedState replyAuthDataValidatorACOwnedState_{};
+ std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterLarge> feedbackTransformLarge94Owned_{};
+ std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterSmall> feedbackTransformSmall98Owned_{};
+ std::unique_ptr<AuthBootstrap680AuthReplyParseObjectF0Sketch> authReplyParseObjectF0Owned_{};
+ std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
+ std::unique_ptr<AuthBootstrapReplyCopyShadowF4_0x44add0> authReplyCopyShadowF4Owned_{};
+ std::vector<uint32_t> modulusBigIntB0OwnedDigits_{};
+ std::vector<uint32_t> publicExponentBigIntC4OwnedDigits_{};
+ std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
+ std::vector<uint8_t> stagedIncomingAuthPacketBytesOwned_{};
+ mxo::auth::GetPublicKeyReply cachedGetPublicKeyReply_{};
+ mxo::auth::AuthRequestBuildResult cachedAuthRequestBuildResult_{};
+ mxo::auth::AuthChallenge cachedAuthChallenge_{};
+ mxo::auth::AuthReply cachedAuthReply_{};
 
  // anchor: launcher.exe:0x445500
  AuthBootstrap680ChildBase_0x4b7134();
