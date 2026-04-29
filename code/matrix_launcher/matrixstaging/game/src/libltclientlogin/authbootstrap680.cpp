@@ -654,8 +654,10 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
 
 static void ResetAuthBootstrap680ReplyMaterialization(
  AuthBootstrap680ChildBase_0x4b7134& child) {
-    child.authReplyCopyShadowF4 = nullptr;
-    child.authReplyCopyShadowF4Owned_.reset();
+    if (child.authReplyCopyShadowF4 != nullptr) {
+        std::free(child.authReplyCopyShadowF4);
+        child.authReplyCopyShadowF4 = nullptr;
+    }
     ResetAuthBootstrap680BigIntObject(&child.modulusBigIntB0, &child.modulusBigIntB0OwnedDigits_);
     ResetAuthBootstrap680BigIntObject(
         &child.publicExponentBigIntC4,
@@ -1356,7 +1358,8 @@ void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
 
  // +0xf4: authReplyCopyShadowF4 - tracked deallocation
  if (authReplyCopyShadowF4 != nullptr) {
- // Tracked: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
+ // `0x444900` frees the tracked `+0xf4` heap block directly.
+ std::free(authReplyCopyShadowF4);
  authReplyCopyShadowF4 = nullptr;
  }
 
@@ -1369,10 +1372,6 @@ void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
  authReplyParseObjectF0 = nullptr;
  }
  authReplyParsePacketBodyBytesOwned_.clear();
-}
-
-const mxo::auth::AuthReply& AuthBootstrap680Child_0x441290::CachedAuthReply_SOURCEOWNED() const {
-        return cachedAuthReply_;
 }
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
@@ -1510,8 +1509,12 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
         return;
     }
 
-    child.authReplyCopyShadowF4Owned_ = std::make_unique<AuthBootstrapReplyCopyShadowF4_0x44add0>();
-    AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow = *child.authReplyCopyShadowF4Owned_;
+    child.authReplyCopyShadowF4 = static_cast<AuthBootstrapReplyCopyShadowF4_0x44add0*>(
+        std::malloc(sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0)));
+    if (child.authReplyCopyShadowF4 == nullptr) {
+        return;
+    }
+    AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow = *child.authReplyCopyShadowF4;
     copyShadow = {};
 
     // Prefer the exact copied parse-object auth-data field recovered from
@@ -1530,7 +1533,8 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     } else {
         if (reply.authSignatureBytes.size() != copyShadow.authSignature00.size() ||
             reply.signedData.rawBytes.size() != copyShadow.signedData80.size()) {
-            child.authReplyCopyShadowF4Owned_.reset();
+            std::free(child.authReplyCopyShadowF4);
+            child.authReplyCopyShadowF4 = nullptr;
             return;
         }
 
@@ -1543,8 +1547,6 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
             reply.signedData.rawBytes.end(),
             copyShadow.signedData80.begin());
     }
-
-    child.authReplyCopyShadowF4 = child.authReplyCopyShadowF4Owned_.get();
 
     AuthBootstrap680BigIntObjects_0x4ba50c* blockB0 = &child.modulusBigIntB0;
     AuthBootstrap680BigIntObjects_0x4ba50c* blockC4 = &child.publicExponentBigIntC4;
@@ -1888,7 +1890,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     stagedBytes);
             const auto* parseObject = child.authReplyParseObjectF0;
 
-            child.cachedAuthReply_ = reply;
             child.inboundAuthStatusEc =
                 storedParseObjectF0
                     ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x01u)

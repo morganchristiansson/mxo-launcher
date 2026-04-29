@@ -4,6 +4,73 @@
 #include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
+namespace {
+
+static uint16_t ReadU16LEState2(const uint8_t* bytes) {
+    if (!bytes) {
+        return 0u;
+    }
+    return static_cast<uint16_t>(bytes[0]) |
+           static_cast<uint16_t>(static_cast<uint16_t>(bytes[1]) << 8u);
+}
+
+static uint32_t ReadU32LEState2(const uint8_t* bytes) {
+    if (!bytes) {
+        return 0u;
+    }
+    return static_cast<uint32_t>(bytes[0]) |
+           (static_cast<uint32_t>(bytes[1]) << 8u) |
+           (static_cast<uint32_t>(bytes[2]) << 16u) |
+           (static_cast<uint32_t>(bytes[3]) << 24u);
+}
+
+static const uint8_t* AuthBootstrap680WorldTempRecordByIndex(
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
+    size_t index) {
+    if (!parseObject || !parseObject->worldTempRecords44 ||
+        index >= parseObject->worldTempRecordCount48) {
+        return nullptr;
+    }
+    return parseObject->worldTempRecords44 + index * 0x20u;
+}
+
+static const uint8_t* AuthBootstrap680CharacterTempRecordByIndex(
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
+    size_t index,
+    const char** outHandleText,
+    uint16_t* outHandleLength) {
+    if (outHandleText) {
+        *outHandleText = "";
+    }
+    if (outHandleLength) {
+        *outHandleLength = 0u;
+    }
+    if (!parseObject || !parseObject->characterTempRecords3c ||
+        index >= parseObject->characterTempRecordCount40) {
+        return nullptr;
+    }
+
+    const uint8_t* const record = parseObject->characterTempRecords3c + index * 0x0eu;
+    const uint16_t handleOffset = ReadU16LEState2(record + 1u);
+    if (handleOffset != 0u) {
+        uint8_t* const mutableHandleLengthBytes = const_cast<uint8_t*>(record + handleOffset);
+        const uint16_t handleLength = ReadU16LEState2(mutableHandleLengthBytes);
+        char* const handleText = reinterpret_cast<char*>(mutableHandleLengthBytes + 2u);
+        if (handleLength != 0u) {
+            handleText[handleLength - 1u] = '\0';
+        }
+        if (outHandleText) {
+            *outHandleText = handleText;
+        }
+        if (outHandleLength) {
+            *outHandleLength = handleLength;
+        }
+    }
+    return record;
+}
+
+}  // namespace
+
 
 // anchor: launcher.exe vtable 0x4b5014
 const char* CLTLoginState_AuthenticatePending_0x4b5014::DebugName() const {
@@ -136,14 +203,12 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             // 4. if clear, set `DAT_004f79e0 = 1` and run the once-only writeback body
             auto& authBootstrapChild =
                 AuthBootstrapChildFromWriteHelper(*g_CurrentLoginMediator->authBootstrapChild680_);
-            const mxo::auth::AuthReply& cachedAuthReply =
-                authBootstrapChild.CachedAuthReply_SOURCEOWNED();
             const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject =
                 authBootstrapChild.authReplyParseObjectF0;
             authBootstrapChild.authReplySuccessHeaderDword07_110 =
                 parseObject != nullptr && parseObject->replyHeader10 != nullptr
-                    ? ReadU32LE(parseObject->replyHeader10 + 0x07u)
-                    : cachedAuthReply.successHeaderUnknownDword07;
+                    ? ReadU32LEState2(parseObject->replyHeader10 + 0x07u)
+                    : 0u;
 
             const char* const passwordText =
                 g_CurrentLoginMediator->ownerAuthBootstrapSource94_.password20.data();
@@ -181,11 +246,19 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 {
                     const size_t worldCount = std::min(
                         g_CurrentLoginMediator->worldDescriptorsD84_.size(),
-                        cachedAuthReply.worlds.size());
+                        parseObject != nullptr
+                            ? static_cast<size_t>(parseObject->worldTempRecordCount48)
+                            : 0u);
                     for (size_t i = 0; i < worldCount; ++i) {
-                        const auto& world = cachedAuthReply.worlds[i];
-                        const uint8_t rawStatus = static_cast<uint8_t>(world.status & 0xffu);
-                        const uint8_t rawType = static_cast<uint8_t>(world.type & 0xffu);
+                        const uint8_t* const worldRecord =
+                            AuthBootstrap680WorldTempRecordByIndex(parseObject, i);
+                        if (!worldRecord) {
+                            break;
+                        }
+                        const uint16_t worldId = ReadU16LEState2(worldRecord + 0x01u);
+                        const char* const worldName = reinterpret_cast<const char*>(worldRecord + 0x03u);
+                        const uint8_t rawStatus = worldRecord[0x17u];
+                        const uint8_t rawType = worldRecord[0x18u];
                         const uint8_t normalizedStatus = (rawStatus != 0u && rawStatus < 6u)
                                                             ? rawStatus
                                                             : 0u;
@@ -196,27 +269,27 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         if (normalizedStatus != rawStatus) {
                             spdlog::info(
                                 CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidWorldStatus,
-                                world.worldName.c_str(),
-                                static_cast<unsigned>(world.worldId),
+                                worldName,
+                                static_cast<unsigned>(worldId),
                                 static_cast<unsigned>(rawStatus));
                         }
                         if (normalizedType != rawType) {
                             spdlog::info(
                                 CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidWorldType,
-                                world.worldName.c_str(),
-                                static_cast<unsigned>(world.worldId),
+                                worldName,
+                                static_cast<unsigned>(worldId),
                                 static_cast<unsigned>(rawType));
                         }
 
                         auto& descriptor = g_CurrentLoginMediator->worldDescriptorsD84_[i];
-                        descriptor.worldId01 = world.worldId;
-                        descriptor.inlineNamePlus03 = world.worldName;
+                        descriptor.worldId01 = worldId;
+                        descriptor.inlineNamePlus03 = worldName;
                         descriptor.status17 = normalizedStatus;
                         descriptor.type18 = normalizedType;
-                        descriptor.serverVersion19 = world.clientVersion;
-                        descriptor.serverLanguage1d = static_cast<uint8_t>(world.unknown4 & 0xffu);
-                        descriptor.privateFlag1e = static_cast<uint8_t>((world.unknown4 >> 8) & 0xffu);
-                        descriptor.populationLevel1f = world.load;
+                        descriptor.serverVersion19 = ReadU32LEState2(worldRecord + 0x19u);
+                        descriptor.serverLanguage1d = worldRecord[0x1du];
+                        descriptor.privateFlag1e = worldRecord[0x1eu];
+                        descriptor.populationLevel1f = worldRecord[0x1fu];
                         g_CurrentLoginMediator->worldDescriptorValidD84_[i] = true;
                         ++g_CurrentLoginMediator->worldDescriptorCountD80_;
                     }
@@ -226,8 +299,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                         authBootstrapChild.authReplyParseObjectF0;
                     const uint32_t field114Value =
                         parseObject2 != nullptr && parseObject2->replyHeader10 != nullptr
-                            ? ReadU32LE(parseObject2->replyHeader10 + 0x15u)
-                            : cachedAuthReply.unknown3;
+                            ? ReadU32LEState2(parseObject2->replyHeader10 + 0x15u)
+                            : 0u;
                     authBootstrapChild.StoreField114AndTimestamp118(field114Value);
                     spdlog::info(
                         "AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp childField114=0x{:08x} childField118=0x{:08x}",
@@ -250,30 +323,47 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
                     const size_t characterCount = std::min(
                         g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_.size(),
-                        cachedAuthReply.characters.size());
+                        parseObject != nullptr
+                            ? static_cast<size_t>(parseObject->characterTempRecordCount40)
+                            : 0u);
                     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ =
                         static_cast<uint8_t>(characterCount);
                     for (size_t i = 0; i < characterCount; ++i) {
-                        const auto& character = cachedAuthReply.characters[i];
-                        const uint8_t rawStatus = static_cast<uint8_t>(character.status & 0xffu);
+                        const char* handleText = "";
+                        uint16_t handleLength = 0u;
+                        const uint8_t* const characterRecord =
+                            AuthBootstrap680CharacterTempRecordByIndex(
+                                parseObject,
+                                i,
+                                &handleText,
+                                &handleLength);
+                        if (!characterRecord) {
+                            break;
+                        }
+                        const uint8_t rawStatus = characterRecord[0x0bu];
                         const uint8_t normalizedStatus = (rawStatus <= 6u) ? rawStatus : 7u;
+                        const uint32_t characterIdLow = ReadU32LEState2(characterRecord + 0x03u);
+                        const uint32_t characterIdHigh = ReadU32LEState2(characterRecord + 0x07u);
+                        const uint16_t worldId = ReadU16LEState2(characterRecord + 0x0cu);
                         if (normalizedStatus != rawStatus) {
+                            const unsigned long long characterId =
+                                static_cast<unsigned long long>(characterIdLow) |
+                                (static_cast<unsigned long long>(characterIdHigh) << 32u);
                             spdlog::info(
                                 CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidCharacterStatus,
-                                character.handle.text.c_str(),
-                                static_cast<unsigned long long>(character.characterId),
+                                handleText,
+                                characterId,
                                 static_cast<unsigned>(rawStatus));
                         }
 
                         auto& slotRecord = g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
                         slotRecord = {};
-                        slotRecord.debugString14 = character.handle.text.c_str();
-                        slotRecord.characterIdLow1c =
-                            static_cast<uint32_t>(character.characterId & 0xffffffffull);
-                        slotRecord.characterIdHigh20 =
-                            static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
+                        slotRecord.debugString14 = handleText;
+                        (void)handleLength;
+                        slotRecord.characterIdLow1c = characterIdLow;
+                        slotRecord.characterIdHigh20 = characterIdHigh;
                         slotRecord.packetType1a = normalizedStatus;
-                        slotRecord.worldId24 = character.worldId;
+                        slotRecord.worldId24 = worldId;
                         g_CurrentLoginMediator->selectionRouteState684_.slotRecordValid04_[i] = true;
 
                         int matchedWorldIndex = -1;

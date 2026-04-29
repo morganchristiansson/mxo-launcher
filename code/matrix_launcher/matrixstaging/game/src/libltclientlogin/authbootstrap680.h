@@ -151,7 +151,6 @@ public:
  std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterLarge> feedbackTransformLarge94Owned_{};
  std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterSmall> feedbackTransformSmall98Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
- std::unique_ptr<AuthBootstrapReplyCopyShadowF4_0x44add0> authReplyCopyShadowF4Owned_{};
  std::vector<uint32_t> modulusBigIntB0OwnedDigits_{};
  std::vector<uint32_t> publicExponentBigIntC4OwnedDigits_{};
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
@@ -159,7 +158,6 @@ public:
  mxo::auth::GetPublicKeyReply cachedGetPublicKeyReply_{};
  mxo::auth::AuthRequestBuildResult cachedAuthRequestBuildResult_{};
  mxo::auth::AuthChallenge cachedAuthChallenge_{};
- mxo::auth::AuthReply cachedAuthReply_{};
 
  // anchor: launcher.exe:0x445500
  AuthBootstrap680ChildBase_0x4b7134();
@@ -209,7 +207,6 @@ public:
     // after `0x448140` finishes. Keep these out of the mirrored child layout.
     const mxo::auth::GetPublicKeyReply& CachedGetPublicKeyReply_SOURCEOWNED() const;
     const mxo::auth::AuthChallenge& CachedAuthChallenge_SOURCEOWNED() const;
-    const mxo::auth::AuthReply& CachedAuthReply_SOURCEOWNED() const;
 
     // anchor: launcher.exe:0x448050
     // Only known direct caller is state2 ready-side handoff at launcher.exe:0x43928b, where
