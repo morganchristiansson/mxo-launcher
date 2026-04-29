@@ -1078,8 +1078,8 @@ public:
     mxo::ltlogin::AuthBootstrap680Field54HelperSketch feedbackSeedHelper54{};
     uint32_t authServerTimeBias80 = 0;
     std::array<uint8_t, 16> feedbackSeed84{};
-    mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr;
-    mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr;
+    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption* feedbackTransformLarge94 = nullptr;
+    CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption* feedbackTransformSmall98 = nullptr;
     uint32_t currentPublicKeyId9C = 0;
     uint8_t authRequestReadyA0 = 0;
     std::array<uint8_t, 3> paddingA1ToA3{};
