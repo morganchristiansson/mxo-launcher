@@ -761,6 +761,24 @@ static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
     return true;
 }
 
+static bool BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
+    std::vector<uint32_t>* ownedDigits,
+    const CryptoPP::Integer& value) {
+    if (!outObject || !ownedDigits || value.IsNegative()) {
+        return false;
+    }
+
+    const size_t encodedByteCount = static_cast<size_t>(value.MinEncodedSize());
+    std::vector<uint8_t> bigEndianBytes(encodedByteCount == 0u ? 1u : encodedByteCount, 0u);
+    value.Encode(bigEndianBytes.data(), bigEndianBytes.size());
+    return BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
+        outObject,
+        ownedDigits,
+        bigEndianBytes.data(),
+        bigEndianBytes.size());
+}
+
 static CryptoPP::Integer AuthBootstrap680BigIntObjectToCryptoPPInteger(
     const AuthBootstrap680BigIntObjects_0x4ba50c& object) {
     const auto* digits = static_cast<const uint32_t*>(object.digits0c);
@@ -1612,109 +1630,6 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
         static_cast<unsigned>(privateExponent.BitCount()));
 }
 
-// Source-owned shared auth-reply materialization bridge for later child `+0xf4` consumers such as
-// `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`.
-// Bridge anchors:
-// - launcher.exe:0x448140 raw `0x0b` success copies the validated `0x136` auth-data block into
-//   child `+0xf4` and rebuilds child `+0xb0/+0xc4/+0xd8`
-// - launcher.exe:0x43f300 consumes that child-side result on the broader state2 path
-// - launcher.exe:0x4401a0 is the later state10 selected-slot auth-reply handler and does not call
-//   `0x448140`
-// The shared replacement helper is therefore a deliberate bridge between anchored original owners,
-// not a newly claimed standalone launcher method.
-void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
-    AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& mediator) {
-    (void)mediator;
-
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
-    ResetAuthBootstrap680ReplyMaterialization(child);
-
-    if (parseObject == nullptr) {
-        return;
-    }
-
-    child.authReplyCopyShadowF4 = static_cast<AuthBootstrapReplyCopyShadowF4_0x44add0*>(
-        std::malloc(sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0)));
-    if (child.authReplyCopyShadowF4 == nullptr) {
-        return;
-    }
-    AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow = *child.authReplyCopyShadowF4;
-    copyShadow = {};
-
-    // Prefer the exact copied parse-object auth-data field recovered from
-    // `0x443470 / 0x448140`: that `0x136` span is the original child `+0xf4` material.
-    if (parseObject->authDataBytes1c != nullptr &&
-        parseObject->authDataByteLength20 == sizeof(copyShadow)) {
-        std::copy_n(
-            parseObject->authDataBytes1c,
-            sizeof(copyShadow),
-            reinterpret_cast<uint8_t*>(&copyShadow));
-    } else {
-        std::free(child.authReplyCopyShadowF4);
-        child.authReplyCopyShadowF4 = nullptr;
-        return;
-    }
-
-    AuthBootstrap680BigIntObjects_0x4ba50c* blockB0 = &child.modulusBigIntB0;
-    AuthBootstrap680BigIntObjects_0x4ba50c* blockC4 = &child.publicExponentBigIntC4;
-    AuthBootstrap680BigIntObjects_0x4ba50c* blockD8 = &child.privateExponentBigIntD8;
-
-    const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-        blockB0,
-        &child.modulusBigIntB0OwnedDigits_,
-        copyShadow.signedData80.data() + 0x52u,
-        0x60u);
-    const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
-        blockC4,
-        &child.publicExponentBigIntC4OwnedDigits_,
-        copyShadow.signedData80[0x51u]);
-
-    std::vector<uint8_t> decryptedPrivateExponentBytes;
-    const bool decryptedPrivateExponent = mxo::auth::DecryptAuthReplyPrivateExponent(
-        parseObject->encryptedPrivateExponentBytes24 != nullptr
-            ? std::vector<uint8_t>(
-                  parseObject->encryptedPrivateExponentBytes24,
-                  parseObject->encryptedPrivateExponentBytes24 +
-                      parseObject->encryptedPrivateExponentByteLength28)
-            : std::vector<uint8_t>{},
-        child.cachedAuthRequestBuildResult_.twofishKeyBytes,
-        child.cachedAuthChallengeCiphertextBytesOwned_,
-        &decryptedPrivateExponentBytes);
-    const bool builtBlockD8 =
-        decryptedPrivateExponent &&
-        decryptedPrivateExponentBytes.size() == 0x60u &&
-        BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-            blockD8,
-            &child.privateExponentBigIntD8OwnedDigits_,
-            decryptedPrivateExponentBytes.data(),
-            decryptedPrivateExponentBytes.size());
-
-    spdlog::info(
-        "AuthBootstrap680MaterializeReplyCopyShadowScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
-        static_cast<unsigned>(sizeof(copyShadow)),
-        static_cast<unsigned>(parseObject->authDataByteLength20),
-        static_cast<unsigned>(parseObject->authDataByteLength20),
-        BuildHexPreview(
-            copyShadow.authSignature00.data(),
-            16u,
-            16u),
-        static_cast<unsigned>(ReadU32LE(copyShadow.signedData80.data() + 0x2cu)),
-        BuildHexPreview(
-            copyShadow.signedData80.data() + 0x52u,
-            16u,
-            16u),
-        static_cast<unsigned>(child.authServerTimeBias80),
-        builtBlockB0 ? 1u : 0u,
-        builtBlockC4 ? 1u : 0u,
-        builtBlockD8 ? 1u : 0u,
-        static_cast<unsigned>(blockB0->capacityWords08),
-        static_cast<unsigned>(blockC4->capacityWords08),
-        static_cast<unsigned>(blockD8->capacityWords08),
-        fmt::ptr(parseObject));
-}
-
-
 // anchor: launcher.exe:0x448050
 uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
     CLTLoginMediator& mediator,
@@ -2143,7 +2058,85 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            AuthBootstrap680MaterializeReplyCopyShadowScaffold(*this, *g_CurrentLoginMediator);
+            // anchor: launcher.exe:0x448200..0x4482cf
+            // Keep the raw `0x0b` success tail inline in the inbound child handler: the original
+            // allocates/copies child `+0xf4`, then rebuilds child `+0xb0/+0xc4/+0xd8` from that
+            // copied shadow and the encrypted-private-exponent side field before returning `2`.
+            ResetAuthBootstrap680ReplyMaterialization(*this);
+            authReplyCopyShadowF4 = static_cast<AuthBootstrapReplyCopyShadowF4_0x44add0*>(
+                std::malloc(sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0)));
+            if (authReplyCopyShadowF4 == nullptr) {
+                return kAuthBootstrap680InboundAuthReplyValidationError;
+            }
+
+            AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow = *authReplyCopyShadowF4;
+            copyShadow = {};
+            std::copy_n(
+                parseObject->authDataBytes1c,
+                sizeof(copyShadow),
+                reinterpret_cast<uint8_t*>(&copyShadow));
+
+            const CryptoPP::Integer modulusInteger(
+                copyShadow.signedData80.data() + 0x52u,
+                0x60u);
+            const CryptoPP::Integer publicExponentInteger(
+                static_cast<unsigned int>(copyShadow.signedData80[0x51u]));
+
+            AuthBootstrap680BigIntObjects_0x4ba50c* const blockB0 = &modulusBigIntB0;
+            AuthBootstrap680BigIntObjects_0x4ba50c* const blockC4 = &publicExponentBigIntC4;
+            AuthBootstrap680BigIntObjects_0x4ba50c* const blockD8 = &privateExponentBigIntD8;
+            const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+                blockB0,
+                &modulusBigIntB0OwnedDigits_,
+                modulusInteger);
+            const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+                blockC4,
+                &publicExponentBigIntC4OwnedDigits_,
+                publicExponentInteger);
+
+            std::vector<uint8_t> decryptedPrivateExponentBytes;
+            const bool decryptedPrivateExponent =
+                parseObject->encryptedPrivateExponentBytes24 != nullptr &&
+                mxo::auth::internal::TwofishCbcProcessWithIvNoPadding(
+                    std::vector<uint8_t>(
+                        parseObject->encryptedPrivateExponentBytes24,
+                        parseObject->encryptedPrivateExponentBytes24 +
+                            parseObject->encryptedPrivateExponentByteLength28),
+                    cachedAuthRequestBuildResult_.twofishKeyBytes,
+                    cachedAuthChallengeCiphertextBytesOwned_,
+                    false,
+                    &decryptedPrivateExponentBytes);
+            const bool builtBlockD8 =
+                decryptedPrivateExponent &&
+                decryptedPrivateExponentBytes.size() == 0x60u &&
+                BuildPositiveAuthBootstrap680BigIntFromCryptoPPInteger(
+                    blockD8,
+                    &privateExponentBigIntD8OwnedDigits_,
+                    CryptoPP::Integer(
+                        decryptedPrivateExponentBytes.data(),
+                        decryptedPrivateExponentBytes.size()));
+
+            spdlog::info(
+                "HandleInboundAuthMessage materialized child+0xf4/+0xb0/+0xc4/+0xd8 from raw0x0b authDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
+                static_cast<unsigned>(sizeof(copyShadow)),
+                static_cast<unsigned>(parseObject->authDataByteLength20),
+                BuildHexPreview(
+                    copyShadow.authSignature00.data(),
+                    16u,
+                    16u),
+                static_cast<unsigned>(ReadU32LE(copyShadow.signedData80.data() + 0x2cu)),
+                BuildHexPreview(
+                    copyShadow.signedData80.data() + 0x52u,
+                    16u,
+                    16u),
+                static_cast<unsigned>(authServerTimeBias80),
+                builtBlockB0 ? 1u : 0u,
+                builtBlockC4 ? 1u : 0u,
+                builtBlockD8 ? 1u : 0u,
+                static_cast<unsigned>(blockB0->capacityWords08),
+                static_cast<unsigned>(blockC4->capacityWords08),
+                static_cast<unsigned>(blockD8->capacityWords08),
+                fmt::ptr(parseObject));
             return kAuthBootstrap680InboundAuthReplySuccess;
         }
 

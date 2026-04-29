@@ -155,7 +155,6 @@ public:
  std::vector<uint32_t> modulusBigIntB0OwnedDigits_{};
  std::vector<uint32_t> publicExponentBigIntC4OwnedDigits_{};
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
- std::vector<uint8_t> stagedIncomingAuthPacketBytesOwned_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
  std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
  mxo::auth::AuthRequestBuildResult cachedAuthRequestBuildResult_{};
@@ -277,10 +276,6 @@ enum AuthBootstrap680InboundAuthResult : uint32_t {
     kAuthBootstrap680InboundAuthReplyValidationError = 6u,
 };
 
-void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
-    AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& owner,
-    const mxo::auth::AuthReply& reply);
 extern bool g_authBootstrap680State2AuthReplySuccessOneTimeGate;
 
 }  // namespace mxo::ltlogin

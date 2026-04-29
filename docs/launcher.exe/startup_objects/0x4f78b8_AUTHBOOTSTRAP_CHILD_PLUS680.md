@@ -230,11 +230,14 @@ Current best read:
 - important later-path restraint from Ghidra callee review:
   - `0x4401a0 = CLTLoginState_State10_Slot6_HandleSecondaryMessage` does **not** call `0x448140`
   - its callees stay inside the local state10 parse/object/slot-record/event helpers
-  - so any replacement helper shared between the broader state2 auth-reply path and the later
-    state10 auth-reply path is a deliberate source bridge, not a newly discovered standalone
-    launcher method
+  - source consequence: keep the broader state2 raw `0x0b` copy/adopt/rebuild tail inline in
+    `AuthBootstrap680Child_0x441290::HandleInboundAuthMessage` instead of inventing a standalone
+    launcher helper boundary for it
 
 Current tighter copied-block layout from static `0x448140 / 0x44add0 / 0x44aec0` plus live source logs:
+- the rebuild tail now mirrors the recovered local-object flow more directly by constructing the
+  modulus/public-exponent/private-exponent values as `CryptoPP::Integer` objects before storing
+  them back into the child `0x4ba50c` big-int slots
 - `+0xf4 + 0x00 .. +0x7f` = 128-byte auth-signature span
 - `+0xf4 + 0x80 .. +0x135` = signed-data span (`0xb6` bytes)
 - high-value later exposures inside that signed-data suffix:

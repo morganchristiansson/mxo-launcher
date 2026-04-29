@@ -124,23 +124,6 @@ struct AuthChallengeResponseLayout {
           paddingByte(0x00) {}
 };
 
-struct AuthChallengeResponseBuildResult {
-    uint16_t passwordLengthField;
-    uint16_t soePasswordLengthField;
-    uint16_t paddingLengthField;
-    FramedPacket packet;
-    std::vector<uint8_t> encryptedChallengeBytes;
-    std::vector<uint8_t> decryptedChallengeBytes;
-    std::vector<uint8_t> processedChallengeMd5Bytes;
-    std::vector<uint8_t> plaintextBytes;
-    std::vector<uint8_t> ciphertextBytes;
-
-    AuthChallengeResponseBuildResult()
-        : passwordLengthField(0),
-          soePasswordLengthField(0),
-          paddingLengthField(0) {}
-};
-
 struct MxoString {
     uint16_t length;
     std::string text;
@@ -208,63 +191,6 @@ struct AuthSignedData {
           expiryTime(0),
           publicExponent(0),
           timeCreated(0) {}
-};
-
-struct AuthReply {
-    bool valid;
-    bool isErrorReply;
-    bool hasAuthDataMarker;
-    uint32_t errorCode;
-    uint32_t zeroDword;
-    uint16_t trailingWord;
-    uint16_t successHeaderUnknownWord05;
-    uint32_t successHeaderUnknownDword07;
-    uint16_t offsetAuthData;
-    uint16_t offsetEncryptedData;
-    uint32_t unknown2;
-    uint16_t offsetCharData;
-    uint32_t unknown3;
-    uint32_t offsetServerData;
-    uint32_t offsetUsername;
-    uint16_t characterCount;
-    uint16_t worldCount;
-    uint16_t authDataFieldLength;
-    uint16_t authDataFirstWord;
-    uint16_t authDataMarker;
-    uint16_t encryptedPrivateExponentLength;
-    MxoString username;
-    std::vector<AuthCharacterEntry> characters;
-    std::vector<AuthWorldEntry> worlds;
-    std::vector<uint8_t> authDataBytes;
-    std::vector<uint8_t> authSignatureBytes;
-    AuthSignedData signedData;
-    std::vector<uint8_t> encryptedPrivateExponentBytes;
-    std::vector<uint8_t> headerBytes;
-    std::vector<uint8_t> payloadBytes;
-    std::vector<uint8_t> bytes;
-
-    AuthReply()
-        : valid(false),
-          isErrorReply(false),
-          hasAuthDataMarker(false),
-          errorCode(0),
-          zeroDword(0),
-          trailingWord(0),
-          successHeaderUnknownWord05(0),
-          successHeaderUnknownDword07(0),
-          offsetAuthData(0),
-          offsetEncryptedData(0),
-          unknown2(0),
-          offsetCharData(0),
-          unknown3(0),
-          offsetServerData(0),
-          offsetUsername(0),
-          characterCount(0),
-          worldCount(0),
-          authDataFieldLength(0),
-          authDataFirstWord(0),
-          authDataMarker(0),
-          encryptedPrivateExponentLength(0) {}
 };
 
 // String/diagnostic helper anchors:
@@ -355,26 +281,13 @@ bool EncryptAuthRequestBlob(
 //   original function boundary is recovered later
 
 // Raw 0x0b / AS_AuthReply parse anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
+// - current strongest child-side consumer/owner-handling anchor:
+//   - launcher.exe:0x448140 inline inside
+//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
+// - launcher-faithful copied parse object builder used there:
+//   - launcher.exe:0x444390 / 0x4449c0 / 0x443470
 // - later owner-side handler:
 //   - launcher.exe:0x4401a0
-// - current concrete auth-reply parse/helper object builder:
-//   - launcher.exe:0x43a330
-bool ParseAuthReplyPayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    AuthReply* outReply);
-
-// Auth-reply private-exponent decrypt anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`
-// - exact original decrypt/helper VA: [not yet isolated]
-bool DecryptAuthReplyPrivateExponent(
-    const AuthReply& reply,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    const std::vector<uint8_t>& challengeIvBytes,
-    std::vector<uint8_t>* outPrivateExponentBytes);
 
 // Transitional low-level margin CERT/MS bootstrap helpers.
 // These stay in the shared crypto layer because they model reusable wire/crypto behavior backed by

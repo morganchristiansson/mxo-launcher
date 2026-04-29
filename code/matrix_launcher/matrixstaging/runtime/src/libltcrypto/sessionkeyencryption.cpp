@@ -92,24 +92,6 @@ bool BuildAuthRequestBlobPlaintext(
     return true;
 }
 
-bool DecryptAuthReplyPrivateExponent(
-    const AuthReply& reply,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    const std::vector<uint8_t>& challengeIvBytes,
-    std::vector<uint8_t>* outPrivateExponentBytes) {
-    using namespace internal;
-
-    if (!outPrivateExponentBytes || reply.encryptedPrivateExponentBytes.empty()) {
-        return false;
-    }
-    return TwofishCbcProcessWithIvNoPadding(
-        reply.encryptedPrivateExponentBytes,
-        twofishKeyBytes,
-        challengeIvBytes,
-        false,
-        outPrivateExponentBytes);
-}
-
 // Transitional low-level margin CERT/MS helper note:
 // - wire/crypto shape here is intentionally shared runtime code
 // - evidence source is open server/proxy code, especially:
