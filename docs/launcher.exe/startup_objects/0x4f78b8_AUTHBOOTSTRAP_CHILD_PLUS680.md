@@ -84,9 +84,9 @@ Bridge consequence for source:
 | `+0x98` | small transform helper allocated on raw `0x08` send path | `0x4474f0`, `VTABLES/0x004b74d4.md` |
 | `+0x9c` | current reply/request public-key id dword for this child | `0x447eb0`, `0x4474f0`, `0x447780` |
 | `+0xa0` | auth-request-ready byte | `0x447f50`, `0x448050` |
-| `+0xa4` | lazy `pubkey.dat`-backed state | `0x447260`, `0x447c10`, `0x447eb0`, `0x447f50` |
-| `+0xa8` | raw `0x08` reply-public-key worker | `0x447780`, `0x4474f0`, later `0x41f370` through copied `+0xf4` block |
-| `+0xac` | sibling reply-validation / transform family; still not tightly typed | `0x447780`, `0x448140`, `0x44aec0` |
+| `+0xa4` | lazy `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` (`pubkey.dat`-backed) | `0x447260`, `0x447c10`, `0x447eb0`, `0x447f50` |
+| `+0xa8` | `CryptoPP::RSAES_OAEP_SHA_Encryptor *` | `0x447780`, `0x4474f0`, later `0x41f370` through copied `+0xf4` block |
+| `+0xac` | sibling `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` | `0x447780`, `0x448140`, `0x44aec0` |
 | `+0xf4` | reply-derived copied `0x136` block | `0x448140` |
 | `+0xf8` | three-dword small-string object | `0x441290`, `0x41f3c0` |
 | `+0x104` | crashreporter prompt flag byte | `0x41f390` |
@@ -138,7 +138,7 @@ So `+0xa4` is no longer best described as generic lazy state; it is specifically
 Current best read:
 - `0x447f50 = AuthBootstrap680_HandleGetPublicKeyReply`
 - on the success path it ensures/reuses `+0xa4`
-- then `0x447780 = AuthBootstrap680_RebuildReplyPublicKeyWorkers` rebuilds the worker family
+- then `0x447780 = AuthBootstrap680_RebuildReplyPublicKeyWorkers` rebuilds the Crypto++ key-object family
 - that path:
   - stores the current key id at child `+0x9c`
   - rebuilds child `+0xa8`
@@ -178,9 +178,9 @@ Current best read:
   - child `+0x98`
 - and consumes the reply-public-key worker at child `+0xa8`
 
-Current conservative naming guidance remains:
-- `+0xa8` is clearly a worker/object family in the live reply-public-key path
-- but it is still not safe to collapse it into a concrete crypto class name
+Current naming guidance is now tighter:
+- `+0xa8` is the recovered `CryptoPP::RSAES_OAEP_SHA_Encryptor *`
+- `+0xa4/+0xac` are recovered `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` objects
 
 ### 5. Raw `0x09` / challenge-material continuation
 
@@ -357,10 +357,11 @@ Current bounded follow-up consequence:
 ## Reimplementation guidance
 
 1. keep `+0xa0` named/treated as a **byte readiness flag**, not a pointer/helper
-2. keep `+0xa4` tied to the lazy `pubkey.dat` state family
-3. keep `+0xa8` conservative as a reply-public-key worker/object family
-4. keep `+0xf4` documented as a **reply-derived copied block**, even if source currently narrows it
-5. do not use sibling `0x4429b0 / 0x441470` `+0x9c` behavior to overwrite the child `+0x9c`
+2. keep `+0xa4` tied to the lazy `pubkey.dat` verifier object
+3. keep `+0xa8` as `CryptoPP::RSAES_OAEP_SHA_Encryptor *`
+4. keep `+0xac` as sibling `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *`
+5. keep `+0xf4` documented as a **reply-derived copied block**, even if source currently narrows it
+6. do not use sibling `0x4429b0 / 0x441470` `+0x9c` behavior to overwrite the child `+0x9c`
    meaning without stronger same-type proof
 
 ## Related docs
