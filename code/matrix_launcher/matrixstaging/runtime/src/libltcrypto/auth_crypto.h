@@ -351,17 +351,14 @@ bool BuildGetPublicKeyRequestPacket(
     FramedPacket* outPacket);
 
 // Raw 0x07 / AS_GetPublicKeyReply parse anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
-// - later consumer/owner-handling anchors:
+// - current strongest child-side consumer/owner-handling anchor:
+//   - launcher.exe:0x4484d3 inside
+//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
+// - local packet parse accessor used there:
+//   - launcher.exe:0x443910 = Packet_AsGetPublicKeyReply_0x4b6ca4::InitFromIncomingMessage
+// - later auth-reply/state-family consumers still decode the body through their own anchored paths:
 //   - launcher.exe:0x41bc20
 //   - launcher.exe:0x4401a0
-// - exact original standalone parse helper VA for the 0x07 body: [not yet isolated]
-bool ParseGetPublicKeyReplyPayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    GetPublicKeyReply* outReply);
-
 // Raw 0x08 / AS_AuthRequest build anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`

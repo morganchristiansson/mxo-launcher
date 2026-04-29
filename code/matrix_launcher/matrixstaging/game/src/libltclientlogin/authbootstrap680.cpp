@@ -1754,11 +1754,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     auto* const module = owner08;
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
     auto& child = *this;
-
+    auto* const incomingAuthMessageRef =
+        static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage);
 
     IncomingAuthPayloadViewScaffold incomingPayload = {};
     if (!BuildIncomingAuthPayloadViewScaffold(
-            static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
+            incomingAuthMessageRef,
             &incomingPayload)) {
         child.stagedIncomingAuthPacketBytesOwned_.clear();
         return kAuthBootstrap680InboundUnhandled;
@@ -1772,13 +1773,56 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     const uint8_t rawCode = incomingPayload.rawCode;
     switch (rawCode) {
         case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
-            mxo::auth::GetPublicKeyReply reply;
-            if (!mxo::auth::ParseGetPublicKeyReplyPayload(
-                    stagedBytes.data(),
-                    stagedBytes.size(),
-                    &reply)) {
+            // anchor: launcher.exe:0x4484d3 / 0x443910
+            // The recovered raw 0x07 path materializes the local packet parse accessor on-stack
+            // and then reads fixed fields directly from the packet body rooted at +0x10. Mirror
+            // that here instead of bouncing through the lower-level shared parser helper.
+            Packet_AsGetPublicKeyReply_0x4b6ca4 incomingReplyPacket;
+            incomingReplyPacket.InitFromIncomingMessage(
+                const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef),
+                true);
+
+            const uint8_t* const replyPayloadBytes =
+                static_cast<const uint8_t*>(incomingReplyPacket.payloadAlias10);
+            if (!replyPayloadBytes || stagedBytes.size() < 14u ||
+                replyPayloadBytes[0] != CLTLoginMediator::kAuthRawCodeGetPublicKeyReply) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
                 return kAuthBootstrap680InboundUnhandled;
+            }
+
+            mxo::auth::GetPublicKeyReply reply;
+            reply.valid = true;
+            reply.payloadLength = static_cast<uint32_t>(stagedBytes.size());
+            reply.payloadBytes = stagedBytes;
+            reply.status = ReadU32LE(replyPayloadBytes + 0x01u);
+            reply.currentTime = ReadU32LE(replyPayloadBytes + 0x05u);
+            reply.publicKeyId = ReadU32LE(replyPayloadBytes + 0x09u);
+            reply.keySize = replyPayloadBytes[0x0du];
+            reply.tailBytes.assign(stagedBytes.begin() + 14, stagedBytes.end());
+
+            if (stagedBytes.size() >= 20u) {
+                reply.reservedByte = replyPayloadBytes[0x0eu];
+                reply.publicExponentByte = replyPayloadBytes[0x0fu];
+                reply.unknownWord = ReadU16LE(replyPayloadBytes + 0x10u);
+                reply.modulusLength = ReadU16LE(replyPayloadBytes + 0x12u);
+
+                const size_t modulusStart = 20u;
+                const size_t modulusEnd = modulusStart + reply.modulusLength;
+                if (reply.modulusLength != 0u && modulusEnd + 2u <= stagedBytes.size()) {
+                    reply.modulusBytes.assign(
+                        stagedBytes.begin() + static_cast<std::ptrdiff_t>(modulusStart),
+                        stagedBytes.begin() + static_cast<std::ptrdiff_t>(modulusEnd));
+                    reply.signatureLength = ReadU16LE(replyPayloadBytes + modulusEnd);
+                    const size_t signatureStart = modulusEnd + 2u;
+                    const size_t signatureEnd = signatureStart + reply.signatureLength;
+                    if (signatureEnd <= stagedBytes.size()) {
+                        reply.signatureBytes.assign(
+                            stagedBytes.begin() + static_cast<std::ptrdiff_t>(signatureStart),
+                            stagedBytes.begin() + static_cast<std::ptrdiff_t>(signatureEnd));
+                        reply.hasEmbeddedPublicKey =
+                            !reply.modulusBytes.empty() && reply.publicExponentByte != 0u;
+                    }
+                }
             }
 
             const mxo::auth::GetPublicKeyReply cachedPublicKeyReplyBeforeUpdate =

@@ -47,51 +47,6 @@ std::string HexEncode(const std::vector<uint8_t>& bytes) {
     return bytes.empty() ? std::string() : HexEncode(bytes.data(), bytes.size());
 }
 
-bool ParseGetPublicKeyReplyPayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    GetPublicKeyReply* outReply) {
-    using namespace internal;
-
-    if (!payloadBytes || !outReply || payloadSize < 14u || payloadBytes[0] != 0x07u) {
-        return false;
-    }
-
-    GetPublicKeyReply reply;
-    reply.valid = true;
-    reply.payloadLength = static_cast<uint32_t>(payloadSize);
-    reply.payloadBytes.assign(payloadBytes, payloadBytes + payloadSize);
-
-    std::memcpy(&reply.status, payloadBytes + 1u, sizeof(uint32_t));
-    std::memcpy(&reply.currentTime, payloadBytes + 5u, sizeof(uint32_t));
-    std::memcpy(&reply.publicKeyId, payloadBytes + 9u, sizeof(uint32_t));
-    reply.keySize = payloadBytes[13u];
-    reply.tailBytes.assign(payloadBytes + 14u, payloadBytes + payloadSize);
-
-    if (payloadSize >= 20u) {
-        reply.reservedByte = payloadBytes[14u];
-        reply.publicExponentByte = payloadBytes[15u];
-        std::memcpy(&reply.unknownWord, payloadBytes + 16u, sizeof(uint16_t));
-        std::memcpy(&reply.modulusLength, payloadBytes + 18u, sizeof(uint16_t));
-
-        const size_t modulusStart = 20u;
-        const size_t modulusEnd = modulusStart + reply.modulusLength;
-        if (reply.modulusLength != 0u && modulusEnd + 2u <= payloadSize) {
-            reply.modulusBytes.assign(payloadBytes + modulusStart, payloadBytes + modulusEnd);
-            std::memcpy(&reply.signatureLength, payloadBytes + modulusEnd, sizeof(uint16_t));
-            const size_t signatureStart = modulusEnd + 2u;
-            const size_t signatureEnd = signatureStart + reply.signatureLength;
-            if (signatureEnd <= payloadSize) {
-                reply.signatureBytes.assign(payloadBytes + signatureStart, payloadBytes + signatureEnd);
-                reply.hasEmbeddedPublicKey = !reply.modulusBytes.empty() && reply.publicExponentByte != 0u;
-            }
-        }
-    }
-
-    *outReply = reply;
-    return true;
-}
-
 bool ParseAuthChallengePayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
