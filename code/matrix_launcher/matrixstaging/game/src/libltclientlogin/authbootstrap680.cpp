@@ -536,22 +536,153 @@ static void TryResolveAuthBootstrap680ReplyLengthPrefixedField(
     }
 }
 
-static bool BuildAuthBootstrap680AuthReplyParseObjectFromPacketBody(
+static void TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+    const uint8_t* packetBodyBytes,
+    size_t packetBodyByteCount,
+    size_t replyHeaderOffset,
+    const uint8_t** outFieldBytes,
+    uint16_t* outFieldLength) {
+    if (outFieldBytes) {
+        *outFieldBytes = nullptr;
+    }
+    if (outFieldLength) {
+        *outFieldLength = 0u;
+    }
+    if (!packetBodyBytes || packetBodyByteCount == 0u ||
+        replyHeaderOffset + 2u > packetBodyByteCount) {
+        return;
+    }
+
+    const uint16_t fieldOffset = ReadU16LE(packetBodyBytes + replyHeaderOffset);
+    if (fieldOffset == 0u) {
+        return;
+    }
+
+    const size_t lengthOffset = static_cast<size_t>(fieldOffset);
+    if (lengthOffset + 2u > packetBodyByteCount) {
+        return;
+    }
+
+    const uint16_t fieldLength = ReadU16LE(packetBodyBytes + lengthOffset);
+    const size_t fieldDataOffset = lengthOffset + 2u;
+    const size_t fieldDataEnd = fieldDataOffset + static_cast<size_t>(fieldLength);
+    if (fieldDataEnd > packetBodyByteCount) {
+        return;
+    }
+
+    if (outFieldBytes) {
+        *outFieldBytes = packetBodyBytes + fieldDataOffset;
+    }
+    if (outFieldLength) {
+        *outFieldLength = fieldLength;
+    }
+}
+
+static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessage(
     AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
+    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef) {
+    if (!outParseObject || !incomingAuthMessageRef) {
+        return false;
+    }
+
+    IncomingAuthPayloadViewScaffold incomingPayload = {};
+    if (!BuildIncomingAuthPayloadViewScaffold(incomingAuthMessageRef, &incomingPayload)) {
+        return false;
+    }
+
+    *outParseObject = {};
+    outParseObject->vtable00 = 0x004b6c74u;
+    outParseObject->packetBody04 = incomingPayload.payloadBytes;
+    outParseObject->incomingMessage08 = const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef);
+    outParseObject->resolveFields0c = 1u;
+    outParseObject->replyHeader10 = outParseObject->packetBody04;
+
+    ResetAuthBootstrap680AuthReplyParseAccessor(
+        &outParseObject->worldDescriptorAccessor5c,
+        0x004b533cu,
+        outParseObject->packetBody04,
+        outParseObject->resolveFields0c);
+    outParseObject->worldDescriptorAccessor5c.incomingMessage08 = outParseObject->incomingMessage08;
+    ResetAuthBootstrap680AuthReplyParseAccessor(
+        &outParseObject->slotRecordAccessor70,
+        0x004b5328u,
+        outParseObject->packetBody04,
+        outParseObject->resolveFields0c);
+    outParseObject->slotRecordAccessor70.incomingMessage08 = outParseObject->incomingMessage08;
+
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x05u,
+        &outParseObject->stringField05Bytes14,
+        &outParseObject->stringField05Length18);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x0bu,
+        &outParseObject->authDataBytes1c,
+        &outParseObject->authDataByteLength20);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x0du,
+        &outParseObject->encryptedPrivateExponentBytes24,
+        &outParseObject->encryptedPrivateExponentByteLength28);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x0fu,
+        &outParseObject->opaqueField0fBytes2c,
+        &outParseObject->opaqueField0fByteLength30);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x11u,
+        &outParseObject->opaqueField11Bytes34,
+        &outParseObject->opaqueField11ByteLength38);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x13u,
+        &outParseObject->characterTempRecords3c,
+        &outParseObject->characterTempRecordCount40);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x19u,
+        &outParseObject->worldTempRecords44,
+        &outParseObject->worldTempRecordCount48);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x1bu,
+        &outParseObject->opaqueField1bBytes4c,
+        &outParseObject->opaqueField1bByteLength50);
+    TryResolveAuthBootstrap680ReplyLengthPrefixedFieldView(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadByteCount,
+        0x1du,
+        &outParseObject->replyString1dBytes54,
+        &outParseObject->replyString1dByteLength58);
+    return true;
+}
+
+static bool CopyAuthBootstrap680AuthReplyParseObjectToOwnedPacketBody(
+    AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch& sourceParseObject,
     std::vector<uint8_t>* packetBodyBytes) {
     if (!outParseObject || !packetBodyBytes) {
         return false;
     }
 
-    *outParseObject = {};
-    // anchor: launcher.exe:0x004b6c74
-    // The launcher reuses this same vtable address for the compact
-    // `Packet_AsGetPublicKeyRequest_0x4b6c74` builder and the larger copied auth-reply parse shell.
-    outParseObject->vtable00 = 0x004b6c74u;
+    *outParseObject = sourceParseObject;
     outParseObject->packetBody04 = packetBodyBytes->empty() ? nullptr : packetBodyBytes->data();
     outParseObject->incomingMessage08 = nullptr;
-    outParseObject->resolveFields0c = 1u;
     outParseObject->replyHeader10 = outParseObject->packetBody04;
+    outParseObject->currentWorldTempRecord6c = nullptr;
+    outParseObject->currentCharacterTempRecord80 = nullptr;
+    outParseObject->currentCharacterHandle84 = nullptr;
+    outParseObject->currentCharacterHandleByteLength88 = 0u;
 
     ResetAuthBootstrap680AuthReplyParseAccessor(
         &outParseObject->worldDescriptorAccessor5c,
@@ -628,10 +759,18 @@ static bool BuildAuthBootstrap680AuthReplyParseObjectFromPacketBody(
 static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
     CLTLoginMediator& /*mediator*/,
     AuthBootstrap680Child_0x441290& child,
+    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
     const std::vector<uint8_t>& stagedBytes) {
     ResetAuthBootstrap680ReplyParseObject(child);
 
     if (stagedBytes.empty()) {
+        return false;
+    }
+
+    AuthBootstrap680AuthReplyParseObjectF0Sketch sourceParseObject = {};
+    if (!InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessage(
+            &sourceParseObject,
+            incomingAuthMessageRef)) {
         return false;
     }
 
@@ -642,8 +781,9 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
         child.authReplyParsePacketBodyBytesOwned_.clear();
         return false;
     }
-    if (!BuildAuthBootstrap680AuthReplyParseObjectFromPacketBody(
+    if (!CopyAuthBootstrap680AuthReplyParseObjectToOwnedPacketBody(
             child.authReplyParseObjectF0,
+            sourceParseObject,
             &child.authReplyParsePacketBodyBytesOwned_)) {
         ResetAuthBootstrap680ReplyParseObject(child);
         return false;
@@ -1887,6 +2027,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
                     *mediator,
                     child,
+                    static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
                     stagedBytes);
             const auto* parseObject = child.authReplyParseObjectF0;
 
