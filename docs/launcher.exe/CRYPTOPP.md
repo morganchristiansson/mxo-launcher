@@ -770,8 +770,18 @@ Key evidence:
 - `0x454ff0`
   - appends bytes to the tail node and allocates a new node when needed, matching `Put2()`
 
-So the source-side `AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch` should now be read as
-**recovered `CryptoPP::ByteQueue` layout**, not as a standalone node helper class.
+So the source-side `AuthBootstrap680ByteQueueBoundary1c` should now be read as a
+**recovered `CryptoPP::ByteQueue` boundary**, not as a standalone node helper class.
+The source header now keeps only the queue-owned boundary fields:
+- `byteQueueVtable00`
+- `bufferedTransformationVtable04`
+- `nodeSize08`
+- `headNode0c` / `tailNode10`
+- `lazyPutbackStorage14` / `lazyPutbackLength18`
+
+The old sketch-only `AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch` name has been retired
+from source in favor of the direct queue boundary representation, and no remaining auth-bootstrap
+source logic models the embedded object as a single node.
 
 ### 2.8.2 `0x4b9c20` = old `CryptoPP::Filter` common base
 
@@ -844,11 +854,89 @@ This means the auth-bootstrap source/docs should treat that stack as **old Crypt
 filter plumbing** surrounding the already-identified RSAES-OAEP encryptor / decryptor families,
 rather than as a launcher-owned bespoke helper family.
 
-## 7. Open questions / negative results
+## 6.2 Validator temporary worker closure: `PK_MessageAccumulatorBase` / `PK_MessageAccumulatorImpl<MD5>`
 
-- The validator temporary worker at child `+0x84` is still best treated as a launcher-owned
-  verifier-side temporary object, even though it internally uses already-identified Crypto++
-  pieces.
+**Confidence: MEDIUM-HIGH**
+
+The worker allocated from validator slot `+0x1c` is now better understood as a real Crypto++
+verifier-accumulator family object rather than as a launcher-only scratch shell.
+
+Best current read:
+- `0x447390` = base-ish accumulator ctor
+- `0x4472f0` = complete-object factory / leaf finisher
+- semantic family = **old `CryptoPP::PK_MessageAccumulatorBase` with a derived
+  `PK_MessageAccumulatorImpl<MD5>`-like leaf**
+
+### 6.2.1 Construction shape
+
+`0x4472f0 = AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker`:
+- allocates `0x84` bytes
+- calls `0x447390 = AuthBootstrap680ValidatorTemporaryWorker_Construct`
+- constructs hash object at `this+0x60` via `0x43d410`
+- then rewrites the primary vfptr to final vtable `0x004b7668`
+
+`0x447390` itself:
+- calls the root/base ctor
+- installs ctor-state vtable `0x004b76b0`
+- zeroes worker fields
+- default-constructs two adjacent `CryptoPP::Integer`-family subobjects at `+0x34` and `+0x48`
+- seeds byte `+0x5c = 1`
+
+This is a **mild staged-retable smell**, but not the strong old-MSVC multi-inheritance /
+adjustor-thunk pattern seen on the outer RSA verifier/encryptor families.
+
+### 6.2.2 `0x447340` strongly matches `PK_MessageAccumulatorBase::Update`
+
+`0x447340 = AuthBootstrap680ValidatorTemporaryWorker_UpdateDigestMaybeClearReadyFlag`:
+- calls worker vtable `+0x44`
+- receives the hash object at `this+0x60`
+- calls that hash object's update slot with caller bytes
+- updates byte `this+0x5c` so it stays `1` only if it was already `1` and `length == 0`, else clears
+
+That matches modern Crypto++ `PK_MessageAccumulatorBase::Update()` almost exactly:
+
+```cpp
+AccessHash().Update(input, length);
+m_empty = m_empty && length == 0;
+```
+
+So the strongest current field interpretation is:
+- `worker +0x5c` = **`m_empty`-style accumulator flag**
+- worker vtable `+0x44` = **`AccessHash()`-style accessor**
+
+### 6.2.3 `0x447380` strongly matches `AccessHash()`
+
+`0x447380 = AuthBootstrap680ValidatorTemporaryWorker_GetDigestObject60` simply returns:
+- `this + 0x60`
+
+That is exactly the shape expected from a derived
+`PK_MessageAccumulatorImpl<HASH>::AccessHash()` implementation where the hash object is embedded in
+place.
+
+### 6.2.4 Embedded hash object is MD5-family
+
+The object constructed at worker `+0x60` through `0x43d410` is the recovered MD5-family object used
+by this validator path. In the live verifier flow:
+- outer validator naming proves `RSA/EMSA-PKCS1-v1_5(MD5)`
+- slot `+0x3c / 0x445410` returns the fixed MD5 `DigestInfo` prefix
+- the worker-local hash reached through `+0x44` feeds the expected PKCS#1 v1.5 MD5 comparison path
+
+So the leaf object finalized at `0x4472f0` is best described as an
+**MD5-backed Crypto++ verification accumulator**.
+
+### 6.2.5 Practical source/doc consequence
+
+The old source-side `AuthBootstrap680ValidatorTemporaryWorker84Sketch` should no longer be described
+as merely a launcher-owned temporary worker. The strongest current interpretation is:
+- **base semantics:** `CryptoPP::PK_MessageAccumulatorBase`
+- **leaf semantics:** `CryptoPP::PK_MessageAccumulatorImpl<MD5>` (old-version equivalent)
+- **usage context:** temporary accumulator created by the
+  `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` family
+
+The remaining launcher-owned pieces are the outer orchestration around allocation, signature loading,
+and final compare wiring — not the accumulator semantics themselves.
+
+## 7. Open questions / negative results
 
 - The auth-reply parse accessor/object sketches remain launcher-owned packet shells.
 
