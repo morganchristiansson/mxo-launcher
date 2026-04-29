@@ -45,19 +45,22 @@ struct AuthBootstrap680BigIntObjects_0x4ba50c {
 static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
 
 
-// Recovered `CryptoPP::ByteQueue` layout (`launcher.exe:0x454f10 / 0x455560`).
-// The queue owns a linked list of launcher-tracked ByteQueueNode allocations; this 0x1c-byte
-// object is the queue wrapper itself, not a single node.
-struct AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch {
-    uint32_t vtable00 = 0u;
-    uint32_t helperVtable04 = 0u;
+// Recovered `CryptoPP::ByteQueue` boundary.
+// anchor: launcher.exe:0x454f10
+// anchor: launcher.exe:0x455470
+// anchor: launcher.exe:0x455560
+// This 0x1c-byte object is the queue itself, not a single ByteQueueNode. The linked 0x18-byte
+// heap records are internal ByteQueueNode-like allocations owned by the queue.
+struct AuthBootstrap680ByteQueueBoundary1c {
+    uint32_t byteQueueVtable00 = 0u;
+    uint32_t bufferedTransformationVtable04 = 0u;
     uint32_t nodeSize08 = 0u;
     void* headNode0c = nullptr;
     void* tailNode10 = nullptr;
-    uint32_t lazyString14 = 0u;
-    uint32_t lazyLength18 = 0u;
+    uint32_t lazyPutbackStorage14 = 0u;
+    uint32_t lazyPutbackLength18 = 0u;
 };
-static_assert(sizeof(AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch) == 0x1cu);
+static_assert(sizeof(AuthBootstrap680ByteQueueBoundary1c) == 0x1cu);
 
 // Recovered per-chunk filter object built by raw `0x08` RSA encryptor vtable `+0x20`.
 // Best current match: old Crypto++ `PK_DefaultEncryptionFilter`
@@ -67,7 +70,7 @@ struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     std::array<uint8_t, 0x0c> reserved08To13{};
-    AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch byteQueue14{};
+    AuthBootstrap680ByteQueueBoundary1c byteQueue14{};
     uint32_t ctorArg30 = 0u;
     void* ctorOwnerWorker34 = nullptr;
     uint32_t reserved38 = 0u;
