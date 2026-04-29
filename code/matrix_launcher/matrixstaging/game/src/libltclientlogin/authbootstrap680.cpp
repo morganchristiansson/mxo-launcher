@@ -451,32 +451,37 @@ static void AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
     resolveField(0x1du, true, &parseObject->replyString1dBytes54, &parseObject->replyString1dByteLength58);
 }
 
-// anchor: launcher.exe:0x444390 = Packet_AsGetPublicKeyRequest_0x4b6c74::FUN_00444390
-// Mirror the original source-view init shape first, then let the smaller `0x4436b0/0x443470`
+// anchor: launcher.exe:0x444390 = Packet_AsGetPublicKeyRequest_0x4b6c74::Packet_AsGetPublicKeyRequest_ctor
+// The same `0x004b6c74` vtable backs two launcher shapes:
+// - the compact 9-byte send builder used by `0x447eb0`
+// - this larger `0x8c` incoming-message parse shell used by `0x448140` for opcode `0x0b`
+// Keep the ctor-like init flow faithful here, then let the smaller `0x4436b0/0x443470`
 // method-family helpers own the writable-body reset vs resolved-field branch.
-static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
-    AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
-    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef) {
-    if (!outParseObject || !incomingAuthMessageRef) {
-        return false;
+static Packet_AsGetPublicKeyRequest_0x4b6c74* Packet_AsGetPublicKeyRequest_CtorFromIncomingMessage(
+    Packet_AsGetPublicKeyRequest_0x4b6c74* thisPacket,
+    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
+    uint8_t resolveFields) {
+    auto* outParseObject = reinterpret_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(thisPacket);
+    if (!incomingAuthMessageRef) {
+        return nullptr;
     }
 
     const auto* messageStorage = incomingAuthMessageRef->messageStorage0c;
     if (!messageStorage) {
-        return false;
+        return nullptr;
     }
 
     const uint16_t incomingMessagePayloadByteCount = messageStorage->PayloadByteCount();
     const uint8_t* const incomingMessagePayloadBytes = messageStorage->PayloadBase();
     if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
-        return false;
+        return nullptr;
     }
 
     const uint8_t* payloadBytes = incomingMessagePayloadBytes;
     size_t payloadByteCount = incomingMessagePayloadByteCount;
     if (incomingAuthMessageRef->headerless10 != 0u) {
         if (incomingMessagePayloadByteCount < 2u) {
-            return false;
+            return nullptr;
         }
 
         const uint8_t locatorByte0d = incomingMessagePayloadBytes[1];
@@ -484,7 +489,7 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
         const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
         if (targetLocatorType == 0u || targetLocatorType > 6u ||
             senderLocatorType == 0u || senderLocatorType > 6u) {
-            return false;
+            return nullptr;
         }
 
         const size_t payloadOffset =
@@ -492,7 +497,7 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
             static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
             static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
         if (payloadOffset >= incomingMessagePayloadByteCount) {
-            return false;
+            return nullptr;
         }
 
         payloadBytes = incomingMessagePayloadBytes + payloadOffset;
@@ -500,7 +505,7 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
     }
 
     if (!payloadBytes || payloadByteCount == 0u) {
-        return false;
+        return nullptr;
     }
 
     *outParseObject = {};
@@ -508,7 +513,7 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
     outParseObject->packetBody04 = payloadBytes;
     outParseObject->incomingMessage08 =
         const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef);
-    outParseObject->resolveFields0c = 1u;
+    outParseObject->resolveFields0c = resolveFields;
     outParseObject->replyHeader10 = outParseObject->packetBody04;
 
     ResetAuthBootstrap680AuthReplyParseAccessor(
@@ -537,7 +542,7 @@ static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
             payloadByteCount,
             true);
     }
-    return true;
+    return reinterpret_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(outParseObject);
 }
 
 // Keep the `0x4449c0`-like copy step intentionally thin: copy the already-initialized source
@@ -907,7 +912,6 @@ static const char* SmallStringMirrorDataOrEmpty(const AuthBootstrap680SmallStrin
 }
 
 }  // namespace
-
 }  // namespace
 
 // anchor: launcher.exe:0x445500
@@ -1904,9 +1908,16 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             bool storedParseObjectF0 = false;
             AuthBootstrap680AuthReplyParseObjectF0Sketch sourceParseObject = {};
-            if (AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
-                    &sourceParseObject,
-                    incomingAuthMessage)) {
+            auto* sourcePacket = reinterpret_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(
+                &sourceParseObject);
+            // anchor: launcher.exe:0x4481aa / 0x444390
+            // The local `0x8c` packet view is built by the same ctor/vtable family as the raw
+            // `0x06` request builder; the incoming-message branch just walks the larger parse shell.
+            if ((sourcePacket = Packet_AsGetPublicKeyRequest_CtorFromIncomingMessage(
+                     sourcePacket,
+                     incomingAuthMessage,
+                     true)) != nullptr) {
+                sourceParseObject.vtable00 = 0x004b6c74u;
                 const uint8_t* const payloadBytes = sourceParseObject.replyHeader10;
                 if (payloadBytes == nullptr || payloadBytes < incomingMessagePayloadBytes) {
                     spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
@@ -2129,6 +2140,9 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
     const bool ensuredLazyPubkeyDatValidatorA4 = EnsureAuthBootstrap680LazyPubkeyDatValidator(*this);
 
     Packet_AsGetPublicKeyRequest_0x4b6c74 packetBuilder;
+    // anchor: launcher.exe:0x447ec3..0x447ef3
+    // The send path uses the default/base ctor shape first, then retables the local packet object
+    // to `0x004b6c74` before filling the fixed 9-byte payload.
     packetBuilder.InitializePayloadSize();
     uint8_t* const getPublicKeyRequestPayload = packetBuilder.PayloadBase();
     if (!getPublicKeyRequestPayload) {

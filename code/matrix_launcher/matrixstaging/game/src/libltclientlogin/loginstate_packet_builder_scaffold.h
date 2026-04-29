@@ -605,6 +605,9 @@ public:
 
  uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadAlias10); }
  const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
+
+ // `0x444390` is modeled in `authbootstrap680.cpp` as a ctor-like free helper returning
+ // `Packet_AsGetPublicKeyRequest_0x4b6c74*` over larger caller-provided storage.
 };
 
 static_assert(sizeof(Packet_AsGetPublicKeyRequest_0x4b6c74) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_AsGetPublicKeyRequest_0x4b6c74 size mismatch");
