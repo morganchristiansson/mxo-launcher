@@ -1616,73 +1616,22 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         return kAuthBootstrap680InboundUnhandled;
     }
 
+    const uint8_t* const incomingMessagePayloadBytes =
+        incomingAuthMessage->messageStorage0c->PayloadBase();
+    const uint16_t incomingMessagePayloadByteCount =
+        incomingAuthMessage->messageStorage0c->PayloadByteCount();
+    if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
+        return kAuthBootstrap680InboundUnhandled;
+    }
+
     // anchor: launcher.exe:0x44814e..0x448171 / 0x41bc20
     // The recovered child dispatches on the shared message-code decoder first, then materializes
     // the narrower stack packet/parse helpers only for raw 0x07/0x09/0x0b.
     const uint16_t incomingMessageCode = mxo::liblttcp::CMessageConnectionMessageRef_DecodeMessageCode(
         const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage));
 
-    auto computeEffectivePayloadSpan = [&](const uint8_t** outPayloadBytes,
-                                           size_t* outPayloadByteCount) -> bool {
-        if (!outPayloadBytes || !outPayloadByteCount) {
-            return false;
-        }
-
-        const auto* incomingMessageStorage = incomingAuthMessage->messageStorage0c;
-        if (!incomingMessageStorage) {
-            return false;
-        }
-
-        const uint16_t incomingMessagePayloadByteCount = incomingMessageStorage->PayloadByteCount();
-        const uint8_t* const incomingMessagePayloadBytes = incomingMessageStorage->PayloadBase();
-        if (!incomingMessagePayloadBytes || incomingMessagePayloadByteCount == 0u) {
-            return false;
-        }
-
-        const uint8_t* payloadBytes = incomingMessagePayloadBytes;
-        size_t payloadByteCount = incomingMessagePayloadByteCount;
-        if (incomingAuthMessage->headerless10 != 0u) {
-            if (incomingMessagePayloadByteCount < 2u) {
-                return false;
-            }
-
-            const uint8_t locatorByte0d = incomingMessagePayloadBytes[1];
-            const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
-            const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
-            if (targetLocatorType == 0u || targetLocatorType > 6u ||
-                senderLocatorType == 0u || senderLocatorType > 6u) {
-                return false;
-            }
-
-            const size_t payloadOffset =
-                0x12u +
-                static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
-                static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
-            if (payloadOffset >= incomingMessagePayloadByteCount) {
-                return false;
-            }
-
-            payloadBytes = incomingMessagePayloadBytes + payloadOffset;
-            payloadByteCount = static_cast<size_t>(incomingMessagePayloadByteCount) - payloadOffset;
-        }
-
-        if (!payloadBytes || payloadByteCount == 0u) {
-            return false;
-        }
-
-        *outPayloadBytes = payloadBytes;
-        *outPayloadByteCount = payloadByteCount;
-        return true;
-    };
-
     switch (incomingMessageCode) {
         case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
-            const uint8_t* payloadBytes = nullptr;
-            size_t payloadByteCount = 0u;
-            if (!computeEffectivePayloadSpan(&payloadBytes, &payloadByteCount)) {
-                return kAuthBootstrap680InboundUnhandled;
-            }
-
             // anchor: launcher.exe:0x4484d3 / 0x443910
             // The recovered raw 0x07 path materializes the local packet parse accessor on-stack
             // and then reads fixed fields directly from the packet body rooted at +0x10. Mirror
@@ -1694,7 +1643,21 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const uint8_t* const replyPayloadBytes =
                 static_cast<const uint8_t*>(incomingReplyPacket.payloadAlias10);
-            if (!replyPayloadBytes || payloadByteCount < 14u ||
+            if (!replyPayloadBytes || replyPayloadBytes < incomingMessagePayloadBytes) {
+                spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            const size_t replyPayloadOffset =
+                static_cast<size_t>(replyPayloadBytes - incomingMessagePayloadBytes);
+            if (replyPayloadOffset >= incomingMessagePayloadByteCount) {
+                spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            const size_t payloadByteCount =
+                static_cast<size_t>(incomingMessagePayloadByteCount) - replyPayloadOffset;
+            if (payloadByteCount < 14u ||
                 replyPayloadBytes[0] != CLTLoginMediator::kAuthRawCodeGetPublicKeyReply) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
                 return kAuthBootstrap680InboundUnhandled;
@@ -1735,8 +1698,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 // into `0x4474f0`. The replacement keeps this one source-owned payload snapshot
                 // only so `SendAuthRequest()` can recover the same reply-public-key header bytes.
                 cachedGetPublicKeyReplyPayloadBytesOwned_.assign(
-                    payloadBytes,
-                    payloadBytes + payloadByteCount);
+                    replyPayloadBytes,
+                    replyPayloadBytes + payloadByteCount);
             }
 
             spdlog::info(
@@ -1769,12 +1732,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         }
 
         case 0x09u: {
-            const uint8_t* payloadBytes = nullptr;
-            size_t payloadByteCount = 0u;
-            if (!computeEffectivePayloadSpan(&payloadBytes, &payloadByteCount)) {
-                return kAuthBootstrap680InboundUnhandled;
-            }
-
             // anchor: launcher.exe:0x443d90 / 0x44831c
             // The recovered raw 0x09 path materializes the local packet parse accessor and then
             // consumes the 16-byte encrypted challenge inline from payload+1.
@@ -1784,7 +1741,21 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const uint8_t* const challengePayloadBytes =
                 static_cast<const uint8_t*>(incomingChallengePacket.payloadAlias10);
-            if (!challengePayloadBytes || payloadByteCount != 17u || challengePayloadBytes[0] != 0x09u) {
+            if (!challengePayloadBytes || challengePayloadBytes < incomingMessagePayloadBytes) {
+                spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            const size_t challengePayloadOffset =
+                static_cast<size_t>(challengePayloadBytes - incomingMessagePayloadBytes);
+            if (challengePayloadOffset >= incomingMessagePayloadByteCount) {
+                spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            const size_t payloadByteCount =
+                static_cast<size_t>(incomingMessagePayloadByteCount) - challengePayloadOffset;
+            if (payloadByteCount != 17u || challengePayloadBytes[0] != 0x09u) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
                 return kAuthBootstrap680InboundUnhandled;
             }
@@ -2008,15 +1979,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         }
 
         case 0x0bu: {
-            const uint8_t* payloadBytes = nullptr;
-            size_t payloadByteCount = 0u;
-            if (!computeEffectivePayloadSpan(&payloadBytes, &payloadByteCount) ||
-                payloadByteCount < 11u || payloadBytes[0] != 0x0bu) {
-                spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
-                return kAuthBootstrap680InboundUnhandled;
-            }
-
-            const uint32_t errorReplyStatus01 = ReadU32LE(payloadBytes + 0x01u);
             ResetAuthBootstrap680ReplyParseObject(*this);
 
             bool storedParseObjectF0 = false;
@@ -2024,6 +1986,26 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             if (AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
                     &sourceParseObject,
                     incomingAuthMessage)) {
+                const uint8_t* const payloadBytes = sourceParseObject.replyHeader10;
+                if (payloadBytes == nullptr || payloadBytes < incomingMessagePayloadBytes) {
+                    spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                const size_t payloadOffset =
+                    static_cast<size_t>(payloadBytes - incomingMessagePayloadBytes);
+                if (payloadOffset >= incomingMessagePayloadByteCount) {
+                    spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                const size_t payloadByteCount =
+                    static_cast<size_t>(incomingMessagePayloadByteCount) - payloadOffset;
+                if (payloadByteCount < 11u || payloadBytes[0] != 0x0bu) {
+                    spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
                 authReplyParsePacketBodyBytesOwned_.assign(
                     payloadBytes,
                     payloadBytes + payloadByteCount);
@@ -2044,6 +2026,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 }
             }
             const auto* parseObject = authReplyParseObjectF0;
+            const uint32_t errorReplyStatus01 =
+                (parseObject != nullptr && parseObject->replyHeader10 != nullptr)
+                    ? ReadU32LE(parseObject->replyHeader10 + 0x01u)
+                    : 0u;
 
             inboundAuthStatusEc =
                 (storedParseObjectF0 && parseObject != nullptr && parseObject->replyHeader10 != nullptr)
