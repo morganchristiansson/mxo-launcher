@@ -855,6 +855,17 @@ This means the auth-bootstrap source/docs should treat that stack as **old Crypt
 filter plumbing** surrounding the already-identified RSAES-OAEP encryptor / decryptor families,
 rather than as a launcher-owned bespoke helper family.
 
+Current source direction after the cleanup pass:
+- the old source-only `AuthBootstrap680Raw08PerChunkWorker48Sketch` has been removed
+- the outer raw-`0x08` worker remains modeled as the `RSAES_OAEP_SHA_Encryptor`-compatible family
+- the inner per-chunk helper is now represented directly by `EncryptPlaintextChunkScaffold()`
+  comments + code that preserve the recovered `PK_DefaultEncryptionFilter` boundary semantics:
+  - construct/use a `ByteQueue` plaintext accumulator
+  - drain it at message-end
+  - emit ciphertext through a `PK_EncryptorFilter`-equivalent step
+- launcher anchors for `0x438120 / 0x438320 / 0x4382c0` now live on that helper body instead of on
+  a dead layout sketch
+
 ## 6.2 Validator temporary worker closure: `PK_MessageAccumulatorBase` / `PK_MessageAccumulatorImpl<MD5>`
 
 **Confidence: MEDIUM-HIGH**

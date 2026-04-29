@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include <queue.h>
-
 #include "rsa.h"
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
@@ -47,30 +45,15 @@ struct AuthBootstrap680BigIntObjects_0x4ba50c {
 static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
 
 
-
-// Recovered per-chunk filter object built by raw `0x08` RSA encryptor vtable `+0x20`.
-// Best current match: old Crypto++ `PK_DefaultEncryptionFilter`
-// (`launcher.exe:0x438120 / 0x438320`).  The sibling vtable `0x004b4548` behaves like
-// `PK_DefaultDecryptionFilter` over the same `Filter` + `ByteQueue` base family.
+// Recovered raw `0x08` helper stack note:
+// - `launcher.exe:0x438120` = `CryptoPP_PK_DefaultEncryptionFilter_ctor`
+// - `launcher.exe:0x438320` = `CryptoPP_PK_DefaultEncryptionFilter_Put2`
+// - `launcher.exe:0x4382c0` = `CryptoPP_PK_Encryptor_CreateEncryptionFilter`
 //
-// The launcher embeds a `ByteQueue` here, but source no longer needs to preserve the exact
-// launcher-side 0x1c queue layout/offsets. Model the member directly as `CryptoPP::ByteQueue`
-// while keeping the surrounding recovered helper boundary and anchors visible.
-// anchor: launcher.exe:0x454f10
-// anchor: launcher.exe:0x455470
-// anchor: launcher.exe:0x455560
-struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
-    uint32_t vtable00 = 0u;
-    uint32_t helperVtable04 = 0u;
-    std::array<uint8_t, 0x0c> reserved08To13{};
-    CryptoPP::ByteQueue byteQueue14{};
-    uint32_t ctorArg30 = 0u;
-    void* ctorOwnerWorker34 = nullptr;
-    uint32_t reserved38 = 0u;
-    uint32_t reserved3c = 0u;
-    uint32_t ctorZeroTail40 = 0u;
-    uint32_t ctorZeroTail44 = 0u;
-};
+// Source no longer keeps a dedicated `AuthBootstrap680Raw08PerChunkWorker48Sketch` because the
+// auth path only needs the inner `PK_DefaultEncryptionFilter` semantics, not the exact launcher
+// helper object layout. The remaining recovered raw-0x08 orchestration stays on the outer
+// `RSAES_OAEP_SHA_Encryptor` family helpers in `authbootstrap680.cpp`.
 
 struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     uint32_t vtable00 = 0u;

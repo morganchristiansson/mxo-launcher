@@ -911,15 +911,43 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextChunkScaffold
             return false;
         }
 
+        // Preserve the raw-0x08 layering recovered from launcher.exe even though we no longer keep
+        // a dedicated `0x48` helper layout struct in source:
+        // - outer worker family here is the `RSAES_OAEP_SHA_Encryptor`-compatible object
+        // - inner per-chunk helper is the old `PK_DefaultEncryptionFilter`
+        // - that helper owns a `ByteQueue` plaintext accumulator with `NodeSize = 0x100`
+        //
+        // anchor: launcher.exe:0x438120
+        // anchor: launcher.exe:0x438320
+        // anchor: launcher.exe:0x4382c0
+        // anchor: launcher.exe:0x454f10
+        // Mirror the message-end semantics of `CryptoPP_PK_DefaultEncryptionFilter_Put2` instead of
+        // erasing the boundary into a one-shot convenience encrypt call:
+        // 1. queue plaintext into a `ByteQueue`
+        // 2. query queued size
+        // 3. drain queued plaintext into a temporary contiguous buffer
+        // 4. feed that plaintext through a `PK_EncryptorFilter`-equivalent emission step
+        CryptoPP::ByteQueue plaintextQueue;
+        plaintextQueue.Put(plaintextBytes, plaintextByteCount);
+        const size_t queuedPlaintextByteCount = plaintextQueue.CurrentSize();
+        if (queuedPlaintextByteCount != plaintextByteCount) {
+            return false;
+        }
+
+        std::string queuedPlaintext(queuedPlaintextByteCount, '\0');
+        plaintextQueue.Get(
+            reinterpret_cast<CryptoPP::byte*>(queuedPlaintext.data()),
+            queuedPlaintextByteCount);
+
         std::string ciphertextChunk;
-        CryptoPP::StringSource source(
-            plaintextBytes,
-            plaintextByteCount,
-            true,
-            new CryptoPP::PK_EncryptorFilter(
-                rng,
-                encryptor,
-                new CryptoPP::StringSink(ciphertextChunk)));
+        CryptoPP::PK_EncryptorFilter encryptFilter(
+            rng,
+            encryptor,
+            new CryptoPP::StringSink(ciphertextChunk));
+        encryptFilter.Put(
+            reinterpret_cast<const CryptoPP::byte*>(queuedPlaintext.data()),
+            queuedPlaintext.size());
+        encryptFilter.MessageEnd();
         if (ciphertextChunk.size() != ciphertextChunkByteCount) {
             return false;
         }
