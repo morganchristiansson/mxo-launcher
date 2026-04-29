@@ -155,39 +155,32 @@ static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
 }
 
 // anchor: launcher.exe:0x4420f0
-static void ResetAuthBootstrap680RsaPublicKeyPairSubobject(
-    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch* outSubobject) {
-    if (!outSubobject) {
+static void ResetAuthBootstrap680RsaPublicKey(CryptoPP::RSA::PublicKey* outPublicKey) {
+    if (!outPublicKey) {
         return;
     }
 
-    outSubobject->vtable00 = 0x004b6680u;
-    outSubobject->helperVtable04 = 0x004b66acu;
-    outSubobject->modulus08 = {};
-    outSubobject->exponent1c = {};
-    outSubobject->helperThunk30 = 0x004b630cu;
-    outSubobject->helperThunk34 = 0x004b6348u;
-    outSubobject->helperThunk38 = 0x004b6454u;
-    outSubobject->helperVtable3c = 0x004b66a0u;
+    *outPublicKey = CryptoPP::RSA::PublicKey();
 }
 
 // anchor: launcher.exe:0x447120 / 0x447020
-static bool BuildAuthBootstrap680RsaPublicKeyPairSubobjectFromReplyPublicKey(
-    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch* outSubobject,
+static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
+    CryptoPP::RSA::PublicKey* outPublicKey,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
     const uint8_t* modulusBytes,
     size_t modulusByteCount,
     uint8_t exponentByte) {
-    if (!outSubobject || !ownedState || !modulusBytes || modulusByteCount == 0u || exponentByte == 0u) {
+    if (!outPublicKey || !ownedState || !modulusBytes || modulusByteCount == 0u || exponentByte == 0u) {
         return false;
     }
 
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(outSubobject);
+    ResetAuthBootstrap680RsaPublicKey(outPublicKey);
 
     try {
         ownedState->publicKey.Initialize(
             CryptoPP::Integer(modulusBytes, modulusByteCount),
             CryptoPP::Integer(&exponentByte, 1u));
+        *outPublicKey = ownedState->publicKey;
     } catch (const CryptoPP::Exception&) {
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
@@ -208,7 +201,7 @@ static void ResetAuthBootstrap680Raw08PublicKeyWorkerA8(
     outWorker->vtable00 = 0x004b75e4u;
     outWorker->helperVtable04 = 0x004b7610u;
     outWorker->helperVtable08 = 0x004b7138u;
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outWorker->publicKeyPair0c);
+    ResetAuthBootstrap680RsaPublicKey(&outWorker->publicKey);
     outWorker->helperThunk4c = 0x004b75e0u;
     outWorker->helperThunk50 = 0x004b6300u;
     outWorker->helperThunk54 = 0x004b3e18u;
@@ -225,7 +218,7 @@ static void ResetAuthBootstrap680ReplyAuthDataValidatorAC(
     outValidator->vtable00 = 0x004b7580u;
     outValidator->helperVtable04 = 0x004b75ccu;
     outValidator->helperVtable08 = 0x004b7440u;
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outValidator->publicKeyPair0c);
+    ResetAuthBootstrap680RsaPublicKey(&outValidator->publicKey);
     outValidator->helperThunk4c = 0x004b73c0u;
     outValidator->helperThunk50 = 0x004b6c44u;
 }
@@ -243,8 +236,8 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::ConstructFromReplyPublicKey(
     size_t modulusByteCount,
     uint8_t exponentByte) {
     ResetAsRecoveredLeaf(ownedState);
-    if (!BuildAuthBootstrap680RsaPublicKeyPairSubobjectFromReplyPublicKey(
-            &publicKeyPair0c,
+    if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
+            &publicKey,
             ownedState,
             modulusBytes,
             modulusByteCount,
@@ -266,8 +259,8 @@ bool AuthBootstrap680ReplyAuthDataValidatorACSketch::ConstructFromReplyPublicKey
     size_t modulusByteCount,
     uint8_t exponentByte) {
     ResetAsRecoveredLeaf(ownedState);
-    if (!BuildAuthBootstrap680RsaPublicKeyPairSubobjectFromReplyPublicKey(
-            &publicKeyPair0c,
+    if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
+            &publicKey,
             ownedState,
             modulusBytes,
             modulusByteCount,

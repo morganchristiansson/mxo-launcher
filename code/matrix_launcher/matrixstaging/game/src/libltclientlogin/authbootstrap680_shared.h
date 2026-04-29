@@ -44,19 +44,6 @@ struct AuthBootstrap680BigIntObjects_0x4ba50c {
 };
 static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
 
-struct AuthBootstrap680RsaPublicKeyPairSubobject0cSketch {
-    uint32_t vtable00 = 0u;
-    uint32_t helperVtable04 = 0u;
-    AuthBootstrap680BigIntObjects_0x4ba50c modulus08{};
-    AuthBootstrap680BigIntObjects_0x4ba50c exponent1c{};
-    uint32_t helperThunk30 = 0u;
-    uint32_t helperThunk34 = 0u;
-    uint32_t helperThunk38 = 0u;
-    uint32_t helperVtable3c = 0u;
-};
-static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, modulus08) == 0x08u);
-static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, exponent1c) == 0x1cu);
-static_assert(sizeof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch) == 0x40u);
 
 struct AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch {
     uint32_t vtable00 = 0u;
@@ -91,7 +78,7 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     uint32_t helperVtable08 = 0u;
-    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch publicKeyPair0c{};
+    CryptoPP::RSA::PublicKey publicKey{};
     uint32_t helperThunk4c = 0u;
     uint32_t helperThunk50 = 0u;
     uint32_t helperThunk54 = 0u;
@@ -117,8 +104,6 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
         uint8_t* ciphertextBytes,
         size_t ciphertextByteCapacity) const;
 };
-static_assert(offsetof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch, publicKeyPair0c) == 0x0cu);
-static_assert(sizeof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch) == 0x5cu);
 
 struct AuthBootstrap680ValidatorTemporaryWorker84Sketch {
     uint32_t vtable00 = 0u;
@@ -152,7 +137,7 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     uint32_t helperVtable08 = 0u;
-    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch publicKeyPair0c{};
+    CryptoPP::RSA::PublicKey publicKey{};
     uint32_t helperThunk4c = 0u;
     uint32_t helperThunk50 = 0u;
 
@@ -169,8 +154,6 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
         const uint8_t* signatureBytes,
         size_t signatureByteCount) const;
 };
-static_assert(offsetof(AuthBootstrap680ReplyAuthDataValidatorACSketch, publicKeyPair0c) == 0x0cu);
-static_assert(sizeof(AuthBootstrap680ReplyAuthDataValidatorACSketch) == 0x54u);
 
 using AuthBootstrap680LazyPubkeyDatValidatorA4Sketch =
     AuthBootstrap680ReplyAuthDataValidatorACSketch;

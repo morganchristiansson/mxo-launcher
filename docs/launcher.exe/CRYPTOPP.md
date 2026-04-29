@@ -282,6 +282,57 @@ Practical static-RE consequence:
 - the strongest current class-equivalent reading is **RSAES OAEP SHA-1 encryptor over an embedded
   RSA public key**, with old-MSVC multiple-inheritance thunks still visible in the layout
 
+### 2.5.1 Exact public-key base class under the `0x4b659c` / `0x4b6680` family
+
+**Confidence: HIGH**
+
+The recovered ctor at `0x4420f0` now appears to be the exact Crypto++ public-key base class
+`CryptoPP::RSAFunction` rather than a launcher-local RSA helper.
+
+Key evidence:
+
+- `0x4420f0` constructs **two** `CryptoPP_Int_0x4ba50c` objects at:
+  - `this+0x08` → modulus `n`
+  - `this+0x1c` → public exponent `e`
+- the ctor installs the final vtable `0x004b6680`
+- the surrounding layout is a classic RSA public-key family with MI/thunk scaffolding
+- `0x42250` then builds the larger derived family by adding the private-key bigint slices, which
+  matches `CryptoPP::InvertibleRSAFunction`
+- in modern Crypto++ source terms, the public-key alias is `CryptoPP::RSA::PublicKey`, but the
+  exact underlying class is `CryptoPP::RSAFunction`
+
+So the launcher-recovered `AuthBootstrap680RsaPublicKeyPairSubobject0cSketch` was only a temporary
+layout mirror. The source has since been pruned to use **direct `CryptoPP::RSA::PublicKey`** for
+that family, and the Crypto++ class it corresponds to is `RSAFunction`.
+
+### 2.5.2 Derived private-key family under `0x4b672c`
+
+**Confidence: HIGH**
+
+The constructor at `0x442250` extends the RSA public-key base into the private-key family and
+matches **`CryptoPP::InvertibleRSAFunction`**.
+
+Key evidence:
+
+- `0x442250` first runs the `0x4b659c` public-key ctor path, then installs additional vtables and
+  helper slices on top of it
+- the constructor emits six more `CryptoPP_Int_0x4ba50c` initializations at:
+  - `field_0x3c`
+  - `field_0x50`
+  - `field_0x64`
+  - `field_0x78`
+  - `field_0x8c`
+  - `field_0xa0`
+- those extra bigint members line up with the private RSA components stored by
+  `CryptoPP::InvertibleRSAFunction` / `RSA::PrivateKey`
+- the vtable family at `0x004b672c` is therefore the derived private-key RSA branch, not a new
+  unrelated launcher-local crypto type
+
+Practical family picture:
+- `0x004b659c / 0x004b6680` = `CryptoPP::RSAFunction` (`RSA::PublicKey`)
+- `0x004b672c` = `CryptoPP::InvertibleRSAFunction` (`RSA::PrivateKey`)
+- the later `0x004b6778` margin/auth wrapper sits on top of that RSA private-key core
+
 ### 2.6 Source implementation status
 
 This replacement has now been done in source.
