@@ -961,63 +961,6 @@ uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryEncryptedOutputLengt
         plaintextByteCount);
 }
 
-bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextIntoCiphertextScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-    const uint8_t* plaintextBytes,
-    size_t plaintextByteCount,
-    std::vector<uint8_t>* outCiphertextBytes) const {
-    if (!plaintextBytes || plaintextByteCount == 0u || !outCiphertextBytes) {
-        return false;
-    }
-
-    CryptoPP::RSA::PublicKey publicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
-        return false;
-    }
-
-    try {
-        CryptoPP::AutoSeededRandomPool rng;
-        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
-        const size_t maxPlaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
-        const size_t ciphertextChunkByteCount =
-            QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey);
-        if (maxPlaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
-            outCiphertextBytes->clear();
-            return false;
-        }
-
-        outCiphertextBytes->clear();
-        outCiphertextBytes->reserve(
-            QueryEncryptedOutputLengthScaffold(ownedState, plaintextByteCount));
-
-        for (size_t offset = 0u; offset < plaintextByteCount; offset += maxPlaintextChunkByteCount) {
-            const size_t chunkByteCount = std::min(
-                maxPlaintextChunkByteCount,
-                plaintextByteCount - offset);
-            std::string ciphertextChunk;
-            CryptoPP::StringSource source(
-                plaintextBytes + offset,
-                chunkByteCount,
-                true,
-                new CryptoPP::PK_EncryptorFilter(
-                    rng,
-                    encryptor,
-                    new CryptoPP::StringSink(ciphertextChunk)));
-            if (ciphertextChunk.size() != ciphertextChunkByteCount) {
-                outCiphertextBytes->clear();
-                return false;
-            }
-            outCiphertextBytes->insert(
-                outCiphertextBytes->end(),
-                ciphertextChunk.begin(),
-                ciphertextChunk.end());
-        }
-        return !outCiphertextBytes->empty();
-    } catch (const CryptoPP::Exception&) {
-        outCiphertextBytes->clear();
-        return false;
-    }
-}
 
 namespace {
 
@@ -2310,24 +2253,23 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
 // anchor: launcher.exe:0x4474f0
 void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
-    auto& child = *this;
 
-    const char* const username = SmallStringMirrorDataOrEmpty(child.string04);
-    if (child.raw08PublicKeyWorkerA8 == nullptr ||
-        child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.modulusBytes.empty() ||
-        child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.exponentBytes.empty()) {
+    const char* const username = SmallStringMirrorDataOrEmpty(string04);
+    if (raw08PublicKeyWorkerA8 == nullptr ||
+        raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.modulusBytes.empty() ||
+        raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.exponentBytes.empty()) {
         spdlog::warn(
             "AuthBootstrap680_SendAuthRequest missing child+0xa8 raw08 worker material; recovered 0x4474f0 consumes that worker through 0x468ea0/0x468f00");
         return;
     }
-    if (!child.sendTarget50) {
+    if (!sendTarget50) {
         spdlog::warn(
             "AuthBootstrap680_SendAuthRequest missing child+0x50 send target; recovered 0x4474f0 tail expects direct virtual send through that field");
         return;
     }
 
-    FillAuthBootstrap680Field54SeedBytesScaffold(child.feedbackSeedHelper54, feedbackSeed84);
-    ResetAuthBootstrap680FeedbackTransforms(child);
+    FillAuthBootstrap680Field54SeedBytesScaffold(feedbackSeedHelper54, feedbackSeed84);
+    ResetAuthBootstrap680FeedbackTransforms(*this);
 
     auto feedbackTransformLarge94 =
         std::make_unique<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption>();
@@ -2336,8 +2278,8 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
             feedbackSeed84.data(),
             static_cast<uint32_t>(feedbackSeed84.size()),
             mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
-        child.feedbackTransformLarge94 = feedbackTransformLarge94.get();
-        child.feedbackTransformLarge94Owned_ = std::move(feedbackTransformLarge94);
+        this->feedbackTransformLarge94 = feedbackTransformLarge94.get();
+        feedbackTransformLarge94Owned_ = std::move(feedbackTransformLarge94);
     } catch (const CryptoPP::Exception&) {
     }
 
@@ -2348,8 +2290,8 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
             feedbackSeed84.data(),
             static_cast<uint32_t>(feedbackSeed84.size()),
             mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data());
-        child.feedbackTransformSmall98 = feedbackTransformSmall98.get();
-        child.feedbackTransformSmall98Owned_ = std::move(feedbackTransformSmall98);
+        this->feedbackTransformSmall98 = feedbackTransformSmall98.get();
+        feedbackTransformSmall98Owned_ = std::move(feedbackTransformSmall98);
     } catch (const CryptoPP::Exception&) {
     }
 
@@ -2360,7 +2302,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     //   payload `+0x05`
     // - outbound builder: fixed 0x28-byte prefix with a length-prefixed ciphertext tail offset at
     //   payload `+0x06`
-    mxo::liblttcp::Packet_0x4af2a4 plaintextAuthBlob;
+    Packet_AsGetPublicKeyReply_0x4b6ca4 plaintextAuthBlob;
     uint8_t* const plaintextPayload =
         ResetRecoveredPacketBuilderPayload(
             plaintextAuthBlob,
@@ -2371,10 +2313,10 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     }
 
     plaintextPayload[0] = 0x00u;
-    *reinterpret_cast<uint32_t*>(plaintextPayload + 0x01u) = child.currentPublicKeyId9C;
-    std::memcpy(plaintextPayload + 0x07u, child.feedbackSeed84.data(), child.feedbackSeed84.size());
+    *reinterpret_cast<uint32_t*>(plaintextPayload + 0x01u) = currentPublicKeyId9C;
+    std::memcpy(plaintextPayload + 0x07u, feedbackSeed84.data(), feedbackSeed84.size());
     *reinterpret_cast<uint32_t*>(plaintextPayload + 0x17u) =
-        static_cast<uint32_t>(std::time(nullptr)) - child.authServerTimeBias80;
+        static_cast<uint32_t>(std::time(nullptr)) - authServerTimeBias80;
 
     const uint16_t usernameLengthField =
         static_cast<uint16_t>(std::strlen(username) + 1u);
@@ -2396,8 +2338,8 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     const uint16_t plaintextPayloadByteCount =
         plaintextAuthBlob.messageRef08 ? plaintextAuthBlob.messageRef08->PayloadByteCount() : 0u;
     const uint32_t raw08WorkerExpectedBlobLen =
-        child.raw08PublicKeyWorkerA8->QueryEncryptedOutputLengthScaffold(
-            child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
+        raw08PublicKeyWorkerA8->QueryEncryptedOutputLengthScaffold(
+            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
             plaintextPayloadByteCount);
     if (raw08WorkerExpectedBlobLen == 0u || raw08WorkerExpectedBlobLen > 0xffffu) {
         spdlog::error(
@@ -2406,7 +2348,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         return;
     }
 
-    mxo::liblttcp::Packet_0x4af2a4 authRequestPacket;
+    Packet_AsGetPublicKeyReply_0x4b6ca4 authRequestPacket;
     uint8_t* const authRequestPayload =
         ResetRecoveredPacketBuilderPayload(
             authRequestPacket,
@@ -2417,10 +2359,10 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     }
 
     authRequestPayload[0] = 0x08u;
-    *reinterpret_cast<uint32_t*>(authRequestPayload + 0x01u) = child.currentPublicKeyId9C;
-    authRequestPayload[0x05u] = static_cast<uint8_t>(child.loginType28 & 0xffu);
-    std::memcpy(authRequestPayload + 0x08u, child.block30.data(), child.block30.size());
-    std::memcpy(authRequestPayload + 0x18u, child.block40.data(), child.block40.size());
+    *reinterpret_cast<uint32_t*>(authRequestPayload + 0x01u) = currentPublicKeyId9C;
+    authRequestPayload[0x05u] = static_cast<uint8_t>(loginType28 & 0xffu);
+    std::memcpy(authRequestPayload + 0x08u, block30.data(), block30.size());
+    std::memcpy(authRequestPayload + 0x18u, block40.data(), block40.size());
 
     if (ReserveRecoveredLengthPrefixedTailAtOffset(
             authRequestPacket,
@@ -2434,34 +2376,82 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         return;
     }
 
-    std::vector<uint8_t> ciphertextBytes;
-    if (!child.raw08PublicKeyWorkerA8->EncryptPlaintextIntoCiphertextScaffold(
-            child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
-            plaintextPayload,
-            plaintextPayloadByteCount,
-            &ciphertextBytes)) {
+    // anchor: launcher.exe:0x468f00
+    // Keep the chunked raw08 RSA worker loop inline here now that `0x4474f0` is the active
+    // fidelity focus: query the per-chunk plaintext bound from the worker family, clamp the final
+    // chunk, then advance plaintext/ciphertext cursors by `chunkLen` and RSA modulus byte count.
+    CryptoPP::RSA::PublicKey raw08PublicKey;
+    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(
+            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
+            &raw08PublicKey)) {
         spdlog::info(
-            "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker scaffold");
+            "DIAGNOSTIC: launcher-owned auth failed to materialize recovered 0x4474f0 raw08 public key");
         return;
     }
-    if (ciphertextBytes.size() != raw08WorkerExpectedBlobLen) {
-        spdlog::error(
-            "launcher-owned auth rejected recovered 0x4474f0 ciphertext size mismatch actual={} expected={}",
-            ciphertextBytes.size(),
-            raw08WorkerExpectedBlobLen);
-        return;
-    }
-    std::memcpy(
-        const_cast<char*>(authRequestPacket.debugString14),
-        ciphertextBytes.data(),
-        ciphertextBytes.size());
 
-    child.cachedAuthRequestTwofishKeyBytesOwned_.assign(
-        child.feedbackSeed84.begin(),
-        child.feedbackSeed84.end());
+    try {
+        CryptoPP::AutoSeededRandomPool rng;
+        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(raw08PublicKey);
+        const size_t plaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
+        const size_t ciphertextChunkByteCount =
+            QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(raw08PublicKey);
+        if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
+            return;
+        }
+
+        uint8_t* ciphertextCursor =
+            reinterpret_cast<uint8_t*>(const_cast<char*>(authRequestPacket.debugString14));
+        const uint8_t* plaintextCursor = plaintextPayload;
+        size_t plaintextBytesRemaining = plaintextPayloadByteCount;
+        size_t ciphertextBytesWritten = 0u;
+        while (plaintextBytesRemaining != 0u) {
+            const size_t currentChunkByteCount =
+                std::min(plaintextChunkByteCount, plaintextBytesRemaining);
+            std::string ciphertextChunk;
+            CryptoPP::StringSource source(
+                plaintextCursor,
+                currentChunkByteCount,
+                true,
+                new CryptoPP::PK_EncryptorFilter(
+                    rng,
+                    encryptor,
+                    new CryptoPP::StringSink(ciphertextChunk)));
+            if (ciphertextChunk.size() != ciphertextChunkByteCount ||
+                ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen) {
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
+                return;
+            }
+
+            std::memcpy(
+                ciphertextCursor + ciphertextBytesWritten,
+                ciphertextChunk.data(),
+                ciphertextChunk.size());
+            plaintextCursor += currentChunkByteCount;
+            plaintextBytesRemaining -= currentChunkByteCount;
+            ciphertextBytesWritten += ciphertextChunkByteCount;
+        }
+        if (ciphertextBytesWritten != raw08WorkerExpectedBlobLen) {
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth rejected recovered 0x4474f0 ciphertext byte count actual={} expected={}",
+                ciphertextBytesWritten,
+                raw08WorkerExpectedBlobLen);
+            return;
+        }
+    } catch (const CryptoPP::Exception&) {
+        spdlog::info(
+            "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
+        return;
+    }
+
+    cachedAuthRequestTwofishKeyBytesOwned_.assign(
+        feedbackSeed84.begin(),
+        feedbackSeed84.end());
 
     auto* sendTarget =
-        static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(child.sendTarget50);
+        static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(sendTarget50);
     sendTarget->SendPacketMessageRef(*authRequestPacket.messageRef08);
     const uint32_t sendResult = 1u;
 
@@ -2476,7 +2466,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         static_cast<unsigned>(headerByteCount),
         static_cast<unsigned>(authRequestPayloadByteCount),
         static_cast<unsigned>(headerByteCount + authRequestPayloadByteCount),
-        fmt::ptr(child.sendTarget50),
+        fmt::ptr(sendTarget50),
         fmt::ptr(this),
         fmt::ptr(owner08),
         fmt::ptr(childBase),
@@ -2485,21 +2475,21 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
 
     spdlog::info(
         "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId={} loginType={} blobLen={} raw08WorkerExpectedBlobLen={} usernameLengthField={} plaintextPayloadLen={} plaintextUsernameFieldOffset=0x{:04x} ciphertextFieldOffset=0x{:04x} childSendTarget50={} childRaw08PublicKeyWorkerA8={} childString04Len={} childString10Len={} childString1CLen={} feedbackSeed84='{}' helper54NextBufferedByte28=0x{:08x}",
-        static_cast<unsigned>(child.currentPublicKeyId9C),
+        static_cast<unsigned>(currentPublicKeyId9C),
         static_cast<unsigned>(authRequestPayload[0x05u]),
-        static_cast<unsigned>(ciphertextBytes.size()),
+        static_cast<unsigned>(raw08WorkerExpectedBlobLen),
         static_cast<unsigned>(raw08WorkerExpectedBlobLen),
         static_cast<unsigned>(usernameLengthField),
         static_cast<unsigned>(plaintextPayloadByteCount),
         static_cast<unsigned>(ReadU16LE(plaintextPayload + 0x05u)),
         static_cast<unsigned>(ReadU16LE(authRequestPayload + 0x06u)),
-        fmt::ptr(child.sendTarget50),
-        fmt::ptr(child.raw08PublicKeyWorkerA8),
-        static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
-        static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
-        static_cast<unsigned>(SmallStringMirrorLength(child.string1C)),
+        fmt::ptr(sendTarget50),
+        fmt::ptr(raw08PublicKeyWorkerA8),
+        static_cast<unsigned>(SmallStringMirrorLength(string04)),
+        static_cast<unsigned>(SmallStringMirrorLength(string10)),
+        static_cast<unsigned>(SmallStringMirrorLength(string1C)),
         BuildHexPreview(feedbackSeed84.data(), feedbackSeed84.size(), feedbackSeed84.size()),
-        static_cast<unsigned>(child.feedbackSeedHelper54.nextBufferedOutputByte28));
+        static_cast<unsigned>(feedbackSeedHelper54.nextBufferedOutputByte28));
 }
 
 // anchor: launcher.exe:0x447780

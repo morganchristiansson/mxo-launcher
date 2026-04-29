@@ -104,11 +104,6 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     uint32_t QueryEncryptedOutputLengthScaffold(
         const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
         size_t plaintextByteCount) const;
-    bool EncryptPlaintextIntoCiphertextScaffold(
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-        const uint8_t* plaintextBytes,
-        size_t plaintextByteCount,
-        std::vector<uint8_t>* outCiphertextBytes) const;
 };
 static_assert(offsetof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch, publicKeyPair0c) == 0x0cu);
 static_assert(sizeof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch) == 0x5cu);
