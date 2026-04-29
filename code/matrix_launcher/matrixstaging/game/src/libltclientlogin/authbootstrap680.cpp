@@ -349,21 +349,22 @@ static void ResetAuthBootstrap680ReplyParseObject(
 // at the same method-family boundary: this helper only zeros the writable/rebuild body rooted at
 // parse-object `+0x10`, it does not perform field-view resolution.
 static void AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(
-    AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject) {
-    if (!parseObject || !parseObject->replyHeader10) {
+    Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject) {
+    if (!parseObject || !parseObject->ReplyHeader10()) {
         return;
     }
 
-    uint8_t* const replyHeader = const_cast<uint8_t*>(parseObject->replyHeader10);
+    uint8_t* const replyHeader = const_cast<uint8_t*>(parseObject->ReplyHeader10());
     replyHeader[0x00u] = 0x0bu;
     *reinterpret_cast<uint32_t*>(replyHeader + 0x01u) = 0u;
     *reinterpret_cast<uint16_t*>(replyHeader + 0x05u) = 0u;
-    parseObject->stringField05Bytes14 = nullptr;
-    parseObject->stringField05Length18 = 0u;
+    parseObject->SetStringField05Bytes14(nullptr);
+    parseObject->SetStringField05Length18(0u);
     *reinterpret_cast<uint32_t*>(replyHeader + 0x07u) = 0u;
     *reinterpret_cast<uint16_t*>(replyHeader + 0x0bu) = 0u;
-    parseObject->authDataBytes1c = nullptr;
-    parseObject->authDataByteLength20 = 0u;
+    parseObject->SetAuthDataBytes1c(nullptr);
+    parseObject->SetAuthDataByteLength20(0u);
+    parseObject->ClearAuthDataPadding22();
     *reinterpret_cast<uint16_t*>(replyHeader + 0x0du) = 0u;
     parseObject->encryptedPrivateExponentBytes24 = nullptr;
     parseObject->encryptedPrivateExponentByteLength28 = 0u;
@@ -390,14 +391,14 @@ static void AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(
 // reply-header offset table at `parseObject+0x10` and resolves the variable field views into the
 // copied shell (`+0x14 .. +0x58`).
 static void AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
-    AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
+    Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
     size_t packetBodyByteCount,
     bool zeroTerminateStrings) {
-    if (!parseObject || !parseObject->replyHeader10) {
+    if (!parseObject || !parseObject->ReplyHeader10()) {
         return;
     }
 
-    const uint8_t* const packetBody = parseObject->replyHeader10;
+    const uint8_t* const packetBody = parseObject->ReplyHeader10();
     auto resolveField = [&](size_t replyHeaderOffset,
                             bool zeroTerminateLastByte,
                             const uint8_t** outFieldBytes,
@@ -440,8 +441,18 @@ static void AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
         }
     };
 
-    resolveField(0x05u, true, &parseObject->stringField05Bytes14, &parseObject->stringField05Length18);
-    resolveField(0x0bu, false, &parseObject->authDataBytes1c, &parseObject->authDataByteLength20);
+    const uint8_t* stringField05Bytes14 = nullptr;
+    uint16_t stringField05Length18 = 0u;
+    resolveField(0x05u, true, &stringField05Bytes14, &stringField05Length18);
+    parseObject->SetStringField05Bytes14(stringField05Bytes14);
+    parseObject->SetStringField05Length18(stringField05Length18);
+
+    const uint8_t* authDataBytes1c = nullptr;
+    uint16_t authDataByteLength20 = 0u;
+    resolveField(0x0bu, false, &authDataBytes1c, &authDataByteLength20);
+    parseObject->SetAuthDataBytes1c(authDataBytes1c);
+    parseObject->SetAuthDataByteLength20(authDataByteLength20);
+    parseObject->ClearAuthDataPadding22();
     resolveField(0x0du, false, &parseObject->encryptedPrivateExponentBytes24, &parseObject->encryptedPrivateExponentByteLength28);
     resolveField(0x0fu, false, &parseObject->opaqueField0fBytes2c, &parseObject->opaqueField0fByteLength30);
     resolveField(0x11u, false, &parseObject->opaqueField11Bytes34, &parseObject->opaqueField11ByteLength38);
@@ -461,7 +472,7 @@ static Packet_AsGetPublicKeyRequest_0x4b6c74* Packet_AsGetPublicKeyRequest_CtorF
     Packet_AsGetPublicKeyRequest_0x4b6c74* thisPacket,
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
     uint8_t resolveFields) {
-    auto* outParseObject = reinterpret_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(thisPacket);
+    auto* outParseObject = thisPacket;
     if (!incomingAuthMessageRef) {
         return nullptr;
     }
@@ -509,32 +520,31 @@ static Packet_AsGetPublicKeyRequest_0x4b6c74* Packet_AsGetPublicKeyRequest_CtorF
     }
 
     *outParseObject = {};
-    outParseObject->vtable00 = 0x004b6c74u;
-    outParseObject->packetBody04 = payloadBytes;
-    outParseObject->incomingMessage08 =
-        const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef);
-    outParseObject->resolveFields0c = resolveFields;
-    outParseObject->replyHeader10 = outParseObject->packetBody04;
+    outParseObject->SetPacketBody04(payloadBytes);
+    outParseObject->SetIncomingMessage08(
+        const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef));
+    outParseObject->SetResolveFields0c(resolveFields);
+    outParseObject->SetReplyHeader10(outParseObject->PacketBody04());
 
     ResetAuthBootstrap680AuthReplyParseAccessor(
         &outParseObject->worldDescriptorAccessor5c,
         0x004b533cu,
-        outParseObject->packetBody04,
-        outParseObject->resolveFields0c);
-    outParseObject->worldDescriptorAccessor5c.incomingMessage08 = outParseObject->incomingMessage08;
+        outParseObject->PacketBody04(),
+        outParseObject->ResolveFields0c());
+    outParseObject->worldDescriptorAccessor5c.incomingMessage08 = outParseObject->IncomingMessage08();
     ResetAuthBootstrap680AuthReplyParseAccessor(
         &outParseObject->slotRecordAccessor70,
         0x004b5328u,
-        outParseObject->packetBody04,
-        outParseObject->resolveFields0c);
-    outParseObject->slotRecordAccessor70.incomingMessage08 = outParseObject->incomingMessage08;
+        outParseObject->PacketBody04(),
+        outParseObject->ResolveFields0c());
+    outParseObject->slotRecordAccessor70.incomingMessage08 = outParseObject->IncomingMessage08();
 
     outParseObject->currentWorldTempRecord6c = nullptr;
     outParseObject->currentCharacterTempRecord80 = nullptr;
     outParseObject->currentCharacterHandle84 = nullptr;
     outParseObject->currentCharacterHandleByteLength88 = 0u;
 
-    if (outParseObject->resolveFields0c == 0u) {
+    if (outParseObject->ResolveFields0c() == 0u) {
         AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(outParseObject);
     } else {
         AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
@@ -548,17 +558,17 @@ static Packet_AsGetPublicKeyRequest_0x4b6c74* Packet_AsGetPublicKeyRequest_CtorF
 // Keep the `0x4449c0`-like copy step intentionally thin: copy the already-initialized source
 // shell, rebase it onto child-owned packet bytes, then reuse the same smaller receiver helpers.
 static bool AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
-    AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch& sourceParseObject,
+    Packet_AsGetPublicKeyRequest_0x4b6c74* outParseObject,
+    const Packet_AsGetPublicKeyRequest_0x4b6c74& sourceParseObject,
     std::vector<uint8_t>* packetBodyBytes) {
     if (!outParseObject || !packetBodyBytes) {
         return false;
     }
 
     *outParseObject = sourceParseObject;
-    outParseObject->packetBody04 = packetBodyBytes->empty() ? nullptr : packetBodyBytes->data();
-    outParseObject->incomingMessage08 = nullptr;
-    outParseObject->replyHeader10 = outParseObject->packetBody04;
+    outParseObject->SetPacketBody04(packetBodyBytes->empty() ? nullptr : packetBodyBytes->data());
+    outParseObject->SetIncomingMessage08(nullptr);
+    outParseObject->SetReplyHeader10(outParseObject->PacketBody04());
     outParseObject->currentWorldTempRecord6c = nullptr;
     outParseObject->currentCharacterTempRecord80 = nullptr;
     outParseObject->currentCharacterHandle84 = nullptr;
@@ -567,15 +577,15 @@ static bool AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
     ResetAuthBootstrap680AuthReplyParseAccessor(
         &outParseObject->worldDescriptorAccessor5c,
         0x004b533cu,
-        outParseObject->packetBody04,
-        outParseObject->resolveFields0c);
+        outParseObject->PacketBody04(),
+        outParseObject->ResolveFields0c());
     ResetAuthBootstrap680AuthReplyParseAccessor(
         &outParseObject->slotRecordAccessor70,
         0x004b5328u,
-        outParseObject->packetBody04,
-        outParseObject->resolveFields0c);
+        outParseObject->PacketBody04(),
+        outParseObject->ResolveFields0c());
 
-    if (outParseObject->resolveFields0c == 0u) {
+    if (outParseObject->ResolveFields0c() == 0u) {
         AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(outParseObject);
     } else {
         AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
@@ -1033,7 +1043,7 @@ void AuthBootstrap680Child_0x441290::StoreField114AndTimestamp118(uint32_t field
 
 // anchor: launcher.exe:0x441170
 void AuthBootstrap680Child_0x441290::CopyOpaqueReplyBlobs108_10c() {
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject = authReplyParseObjectF0;
+    const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject = authReplyParseObjectF0;
 
     if (opaqueReplyBlob108 != nullptr) {
         std::free(opaqueReplyBlob108);
@@ -1070,7 +1080,7 @@ void AuthBootstrap680Child_0x441290::CopyOpaqueReplyBlobs108_10c() {
 
 // anchor: launcher.exe:0x43d480
 std::string AuthBootstrap680Child_0x441290::CopyReplyString54_SOURCEOWNED() const {
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject = authReplyParseObjectF0;
+    const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject = authReplyParseObjectF0;
     if (parseObject == nullptr || parseObject->replyString1dBytes54 == nullptr ||
         parseObject->replyString1dByteLength58 == 0u) {
         return {};
@@ -1907,7 +1917,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             ResetAuthBootstrap680ReplyParseObject(*this);
 
             bool storedParseObjectF0 = false;
-            AuthBootstrap680AuthReplyParseObjectF0Sketch sourceParseObject = {};
+            Packet_AsGetPublicKeyRequest_0x4b6c74 sourceParseObject = {};
             auto* sourcePacket = reinterpret_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(
                 &sourceParseObject);
             // anchor: launcher.exe:0x4481aa / 0x444390
@@ -1917,8 +1927,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                      sourcePacket,
                      incomingAuthMessage,
                      true)) != nullptr) {
-                sourceParseObject.vtable00 = 0x004b6c74u;
-                const uint8_t* const payloadBytes = sourceParseObject.replyHeader10;
+                const uint8_t* const payloadBytes = sourceParseObject.ReplyHeader10();
                 if (payloadBytes == nullptr || payloadBytes < incomingMessagePayloadBytes) {
                     spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthReply");
                     return kAuthBootstrap680InboundUnhandled;
@@ -1942,8 +1951,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     payloadBytes,
                     payloadBytes + payloadByteCount);
                 authReplyParseObjectF0 =
-                    static_cast<AuthBootstrap680AuthReplyParseObjectF0Sketch*>(
-                        std::malloc(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch)));
+                    static_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(
+                        std::malloc(sizeof(Packet_AsGetPublicKeyRequest_0x4b6c74)));
                 if (authReplyParseObjectF0 != nullptr) {
                     storedParseObjectF0 =
                         AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
@@ -1959,20 +1968,20 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             }
             const auto* parseObject = authReplyParseObjectF0;
             const uint32_t errorReplyStatus01 =
-                (parseObject != nullptr && parseObject->replyHeader10 != nullptr)
-                    ? ReadU32LE(parseObject->replyHeader10 + 0x01u)
+                (parseObject != nullptr && parseObject->ReplyHeader10() != nullptr)
+                    ? ReadU32LE(parseObject->ReplyHeader10() + 0x01u)
                     : 0u;
 
             inboundAuthStatusEc =
-                (storedParseObjectF0 && parseObject != nullptr && parseObject->replyHeader10 != nullptr)
-                    ? ReadU32LE(parseObject->replyHeader10 + 0x01u)
+                (storedParseObjectF0 && parseObject != nullptr && parseObject->ReplyHeader10() != nullptr)
+                    ? ReadU32LE(parseObject->ReplyHeader10() + 0x01u)
                     : errorReplyStatus01;
 
             spdlog::debug(
                 "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage stored child+0xf0 parse copy={} status=0x{:08x} authDataLen=0x{:04x} encryptedPrivateExponentLen=0x{:04x} characterCount={} worldCount={} replyString1dLen=0x{:04x}",
                 storedParseObjectF0 ? 1u : 0u,
                 static_cast<unsigned>(inboundAuthStatusEc),
-                static_cast<unsigned>(parseObject ? parseObject->authDataByteLength20 : 0u),
+                static_cast<unsigned>(parseObject ? parseObject->AuthDataByteLength20() : 0u),
                 static_cast<unsigned>(parseObject ? parseObject->encryptedPrivateExponentByteLength28 : 0u),
                 static_cast<unsigned>(parseObject ? parseObject->characterTempRecordCount40 : 0u),
                 static_cast<unsigned>(parseObject ? parseObject->worldTempRecordCount48 : 0u),
@@ -1983,7 +1992,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             }
 
             const uint16_t authDataByteLength =
-                parseObject ? parseObject->authDataByteLength20 : 0u;
+                parseObject ? parseObject->AuthDataByteLength20() : 0u;
             if (!storedParseObjectF0 || parseObject == nullptr ||
                 authDataByteLength != sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) ||
                 replyAuthDataValidatorAC == nullptr) {
@@ -1991,10 +2000,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             }
 
             AuthBootstrapReplyCopyShadowF4_0x44add0 copyShadowCandidate = {};
-            if (parseObject != nullptr && parseObject->authDataBytes1c != nullptr &&
-                parseObject->authDataByteLength20 == sizeof(copyShadowCandidate)) {
+            if (parseObject != nullptr && parseObject->AuthDataBytes1c() != nullptr &&
+                parseObject->AuthDataByteLength20() == sizeof(copyShadowCandidate)) {
                 std::copy_n(
-                    parseObject->authDataBytes1c,
+                    parseObject->AuthDataBytes1c(),
                     sizeof(copyShadowCandidate),
                     reinterpret_cast<uint8_t*>(&copyShadowCandidate));
             } else {
@@ -2024,7 +2033,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow = *authReplyCopyShadowF4;
             copyShadow = {};
             std::copy_n(
-                parseObject->authDataBytes1c,
+                parseObject->AuthDataBytes1c(),
                 sizeof(copyShadow),
                 reinterpret_cast<uint8_t*>(&copyShadow));
 
@@ -2106,7 +2115,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             spdlog::info(
                 "HandleInboundAuthMessage materialized child+0xf4/+0xb0/+0xc4/+0xd8 from raw0x0b authDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Bytes={} blockC4Bytes={} blockD8Bytes={} parseObjectF0={}",
                 static_cast<unsigned>(sizeof(copyShadow)),
-                static_cast<unsigned>(parseObject->authDataByteLength20),
+                static_cast<unsigned>(parseObject->AuthDataByteLength20()),
                 BuildHexPreview(
                     copyShadow.authSignature00.data(),
                     16u,

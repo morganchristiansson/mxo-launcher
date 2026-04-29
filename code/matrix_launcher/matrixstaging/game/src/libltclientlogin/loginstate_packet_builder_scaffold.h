@@ -552,29 +552,94 @@ public:
 static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectRequest_0x4b5364 size mismatch");
 
 // =============================================================================
-// Packet_AsGetPublicKeyRequest_0x4b6c74 - Compact auth packet builder (opcode 0x06)
+// Packet_AsGetPublicKeyRequest_0x4b6c74 - Shared auth packet family for raw opcodes 0x06 / 0x0b
 // =============================================================================
 // anchor: launcher.exe vtable 0x004b6c74
 // anchor: launcher.exe:0x447eb0 = AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest
+// anchor: launcher.exe:0x444390 = Packet_AsGetPublicKeyRequest_0x4b6c74::Packet_AsGetPublicKeyRequest_ctor
+// anchor: launcher.exe:0x4449c0 = Packet_AsGetPublicKeyRequest_0x4b6c74::AuthBootstrap680AuthReplyParseObject_Copy
 //
-// Recovered role:
-// - compact `Packet_0x4af2a4` subclass used on the raw auth bootstrap send path
-// - reserves a fixed 9-byte payload and stamps opcode `0x06`
-// - caller then writes:
-//   - dword [payload+0x01] = launcherVersion
-//   - dword [payload+0x05] = currentPublicKeyId
+// Source-semantic model:
+// - outbound role: compact raw-auth opcode `0x06` builder using the inherited packet envelope
+// - inbound role: larger auth-reply parse shell used by opcode `0x0b` ctor/copy helper family
 //
-// Important fidelity note:
-// - launcher.exe also retables the larger auth-reply parse-object shell to this same vtable
-//   address (`0x004b6c74`) before copying the expanded non-virtual state that follows the first
-//   `Packet_0x4af2a4`-sized prefix. Keep the compact builder name explicit here because
-//   `0x447eb0` only uses the base packet envelope surface.
+// Fidelity note:
+// - launcher.exe overlays the parse shell on the same vtable family rather than expressing it as a
+//   normal C++ subclass extension. Source code does not need that ABI trick, so this class keeps
+//   both semantic roles together as one larger source-owned type.
 class Packet_AsGetPublicKeyRequest_0x4b6c74 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
  static constexpr uint8_t kPayloadTag06 = 0x06;
  static constexpr size_t kLauncherVersionOffset = 0x01;
  static constexpr size_t kCurrentPublicKeyIdOffset = 0x05;
  static constexpr size_t kFixedByteCount = 0x09;
+
+ // Source-semantic overlap with inherited Packet_0x4af2a4 storage:
+ // - payloadPtr04      <-> packetBody04
+ // - messageRef08      <-> incomingMessage08
+ // - createRefParam0c  <-> resolveFields0c
+ // - payloadAlias10    <-> replyHeader10
+ // - debugString14     <-> stringField05Bytes14
+ // - payloadSize18     <-> stringField05Length18
+ // - packetType1a/1b   <-> padding1a
+ // - characterIdLow1c  <-> authDataBytes1c
+ // - characterIdHigh20 <-> authDataByteLength20/padding22
+ // The parse-shell-only tail begins after that overlapped prefix.
+ const uint8_t* PacketBody04() const { return reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(payloadPtr04)); }
+ void SetPacketBody04(const uint8_t* packetBody) { payloadPtr04 = reinterpret_cast<uint32_t>(packetBody); }
+
+ mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* IncomingMessage08() const { return messageRef08; }
+ void SetIncomingMessage08(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessage) { messageRef08 = incomingMessage; }
+
+ uint8_t ResolveFields0c() const { return createRefParam0c; }
+ void SetResolveFields0c(uint8_t resolveFields) { createRefParam0c = resolveFields; }
+
+ const uint8_t* ReplyHeader10() const { return static_cast<const uint8_t*>(payloadAlias10); }
+ void SetReplyHeader10(const uint8_t* replyHeader) { payloadAlias10 = const_cast<uint8_t*>(replyHeader); }
+
+ const uint8_t* StringField05Bytes14() const { return reinterpret_cast<const uint8_t*>(debugString14); }
+ void SetStringField05Bytes14(const uint8_t* stringFieldBytes) { debugString14 = reinterpret_cast<const char*>(stringFieldBytes); }
+
+ uint16_t StringField05Length18() const { return payloadSize18; }
+ void SetStringField05Length18(uint16_t stringFieldLength) { payloadSize18 = stringFieldLength; }
+
+ const uint8_t* AuthDataBytes1c() const { return reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(characterIdLow1c)); }
+ void SetAuthDataBytes1c(const uint8_t* authDataBytes) { characterIdLow1c = reinterpret_cast<uint32_t>(authDataBytes); }
+
+ uint16_t AuthDataByteLength20() const { return static_cast<uint16_t>(characterIdHigh20 & 0xffffu); }
+ void SetAuthDataByteLength20(uint16_t authDataByteLength) {
+  characterIdHigh20 = (characterIdHigh20 & 0xffff0000u) | static_cast<uint32_t>(authDataByteLength);
+ }
+
+ void ClearAuthDataPadding22() { characterIdHigh20 &= 0xffffu; }
+ const uint8_t* encryptedPrivateExponentBytes24 = nullptr;
+ uint16_t encryptedPrivateExponentByteLength28 = 0u;
+ std::array<uint8_t, 2> padding2a{};
+ const uint8_t* opaqueField0fBytes2c = nullptr;
+ uint16_t opaqueField0fByteLength30 = 0u;
+ std::array<uint8_t, 2> padding32{};
+ const uint8_t* opaqueField11Bytes34 = nullptr;
+ uint16_t opaqueField11ByteLength38 = 0u;
+ std::array<uint8_t, 2> padding3a{};
+ const uint8_t* characterTempRecords3c = nullptr;
+ uint16_t characterTempRecordCount40 = 0u;
+ std::array<uint8_t, 2> padding42{};
+ const uint8_t* worldTempRecords44 = nullptr;
+ uint16_t worldTempRecordCount48 = 0u;
+ std::array<uint8_t, 2> padding4a{};
+ const uint8_t* opaqueField1bBytes4c = nullptr;
+ uint16_t opaqueField1bByteLength50 = 0u;
+ std::array<uint8_t, 2> padding52{};
+ const uint8_t* replyString1dBytes54 = nullptr;
+ uint16_t replyString1dByteLength58 = 0u;
+ std::array<uint8_t, 2> padding5a{};
+ AuthBootstrap680AuthReplyParseAccessor10Sketch worldDescriptorAccessor5c{};
+ const uint8_t* currentWorldTempRecord6c = nullptr;
+ AuthBootstrap680AuthReplyParseAccessor10Sketch slotRecordAccessor70{};
+ const uint8_t* currentCharacterTempRecord80 = nullptr;
+ const uint8_t* currentCharacterHandle84 = nullptr;
+ uint16_t currentCharacterHandleByteLength88 = 0u;
+ std::array<uint8_t, 2> padding8a{};
 
  // anchor: launcher.exe:0x447eb0 / local packet init after Packet_0x4af2a4 default ctor
  // The original grows a 9-byte payload, zeros both trailing dwords, then the caller patches in
@@ -605,12 +670,7 @@ public:
 
  uint8_t* PayloadBase() { return static_cast<uint8_t*>(payloadAlias10); }
  const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
-
- // `0x444390` is modeled in `authbootstrap680.cpp` as a ctor-like free helper returning
- // `Packet_AsGetPublicKeyRequest_0x4b6c74*` over larger caller-provided storage.
 };
-
-static_assert(sizeof(Packet_AsGetPublicKeyRequest_0x4b6c74) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_AsGetPublicKeyRequest_0x4b6c74 size mismatch");
 
 // =============================================================================
 // Packet_AsGetPublicKeyReply_0x4b6ca4 - Parse/builder accessor for MS_ConnectChallenge (opcode 0x07)

@@ -22,6 +22,7 @@ namespace mxo::ltlogin {
 
 class CLTLoginMediator;
 class Packet_AsGetPublicKeyReply_0x4b6ca4;
+class Packet_AsGetPublicKeyRequest_0x4b6c74;
 
 // Direct Crypto++ public-key material owned by the launcher-side wrappers.
 // The raw leaf sketch fields remain only as recovered layout mirrors.
@@ -127,7 +128,7 @@ public:
  CryptoPP::Integer privateExponentBigIntD8{}; // semantic mirror of original child `+0xd8`
 
  uint32_t inboundAuthStatusEc = 1; // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
- AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
+ Packet_AsGetPublicKeyRequest_0x4b6c74* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied Packet_AsGetPublicKeyRequest_0x4b6c74 auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
  AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`
 
  // Source-owned trailing storage used to back the recovered child pointers/byte spans above.

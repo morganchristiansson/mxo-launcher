@@ -91,58 +91,8 @@ struct AuthBootstrap680AuthReplyParseAccessor10Sketch {
 };
 static_assert(sizeof(AuthBootstrap680AuthReplyParseAccessor10Sketch) == 0x10u);
 
-struct AuthBootstrap680AuthReplyParseObjectF0Sketch {
-    uint32_t vtable00 = 0u;
-    const uint8_t* packetBody04 = nullptr;
-    void* incomingMessage08 = nullptr;
-    uint8_t resolveFields0c = 0u;
-    std::array<uint8_t, 3> padding0d{};
-    const uint8_t* replyHeader10 = nullptr;
-    const uint8_t* stringField05Bytes14 = nullptr;
-    uint16_t stringField05Length18 = 0u;
-    std::array<uint8_t, 2> padding1a{};
-    const uint8_t* authDataBytes1c = nullptr;
-    uint16_t authDataByteLength20 = 0u;
-    std::array<uint8_t, 2> padding22{};
-    const uint8_t* encryptedPrivateExponentBytes24 = nullptr;
-    uint16_t encryptedPrivateExponentByteLength28 = 0u;
-    std::array<uint8_t, 2> padding2a{};
-    const uint8_t* opaqueField0fBytes2c = nullptr;
-    uint16_t opaqueField0fByteLength30 = 0u;
-    std::array<uint8_t, 2> padding32{};
-    const uint8_t* opaqueField11Bytes34 = nullptr;
-    uint16_t opaqueField11ByteLength38 = 0u;
-    std::array<uint8_t, 2> padding3a{};
-    const uint8_t* characterTempRecords3c = nullptr;
-    uint16_t characterTempRecordCount40 = 0u;
-    std::array<uint8_t, 2> padding42{};
-    const uint8_t* worldTempRecords44 = nullptr;
-    uint16_t worldTempRecordCount48 = 0u;
-    std::array<uint8_t, 2> padding4a{};
-    const uint8_t* opaqueField1bBytes4c = nullptr;
-    uint16_t opaqueField1bByteLength50 = 0u;
-    std::array<uint8_t, 2> padding52{};
-    const uint8_t* replyString1dBytes54 = nullptr;
-    uint16_t replyString1dByteLength58 = 0u;
-    std::array<uint8_t, 2> padding5a{};
-    AuthBootstrap680AuthReplyParseAccessor10Sketch worldDescriptorAccessor5c{};
-    const uint8_t* currentWorldTempRecord6c = nullptr;
-    AuthBootstrap680AuthReplyParseAccessor10Sketch slotRecordAccessor70{};
-    const uint8_t* currentCharacterTempRecord80 = nullptr;
-    const uint8_t* currentCharacterHandle84 = nullptr;
-    uint16_t currentCharacterHandleByteLength88 = 0u;
-    std::array<uint8_t, 2> padding8a{};
-};
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, replyHeader10) == 0x10u);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, authDataBytes1c) == 0x1cu);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, encryptedPrivateExponentBytes24) == 0x24u);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, opaqueField0fBytes2c) == 0x2cu);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, opaqueField11Bytes34) == 0x34u);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, characterTempRecords3c) == 0x3cu);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldTempRecords44) == 0x44u);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, replyString1dBytes54) == 0x54u);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldDescriptorAccessor5c) == 0x5cu);
-static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, slotRecordAccessor70) == 0x70u);
-static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
+// The old `AuthBootstrap680AuthReplyParseObjectF0Sketch` documentation-only shell has been
+// retired. Source now treats `Packet_AsGetPublicKeyRequest_0x4b6c74` as the canonical semantic
+// type for both the outbound raw0x06 builder role and the inbound raw0x0b auth-reply parse role.
 
 }  // namespace mxo::ltlogin

@@ -1,5 +1,6 @@
 #include "loginstate.h"
 #include "loginmediator.h"
+#include "loginstate_packet_builder_scaffold.h"
 
 #include <spdlog/spdlog.h>
 
@@ -25,7 +26,7 @@ static uint32_t ReadU32LEState2(const uint8_t* bytes) {
 }
 
 static const uint8_t* AuthBootstrap680WorldTempRecordByIndex(
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
+    const Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
     size_t index) {
     if (!parseObject || !parseObject->worldTempRecords44 ||
         index >= parseObject->worldTempRecordCount48) {
@@ -35,7 +36,7 @@ static const uint8_t* AuthBootstrap680WorldTempRecordByIndex(
 }
 
 static const uint8_t* AuthBootstrap680CharacterTempRecordByIndex(
-    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
+    const Packet_AsGetPublicKeyRequest_0x4b6c74* parseObject,
     size_t index,
     const char** outHandleText,
     uint16_t* outHandleLength) {
@@ -202,11 +203,11 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             // 4. if clear, set `DAT_004f79e0 = 1` and run the once-only writeback body
             auto& authBootstrapChild =
                 AuthBootstrapChildFromWriteHelper(*g_CurrentLoginMediator->authBootstrapChild680_);
-            const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject =
+            const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject =
                 authBootstrapChild.authReplyParseObjectF0;
             authBootstrapChild.authReplySuccessHeaderDword07_110 =
-                parseObject != nullptr && parseObject->replyHeader10 != nullptr
-                    ? ReadU32LEState2(parseObject->replyHeader10 + 0x07u)
+                parseObject != nullptr && parseObject->ReplyHeader10() != nullptr
+                    ? ReadU32LEState2(parseObject->ReplyHeader10() + 0x07u)
                     : 0u;
 
             const char* const passwordText =
@@ -294,11 +295,11 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     }
                 }
                 {
-                    const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject2 =
+                    const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject2 =
                         authBootstrapChild.authReplyParseObjectF0;
                     const uint32_t field114Value =
-                        parseObject2 != nullptr && parseObject2->replyHeader10 != nullptr
-                            ? ReadU32LEState2(parseObject2->replyHeader10 + 0x15u)
+                        parseObject2 != nullptr && parseObject2->ReplyHeader10() != nullptr
+                            ? ReadU32LEState2(parseObject2->ReplyHeader10() + 0x15u)
                             : 0u;
                     authBootstrapChild.StoreField114AndTimestamp118(field114Value);
                     spdlog::info(
@@ -388,7 +389,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 g_CurrentLoginMediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
                 g_CurrentLoginMediator->PostEvent(6u);
 
-                const AuthBootstrap680AuthReplyParseObjectF0Sketch* const parseObject3 =
+                const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject3 =
                     authBootstrapChild.authReplyParseObjectF0;
                 const std::string replyString1d =
                     authBootstrapChild.CopyReplyString54_SOURCEOWNED();

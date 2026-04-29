@@ -16,6 +16,7 @@
 namespace mxo { namespace ltlogin {
 class CLTLoginMediator;
 class AuthBootstrap680ChildBase_0x4b7134;
+class Packet_AsGetPublicKeyRequest_0x4b6c74;
 } }
 #include "../libltcrypto/auth_internal.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
@@ -1090,7 +1091,7 @@ public:
     CryptoPP::Integer publicExponentBigIntC4{};
     CryptoPP::Integer privateExponentBigIntD8{};
     uint32_t inboundAuthStatusEc = 1;
-    mxo::ltlogin::AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr;
+    mxo::ltlogin::Packet_AsGetPublicKeyRequest_0x4b6c74* authReplyParseObjectF0 = nullptr;
     mxo::ltlogin::AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
