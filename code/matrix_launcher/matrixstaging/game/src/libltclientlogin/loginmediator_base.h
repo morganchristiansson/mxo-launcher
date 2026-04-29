@@ -249,27 +249,64 @@ struct LateEntryList1470VectorLikeSketch {
 // SessionCallbackHelper65cSketch is now LaunchPadClient_0x4b0e48 (see launchpad.h)
 // The session callback helper at CLTLoginMediator +0x65c is a LaunchPadClient instance.
 
-struct ProcessLoginRequestInputSketch {
-    // owner vtable `+0x30` / `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`
+class SubmitLoginRequestInput_0x407d50 {
+public:
+    // anchor: launcher.exe:0x407d50 helper / launcher.exe:0x41ecd0 consumer
+    // Best current identity:
+    // - concrete launcher submit-input class/layout used by `0x408400`
+    // - non-polymorphic data carrier with one recovered helper method at `0x407d50`
+    // - Ghidra/OOAnalyzer class identity is worth preserving even though the object behaves more
+    //   like a packed request block than a rich business object
     // Live input shape confirmed:
     // - `+0x00` = username
     // - `+0x20` = password
+    // - `+0x40` = key-config md5 block
+    // - `+0x50` = ui-config md5 block
+    // - `+0x60` = session-token string triple
+    // - `+0x6c` = request flag byte
     // - on the happy path this runs while current helper is still state0
     // - the owner path copies this into owner `+0x94`, clears owner `+0xf4`, then moves to
     //   helper/state `2`
     // So state2 is the first post-submit helper here, not the startup default helper.
-    std::array<char, 0x20> inlineString00{};     // input `+0x00 .. +0x1f` = username
-    std::array<char, 0x20> inlineString20{};     // input `+0x20 .. +0x3f` = password
-    std::array<uint8_t, 16> block40{};           // input `+0x40 .. +0x4f`
-    std::array<uint8_t, 16> block50{};           // input `+0x50 .. +0x5f`
-    // SmallString60 (same as OwnerAuthBootstrapSource94::SmallString60)
-    struct SmallString60Sketch {
+    struct SessionTokenString60 {
         const char* begin = nullptr;
         const char* current = nullptr;
         const char* capacity = nullptr;
-    } string60; // input `+0x60 .. +0x68`
-    uint8_t flag6C = 0;                          // input `+0x6c`
+
+        bool Empty() const { return begin == current; }
+        void Clear() {
+            begin = nullptr;
+            current = nullptr;
+            capacity = nullptr;
+        }
+    };
+
+    std::array<char, 0x20> submitUsername{};          // input `+0x00 .. +0x1f`
+    std::array<char, 0x20> submitPassword{};          // input `+0x20 .. +0x3f`
+    std::array<uint8_t, 16> submitKeyConfigMd5Block40{}; // input `+0x40 .. +0x4f`
+    std::array<uint8_t, 16> submitUiConfigMd5Block50{};  // input `+0x50 .. +0x5f`
+    SessionTokenString60 submitSessionTokenString{};  // input `+0x60 .. +0x6b`
+    uint8_t submitRequestFlag6c = 0;                  // input `+0x6c`
+
+    bool HasUsername() const { return submitUsername[0] != '\0'; }
+    bool HasPassword() const { return submitPassword[0] != '\0'; }
+    bool HasSessionToken() const { return !submitSessionTokenString.Empty(); }
+
+    // anchor: launcher.exe:0x407d50
+    // Fidelity note: the original helper frees pooled or heap-backed storage for the session-token
+    // triple. Our source model treats this input as non-owning, so the safe equivalent is to clear
+    // the pointer triple without attempting to free foreign storage.
+    void ReleaseSubmitSessionTokenStringStorage() {
+        submitSessionTokenString.Clear();
+    }
 };
+
+static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitUsername) == 0x00);
+static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitPassword) == 0x20);
+static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitKeyConfigMd5Block40) == 0x40);
+static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitUiConfigMd5Block50) == 0x50);
+static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitSessionTokenString) == 0x60);
+static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitRequestFlag6c) == 0x6c);
 
 // anchor: launcher.exe:0x41eb80
 // Owner-side auth/bootstrap source block at owner +0x94.
@@ -295,23 +332,23 @@ public:
     // (owner +0x94 + 0x60 = owner +0xf4), cleared by the +0x30 path.
 
     // anchor: launcher.exe:0x41eb80
-    // Copies from ProcessLoginRequestInputSketch to this block.
+    // Copies from SubmitLoginRequestInput_0x407d50 to this block.
     // Uses delta-based byte copy matching the static-RE implementation.
-    void CopyFromSubmitLoginRequestInput(const ProcessLoginRequestInputSketch& input) {
+    void CopyFromSubmitLoginRequestInput(const SubmitLoginRequestInput_0x407d50& input) {
         // Copy username (32 bytes)
-        std::copy_n(input.inlineString00.begin(), 0x20, username00.begin());
+        std::copy_n(input.submitUsername.begin(), 0x20, username00.begin());
         // Copy password (32 bytes)
-        std::copy_n(input.inlineString20.begin(), 0x20, password20.begin());
+        std::copy_n(input.submitPassword.begin(), 0x20, password20.begin());
         // Copy keyConfigMd5 block (16 bytes)
-        std::copy_n(input.block40.begin(), 0x10, keyConfigMd540.begin());
+        std::copy_n(input.submitKeyConfigMd5Block40.begin(), 0x10, keyConfigMd540.begin());
         // Copy uiConfigMd5 block (16 bytes)
-        std::copy_n(input.block50.begin(), 0x10, uiConfigMd550.begin());
+        std::copy_n(input.submitUiConfigMd5Block50.begin(), 0x10, uiConfigMd550.begin());
         // Copy session token string
-        sessionToken60.begin = input.string60.begin;
-        sessionToken60.current = input.string60.current;
-        sessionToken60.capacity = input.string60.capacity;
+        sessionToken60.begin = input.submitSessionTokenString.begin;
+        sessionToken60.current = input.submitSessionTokenString.current;
+        sessionToken60.capacity = input.submitSessionTokenString.capacity;
         // Copy flag
-        flag6C = input.flag6C;
+        flag6C = input.submitRequestFlag6c;
     }
 };
 
@@ -477,7 +514,7 @@ public:
     // +0x2c
     virtual uint32_t IsConnected() = 0;
     // +0x30
-    virtual uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) = 0;
+    virtual uint32_t ProcessLoginRequest(const SubmitLoginRequestInput_0x407d50& input) = 0;
     // +0x34
     virtual void RequestAuthCloseAndSwitchToState0() = 0;
     // +0x38

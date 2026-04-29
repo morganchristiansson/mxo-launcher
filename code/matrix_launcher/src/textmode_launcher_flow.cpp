@@ -588,31 +588,29 @@ void TrimAsciiWhitespaceInPlace(char* text) {
 // No-GUI launcher bridge over the original page-6 submit helper contract:
 // - trim username
 // - copy password
-// - zero block40/block50
-// - leave the small-string session-token field empty on the interactive username/password path
+// - zero submitKeyConfigMd5Block40/submitUiConfigMd5Block50
+// - leave the session-token triple empty on the interactive username/password path
 bool BuildNoGuiProcessLoginRequestInput(
     const char* username,
     const char* password,
-    mxo::ltlogin::ProcessLoginRequestInputSketch* outInput) {
+    mxo::ltlogin::SubmitLoginRequestInput_0x407d50* outInput) {
     if (!username || !password || !outInput) {
         return false;
     }
 
     *outInput = {};
 
-    char trimmedUsername[sizeof(outInput->inlineString00)] = {};
+    char trimmedUsername[sizeof(outInput->submitUsername)] = {};
     std::strncpy(trimmedUsername, username, sizeof(trimmedUsername) - 1u);
     trimmedUsername[sizeof(trimmedUsername) - 1u] = '\0';
     TrimAsciiWhitespaceInPlace(trimmedUsername);
 
-    std::strncpy(outInput->inlineString00.data(), trimmedUsername, outInput->inlineString00.size() - 1u);
-    outInput->inlineString00[outInput->inlineString00.size() - 1u] = '\0';
-    std::strncpy(outInput->inlineString20.data(), password, outInput->inlineString20.size() - 1u);
-    outInput->inlineString20[outInput->inlineString20.size() - 1u] = '\0';
-    outInput->string60.begin = nullptr;
-    outInput->string60.current = nullptr;
-    outInput->string60.capacity = nullptr;
-    outInput->flag6C = 0u;
+    std::strncpy(outInput->submitUsername.data(), trimmedUsername, outInput->submitUsername.size() - 1u);
+    outInput->submitUsername[outInput->submitUsername.size() - 1u] = '\0';
+    std::strncpy(outInput->submitPassword.data(), password, outInput->submitPassword.size() - 1u);
+    outInput->submitPassword[outInput->submitPassword.size() - 1u] = '\0';
+    outInput->submitSessionTokenString.Clear();
+    outInput->submitRequestFlag6c = 0u;
     return true;
 }
 
@@ -637,7 +635,7 @@ bool CLauncher::RunTextModeLoginRichEditSubmitCredentialsStage() {
         if (!PromptForLauncherCredentialsForSubmitAttempt(forceRepromptAllFields)) {
             return false;
         }
-        mxo::ltlogin::ProcessLoginRequestInputSketch submitLoginRequestInput = {};
+        mxo::ltlogin::SubmitLoginRequestInput_0x407d50 submitLoginRequestInput = {};
         if (!BuildNoGuiProcessLoginRequestInput(
                 g_LauncherCommandLine.AuthUsername(),
                 g_LauncherCommandLine.AuthPassword(),

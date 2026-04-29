@@ -438,7 +438,7 @@ uint32_t CLTLoginMediator::IsConnected() {
 }
 
 // anchor: launcher.exe:0x41ecd0 slot +0x2c
-uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) {
+uint32_t CLTLoginMediator::ProcessLoginRequest(const SubmitLoginRequestInput_0x407d50& input) {
     const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
     switch (stateCode) {
         case 1u:
@@ -471,8 +471,8 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             break;
     }
 
-    const bool string60Empty = (input.string60.current == input.string60.begin);
-    if ((input.inlineString00[0] == '\0' || input.inlineString20[0] == '\0') && string60Empty) {
+    const bool sessionTokenEmpty = !input.HasSessionToken();
+    if ((!input.HasUsername() || !input.HasPassword()) && sessionTokenEmpty) {
         spdlog::info(
             "ROUTE CHECKPOINT: ProcessLoginRequest rejected empty credentials currentState={} -> 0x00000004",
             currentState_ ? currentState_->DebugName() : "<null>");
@@ -482,9 +482,9 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     ownerAuthBootstrapSource94_.CopyFromSubmitLoginRequestInput(input);
 
     // Fidelity: session token at +0xf4 within owner+0x94 block
-    ownerAuthBootstrapSource94_.sessionToken60.begin = input.string60.begin;
-    ownerAuthBootstrapSource94_.sessionToken60.current = input.string60.current;
-    ownerAuthBootstrapSource94_.sessionToken60.capacity = input.string60.capacity;
+    ownerAuthBootstrapSource94_.sessionToken60.begin = input.submitSessionTokenString.begin;
+    ownerAuthBootstrapSource94_.sessionToken60.current = input.submitSessionTokenString.current;
+    ownerAuthBootstrapSource94_.sessionToken60.capacity = input.submitSessionTokenString.capacity;
 
     spdlog::info(
         "CLTLoginMediator::ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} currentState={} stateCode={} launchPadGateState16State18AltPath={} helper65cPresent={} submitOwnership=owner",
@@ -501,7 +501,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         spdlog::info(
             "ROUTE CHECKPOINT: early-auth ProcessLoginRequest from state0 currentState={} string60Empty={} launchPadGateState16State18Scaffold={} helper65cPresent={}",
             upstreamState ? upstreamState->DebugName() : "<null>",
-            string60Empty ? 1u : 0u,
+            sessionTokenEmpty ? 1u : 0u,
             0u,
             launchPadClient65c_ ? 1u : 0u);
     }
@@ -549,7 +549,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     // `g_LaunchPadGateState16State18 == 0` happy path remains the exact favored route.
     // That alternate family is separate from the active state2 -> owner+0x680 bootstrap-child
     // handoff.
-    if (!string60Empty) {
+    if (!sessionTokenEmpty) {
         if (launchPadClient65c_ == nullptr) {
             spdlog::info(
                 "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state16 (string60 non-empty, helper65c absent) upstreamState={}",

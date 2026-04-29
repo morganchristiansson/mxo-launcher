@@ -5,7 +5,7 @@
 #include <cstdint>
 
 namespace mxo::ltlogin {
-struct ProcessLoginRequestInputSketch;
+class SubmitLoginRequestInput_0x407d50;
 }
 
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);

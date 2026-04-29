@@ -1009,7 +1009,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // +0x24
     // anchor: launcher.exe:0x41ecd0
-    uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input);
+    uint32_t ProcessLoginRequest(const SubmitLoginRequestInput_0x407d50& input);
 
     // +0xe8
     // anchor: launcher.exe:0x41ec00

@@ -333,7 +333,7 @@ static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* 
 //   surface rather than through a separate launcher-only credential API
 static uint32_t __thiscall Mediator_ProcessLoginRequest30(
     MinimalLoginMediatorStub* self,
-    const mxo::ltlogin::ProcessLoginRequestInputSketch* input) {
+    const mxo::ltlogin::SubmitLoginRequestInput_0x407d50* input) {
     (void)self;
     return input
         ? mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->ProcessLoginRequest(*input)
