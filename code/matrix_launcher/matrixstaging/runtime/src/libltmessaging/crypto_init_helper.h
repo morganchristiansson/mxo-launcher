@@ -9,12 +9,18 @@ namespace mxo::liblttcp {
 using byte = uint8_t;
 
 // anchor: launcher.exe:0x4f7bf4 / outer wrapper vtable 0x4b695c
-// Static-RE maps the original helper's +0x04 subobject (vtable 0x4b68a8) to the old
-// Crypto++ RandomPool family. Source now models that semantic object directly with the
-// modern compatibility type CryptoPP::OldRandomPool.
-class CryptoInitHelperGlobal_0x4f7bf4 {
+// Source-owned wrapper for the launcher global `CryptoInitHelper_0x4b42bc` object.
+// Static-RE currently closes the embedded Crypto++ pieces as:
+// - wrapper `+0x04` / vtable `0x4b68a8` -> old `CryptoPP::RandomPool`
+//   (`CryptoPP::OldRandomPool` in the modern tree)
+// - wrapper `+0x08` / vtable `0x4b41e0` -> `CryptoPP::BufferedTransformation`
+//
+// Source models the semantic RNG object directly and keeps the outer launcher wrapper boundary
+// explicit so callers still pass around the same helper concept seen at `0x4429b0`, `0x44557a`,
+// and `0x44d27a`.
+class CryptoInitHelperWrapper_0x4f7bf4 {
 public:
-    CryptoInitHelperGlobal_0x4f7bf4();
+    CryptoInitHelperWrapper_0x4f7bf4();
 
     CryptoPP::OldRandomPool& RandomPoolSubobject04() { return randomPoolSubobject04_; }
     const CryptoPP::OldRandomPool& RandomPoolSubobject04() const { return randomPoolSubobject04_; }
@@ -25,7 +31,7 @@ private:
 
 // Global crypto context wrapper around the recovered launcher helper.
 // anchor: launcher.exe:0x4f7bf4
-extern CryptoInitHelperGlobal_0x4f7bf4 g_CryptoInitHelper_0x4f7bf4;
+extern CryptoInitHelperWrapper_0x4f7bf4 g_CryptoInitHelper_0x4f7bf4;
 
 // Initialization flag
 // anchor: launcher.exe:0x4f7c20

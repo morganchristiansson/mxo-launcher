@@ -7,12 +7,12 @@
 
 namespace mxo::liblttcp {
 
-CryptoInitHelperGlobal_0x4f7bf4::CryptoInitHelperGlobal_0x4f7bf4()
+CryptoInitHelperWrapper_0x4f7bf4::CryptoInitHelperWrapper_0x4f7bf4()
     : randomPoolSubobject04_(0x180u) {
 }
 
 // anchor: launcher.exe:0x4f7bf4
-CryptoInitHelperGlobal_0x4f7bf4 g_CryptoInitHelper_0x4f7bf4{};
+CryptoInitHelperWrapper_0x4f7bf4 g_CryptoInitHelper_0x4f7bf4{};
 
 // anchor: launcher.exe:0x4f7c20
 uint32_t g_CryptoInitializedFlag_0x4f7c20 = 0;

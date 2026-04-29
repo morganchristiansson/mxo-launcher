@@ -2454,8 +2454,8 @@ void* CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption(
         return outputBuffer;
     }
 
-    auto* cryptoHelper = const_cast<CryptoInitHelperGlobal_0x4f7bf4*>(
-        static_cast<const CryptoInitHelperGlobal_0x4f7bf4*>(cryptoContext));
+    auto* cryptoHelper = const_cast<CryptoInitHelperWrapper_0x4f7bf4*>(
+        static_cast<const CryptoInitHelperWrapper_0x4f7bf4*>(cryptoContext));
     if (!cryptoHelper) {
         spdlog::warn(
             "CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption missing RNG helper");
