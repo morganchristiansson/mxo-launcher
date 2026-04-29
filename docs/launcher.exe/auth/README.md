@@ -142,12 +142,15 @@ Representative current run inputs:
 - currentPublicKeyId: `0`
 - loginType: `1`
 - zeroed key/ui MD5s
-- default blob layout:
-  - leading byte `0x00`
-  - `rsaMethod = 4`
-  - `someShort = 0x001b`
-  - embedded current unix time
-  - username length includes null terminator
+- recovered `0x4474f0` packet shape:
+  - plaintext RSA input is a packet-like blob with fixed prefix `0x1b`
+  - byte `+0x00 = 0x00`
+  - dword `+0x01 = currentPublicKeyId`
+  - word `+0x05 = username-field offset` to a length-prefixed tail
+  - bytes `+0x07 .. +0x16 = child +0x84 .. +0x93` feedback seed / live Twofish key
+  - dword `+0x17 = time(NULL) - child +0x80`
+  - username tail length includes the null terminator
+  - outbound raw `0x08` packet likewise keeps a fixed prefix `0x28` and stores the ciphertext tail offset at payload `+0x06`
 
 Observed wire result:
 - outbound raw `0x06` / `AS_GetPublicKeyRequest`
@@ -171,7 +174,7 @@ Observed wire result:
   - blobLen `128`
   - usernameLengthField `7`
   - null terminator included
-  - fixed-header override not used
+  - ciphertext is appended through the recovered length-prefixed tail, not written inline after a guessed fixed header
   - **usedReplyPublicKey = 1**
 - inbound raw `0x09` / `AS_AuthChallenge`
   - payloadLen `17`, headerLen `1`, byteCount `18`

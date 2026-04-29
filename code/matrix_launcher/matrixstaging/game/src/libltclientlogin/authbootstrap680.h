@@ -155,7 +155,7 @@ public:
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
  std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
- std::vector<uint8_t> cachedAuthRequestTwofishKeyBytesOwned_{};
+ std::vector<uint8_t> cachedAuthRequestTwofishKeyBytesOwned_{}; // source-owned mirror of the live 16-byte child `+0x84..+0x93` seed reused by raw `0x09/0x0a/0x0b` follow-on crypto
 
  // anchor: launcher.exe:0x445500
  AuthBootstrap680ChildBase_0x4b7134();
