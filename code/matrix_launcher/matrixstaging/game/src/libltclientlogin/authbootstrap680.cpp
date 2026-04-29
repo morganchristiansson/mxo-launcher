@@ -115,18 +115,13 @@ static uint32_t ReadU32LE(const uint8_t* bytes) {
 }
 
 static void ResetAuthBootstrap680BigIntObject(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject) {
+    CryptoPP::Integer* outObject) {
     if (!outObject) {
         return;
     }
 
     *outObject = CryptoPP::Integer::Zero();
 }
-
-static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    const uint8_t* bigEndianBytes,
-    size_t byteCount);
 
 static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
@@ -176,81 +171,63 @@ static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
     return true;
 }
 
-static void ResetAuthBootstrap680Raw08PublicKeyWorkerA8(
-    AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* outWorker,
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    if (!outWorker || !ownedState) {
-        return;
-    }
-
-    outWorker->vtable00 = 0x004b75e4u;
-    outWorker->helperVtable04 = 0x004b7610u;
-    outWorker->helperVtable08 = 0x004b7138u;
-    ResetAuthBootstrap680RsaPublicKey(&outWorker->publicKey);
-    outWorker->helperThunk4c = 0x004b75e0u;
-    outWorker->helperThunk50 = 0x004b6300u;
-    outWorker->helperThunk54 = 0x004b3e18u;
-    outWorker->helperVtable58 = 0x004b67a0u;
-}
-
-static void ResetAuthBootstrap680ReplyAuthDataValidatorAC(
-    AuthBootstrap680ReplyAuthDataValidatorACSketch* outValidator,
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    if (!outValidator || !ownedState) {
-        return;
-    }
-
-    outValidator->vtable00 = 0x004b7580u;
-    outValidator->helperVtable04 = 0x004b75ccu;
-    outValidator->helperVtable08 = 0x004b7440u;
-    ResetAuthBootstrap680RsaPublicKey(&outValidator->publicKey);
-    outValidator->helperThunk4c = 0x004b73c0u;
-    outValidator->helperThunk50 = 0x004b6c44u;
-}
-
-}  // namespace
-
-void AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::ResetAsRecoveredLeaf(
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    ResetAuthBootstrap680Raw08PublicKeyWorkerA8(this, ownedState);
-}
-
-bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::ConstructFromReplyPublicKey(
+static bool BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
+    std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor>* outWorker,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
     const uint8_t* modulusBytes,
     size_t modulusByteCount,
     uint8_t exponentByte) {
-    ResetAsRecoveredLeaf(ownedState);
+    if (!outWorker || !ownedState) {
+        return false;
+    }
+
+    outWorker->reset();
     if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &publicKey,
+            &ownedState->publicKey,
             ownedState,
             modulusBytes,
             modulusByteCount,
             exponentByte)) {
-        ResetAsRecoveredLeaf(ownedState);
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
+        return false;
+    }
+
+    try {
+        *outWorker = std::make_unique<CryptoPP::RSAES_OAEP_SHA_Encryptor>(ownedState->publicKey);
+    } catch (const CryptoPP::Exception&) {
+        outWorker->reset();
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
     return true;
 }
 
-void AuthBootstrap680ReplyAuthDataValidatorACSketch::ResetAsRecoveredLeaf(
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    ResetAuthBootstrap680ReplyAuthDataValidatorAC(this, ownedState);
-}
-
-bool AuthBootstrap680ReplyAuthDataValidatorACSketch::ConstructFromReplyPublicKey(
+static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>* outValidator,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
     const uint8_t* modulusBytes,
     size_t modulusByteCount,
     uint8_t exponentByte) {
-    ResetAsRecoveredLeaf(ownedState);
+    if (!outValidator || !ownedState) {
+        return false;
+    }
+
+    outValidator->reset();
     if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &publicKey,
+            &ownedState->publicKey,
             ownedState,
             modulusBytes,
             modulusByteCount,
             exponentByte)) {
-        ResetAsRecoveredLeaf(ownedState);
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
+        return false;
+    }
+
+    try {
+        *outValidator = std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(ownedState->publicKey);
+    } catch (const CryptoPP::Exception&) {
+        outValidator->reset();
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
     return true;
@@ -602,7 +579,7 @@ static void ResetAuthBootstrap680ReplyMaterialization(
 
 
 static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
+    CryptoPP::Integer* outObject,
     const uint8_t* bigEndianBytes,
     size_t byteCount) {
     if (!outObject || !bigEndianBytes || byteCount == 0u) {
@@ -676,7 +653,7 @@ static bool VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
     }
 
     std::array<uint8_t, 16> workerMd5Digest{};
-    CryptoPP::Weak::MD5 md5;
+    CryptoPP::Weak1::MD5 md5;
     md5.Update(signedBytes, signedByteCount);
     md5.Final(workerMd5Digest.data());
 
@@ -719,12 +696,12 @@ static bool VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
 
 }  // namespace
 
-bool AuthBootstrap680ReplyAuthDataValidatorACSketch::VerifySignatureRecoveredFinalizeScaffold(
+static bool VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     const uint8_t* signedBytes,
     size_t signedByteCount,
     const uint8_t* signatureBytes,
-    size_t signatureByteCount) const {
+    size_t signatureByteCount) {
     return VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
         ownedState,
         signedBytes,
@@ -779,32 +756,24 @@ static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthSc
 
 }  // namespace
 
-uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryEncryptedOutputLengthScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-    size_t plaintextByteCount) const {
-    return QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
-        ownedState,
-        plaintextByteCount);
-}
-
-uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryCiphertextChunkByteCountScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const {
+static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerCiphertextChunkByteCountScaffold(
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) {
     return static_cast<uint32_t>(
         QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(ownedState.publicKey));
 }
 
-uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryPlaintextChunkByteCountScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const {
+static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerPlaintextChunkByteCountScaffold(
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) {
     CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
     return static_cast<uint32_t>(encryptor.FixedMaxPlaintextLength());
 }
 
-bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextChunkScaffold(
+static bool EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     const uint8_t* plaintextBytes,
     size_t plaintextByteCount,
     uint8_t* ciphertextBytes,
-    size_t ciphertextByteCapacity) const {
+    size_t ciphertextByteCapacity) {
     if (!plaintextBytes || plaintextByteCount == 0u || !ciphertextBytes) {
         return false;
     }
@@ -920,6 +889,8 @@ static size_t SmallStringMirrorLength(const AuthBootstrap680SmallStringMirror& m
 static const char* SmallStringMirrorDataOrEmpty(const AuthBootstrap680SmallStringMirror& mirror) {
     return mirror.begin ? mirror.begin : "";
 }
+
+}  // namespace
 
 }  // namespace
 
@@ -1176,9 +1147,8 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_S
     }
 
     if (child.lazyPubkeyDatValidatorA4 == nullptr || !child.lazyPubkeyDatValidatorA4OwnedState_.object) {
-        child.lazyPubkeyDatValidatorA4OwnedState_.object =
-            std::make_unique<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch>();
-        if (!child.lazyPubkeyDatValidatorA4OwnedState_.object->ConstructFromReplyPublicKey(
+        if (!BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+                &child.lazyPubkeyDatValidatorA4OwnedState_.object,
                 &child.lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
                 kAuthBootstrap680PubkeyDatFallbackModulus.data(),
                 kAuthBootstrap680PubkeyDatFallbackModulus.size(),
@@ -1201,7 +1171,7 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_S
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
     std::copy_n(modulusBytes, modulusByteCount, signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = publicExponentByte;
-    return child.lazyPubkeyDatValidatorA4->VerifySignatureRecoveredFinalizeScaffold(
+    return VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
         child.lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
@@ -1338,7 +1308,7 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
         return;
     }
     // Uses same logic as BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold
-    CryptoPP::Weak::MD5 md5;
+    CryptoPP::Weak1::MD5 md5;
     md5.Update(signedData80.data(), signedData80.size());
     md5.Final(outDigest->data());
 }
@@ -1346,7 +1316,7 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
 // anchor: launcher.exe:0x44aec0
 // Full fidelity: builds MD5 of signedData80 and delegates to validator
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
-    AuthBootstrap680ReplyAuthDataValidatorACSketch* validator,
+    const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* validator,
     const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair,
     int timeBias) const {
     // Calculate current auth server time
@@ -1367,12 +1337,13 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
     BuildSignedDataMd5Digest(&md5Digest10);
 
     // Call validator verify with public key pair
-    return validator->VerifySignatureRecoveredFinalizeScaffold(
-        publicKeyPair,
-        md5Digest10.data(),
-        md5Digest10.size(),
-        authSignature00.data(),
-        authSignature00.size());
+    return validator != nullptr &&
+                   VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
+                       publicKeyPair,
+                       md5Digest10.data(),
+                       md5Digest10.size(),
+                       authSignature00.data(),
+                       authSignature00.size());
 }
 
 // anchor: launcher.exe:0x4435f0
@@ -1699,7 +1670,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
                 processedChallengeMd5Bytes.assign(16u, 0u);
                 {
-                    CryptoPP::Weak::MD5 challengeMd5;
+                    CryptoPP::Weak1::MD5 challengeMd5;
                     if (!decryptedChallengeBytes.empty()) {
                         challengeMd5.Update(
                             decryptedChallengeBytes.data(),
@@ -1975,9 +1946,9 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             const CryptoPP::Integer publicExponentInteger(
                 static_cast<unsigned int>(copyShadow.signedData80[0x51u]));
 
-            AuthBootstrap680BigIntObjects_0x4ba50c* const blockB0 = &modulusBigIntB0;
-            AuthBootstrap680BigIntObjects_0x4ba50c* const blockC4 = &publicExponentBigIntC4;
-            AuthBootstrap680BigIntObjects_0x4ba50c* const blockD8 = &privateExponentBigIntD8;
+            CryptoPP::Integer* const blockB0 = &modulusBigIntB0;
+            CryptoPP::Integer* const blockC4 = &publicExponentBigIntC4;
+            CryptoPP::Integer* const blockD8 = &privateExponentBigIntD8;
 
             const size_t modulusByteCount =
                 std::max<size_t>(1u, static_cast<size_t>(modulusInteger.MinEncodedSize()));
@@ -2082,9 +2053,8 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
         ensuredLazyPubkeyDatValidatorA4 = true;
     } else {
         // anchor: launcher.exe:0x447260 / 0x447c10
-        lazyPubkeyDatValidatorA4OwnedState_.object =
-            std::make_unique<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch>();
-        if (lazyPubkeyDatValidatorA4OwnedState_.object->ConstructFromReplyPublicKey(
+        if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+                &lazyPubkeyDatValidatorA4OwnedState_.object,
                 &lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
                 kAuthBootstrap680PubkeyDatFallbackModulus.data(),
                 kAuthBootstrap680PubkeyDatFallbackModulus.size(),
@@ -2253,7 +2223,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     const uint16_t plaintextPayloadByteCount =
         plaintextAuthBlob.messageRef08 ? plaintextAuthBlob.messageRef08->PayloadByteCount() : 0u;
     const uint32_t raw08WorkerExpectedBlobLen =
-        raw08PublicKeyWorkerA8->QueryEncryptedOutputLengthScaffold(
+        QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
             raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
             plaintextPayloadByteCount);
     if (raw08WorkerExpectedBlobLen == 0u || raw08WorkerExpectedBlobLen > 0xffffu) {
@@ -2309,10 +2279,10 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     // sizing / encrypt work through recovered worker-shaped methods instead of driving Crypto++
     // directly from this send helper.
     const uint32_t plaintextChunkByteCount =
-        raw08PublicKeyWorkerA8->QueryPlaintextChunkByteCountScaffold(
+        QueryAuthBootstrap680Raw08PublicKeyWorkerPlaintextChunkByteCountScaffold(
             raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
     const uint32_t ciphertextChunkByteCount =
-        raw08PublicKeyWorkerA8->QueryCiphertextChunkByteCountScaffold(
+        QueryAuthBootstrap680Raw08PublicKeyWorkerCiphertextChunkByteCountScaffold(
             raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
     if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
         spdlog::info(
@@ -2329,7 +2299,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         const size_t currentChunkByteCount =
             std::min<size_t>(plaintextChunkByteCount, plaintextBytesRemaining);
         if (ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen ||
-            !raw08PublicKeyWorkerA8->EncryptPlaintextChunkScaffold(
+            !EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
                 raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
                 plaintextCursor,
                 currentChunkByteCount,
@@ -2413,9 +2383,8 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     }
 
     if (lazyPubkeyDatValidatorA4 == nullptr || !lazyPubkeyDatValidatorA4OwnedState_.object) {
-        lazyPubkeyDatValidatorA4OwnedState_.object =
-            std::make_unique<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch>();
-        if (lazyPubkeyDatValidatorA4OwnedState_.object->ConstructFromReplyPublicKey(
+        if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+                &lazyPubkeyDatValidatorA4OwnedState_.object,
                 &lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
                 kAuthBootstrap680PubkeyDatFallbackModulus.data(),
                 kAuthBootstrap680PubkeyDatFallbackModulus.size(),
@@ -2441,9 +2410,8 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     ResetAuthBootstrap680ReplyPublicKeyWorkers(child);
     currentPublicKeyId9C = replyPublicKeyId09;
 
-    child.raw08PublicKeyWorkerA8OwnedState_.object =
-        std::make_unique<AuthBootstrap680Raw08PublicKeyWorkerA8Sketch>();
-    if (child.raw08PublicKeyWorkerA8OwnedState_.object->ConstructFromReplyPublicKey(
+    if (BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
+            &child.raw08PublicKeyWorkerA8OwnedState_.object,
             &child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
             modulusBytes,
             modulusByteCount,
@@ -2454,9 +2422,8 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
         child.raw08PublicKeyWorkerA8 = nullptr;
     }
 
-    child.replyAuthDataValidatorACOwnedState_.object =
-        std::make_unique<AuthBootstrap680ReplyAuthDataValidatorACSketch>();
-    if (child.replyAuthDataValidatorACOwnedState_.object->ConstructFromReplyPublicKey(
+    if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+            &child.replyAuthDataValidatorACOwnedState_.object,
             &child.replyAuthDataValidatorACOwnedState_.publicKeyPair0c,
             modulusBytes,
             modulusByteCount,

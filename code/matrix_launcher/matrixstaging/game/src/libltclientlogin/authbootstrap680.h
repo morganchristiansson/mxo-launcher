@@ -36,17 +36,17 @@ struct AuthBootstrap680Field54HelperOwnedState {
 };
 
 struct AuthBootstrap680LazyPubkeyDatValidatorOwnedState {
-    std::unique_ptr<AuthBootstrap680LazyPubkeyDatValidatorA4Sketch> object;
+    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> object;
     AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
 };
 
 struct AuthBootstrap680Raw08PublicKeyWorkerOwnedState {
-    std::unique_ptr<AuthBootstrap680Raw08PublicKeyWorkerA8Sketch> object;
+    std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor> object;
     AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
 };
 
 struct AuthBootstrap680ReplyAuthDataValidatorOwnedState {
-    std::unique_ptr<AuthBootstrap680ReplyAuthDataValidatorACSketch> object;
+    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> object;
     AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
 };
 
@@ -124,9 +124,9 @@ public:
  uint32_t currentPublicKeyId9C = 0; // original child `+0x9c`
  uint8_t authRequestReadyA0 = 0; // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
  std::array<uint8_t, 3> paddingA1ToA3{}; // original child `+0xa1 .. +0xa3`
- AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` validator family built by `0x447260/0x447c10`, now backed by a direct `CryptoPP::RSA::PublicKey` and consulted by `0x447780 -> 0x468f80`
- AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780`, now backed by a direct `CryptoPP::RSA::PublicKey`, and consumed by `0x4474f0` through `0x468ea0/0x468f00`
- AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780`, now backed by a direct `CryptoPP::RSA::PublicKey`, and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
+ CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` verifier family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
+ CryptoPP::RSAES_OAEP_SHA_Encryptor* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key encryptor materialized by `0x447f50 -> 0x447780`, consumed by `0x4474f0` through `0x468ea0/0x468f00`
+ CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling verifier materialized by `0x447f50 -> 0x447780`, consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
 
  // Original child `+0xb0 .. +0xeb` stored three adjacent old-Crypto++ `Integer` objects.
  // Static RE now proves data type `0x4ba50c` is `CryptoPP::Integer`, so source keeps those
@@ -135,9 +135,9 @@ public:
  // - `+0xb0` <- modulus bytes from copied `+0xf4 + 0xd2 .. + 0x131`
  // - `+0xc4` <- low public-exponent byte from copied `+0xf4 + 0xd1`
  // - `+0xd8` <- derived 96-byte private-exponent/transform output used by the same prep path
- AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{}; // semantic mirror of original child `+0xb0`
- AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{}; // semantic mirror of original child `+0xc4`
- AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{}; // semantic mirror of original child `+0xd8`
+ CryptoPP::Integer modulusBigIntB0{}; // semantic mirror of original child `+0xb0`
+ CryptoPP::Integer publicExponentBigIntC4{}; // semantic mirror of original child `+0xc4`
+ CryptoPP::Integer privateExponentBigIntD8{}; // semantic mirror of original child `+0xd8`
 
  uint32_t inboundAuthStatusEc = 1; // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
  AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it

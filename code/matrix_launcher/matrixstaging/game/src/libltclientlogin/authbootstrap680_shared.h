@@ -7,6 +7,10 @@
 #include <vector>
 
 #include <integer.h>
+#ifndef CRYPTOPP_ENABLE_NAMESPACE_WEAK
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+#endif
+#include <md5.h>
 #include "rsa.h"
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
@@ -14,7 +18,6 @@
 namespace mxo::ltlogin {
 
 struct AuthBootstrap680RsaPublicKeyPairOwnedState;
-struct AuthBootstrap680ReplyAuthDataValidatorACSketch;
 
 struct AuthBootstrap680SmallStringMirror {
     const char* begin = nullptr;
@@ -31,15 +34,13 @@ public:
     void BuildSignedDataMd5Digest(std::array<uint8_t, 16>* outDigest) const;
     bool IsFresh(int timeBias) const;
     uint32_t VerifyWithValidator(
-        AuthBootstrap680ReplyAuthDataValidatorACSketch* validator,
+        const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* validator,
         const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair,
         int timeBias) const;
 };
 
 // Static RE now proves launcher data type `0x4ba50c` is old Crypto++ `Integer`.
-// Source therefore uses the real `CryptoPP::Integer` directly and keeps the launcher
-// address-family tag only in the alias name/comments.
-using AuthBootstrap680BigIntObjects_0x4ba50c = CryptoPP::Integer;
+// Source therefore uses `CryptoPP::Integer` directly.
 
 
 // Recovered raw `0x08` helper stack note:
@@ -47,41 +48,8 @@ using AuthBootstrap680BigIntObjects_0x4ba50c = CryptoPP::Integer;
 // - `launcher.exe:0x438320` = `CryptoPP_PK_DefaultEncryptionFilter_Put2`
 // - `launcher.exe:0x4382c0` = `CryptoPP_PK_Encryptor_CreateEncryptionFilter`
 //
-// Source no longer keeps a dedicated `AuthBootstrap680Raw08PerChunkWorker48Sketch` because the
-// auth path only needs the inner `PK_DefaultEncryptionFilter` semantics, not the exact launcher
-// helper object layout. The remaining recovered raw-0x08 orchestration stays on the outer
-// `RSAES_OAEP_SHA_Encryptor` family helpers in `authbootstrap680.cpp`.
-
-struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
-    uint32_t vtable00 = 0u;
-    uint32_t helperVtable04 = 0u;
-    uint32_t helperVtable08 = 0u;
-    CryptoPP::RSA::PublicKey publicKey{};
-    uint32_t helperThunk4c = 0u;
-    uint32_t helperThunk50 = 0u;
-    uint32_t helperThunk54 = 0u;
-    uint32_t helperVtable58 = 0u;
-
-    void ResetAsRecoveredLeaf(AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState);
-    bool ConstructFromReplyPublicKey(
-        AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-        const uint8_t* modulusBytes,
-        size_t modulusByteCount,
-        uint8_t exponentByte);
-    uint32_t QueryEncryptedOutputLengthScaffold(
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-        size_t plaintextByteCount) const;
-    uint32_t QueryCiphertextChunkByteCountScaffold(
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const;
-    uint32_t QueryPlaintextChunkByteCountScaffold(
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const;
-    bool EncryptPlaintextChunkScaffold(
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-        const uint8_t* plaintextBytes,
-        size_t plaintextByteCount,
-        uint8_t* ciphertextBytes,
-        size_t ciphertextByteCapacity) const;
-};
+// Static RE now identifies child `+0xa8` as an old Crypto++ encryptor family, so source uses the
+// direct `CryptoPP::RSAES_OAEP_SHA_Encryptor` class.
 
 // Recovered validator accumulator note:
 // - `launcher.exe:0x4472f0` = `CryptoPP_PK_MessageAccumulatorMD5_Create`
@@ -91,35 +59,8 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
 // - `launcher.exe:0x468520` loads the RSA-decoded signature bytes into the accumulator state
 // - `launcher.exe:0x467ee0` / `0x467f70` finalize against the outer verifier object
 //
-// Source no longer keeps a fake `0x84` launcher-owned worker layout. The active auth path only
-// needs the recovered boundary split between:
-// - the outer `RSASSA_PKCS1v15_MD5_Verifier`-compatible object
-// - the temporary MD5-backed PK_MessageAccumulator used during verify
-
-struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
-    uint32_t vtable00 = 0u;
-    uint32_t helperVtable04 = 0u;
-    uint32_t helperVtable08 = 0u;
-    CryptoPP::RSA::PublicKey publicKey{};
-    uint32_t helperThunk4c = 0u;
-    uint32_t helperThunk50 = 0u;
-
-    void ResetAsRecoveredLeaf(AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState);
-    bool ConstructFromReplyPublicKey(
-        AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-        const uint8_t* modulusBytes,
-        size_t modulusByteCount,
-        uint8_t exponentByte);
-    bool VerifySignatureRecoveredFinalizeScaffold(
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-        const uint8_t* signedBytes,
-        size_t signedByteCount,
-        const uint8_t* signatureBytes,
-        size_t signatureByteCount) const;
-};
-
-using AuthBootstrap680LazyPubkeyDatValidatorA4Sketch =
-    AuthBootstrap680ReplyAuthDataValidatorACSketch;
+// Static RE now identifies child `+0xa4/+0xac` as old Crypto++ verifier-family objects, so source
+// uses direct `CryptoPP::RSASSA_PKCS1v15_MD5_Verifier` instances.
 
 // Launcher-owned wrapper around embedded Crypto++ RNG / BufferedTransformation slices.
 // Final ctor state from `launcher.exe:0x4686e0` is:

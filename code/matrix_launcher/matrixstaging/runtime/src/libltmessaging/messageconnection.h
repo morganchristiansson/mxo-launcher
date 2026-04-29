@@ -1083,12 +1083,12 @@ public:
     uint32_t currentPublicKeyId9C = 0;
     uint8_t authRequestReadyA0 = 0;
     std::array<uint8_t, 3> paddingA1ToA3{};
-    mxo::ltlogin::AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr;
-    mxo::ltlogin::AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr;
-    mxo::ltlogin::AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr;
-    mxo::ltlogin::AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{};
-    mxo::ltlogin::AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{};
-    mxo::ltlogin::AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{};
+    CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* lazyPubkeyDatValidatorA4 = nullptr;
+    CryptoPP::RSAES_OAEP_SHA_Encryptor* raw08PublicKeyWorkerA8 = nullptr;
+    CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* replyAuthDataValidatorAC = nullptr;
+    CryptoPP::Integer modulusBigIntB0{};
+    CryptoPP::Integer publicExponentBigIntC4{};
+    CryptoPP::Integer privateExponentBigIntD8{};
     uint32_t inboundAuthStatusEc = 1;
     mxo::ltlogin::AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr;
     mxo::ltlogin::AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr;
