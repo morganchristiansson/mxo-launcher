@@ -913,6 +913,70 @@ uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryEncryptedOutputLengt
         plaintextByteCount);
 }
 
+uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryCiphertextChunkByteCountScaffold(
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const {
+    CryptoPP::RSA::PublicKey publicKey;
+    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
+        return 0u;
+    }
+    return static_cast<uint32_t>(
+        QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey));
+}
+
+uint32_t AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::QueryPlaintextChunkByteCountScaffold(
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) const {
+    CryptoPP::RSA::PublicKey publicKey;
+    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
+        return 0u;
+    }
+
+    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
+    return static_cast<uint32_t>(encryptor.FixedMaxPlaintextLength());
+}
+
+bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextChunkScaffold(
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
+    const uint8_t* plaintextBytes,
+    size_t plaintextByteCount,
+    uint8_t* ciphertextBytes,
+    size_t ciphertextByteCapacity) const {
+    if (!plaintextBytes || plaintextByteCount == 0u || !ciphertextBytes) {
+        return false;
+    }
+
+    CryptoPP::RSA::PublicKey publicKey;
+    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
+        return false;
+    }
+
+    try {
+        CryptoPP::AutoSeededRandomPool rng;
+        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
+        const size_t ciphertextChunkByteCount =
+            QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey);
+        if (ciphertextChunkByteCount == 0u || ciphertextByteCapacity < ciphertextChunkByteCount) {
+            return false;
+        }
+
+        std::string ciphertextChunk;
+        CryptoPP::StringSource source(
+            plaintextBytes,
+            plaintextByteCount,
+            true,
+            new CryptoPP::PK_EncryptorFilter(
+                rng,
+                encryptor,
+                new CryptoPP::StringSink(ciphertextChunk)));
+        if (ciphertextChunk.size() != ciphertextChunkByteCount) {
+            return false;
+        }
+
+        std::memcpy(ciphertextBytes, ciphertextChunk.data(), ciphertextChunk.size());
+        return true;
+    } catch (const CryptoPP::Exception&) {
+        return false;
+    }
+}
 
 namespace {
 
@@ -2355,72 +2419,50 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     }
 
     // anchor: launcher.exe:0x468f00
-    // Keep the chunked raw08 RSA worker loop inline here now that `0x4474f0` is the active
-    // fidelity focus: query the per-chunk plaintext bound from the worker family, clamp the final
-    // chunk, then advance plaintext/ciphertext cursors by `chunkLen` and RSA modulus byte count.
-    CryptoPP::RSA::PublicKey raw08PublicKey;
-    if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(
-            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
-            &raw08PublicKey)) {
+    // Keep the raw08 per-chunk worker loop inline in `0x4474f0`, but route the concrete chunk
+    // sizing / encrypt work through recovered worker-shaped methods instead of driving Crypto++
+    // directly from this send helper.
+    const uint32_t plaintextChunkByteCount =
+        raw08PublicKeyWorkerA8->QueryPlaintextChunkByteCountScaffold(
+            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
+    const uint32_t ciphertextChunkByteCount =
+        raw08PublicKeyWorkerA8->QueryCiphertextChunkByteCountScaffold(
+            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
+    if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
         spdlog::info(
-            "DIAGNOSTIC: launcher-owned auth failed to materialize recovered 0x4474f0 raw08 public key");
+            "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
         return;
     }
 
-    try {
-        CryptoPP::AutoSeededRandomPool rng;
-        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(raw08PublicKey);
-        const size_t plaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
-        const size_t ciphertextChunkByteCount =
-            QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(raw08PublicKey);
-        if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
-            return;
-        }
-
-        uint8_t* ciphertextCursor =
-            reinterpret_cast<uint8_t*>(const_cast<char*>(authRequestPacket.debugString14));
-        const uint8_t* plaintextCursor = plaintextPayload;
-        size_t plaintextBytesRemaining = plaintextPayloadByteCount;
-        size_t ciphertextBytesWritten = 0u;
-        while (plaintextBytesRemaining != 0u) {
-            const size_t currentChunkByteCount =
-                std::min(plaintextChunkByteCount, plaintextBytesRemaining);
-            std::string ciphertextChunk;
-            CryptoPP::StringSource source(
+    uint8_t* ciphertextCursor =
+        reinterpret_cast<uint8_t*>(const_cast<char*>(authRequestPacket.debugString14));
+    const uint8_t* plaintextCursor = plaintextPayload;
+    size_t plaintextBytesRemaining = plaintextPayloadByteCount;
+    size_t ciphertextBytesWritten = 0u;
+    while (plaintextBytesRemaining != 0u) {
+        const size_t currentChunkByteCount =
+            std::min<size_t>(plaintextChunkByteCount, plaintextBytesRemaining);
+        if (ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen ||
+            !raw08PublicKeyWorkerA8->EncryptPlaintextChunkScaffold(
+                raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
                 plaintextCursor,
                 currentChunkByteCount,
-                true,
-                new CryptoPP::PK_EncryptorFilter(
-                    rng,
-                    encryptor,
-                    new CryptoPP::StringSink(ciphertextChunk)));
-            if (ciphertextChunk.size() != ciphertextChunkByteCount ||
-                ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen) {
-                spdlog::info(
-                    "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
-                return;
-            }
-
-            std::memcpy(
                 ciphertextCursor + ciphertextBytesWritten,
-                ciphertextChunk.data(),
-                ciphertextChunk.size());
-            plaintextCursor += currentChunkByteCount;
-            plaintextBytesRemaining -= currentChunkByteCount;
-            ciphertextBytesWritten += ciphertextChunkByteCount;
-        }
-        if (ciphertextBytesWritten != raw08WorkerExpectedBlobLen) {
+                ciphertextChunkByteCount)) {
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth rejected recovered 0x4474f0 ciphertext byte count actual={} expected={}",
-                ciphertextBytesWritten,
-                raw08WorkerExpectedBlobLen);
+                "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
             return;
         }
-    } catch (const CryptoPP::Exception&) {
+
+        plaintextCursor += currentChunkByteCount;
+        plaintextBytesRemaining -= currentChunkByteCount;
+        ciphertextBytesWritten += ciphertextChunkByteCount;
+    }
+    if (ciphertextBytesWritten != raw08WorkerExpectedBlobLen) {
         spdlog::info(
-            "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
+            "DIAGNOSTIC: launcher-owned auth rejected recovered 0x4474f0 ciphertext byte count actual={} expected={}",
+            ciphertextBytesWritten,
+            raw08WorkerExpectedBlobLen);
         return;
     }
 

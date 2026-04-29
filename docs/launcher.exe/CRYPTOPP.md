@@ -214,7 +214,75 @@ This class family is strongly identified as **old Crypto++ `RSAES<OAEP<SHA1>>::D
 
 ---
 
-### 2.5 Source implementation status
+### 2.5 Encryptor counterpart — `0x4b75e4` = `CryptoPP::RSAES_OAEP_SHA_Encryptor`-compatible
+
+**Confidence: HIGH for the exact scheme; MEDIUM-HIGH for the precise old-template spelling**
+
+The raw `0x08` reply-public-key worker rebuilt at child `+0xa8` is now best read as the launcher's
+**public-key encryptor half** of the same OAEP/SHA1 RSA family:
+
+- ctor `0x447120`
+- intermediate ctor-state vtable `0x004b74a8`
+- final leaf vtable `0x004b75e4`
+- output-sizing helper `0x468ea0`
+- chunked encrypt loop `0x468f00`
+- per-chunk encrypt virtual `0x468280`
+
+Best current modern Crypto++ equivalent:
+
+- `CryptoPP::RSAES_OAEP_SHA_Encryptor`
+- more explicitly: `PK_FinalTemplate<TF_EncryptorImpl<TF_CryptoSchemeOptions<RSAES<OAEP<SHA1> >, RSA, OAEP<SHA1>>>>`
+
+Why this mapping is now strong:
+
+1. **Scheme match from call sites**
+   - `0x4474f0` uses child `+0xa8` only on the outbound raw `0x08 / AS_AuthRequest` path
+   - `0x468ea0` computes the encrypted output length from RSA modulus bytes and plaintext chunk
+     bytes, matching `TF_EncryptorBase::FixedCiphertextLength()` / `FixedMaxPlaintextLength()`-style
+     behavior
+   - `0x468f00` then loops over plaintext chunks and calls worker vtable `+0x1c` once per chunk,
+     exactly what we expect from an OAEP/RSA encryptor wrapper over a public key
+
+2. **Key material shape matches `RSA::PublicKey` / `RSAFunction`**
+   - ctor `0x447120` deep-copies only **two** Crypto++ integer objects:
+     - destination `this+0x14` from ctor arg2
+     - destination `this+0x28` from ctor arg3
+   - that is exactly the public-key pair `(n, e)` shape of `CryptoPP::RSAFunction`
+   - no private-key fields (`d/p/q/dp/dq/u`) are present here, so this is not the decryptor or
+     `InvertibleRSAFunction` family
+
+3. **Constructor shape matches `PK_FinalTemplate<...Encryptor...>` multiple inheritance**
+   - `0x447120` performs staged retabling at several offsets (`+0x00/+0x08/+0x4c/+0x50/+0x54/+0x58`)
+   - it first installs the 11-slot ctor-state vtable `0x004b74a8`, then rewrites the primary leaf
+     vtable to `0x004b75e4`
+   - both tables share the hot encrypt-side entries (`+0x1c = 0x468280`, `+0x20 = 0x4382c0`), which
+     is exactly what we would expect from an intermediate-to-final retable within the same Crypto++
+     encryptor family rather than from two unrelated launcher-local helper classes
+   - this is the smell expected from old MSVC codegen for Crypto++'s layered template hierarchy:
+     `PK_FinalTemplate` → `TF_EncryptorImpl` → `TF_EncryptorBase` with embedded key material and
+     secondary interface slices
+
+4. **Explicit adjustor thunk evidence**
+   - `0x446d80` does:
+     - call `~cls_0x4b74a8((this-0x50), flag)`
+   - `0x4471f0` does:
+     - `sub ecx, 0x50`
+     - `jmp 0x447880`
+   - those are classic non-primary-base `this` adjustor thunks and strongly support the view that
+     the worker object is not a flat launcher-local struct but a real Crypto++ MI object family
+
+5. **The public-key-only ctor arguments line up with Crypto++ constructor sugar**
+   - modern Crypto++ exposes `PK_FinalTemplate(const T1&, const T2&)` which forwards to
+     `AccessKey().Initialize(v1, v2)`
+   - the older launcher build appears to inline that into direct bigint deep-copy work in
+     `0x447120`, but the semantic surface is the same: construct an RSA OAEP encryptor from `(n, e)`
+
+Practical static-RE consequence:
+- child `+0xa8` should no longer be treated as just a generic "reply-public-key worker"
+- the strongest current class-equivalent reading is **RSAES OAEP SHA-1 encryptor over an embedded
+  RSA public key**, with old-MSVC multiple-inheritance thunks still visible in the layout
+
+### 2.6 Source implementation status
 
 This replacement has now been done in source.
 
@@ -562,10 +630,11 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
   `BufferedTransformation` vtable to confirm exact method names (`Put2`, `ChannelPut2`,
   etc.).  The size and rough layout match; individual slots remain unverified.
 
-- **Encryptor decryptor asymmetry** — the source side already owns the encryptor
-  (`RSAES_OAEP_SHA_Encryptor`).  The decryptor mapping is inferred from inheritance,
-  `PerformRSADecryption` shape, and the encryptor counterpart.  We have not yet
-  decompiled the decryptor vtable slot-by-slot to prove every method.
+- **Encryptor/decryptor asymmetry remains at the subobject level** — we now have a strong exact
+  scheme match for both sides (`RSAES_OAEP_SHA_Encryptor` at child `+0xa8`, decryptor-compatible
+  `RSAES_OAEP_SHA_Decryptor` family elsewhere), but we have not yet mapped every secondary
+  sub-vtable in the old MSVC MI layout slot-by-slot. The top-level class IDs are strong; the full
+  inheritance graph is still being tightened.
 
 - **`CryptoPP_MicrosoftCryptoProvider_0x4baed8`** — the class used inside
   `InitializeCryptoState` is believed to be `CryptoPP::MicrosoftCryptoProvider` (or the
@@ -581,7 +650,7 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
 |-------------|-----------------|
 | `matrixstaging/runtime/src/libltmessaging/crypto_init_helper.h` | `0x4f7bf4` global layout, `0x4b695c`/`0x4b68a8`/`0x4b41e0` vtable pointers |
 | `matrixstaging/runtime/src/libltmessaging/crypto_init_helper.cpp` | `EnsureCryptoContextInitialized` replicates `0x4429b0` static init block |
-| `matrixstaging/game/src/libltclientlogin/authbootstrap680.cpp` | `0x4b695c`/`0x4b68a8`/`0x4b41e0` hard-coded in `ResetAuthBootstrap680Field54Helper` |
+| `matrixstaging/game/src/libltclientlogin/authbootstrap680.cpp` | `0x4b695c`/`0x4b68a8`/`0x4b41e0` hard-coded in `ResetAuthBootstrap680Field54Helper`; `0x447120/0x468ea0/0x468f00` evidence now also anchors the raw `0x08` `RSAES_OAEP_SHA_Encryptor` family |
 | `matrixstaging/runtime/src/libltcrypto/auth_internal.h` | `RSAES_OAEP_SHA_Encryptor` source-owned encryptor path |
 
 ---

@@ -151,6 +151,10 @@ Representative current run inputs:
   - dword `+0x17 = time(NULL) - child +0x80`
   - username tail length includes the null terminator
   - outbound raw `0x08` packet likewise keeps a fixed prefix `0x28` and stores the ciphertext tail offset at payload `+0x06`
+  - recovered raw08 worker split now stays visible in source:
+    - output sizing follows `0x468ea0`
+    - per-chunk loop stays inline in `0x4474f0`
+    - chunk bound / ciphertext block size / per-chunk encrypt are routed through worker-shaped methods instead of direct send-helper Crypto++ calls
 
 Observed wire result:
 - outbound raw `0x06` / `AS_GetPublicKeyRequest`
