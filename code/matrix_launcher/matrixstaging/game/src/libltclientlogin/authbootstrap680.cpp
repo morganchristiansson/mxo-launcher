@@ -536,8 +536,12 @@ static void TryResolveAuthBootstrap680ReplyLengthPrefixedField(
     }
 }
 
-// anchor: launcher.exe:0x4436b0
-static void ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(
+// anchor: launcher.exe:0x4436b0 = Packet_AsGetPublicKeyRequest_0x4b6c74::FUN_004436b0
+// Ghidra may show a bogus free-function/int-parameter signature here, but assembly proves this is
+// an ECX-receiver helper over the larger `0x4b6c74` auth-reply parse shell. Keep the source split
+// at the same method-family boundary: this helper only zeros the writable/rebuild body rooted at
+// parse-object `+0x10`, it does not perform field-view resolution.
+static void AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(
     AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject) {
     if (!parseObject || !parseObject->replyHeader10) {
         return;
@@ -574,8 +578,11 @@ static void ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(
     parseObject->replyString1dByteLength58 = 0u;
 }
 
-// anchor: launcher.exe:0x443470
-static void ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
+// anchor: launcher.exe:0x443470 = Packet_AsGetPublicKeyRequest_0x4b6c74::FUN_00443470
+// Companion ECX-receiver helper for the same larger `0x4b6c74` parse shell. This method walks the
+// reply-header offset table at `parseObject+0x10` and resolves the variable field views into the
+// copied shell (`+0x14 .. +0x58`).
+static void AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
     AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject,
     size_t packetBodyByteCount,
     bool zeroTerminateStrings) {
@@ -637,8 +644,10 @@ static void ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
     resolveField(0x1du, true, &parseObject->replyString1dBytes54, &parseObject->replyString1dByteLength58);
 }
 
-// anchor: launcher.exe:0x444390
-static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessage(
+// anchor: launcher.exe:0x444390 = Packet_AsGetPublicKeyRequest_0x4b6c74::FUN_00444390
+// Mirror the original source-view init shape first, then let the smaller `0x4436b0/0x443470`
+// method-family helpers own the writable-body reset vs resolved-field branch.
+static bool AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
     AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
     const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef) {
     if (!outParseObject || !incomingAuthMessageRef) {
@@ -677,9 +686,9 @@ static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessag
     outParseObject->currentCharacterHandleByteLength88 = 0u;
 
     if (outParseObject->resolveFields0c == 0u) {
-        ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(outParseObject);
+        AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(outParseObject);
     } else {
-        ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
+        AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
             outParseObject,
             incomingPayload.payloadByteCount,
             true);
@@ -687,7 +696,9 @@ static bool InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessag
     return true;
 }
 
-static bool CopyAuthBootstrap680AuthReplyParseObjectToOwnedPacketBody(
+// Keep the `0x4449c0`-like copy step intentionally thin: copy the already-initialized source
+// shell, rebase it onto child-owned packet bytes, then reuse the same smaller receiver helpers.
+static bool AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
     AuthBootstrap680AuthReplyParseObjectF0Sketch* outParseObject,
     const AuthBootstrap680AuthReplyParseObjectF0Sketch& sourceParseObject,
     std::vector<uint8_t>* packetBodyBytes) {
@@ -716,9 +727,9 @@ static bool CopyAuthBootstrap680AuthReplyParseObjectToOwnedPacketBody(
         outParseObject->resolveFields0c);
 
     if (outParseObject->resolveFields0c == 0u) {
-        ResetAuthBootstrap680AuthReplyParseObjectWritableBodyScaffold(outParseObject);
+        AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(outParseObject);
     } else {
-        ResolveAuthBootstrap680AuthReplyParseObjectFieldViewsScaffold(
+        AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
             outParseObject,
             packetBodyBytes->size(),
             true);
@@ -738,7 +749,7 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
     }
 
     AuthBootstrap680AuthReplyParseObjectF0Sketch sourceParseObject = {};
-    if (!InitAuthBootstrap680AuthReplyParseObjectSourceViewFromIncomingMessage(
+    if (!AuthBootstrap680AuthReplyParseObject_InitSourceView_0x444390(
             &sourceParseObject,
             incomingAuthMessageRef)) {
         return false;
@@ -751,7 +762,7 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
         child.authReplyParsePacketBodyBytesOwned_.clear();
         return false;
     }
-    if (!CopyAuthBootstrap680AuthReplyParseObjectToOwnedPacketBody(
+    if (!AuthBootstrap680AuthReplyParseObject_CopyToOwnedPacketBody(
             child.authReplyParseObjectF0,
             sourceParseObject,
             &child.authReplyParsePacketBodyBytesOwned_)) {
