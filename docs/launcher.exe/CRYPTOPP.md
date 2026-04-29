@@ -938,15 +938,22 @@ So the leaf object finalized at `0x4472f0` is best described as an
 
 ### 6.2.5 Practical source/doc consequence
 
-The old source-side `AuthBootstrap680ValidatorTemporaryWorker84Sketch` should no longer be described
-as merely a launcher-owned temporary worker. The strongest current interpretation is:
+The old source-side `AuthBootstrap680ValidatorTemporaryWorker84Sketch` has now been removed.
+The strongest current interpretation is:
 - **base semantics:** `CryptoPP::PK_MessageAccumulatorBase`
 - **leaf semantics:** `CryptoPP::PK_MessageAccumulatorImpl<MD5>` (old-version equivalent)
 - **usage context:** temporary accumulator created by the
   `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` family
 
-The remaining launcher-owned pieces are the outer orchestration around allocation, signature loading,
-and final compare wiring — not the accumulator semantics themselves.
+Current source direction after the cleanup pass:
+- the outer validator remains modeled as the `RSASSA_PKCS1v15_MD5_Verifier`-compatible family
+- the temporary object is treated as real accumulator semantics rather than as a launcher-owned
+  `0x84` field layout
+- launcher anchors for `0x4472f0 / 0x447390 / 0x447340 / 0x447380 / 0x468520 / 0x467ee0` now live
+  on the verifier helper/orchestration comments in `authbootstrap680.cpp`
+
+The remaining launcher-owned pieces are the outer orchestration around allocation, signature
+loading, and final compare wiring — not the accumulator semantics themselves.
 
 ## 7. Open questions / negative results
 

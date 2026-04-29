@@ -86,33 +86,18 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
         size_t ciphertextByteCapacity) const;
 };
 
-struct AuthBootstrap680ValidatorTemporaryWorker84Sketch {
-    uint32_t vtable00 = 0u;
-    uint32_t reserved04 = 0u;
-    uint32_t reserved08 = 0u;
-    uint32_t reserved0c = 0u;
-    uint32_t reserved10 = 0u;
-    uint32_t decodedSignatureByteCount14 = 0u;
-    void* decodedSignatureBytes18 = nullptr;
-    uint32_t reserved1c = 0u;
-    uint32_t reserved20 = 0u;
-    uint32_t reserved24 = 0u;
-    uint32_t reserved28 = 0u;
-    uint32_t reserved2c = 0u;
-    uint32_t reserved30 = 0u;
-    AuthBootstrap680BigIntObjects_0x4ba50c bigInt34{};
-    AuthBootstrap680BigIntObjects_0x4ba50c bigInt48{};
-    uint8_t readyOrEmptyUpdateFlag5c = 0u;
-    std::array<uint8_t, 3> padding5d{};
-    std::array<uint8_t, 0x24> md5Accumulator60{};
-};
-static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, decodedSignatureByteCount14) == 0x14u);
-static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, decodedSignatureBytes18) == 0x18u);
-static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, bigInt34) == 0x34u);
-static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, bigInt48) == 0x48u);
-static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, readyOrEmptyUpdateFlag5c) == 0x5cu);
-static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, md5Accumulator60) == 0x60u);
-static_assert(sizeof(AuthBootstrap680ValidatorTemporaryWorker84Sketch) == 0x84u);
+// Recovered validator accumulator note:
+// - `launcher.exe:0x4472f0` = `CryptoPP_PK_MessageAccumulatorMD5_Create`
+// - `launcher.exe:0x447390` = `CryptoPP_PK_MessageAccumulatorBase_Construct`
+// - `launcher.exe:0x447340` = `CryptoPP_PK_MessageAccumulatorBase_Update`
+// - `launcher.exe:0x447380` = `CryptoPP_PK_MessageAccumulatorMD5_AccessHash`
+// - `launcher.exe:0x468520` loads the RSA-decoded signature bytes into the accumulator state
+// - `launcher.exe:0x467ee0` / `0x467f70` finalize against the outer verifier object
+//
+// Source no longer keeps a fake `0x84` launcher-owned worker layout. The active auth path only
+// needs the recovered boundary split between:
+// - the outer `RSASSA_PKCS1v15_MD5_Verifier`-compatible object
+// - the temporary MD5-backed PK_MessageAccumulator used during verify
 
 struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     uint32_t vtable00 = 0u;

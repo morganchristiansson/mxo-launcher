@@ -717,28 +717,37 @@ static CryptoPP::Integer AuthBootstrap680BigIntObjectToCryptoPPInteger(
     return CryptoPP::Integer(bigEndianBytes.data(), bigEndianBytes.size());
 }
 
-// anchor: launcher.exe:0x468f80 / 0x44aec0 / 0x467ee0 / 0x4680a0 / 0x468e20
-// Static RE now closes the common validator-family finalize path tightly enough to mirror the real
-// launcher call shape instead of a generic RSA-signature guess:
-// - `0x437ba0` allocates a temporary worker through validator vtable `+0x1c`
-// - `0x468520` loads the signature by applying the outer RSA public-key path and storing the
-//   encoded representative bytes into worker `+0x14/+0x18`
-// - worker vtable `+0x0c / 0x447340` feeds caller bytes into the worker-local MD5 object
-//   returned by worker vtable `+0x44 / 0x447380`
+// anchor: launcher.exe:0x4472f0
+// anchor: launcher.exe:0x447390
+// anchor: launcher.exe:0x447340
+// anchor: launcher.exe:0x447380
+// anchor: launcher.exe:0x468520
+// anchor: launcher.exe:0x467ee0
+// anchor: launcher.exe:0x468f80 / 0x44aec0 / 0x4680a0 / 0x468e20
+// Static RE now closes the validator-family accumulator/orchestration split tightly enough to
+// model it with real Crypto++ semantics instead of a fake `0x84` launcher-owned worker layout:
+// - `0x4472f0` creates the temporary MD5-backed verification accumulator
+// - `0x447390` constructs the accumulator base state
+// - `0x447340` behaves like `PK_MessageAccumulatorBase::Update`
+// - `0x447380` behaves like `AccessHash()` for the embedded MD5 object
+// - `0x468520` loads the RSA-decoded signature representative bytes into accumulator-owned state
+// - `0x467ee0` / `0x467f70` finalize against the outer verifier object
 // - `0x445410` returns the 18-byte MD5 `DigestInfo` prefix at `0x004baefc`
 // - `0x468e20` builds the exact EMSA-PKCS1-v1_5 encoded block:
 //     [optional leading 0 when (modulusBitCount-1)&7 != 0]
-//     0x01 || 0xff... || 0x00 || DigestInfoPrefix || workerMd5Digest
-// - `0x4680a0` compares that generated block byte-for-byte against the worker's stored decoded
+//     0x01 || 0xff... || 0x00 || DigestInfoPrefix || accumulatorMd5Digest
+// - `0x4680a0` compares that generated block byte-for-byte against the loaded decoded
 //   signature bytes
 //
-// So the remaining source-side logic below is now a direct mirror of the recovered launcher
-// finalize semantics. Keep it source-local instead of pretending it is one recovered library
-// function: this helper is a composite mirror of the concrete launcher chain
-// `0x467ee0 -> 0x4680a0 -> 0x468e20 -> 0x445410`, not a single standalone leaf.
-// On the child `+0xac` path this intentionally means a second MD5 stage over
-// the caller's already-prebuilt 16-byte MD5 digest, because `0x44ae40` hashes signed-data first
-// and the temporary worker then hashes those 16 bytes again before the final compare.
+// Source keeps the boundary separation visible even though the temporary worker struct is gone:
+// - outer object: `RSASSA_PKCS1v15_MD5_Verifier`-compatible validator family
+// - temporary object: MD5-backed `PK_MessageAccumulator` semantics
+//
+// The remaining helper below is therefore a source-local mirror of the concrete launcher chain
+// `0x468520 -> 0x447340 -> 0x467ee0 -> 0x4680a0 -> 0x468e20 -> 0x445410`, not a single recovered
+// library leaf. On the child `+0xac` path this intentionally means a second MD5 stage over the
+// caller's already-prebuilt 16-byte MD5 digest, because `0x44ae40` hashes signed-data first and
+// the temporary accumulator then hashes those 16 bytes again before the final compare.
 static bool VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     const uint8_t* signedBytes,
