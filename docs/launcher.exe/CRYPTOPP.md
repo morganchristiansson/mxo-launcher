@@ -11,85 +11,38 @@ The launcher was statically linked against an older Crypto++ (likely 5.1–5.2).
 
 ---
 
-## 1. RNG / RandomPool family
+## 1. Implemented RNG / RandomPool mappings
 
-### 1.1 Outer wrapper — `CryptoInitHelper_0x4b42bc`
+These RNG/helper classes are now treated as implemented/proven in source. Keep this section factual
+and address-oriented.
 
-| Field | Address / VTable | Role |
-|-------|-----------------|------|
-| `this+0x00` | `0x4b695c` (`0x4bacbc` alternative) | Launcher-specific wrapper vtable |
-| `this+0x04` | `0x4b68a8` | **Crypto++ RNG** (see §1.2) |
-| `this+0x08` | `0x4b41e0` | **Crypto++ BufferedTransformation** (see §1.3) |
+#### `0x004b42bc` / `0x004b695c` = launcher-owned CryptoInitHelper wrapper
 
-The object at `0x4b42bc` is **not** a pure Crypto++ class.  It is a launcher-owned wrapper that
-embeds a Crypto++ RNG at offset `+4` and a `BufferedTransformation` at offset `+8`.
+| Address | Mapped name |
+|---|---|
+| `0x4686e0` | wrapper construct with pool size `0x180` |
+| `0x4429d9` | global crypto-helper init call site |
+| `0x44557a` | auth-bootstrap child `+0x54` helper init call site |
+| `0x44d27a` | global auth helper init call site |
 
-**Constructor** (`0x4686e0`):  
-- Calls `CLTReferenceCountedBase_0x4b42b0` ctor at `+0`  
-- Calls second `CLTReferenceCountedBase` ctor at `+4`  
-- Assigns temporary vtables `0x4b9fa0` → `0x4bace0` → `0x4b41e0` during multi-stage init  
-- Final vtables become `0x4b695c` (outer), `0x4b68a8` (RNG), `0x4b41e0` (BT)  
-- Allocates buffer of caller-provided size (always `0x180` = 384 in observed call sites)  
-- Allocates second buffer of size `0x40`  
+#### `0x004b68a8` = `CryptoPP::RandomPool` / modern `CryptoPP::OldRandomPool`
 
-**Call sites**  
-- `0x4429d9` — margin bootstrap static init (`g_CryptoInitHelper_0x4f7bf4`)  
-- `0x44557a` — `AuthBootstrap680ChildBase_ctor` field `+0x54`  
-- `0x44d27a` — global auth helper (`DAT_004f80b8`)
+| Address | Mapped name |
+|---|---|
+| `0x442950` | dtor thunk |
+| `0x468050` | `CanIncorporateEntropy()` |
+| `0x468c30` | `GenerateBlock(byte*, size_t)` |
+| `0x468640` | generate into buffered output helper |
+| `0x468d30` | `GenerateByte()`-like helper |
+| `0x468cb0` | buffered-transformation pump helper |
+| `0x468dc0` | incorporate-entropy / seed helper |
 
----
+#### `0x004b41e0` = `CryptoPP::BufferedTransformation`
 
-### 1.2 RNG subobject — `0x4b68a8` → `CryptoPP::RandomPool` (old / `OldRandomPool`)
-
-**Confidence: HIGH**
-
-The vtable at `0x4b68a8` is a 32-entry table.  Key slots decompiled:
-
-| VTable slot | Function address | Likely Crypto++ method |
-|-------------|-----------------|------------------------|
-| `+0x00` | `0x442950` | Destructor thunk |
-| `+0x0c` | `0x468050` | `CanIncorporateEntropy()` (returns 1) |
-| `+0x14` | `0x468c30` | `GenerateBlock(byte *out, size_t len)` |
-| `+0x18` | `0x468640` | `GenerateIntoBufferedTransformation(...)` / `FillBytes` helper |
-| `+0x1c` | `0x68d30` | `GenerateByte()` (read from internal pool, refill when exhausted) |
-| `+0x20` | `0x68cb0` | `GenerateIntoBufferedTransformation` (full BufferedTransformation pump) |
-
-**Why `RandomPool` (pre-5.5)?**
-
-1. **Pool size** — constructor arg is always `0x180` (384).  This matches the default pool size of
-   pre-5.5 `RandomPool`.
-2. **Two-buffer layout** — `+0x14` (384-byte pool) and `+0x20` (64-byte key).  The old
-   `RandomPool` maintained a `pool` and a `key`/`state` block.
-3. **`InitializeCryptoState` (`0x468dc0`)** — creates a `CryptoPP_MicrosoftCryptoProvider`,
-   allocates a temp buffer sized to the seed param (always `0x20` at call sites), seeds the RNG,
-   then zero-frees the temp buffer.  This is the old `RandomPool::IncorporateEntropy` path.
-4. **`RefillBufferedOutput` (`0x68dc0` family)** — the launcher helper calls into the RNG to
-   refill a 384-byte output buffer from the keyed state, exactly matching the old `RandomPool`
-   stir-and-output design.
-
-In Crypto++ 8.9.0 the equivalent class is `OldRandomPool` (`randpool.h`).
-
----
-
-### 1.3 BufferedTransformation subobject — `0x4b41e0` → `CryptoPP::BufferedTransformation`
-
-**Confidence: MEDIUM-HIGH**
-
-This vtable sits at `this+8` inside the RNG subobject.  It is a ~24-entry table with slots
-that look like `Put` / `Put2` / `ChannelPut2` / `MessageEnd` / `MessageSeriesEnd`.
-
-Old Crypto++ `RandomPool` (pre-5.5) inherited from `BufferedTransformation` so that it could
-be used directly in filter pipelines (`Pump`, `TransferTo`, etc.).  The vtable size and slot
-positions line up with the `BufferedTransformation` interface layout in Crypto++.
-
-**Cross-reference:** the auth bootstrap source already hard-codes this value:
-
-```cpp
-// authbootstrap680.cpp
-helperVtable08 = 0x004b41e0u;   // ResetAuthBootstrap680Field54Helper
-```
-
----
+| Address | Mapped name |
+|---|---|
+| `0x004b41e0` | buffered-transformation interface vtable |
+| `0x004372c0` | first visible vtable entry in current listing |
 
 ### 1.4 Transient / alternative vtables
 
