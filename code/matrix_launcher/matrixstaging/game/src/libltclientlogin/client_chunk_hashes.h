@@ -3,7 +3,7 @@
 
 // anchor: launcher.exe:0x43d800 = GenerateClientChunkHashes
 // Fidelity: Uses Crypto++ SHA1 for hash computation per static-RE evidence.
-// See ../../docs/launcher.exe/CRYPTOPP.md section 4.1 for cls_0x4ba258 mapping.
+// See ../../docs/launcher.exe/CRYPTOPP.md SHA1 family notes for the `0x4ba258` mapping.
 
 #ifndef MATRIXSTAGING_GAME_SRC_LIBLTCLIENTLOGIN_CLIENT_CHUNK_HASHES_H_
 #define MATRIXSTAGING_GAME_SRC_LIBLTCLIENTLOGIN_CLIENT_CHUNK_HASHES_H_
