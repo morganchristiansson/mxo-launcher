@@ -128,15 +128,16 @@ public:
  AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780`, now backed by a direct `CryptoPP::RSA::PublicKey`, and consumed by `0x4474f0` through `0x468ea0/0x468f00`
  AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780`, now backed by a direct `CryptoPP::RSA::PublicKey`, and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
 
- // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
- // explicit as the same three adjacent `0x14`-byte big-int objects the launcher ctor seeds with
- // `0x45d000` and the success path overwrites via `0x45de10`:
+ // Original child `+0xb0 .. +0xeb` stored three adjacent old-Crypto++ `Integer` objects.
+ // Static RE now proves data type `0x4ba50c` is `CryptoPP::Integer`, so source keeps those
+ // fields directly as real Crypto++ integers while preserving the launcher child offsets in the
+ // field names/comments:
  // - `+0xb0` <- modulus bytes from copied `+0xf4 + 0xd2 .. + 0x131`
  // - `+0xc4` <- low public-exponent byte from copied `+0xf4 + 0xd1`
  // - `+0xd8` <- derived 96-byte private-exponent/transform output used by the same prep path
- AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{}; // original child `+0xb0`
- AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{}; // original child `+0xc4`
- AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{}; // original child `+0xd8`
+ AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{}; // semantic mirror of original child `+0xb0`
+ AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{}; // semantic mirror of original child `+0xc4`
+ AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{}; // semantic mirror of original child `+0xd8`
 
  uint32_t inboundAuthStatusEc = 1; // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
  AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
@@ -151,9 +152,6 @@ public:
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption> feedbackTransformLarge94Owned_{};
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> feedbackTransformSmall98Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
- std::vector<uint32_t> modulusBigIntB0OwnedDigits_{};
- std::vector<uint32_t> publicExponentBigIntC4OwnedDigits_{};
- std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
  std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
  std::vector<uint8_t> cachedAuthRequestTwofishKeyBytesOwned_{}; // source-owned mirror of the live 16-byte child `+0x84..+0x93` seed reused by raw `0x09/0x0a/0x0b` follow-on crypto

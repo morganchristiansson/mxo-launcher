@@ -114,34 +114,19 @@ static uint32_t ReadU32LE(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[3]) << 24u);
 }
 
-static constexpr uint32_t kAuthBootstrap680BigIntCapacityTable[9] = {
-    2u, 2u, 2u, 4u, 4u, 8u, 8u, 8u, 8u,
-};
-
 static void ResetAuthBootstrap680BigIntObject(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    std::vector<uint32_t>* ownedDigits) {
-    if (!outObject || !ownedDigits) {
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject) {
+    if (!outObject) {
         return;
     }
 
-    ownedDigits->assign(2u, 0u);
-    outObject->vtable00 = 0x004ba50cu;
-    outObject->reserved04 = 0u;
-    outObject->capacityWords08 = 2u;
-    outObject->digits0c = ownedDigits->data();
-    outObject->sign10 = 0u;
+    *outObject = CryptoPP::Integer::Zero();
 }
 
 static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
     AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    std::vector<uint32_t>* ownedDigits,
     const uint8_t* bigEndianBytes,
     size_t byteCount);
-static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    std::vector<uint32_t>* ownedDigits,
-    uint8_t value);
 
 static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
@@ -609,112 +594,26 @@ static void ResetAuthBootstrap680ReplyMaterialization(
         std::free(child.authReplyCopyShadowF4);
         child.authReplyCopyShadowF4 = nullptr;
     }
-    ResetAuthBootstrap680BigIntObject(&child.modulusBigIntB0, &child.modulusBigIntB0OwnedDigits_);
-    ResetAuthBootstrap680BigIntObject(
-        &child.publicExponentBigIntC4,
-        &child.publicExponentBigIntC4OwnedDigits_);
-    ResetAuthBootstrap680BigIntObject(
-        &child.privateExponentBigIntD8,
-        &child.privateExponentBigIntD8OwnedDigits_);
+    ResetAuthBootstrap680BigIntObject(&child.modulusBigIntB0);
+    ResetAuthBootstrap680BigIntObject(&child.publicExponentBigIntC4);
+    ResetAuthBootstrap680BigIntObject(&child.privateExponentBigIntD8);
 }
 
 
 
 static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
     AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    std::vector<uint32_t>* ownedDigits,
     const uint8_t* bigEndianBytes,
     size_t byteCount) {
-    if (!outObject || !ownedDigits || !bigEndianBytes || byteCount == 0u) {
+    if (!outObject || !bigEndianBytes || byteCount == 0u) {
         return false;
-    }
-
-    const size_t requiredWordCount = (byteCount + 3u) / 4u;
-    uint32_t capacityWords = 0u;
-    // anchor: launcher.exe:0x45d340
-    // Preserve the old `CryptoPP::Integer` ctor capacity policy only where the launcher child
-    // still physically stores raw `0x4ba50c` objects. `0x45d340` rounds requested word counts
-    // through `DAT_004ba310`, then 0x10/0x20/0x40, then the next power of two.
-    if (requiredWordCount < std::size(kAuthBootstrap680BigIntCapacityTable)) {
-        capacityWords = kAuthBootstrap680BigIntCapacityTable[requiredWordCount];
-    } else if (requiredWordCount < 0x11u) {
-        capacityWords = 0x10u;
-    } else if (requiredWordCount < 0x21u) {
-        capacityWords = 0x20u;
-    } else if (requiredWordCount < 0x41u) {
-        capacityWords = 0x40u;
-    } else {
-        capacityWords = 1u;
-        while (capacityWords < requiredWordCount && capacityWords < 0x80000000u) {
-            capacityWords <<= 1u;
-        }
-    }
-    ownedDigits->assign(static_cast<size_t>(capacityWords), 0u);
-    for (size_t i = 0; i < byteCount; ++i) {
-        const size_t reversedIndex = byteCount - 1u - i;
-        const size_t wordIndex = reversedIndex / 4u;
-        const size_t byteShift = (reversedIndex & 3u) * 8u;
-        (*ownedDigits)[wordIndex] |= static_cast<uint32_t>(bigEndianBytes[i]) << byteShift;
-    }
-
-    outObject->vtable00 = 0x004ba50cu;
-    outObject->reserved04 = 0u;
-    outObject->capacityWords08 = capacityWords;
-    outObject->digits0c = ownedDigits->empty() ? nullptr : ownedDigits->data();
-    outObject->sign10 = 0u;
-    return true;
-}
-
-static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
-    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
-    std::vector<uint32_t>* ownedDigits,
-    uint8_t value) {
-    if (!outObject || !ownedDigits) {
-        return false;
-    }
-
-    ownedDigits->assign(2u, 0u);
-    (*ownedDigits)[0] = static_cast<uint32_t>(value);
-
-    outObject->vtable00 = 0x004ba50cu;
-    outObject->reserved04 = 0u;
-    outObject->capacityWords08 = 2u;
-    outObject->digits0c = ownedDigits->data();
-    outObject->sign10 = 0u;
-    return true;
-}
-
-static CryptoPP::Integer AuthBootstrap680BigIntObjectToCryptoPPInteger(
-    const AuthBootstrap680BigIntObjects_0x4ba50c& object) {
-    const auto* digits = static_cast<const uint32_t*>(object.digits0c);
-    if (!digits || object.capacityWords08 == 0u) {
-        return CryptoPP::Integer::Zero();
-    }
-
-    size_t usedWordCount = object.capacityWords08;
-    while (usedWordCount != 0u && digits[usedWordCount - 1u] == 0u) {
-        --usedWordCount;
-    }
-    if (usedWordCount == 0u) {
-        return CryptoPP::Integer::Zero();
     }
 
     // anchor family: launcher.exe:0x45d000 / 0x45de10 / data type `0x4ba50c`
-    // The preserved child-side `0x14` object stores little-endian digit words. Modern
-    // `CryptoPP::Integer(byte*, size)` expects big-endian bytes, so convert here once and then
-    // keep direct `CryptoPP::Integer` semantics through the later `0x443340 -> 0x443220 -> 0x465d70`
-    // margin-bootstrap prep path.
-    std::vector<uint8_t> bigEndianBytes(usedWordCount * 4u);
-    for (size_t wordIdx = 0; wordIdx < usedWordCount; ++wordIdx) {
-        const uint32_t word = digits[wordIdx];
-        const size_t destBase = (usedWordCount - 1u - wordIdx) * 4u;
-        bigEndianBytes[destBase + 0] = static_cast<uint8_t>(word >> 24);
-        bigEndianBytes[destBase + 1] = static_cast<uint8_t>(word >> 16);
-        bigEndianBytes[destBase + 2] = static_cast<uint8_t>(word >> 8);
-        bigEndianBytes[destBase + 3] = static_cast<uint8_t>(word);
-    }
-
-    return CryptoPP::Integer(bigEndianBytes.data(), bigEndianBytes.size());
+    // Static RE now proves the preserved child-side object family is old `CryptoPP::Integer`,
+    // so source stores the real integer directly instead of rebuilding the legacy digit array.
+    *outObject = CryptoPP::Integer(bigEndianBytes, byteCount);
+    return true;
 }
 
 // anchor: launcher.exe:0x4472f0
@@ -1492,9 +1391,9 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
     const auto* blockB0 = &child.modulusBigIntB0;
     const auto* blockC4 = &child.publicExponentBigIntC4;
     const auto* blockD8 = &child.privateExponentBigIntD8;
-    const CryptoPP::Integer modulus = AuthBootstrap680BigIntObjectToCryptoPPInteger(*blockB0);
-    const CryptoPP::Integer publicExponent = AuthBootstrap680BigIntObjectToCryptoPPInteger(*blockC4);
-    const CryptoPP::Integer privateExponent = AuthBootstrap680BigIntObjectToCryptoPPInteger(*blockD8);
+    const CryptoPP::Integer& modulus = *blockB0;
+    const CryptoPP::Integer& publicExponent = *blockC4;
+    const CryptoPP::Integer& privateExponent = *blockD8;
 
     const bool storedReplyCopy =
         marginConnection.StoreBootstrapReplyCopy98(copyShadow, sizeof(*copyShadow));
@@ -1502,12 +1401,12 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
         .StoreBootstrapPrepStateA0(modulus, publicExponent, privateExponent);
 
     spdlog::info(
-        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} childBlockB0Cap={} childBlockC4Cap={} childBlockD8Cap={} modulusBits={} publicExponentBits={} privateExponentBits={}",
+        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} modulusBytes={} publicExponentBytes={} privateExponentBytes={} modulusBits={} publicExponentBits={} privateExponentBits={}",
         fmt::ptr(copyShadow),
         storedReplyCopy ? 1u : 0u,
-        blockB0->capacityWords08,
-        blockC4->capacityWords08,
-        blockD8->capacityWords08,
+        static_cast<unsigned>(modulus.ByteCount()),
+        static_cast<unsigned>(publicExponent.ByteCount()),
+        static_cast<unsigned>(privateExponent.ByteCount()),
         static_cast<unsigned>(modulus.BitCount()),
         static_cast<unsigned>(publicExponent.BitCount()),
         static_cast<unsigned>(privateExponent.BitCount()));
@@ -2086,7 +1985,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             modulusInteger.Encode(modulusBytes.data(), modulusBytes.size());
             const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
                 blockB0,
-                &modulusBigIntB0OwnedDigits_,
                 modulusBytes.data(),
                 modulusBytes.size());
 
@@ -2098,7 +1996,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 publicExponentBytes.size());
             const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
                 blockC4,
-                &publicExponentBigIntC4OwnedDigits_,
                 publicExponentBytes.data(),
                 publicExponentBytes.size());
 
@@ -2143,13 +2040,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     privateExponentBytes.size());
                 builtBlockD8 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
                     blockD8,
-                    &privateExponentBigIntD8OwnedDigits_,
                     privateExponentBytes.data(),
                     privateExponentBytes.size());
             }
 
             spdlog::info(
-                "HandleInboundAuthMessage materialized child+0xf4/+0xb0/+0xc4/+0xd8 from raw0x0b authDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
+                "HandleInboundAuthMessage materialized child+0xf4/+0xb0/+0xc4/+0xd8 from raw0x0b authDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Bytes={} blockC4Bytes={} blockD8Bytes={} parseObjectF0={}",
                 static_cast<unsigned>(sizeof(copyShadow)),
                 static_cast<unsigned>(parseObject->authDataByteLength20),
                 BuildHexPreview(
@@ -2165,9 +2061,9 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 builtBlockB0 ? 1u : 0u,
                 builtBlockC4 ? 1u : 0u,
                 builtBlockD8 ? 1u : 0u,
-                static_cast<unsigned>(blockB0->capacityWords08),
-                static_cast<unsigned>(blockC4->capacityWords08),
-                static_cast<unsigned>(blockD8->capacityWords08),
+                static_cast<unsigned>(blockB0->ByteCount()),
+                static_cast<unsigned>(blockC4->ByteCount()),
+                static_cast<unsigned>(blockD8->ByteCount()),
                 fmt::ptr(parseObject));
             return kAuthBootstrap680InboundAuthReplySuccess;
         }

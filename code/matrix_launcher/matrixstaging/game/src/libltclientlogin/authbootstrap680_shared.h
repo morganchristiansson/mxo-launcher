@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <integer.h>
 #include "rsa.h"
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
@@ -35,14 +36,10 @@ public:
         int timeBias) const;
 };
 
-struct AuthBootstrap680BigIntObjects_0x4ba50c {
-    uint32_t vtable00 = 0u;
-    uint32_t reserved04 = 0u;
-    uint32_t capacityWords08 = 0u;
-    void* digits0c = nullptr;
-    uint32_t sign10 = 0u;
-};
-static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
+// Static RE now proves launcher data type `0x4ba50c` is old Crypto++ `Integer`.
+// Source therefore uses the real `CryptoPP::Integer` directly and keeps the launcher
+// address-family tag only in the alias name/comments.
+using AuthBootstrap680BigIntObjects_0x4ba50c = CryptoPP::Integer;
 
 
 // Recovered raw `0x08` helper stack note:

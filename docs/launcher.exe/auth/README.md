@@ -255,6 +255,9 @@ The key practical integration rules are:
 5. keep the probe runnable as the fastest auth regression harness while launcher integration progresses
 6. keep the `+0xa8` encryptor and `+0xa4/+0xac` validators as thin wrappers around direct
    `CryptoPP::RSA::PublicKey`-backed Crypto++ classes, not source-owned crypto engines
+7. treat launcher type `0x4ba50c` as proven old `CryptoPP::Integer`
+   - source should use real `CryptoPP::Integer` directly for child `+0xb0/+0xc4/+0xd8`
+   - avoid preserving the earlier fake raw-field stand-in unless a future ABI-specific need appears
 
 ## Launcher integration milestone in `resurrections.exe` (2026-03-13)
 
