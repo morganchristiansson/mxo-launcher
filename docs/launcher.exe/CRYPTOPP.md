@@ -342,13 +342,109 @@ remaining the top-level mapping/index.
 | `0x4ba258` | `CryptoPP::SHA1` base/hash context | **High** | SHA1 IV and algorithm layout match |
 | `0x4ba7d8` | `CryptoPP::SHA1` init/specialization layer | **High** | wraps/initializes the SHA1 base context |
 | `0x4baed8` | `CryptoPP::MicrosoftCryptoProvider`-like helper | **Medium** | used in RandomPool seeding path |
+| `0x4b00b0` / `FeedbackSizeTransformAdapter_0x4b00b0` | `CryptoPP::CBC_Encryption`-compatible mode object | **Medium-High** | two block-sized SecByteBlock-like buffers; process row matches CBC encrypt semantics |
+| `0x4b7500` / `FeedbackSizeTransformAdapterLarge_0x4b7500` | `CryptoPP::CBC_Decryption`-compatible mode object | **Medium-High** | inherits from `0x4b00b0`; adds third temp buffer; process row matches CBC decrypt semantics |
 | `0x4b9fa0` | 45-entry temp vtable set during RNG ctor | **Medium** | Intermediate base before MI resolution; not in final object |
 | `0x4b3e18` | Tiny 2-entry vtable placed at `this+8` during ctor | **Low** | Launcher-specific stub; no Crypto++ equivalent identified |
 | `0x468130` `PerformRSADecryption` | `PK_Decryptor::Decrypt` / `TF_DecryptorBase::Decrypt` | **High** | Exact call shape and algorithm |
 
 ---
 
-## 4. Hash / SHA1 family
+## 4. CBC mode family recovered under the auth-bootstrap “FeedbackSize” names
+
+### 4.1 Current identification
+
+Despite the recovered constructor/configure string `"FeedbackSize"`, the strongest static-RE match
+for the two auth-bootstrap transform classes is **Crypto++ CBC mode**, not CFB mode and not a
+launcher-local bespoke packet transform.
+
+Current best mapping:
+
+| Recovered class | Best Crypto++ match | Confidence |
+|---|---|---|
+| `FeedbackSizeTransformAdapter_0x4b00b0` | `CryptoPP::CBC_Encryption` | **Medium-High** |
+| `FeedbackSizeTransformAdapterLarge_0x4b7500` | `CryptoPP::CBC_Decryption` | **Medium-High** |
+
+Most likely these live inside an older Crypto++ holder/final-template family around Twofish, but the
+**mode semantics** are already identifiable from slots + fields + process behavior even if the exact
+old public template spelling is still unsettled.
+
+### 4.2 Evidence from fields and destructors
+
+`FeedbackSizeTransformAdapter_0x4b00b0::~cls_0x4b00b0` (`0x41e010`) frees **two** tracked buffers.
+This matches the expected storage split for older Crypto++ CBC encrypt-side mode objects:
+- `CipherModeBase::m_register`
+- `BlockOrientedCipherModeBase::m_buffer`
+
+`FeedbackSizeTransformAdapterLarge_0x4b7500::~cls_0x4b7500` (`0x446e40`) frees **three** tracked
+buffers. That matches the extra temp buffer carried by old Crypto++ `CBC_Decryption`.
+
+The resize rows are especially strong:
+- `0x41d6e0` resizes **two** block-sized buffers
+- `0x446d00` resizes **three** block-sized buffers
+
+That is a close structural match for:
+- `BlockOrientedCipherModeBase::ResizeBuffers()`
+- `CBC_Decryption::ResizeBuffers()`
+
+### 4.3 Evidence from process rows / signatures
+
+The most important recovered process rows are:
+
+| Address | Recovered class | Observed behavior | Best Crypto++ match |
+|---|---|---|---|
+| `0x44b2e0` | `FeedbackSizeTransformAdapter_0x4b00b0` | XOR input into live register, run block transform, copy register to output, advance block-by-block | `CryptoPP::CBC_Encryption::ProcessData` |
+| `0x44b6c0` | `FeedbackSizeTransformAdapterLarge_0x4b7500` | save ciphertext block to temp, decrypt current block, XOR with previous register/IV, swap saved ciphertext into register | `CryptoPP::CBC_Decryption::ProcessData` |
+
+This is stronger proof than the configure-time string because the slot behavior is characteristic of
+CBC encrypt/decrypt and does **not** look like a simple launcher-local wrapper around
+`CryptoPP::CBC_Mode<Twofish>`.
+
+### 4.4 Why the `"FeedbackSize"` string does not overturn the CBC identification
+
+Modern Crypto++ uses `Name::FeedbackSize()` most visibly with CFB mode configuration, so the string
+initially suggested a CFB-family object.
+
+However, the stronger evidence here is:
+- actual block-processing slot behavior
+- number and role of internal buffers
+- destructor/free layout
+- resize-buffer layout
+- inheritance between the small/base and large/derived object
+
+So the safest interpretation is:
+- `"FeedbackSize"` comes from shared older Crypto++ parameter/configuration plumbing visible in the
+  launcher build
+- but the concrete recovered transform objects used by the auth bootstrap path are CBC-compatible
+  mode objects
+
+### 4.5 Inheritance / object-family note
+
+Ghidra-side recovery now has:
+- `FeedbackSizeTransformAdapter_0x4b00b0`
+- `FeedbackSizeTransformAdapterLarge_0x4b7500`
+- with inheritance between them
+
+This fits the CBC identification above, but adjustor-thunk evidence still suggests old Crypto++
+multiple-inheritance / holder/subobject complexity. Treat the CBC mapping as **semantic class
+identification**, not proof that the launcher’s exact original source used a simple two-class
+hand-written hierarchy.
+
+### 4.6 Replacement consequence
+
+These objects are **not** faithfully modeled by a simple source-owned helper that merely stores key
+bytes and IV bytes and then directly runs a modern `CryptoPP::CBC_Mode<CryptoPP::Twofish>` object as
+if that were the whole original class.
+
+Current practical rule:
+- keep the known-working direct Twofish challenge path where live auth requires it
+- preserve the recovered object ownership/inheritance notes here
+- do not claim the current source implementation of the `0x4b00b0/0x4b7500` family is already a
+  faithful reimplementation of the original launcher class semantics
+
+---
+
+## 5. Hash / SHA1 family
 
 ### 4.1 Base hash context — `cls_0x4ba258` → `CryptoPP::SHA1` (or compatible)
 
@@ -405,7 +501,7 @@ Calls `HashContext_InitSHA1` to set the SHA-1 IV in the state buffer.
 
 ---
 
-## 5. Crypto++ "unknown" fingerprint — Algorithm base class proof
+## 6. Crypto++ "unknown" fingerprint — Algorithm base class proof
 
 ### 5.1 Evidence: `0x41d880` = Crypto++ `Algorithm::AlgorithmName()`
 
@@ -447,7 +543,7 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
 
 ---
 
-## 6. Open questions / negative results
+## 7. Open questions / negative results
 
 - **Exact Crypto++ version** — the launcher was likely built against 5.1.x or 5.2.x.
   The `OldRandomPool` in 8.9.0 is a faithful reproduction, but slot-level vtable offsets
@@ -470,7 +566,7 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
 
 ---
 
-## 5. Source anchors
+## 8. Source anchors
 
 | Source file | Anchor / comment |
 |-------------|-----------------|
@@ -481,7 +577,7 @@ The launcher classes use launcher-owned base classes but inherit Crypto++ virtua
 
 ---
 
-## 6. How to update this doc
+## 9. How to update this doc
 
 1. Run Ghidra decompile on any unmapped slot function.
 2. Compare its shape to `third_party/cryptopp890/*.h`.
