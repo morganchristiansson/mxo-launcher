@@ -233,6 +233,39 @@ Practical family picture:
 - `0x004b672c` = `CryptoPP::InvertibleRSAFunction` (`RSA::PrivateKey`)
 - the later `0x004b6778` margin/auth wrapper sits on top of that RSA private-key core
 
+### 2.5.3 FileSink family used by auth pubkey.dat recording
+
+**Confidence: HIGH for family identification; MEDIUM for exact leaf type**
+
+The auth helper `0x447dd0` constructs a Crypto++ file-output sink for `pubkey.dat`.
+
+Key evidence from launcher RE:
+- constructor `0x447b50` feeds the strings `"OutputFileName"` and `"OutputBinaryMode"`
+- the resulting object is then used as a binary sink in `0x447dd0`
+- `0x447dd0` serializes reply-public-key data into that sink before `0x447f50` marks child `+0xa0` ready
+
+Key evidence from the bundled reference tree (`third_party/cryptopp890`):
+- `argnames.h` defines `Name::OutputFileName()` and `Name::OutputBinaryMode()`
+- `files.h` shows `CryptoPP::FileSink(const char*, bool)` calling:
+  `IsolatedInitialize(MakeParameters(Name::OutputFileName(), filename)(Name::OutputBinaryMode(), binary));`
+
+Current best mapping:
+
+| Address | Best mapping |
+|---|---|
+| `0x004b77f8` | Crypto++ `FileSink` family / configured output sink |
+| `0x447b50` | ctor/config-init path for that FileSink-family object |
+| `0x447dd0` | launcher auth helper that serializes a reply-public-key record into the sink |
+
+Current `0x447dd0` record shape from static RE:
+1. write reply public-key id
+2. write modulus integer
+3. write public exponent integer
+4. append one NUL byte
+5. write a fixed `0x100`-byte blob from the signature pointer
+
+This should be treated as **launcher logic using Crypto++ sink infrastructure**, not as a bespoke launcher file class.
+
 ### 2.6 Source implementation status
 
 This replacement has now been done in source.
