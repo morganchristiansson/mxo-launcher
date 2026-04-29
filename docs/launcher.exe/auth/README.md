@@ -103,8 +103,8 @@ Current evidence for that last point:
   - fidelity note from the `0x448140` pass:
     - raw `0x07` only leaves a reply-public-key snapshot alive on the success tail that immediately falls into raw `0x08`; replacement code should not preserve a failed/error `0x07` reply as if the original kept it around
     - the `0x447780` rebuild family owns the lazy `pubkey.dat` validation plus child `+0x9c/+0xa8/+0xac` refresh; `0x4474f0` should then consume that prepared child state directly rather than reparsing a cached raw `0x07` payload
-    - raw `0x0a` is driven by child `+0x94/+0x98` feedback-transform objects, not by the generic `mxo::auth::BuildAuthChallengeResponsePacket(...)` helper
-    - replacement consequence: keep the raw `0x0a` digest / packet-builder staging inline in `HandleInboundAuthMessage`, and run the challenge decrypt / response encrypt through child `+0x94/+0x98` instead of source-only shared byte-crypto helpers
+    - raw `0x0a` is driven by child `+0x94/+0x98` feedback-transform object ownership in the launcher field graph, but the exact live transform semantics are not yet closed tightly enough to replace the known-working Twofish CBC challenge/response path
+    - replacement consequence: keep the raw `0x0a` digest / packet-builder staging inline in `HandleInboundAuthMessage`; preserve the recovered child-field ownership notes, but continue using the known-working direct Twofish challenge decrypt / response encrypt path until the `+0x94/+0x98` transform implementation is proven faithful
     - raw `0x0b` status handling keys off the parse/header status dword stored into child `+0xec`, not a replacement-side packet-length heuristic
     - replacement consequence: keep the incoming-message payload decode and auth-reply parse-object store/copy steps inline in the anchored `0x444390 / 0x448140` family instead of hiding them behind source-only staging helpers
     - raw `0x0b` success-side private-exponent materialization likewise comes from child `+0x94` over the copied parse-object encrypted field, not from a generic shared decrypt helper

@@ -157,6 +157,7 @@ public:
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
  std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
+ std::vector<uint8_t> cachedAuthRequestTwofishKeyBytesOwned_{};
 
  // anchor: launcher.exe:0x445500
  AuthBootstrap680ChildBase_0x4b7134();
