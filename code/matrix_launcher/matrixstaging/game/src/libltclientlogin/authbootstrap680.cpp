@@ -1740,7 +1740,7 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
     const bool decryptedPrivateExponent = mxo::auth::DecryptAuthReplyPrivateExponent(
         reply,
         child.cachedAuthRequestBuildResult_.twofishKeyBytes,
-        child.cachedAuthChallenge_.encryptedChallengeBytes,
+        child.cachedAuthChallengeCiphertextBytesOwned_,
         &decryptedPrivateExponentBytes);
     const bool builtBlockD8 =
         decryptedPrivateExponent &&
@@ -1990,19 +1990,26 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
         }
 
         case 0x09u: {
-            mxo::auth::AuthChallenge challenge;
-            if (!mxo::auth::ParseAuthChallengePayload(
-                    stagedBytes.data(),
-                    stagedBytes.size(),
-                    &challenge)) {
+            // anchor: launcher.exe:0x443d90 / 0x44831c
+            // The recovered raw 0x09 path materializes the local packet parse accessor and then
+            // consumes the 16-byte encrypted challenge inline from payload+1.
+            Packet_AsAuthChallenge_0x4b6ce0 incomingChallengePacket;
+            incomingChallengePacket.InitFromIncomingMessage(
+                const_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessageRef));
+
+            const uint8_t* const challengePayloadBytes =
+                static_cast<const uint8_t*>(incomingChallengePacket.payloadAlias10);
+            if (!challengePayloadBytes || stagedBytes.size() != 17u || challengePayloadBytes[0] != 0x09u) {
                 spdlog::warn("DIAGNOSTIC: CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
                 return kAuthBootstrap680InboundUnhandled;
             }
 
-            child.cachedAuthChallenge_ = challenge;
+            child.cachedAuthChallengeCiphertextBytesOwned_.assign(
+                challengePayloadBytes + 1u,
+                challengePayloadBytes + stagedBytes.size());
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
-                challenge.encryptedChallengeBytes.size());
+                child.cachedAuthChallengeCiphertextBytesOwned_.size());
 
             {
                 const char* password = SmallStringMirrorDataOrEmpty(child.string10);
@@ -2028,14 +2035,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
                 mxo::auth::AuthChallengeResponseLayout layout;
                 mxo::auth::AuthChallengeResponseBuildResult buildResult;
-                buildResult.encryptedChallengeBytes = challenge.encryptedChallengeBytes;
+                buildResult.encryptedChallengeBytes = child.cachedAuthChallengeCiphertextBytesOwned_;
 
                 // anchor: launcher.exe:0x44831c..0x448467
                 // This raw 0x0a path is inline in the child-side inbound handler, not a separate
                 // standalone launcher.exe helper. Keep the crypto/material assembly here so future
                 // fidelity passes can compare directly against the packet-object staging below.
                 if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
-                        challenge.encryptedChallengeBytes,
+                        child.cachedAuthChallengeCiphertextBytesOwned_,
                         child.cachedAuthRequestBuildResult_.twofishKeyBytes,
                         false,
                         &buildResult.decryptedChallengeBytes)) {

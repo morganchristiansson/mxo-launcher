@@ -222,7 +222,6 @@ CLTLoginMediator::CLTLoginMediator()
       authRequestSent_(false),
       authChallengeResponseSent_(false),
       lastAuthRequestBuildResult_(),
-      lastAuthChallenge_(),
       lastAuthConnectStatus_(0),
       lastMarginConnectStatus_(0),
       authConnectStatusCount_(0),

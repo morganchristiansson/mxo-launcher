@@ -47,22 +47,6 @@ std::string HexEncode(const std::vector<uint8_t>& bytes) {
     return bytes.empty() ? std::string() : HexEncode(bytes.data(), bytes.size());
 }
 
-bool ParseAuthChallengePayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    AuthChallenge* outChallenge) {
-    if (!payloadBytes || !outChallenge || payloadSize != 17u || payloadBytes[0] != 0x09u) {
-        return false;
-    }
-
-    AuthChallenge challenge;
-    challenge.valid = true;
-    challenge.payloadBytes.assign(payloadBytes, payloadBytes + payloadSize);
-    challenge.encryptedChallengeBytes.assign(payloadBytes + 1u, payloadBytes + payloadSize);
-    *outChallenge = challenge;
-    return true;
-}
-
 bool ParseAuthReplyPayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,

@@ -821,17 +821,58 @@ static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == sizeof(mxo::liblttc
 // This is a minimal parse object, NOT a full packet builder
 class Packet_AsAuthChallenge_0x4b6ce0 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+ // anchor: launcher.exe:0x443d90
+ // Incoming parse-view path: retain the source message-ref, decode the effective payload start
+ // from direct or headerless storage, and expose the body at +0x10.
+ void InitFromIncomingMessage(
+     ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* sourceMessageRef) {
+  if (messageRef08 && messageRef08 != sourceMessageRef) {
+   messageRef08->Release();
+  }
+
+  messageRef08 = sourceMessageRef;
+  if (messageRef08) {
+   messageRef08->AddRef();
+  }
+
+  if (!messageRef08 || !messageRef08->messageStorage0c) {
+   payloadPtr04 = 0u;
+   payloadAlias10 = nullptr;
+   return;
+  }
+
+  uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
+  if (!messageRef08->headerless10) {
+   payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
+  } else {
+   const uint8_t descriptor = *(payloadBase + 1);
+   payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase) +
+       g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
+       g_MessageOffsetLookupTable[descriptor & 7] +
+       0x12u;
+   messageRef08->headerless10 = 1u;
+  }
+
+  payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+  debugString14 = nullptr;
+  payloadSize18 = 0u;
+ }
+
  // anchor: launcher.exe:0x443e30 = Packet_AsAuthChallenge_0x4b6ce0::ResetAndInitialize
- // Original implementation pattern:
- // 1. Calculates payload offset from message header encoding byte
- // 2. Advances message read position by 0x11 bytes
- // 3. Writes opcode byte 0x09 at payload[0] (for identifying parsed message)
+ // Builder-style reset path stamps a fresh 0x11-byte opcode 0x09 payload body.
  void ResetAndInitialize() {
- // This is a parse accessor - minimal initialization
- // The original at 0x443e30 sets up read pointers from incoming message
- payloadAlias10 = nullptr;
- debugString14 = nullptr;
- payloadSize18 = 0u;
+  createRefParam0c = 0u;
+  payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+  if (!messageRef08) {
+   return;
+  }
+  messageRef08->GrowPayloadByteCount(0x11u);
+  auto* payload = static_cast<uint8_t*>(payloadAlias10);
+  if (payload) {
+   payload[0] = 0x09u;
+  }
+  debugString14 = nullptr;
+  payloadSize18 = 0u;
  }
 
  // Override virtual methods to match 5-slot vtable

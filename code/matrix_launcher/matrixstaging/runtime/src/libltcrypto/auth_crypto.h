@@ -99,16 +99,6 @@ struct AuthRequestBuildResult {
           usedProvidedPublicKey(false) {}
 };
 
-struct AuthChallenge {
-    bool valid;
-    std::vector<uint8_t> headerBytes;
-    std::vector<uint8_t> payloadBytes;
-    std::vector<uint8_t> bytes;
-    std::vector<uint8_t> encryptedChallengeBytes;
-
-    AuthChallenge() : valid(false) {}
-};
-
 struct AuthChallengeResponseLayout {
     uint16_t packetSomeShort;
     uint8_t plaintextLeadingByte;
@@ -345,13 +335,11 @@ bool EncryptAuthRequestBlob(
     std::vector<uint8_t>* outCiphertext);
 
 // Raw 0x09 / AS_AuthChallenge parse anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
-// - exact original standalone 0x09 parser VA: [not yet isolated]
-bool ParseAuthChallengePayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    AuthChallenge* outChallenge);
+// - current strongest child-side consumer/owner-handling anchor:
+//   - launcher.exe:0x44831c..0x448467 inline inside
+//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
+// - local packet parse accessor used there:
+//   - launcher.exe:0x443d90 = Packet_AsAuthChallenge_0x4b6ce0 init path
 
 // Raw 0x0a / AS_AuthChallengeResponse build anchors:
 // - concrete owner-side inline continuation lives in:

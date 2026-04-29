@@ -157,8 +157,8 @@ public:
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
  std::vector<uint8_t> stagedIncomingAuthPacketBytesOwned_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
+ std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
  mxo::auth::AuthRequestBuildResult cachedAuthRequestBuildResult_{};
- mxo::auth::AuthChallenge cachedAuthChallenge_{};
 
  // anchor: launcher.exe:0x445500
  AuthBootstrap680ChildBase_0x4b7134();
@@ -203,10 +203,6 @@ public:
     void CopyOpaqueReplyBlobs108_10c();
     // anchor: launcher.exe:0x43d480
     std::string CopyReplyString54_SOURCEOWNED() const;
-
-    // Source-owned compatibility accessors for code that still needs recovered auth payloads
-    // after `0x448140` finishes. Keep these out of the mirrored child layout.
-    const mxo::auth::AuthChallenge& CachedAuthChallenge_SOURCEOWNED() const;
 
     // anchor: launcher.exe:0x448050
     // Only known direct caller is state2 ready-side handoff at launcher.exe:0x43928b, where
