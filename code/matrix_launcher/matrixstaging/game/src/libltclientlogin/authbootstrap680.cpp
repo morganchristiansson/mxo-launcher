@@ -1531,7 +1531,7 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
 }
 
 // anchor: launcher.exe:0x448050
-uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
+void AuthBootstrap680Child_0x441290::PrepareAndDispatch(
     CLTLoginMediator& mediator,
     void* sendTarget,
     const char* sessionTokenBegin) {
@@ -1592,11 +1592,12 @@ uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
 
     if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-        return child.SendAuthRequest();
+        child.SendAuthRequest();
+        return;
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-    return child.SendGetPublicKeyRequest();
+    child.SendGetPublicKeyRequest();
 }
 
 // anchor: launcher.exe:0x448140
@@ -1769,8 +1770,9 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     spdlog::warn(
                         "launcher-owned auth raw0x0a using empty child+0x1c secondary password/station field while preserving the recovered 0x44831c field mapping");
                 }
-                if (cachedAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
-                    spdlog::error("launcher-owned auth missing Twofish key from AS_AuthRequest build result");
+                if (feedbackTransformLarge94 == nullptr || feedbackTransformSmall98 == nullptr) {
+                    spdlog::error(
+                        "launcher-owned auth missing child+0x94/+0x98 feedback transform state for AS_AuthChallenge response path");
                     return kAuthBootstrap680InboundUnhandled;
                 }
                 if (!sendTarget50) {
@@ -1796,22 +1798,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     spdlog::error("launcher-owned auth rejected misaligned AS_AuthChallenge ciphertext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
-                if (!cachedAuthChallengeCiphertextBytesOwned_.empty()) {
-                    static constexpr uint8_t kZeroIv[16] = {0};
-                    try {
-                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption challengeCipher;
-                        challengeCipher.SetKeyWithIV(
-                            cachedAuthRequestBuildResult_.twofishKeyBytes.data(),
-                            cachedAuthRequestBuildResult_.twofishKeyBytes.size(),
-                            kZeroIv);
-                        challengeCipher.ProcessData(
-                            decryptedChallengeBytes.data(),
-                            cachedAuthChallengeCiphertextBytesOwned_.data(),
-                            cachedAuthChallengeCiphertextBytesOwned_.size());
-                    } catch (const CryptoPP::Exception&) {
-                        spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext");
-                        return kAuthBootstrap680InboundUnhandled;
-                    }
+                if (!cachedAuthChallengeCiphertextBytesOwned_.empty() &&
+                    !feedbackTransformLarge94->FeedbackSizeTransformAdapter_TransformBuffer(
+                        decryptedChallengeBytes.data(),
+                        cachedAuthChallengeCiphertextBytesOwned_.data(),
+                        static_cast<uint32_t>(cachedAuthChallengeCiphertextBytesOwned_.size()))) {
+                    spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext through child+0x94 feedback transform");
+                    return kAuthBootstrap680InboundUnhandled;
                 }
 
                 processedChallengeMd5Bytes.assign(16u, 0u);
@@ -1889,22 +1882,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     return kAuthBootstrap680InboundUnhandled;
                 }
                 ciphertextBytes.assign(plaintextBytes.size(), 0u);
-                if (!plaintextBytes.empty()) {
-                    static constexpr uint8_t kZeroIv[16] = {0};
-                    try {
-                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption responseCipher;
-                        responseCipher.SetKeyWithIV(
-                            cachedAuthRequestBuildResult_.twofishKeyBytes.data(),
-                            cachedAuthRequestBuildResult_.twofishKeyBytes.size(),
-                            kZeroIv);
-                        responseCipher.ProcessData(
-                            ciphertextBytes.data(),
-                            plaintextBytes.data(),
-                            plaintextBytes.size());
-                    } catch (const CryptoPP::Exception&) {
-                        spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
-                        return kAuthBootstrap680InboundUnhandled;
-                    }
+                if (!plaintextBytes.empty() &&
+                    !feedbackTransformSmall98->FeedbackSizeTransformAdapter_TransformBuffer(
+                        ciphertextBytes.data(),
+                        plaintextBytes.data(),
+                        static_cast<uint32_t>(plaintextBytes.size()))) {
+                    spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext through child+0x98 feedback transform");
+                    return kAuthBootstrap680InboundUnhandled;
                 }
 
                 Packet_AsAuthChallengeResponse_0x4b6cf4 plaintextPacket;
@@ -2121,28 +2105,19 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             std::vector<uint8_t> decryptedPrivateExponentBytes;
             bool decryptedPrivateExponent = false;
             if (parseObject->encryptedPrivateExponentBytes24 != nullptr &&
-                cachedAuthRequestBuildResult_.twofishKeyBytes.size() == 16u &&
-                cachedAuthChallengeCiphertextBytesOwned_.size() == 16u &&
+                feedbackTransformLarge94 != nullptr &&
                 (parseObject->encryptedPrivateExponentByteLength28 % 16u) == 0u) {
                 decryptedPrivateExponentBytes.assign(
                     parseObject->encryptedPrivateExponentByteLength28,
                     0u);
                 decryptedPrivateExponent = true;
-                if (parseObject->encryptedPrivateExponentByteLength28 != 0u) {
-                    try {
-                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption privateExponentCipher;
-                        privateExponentCipher.SetKeyWithIV(
-                            cachedAuthRequestBuildResult_.twofishKeyBytes.data(),
-                            cachedAuthRequestBuildResult_.twofishKeyBytes.size(),
-                            cachedAuthChallengeCiphertextBytesOwned_.data());
-                        privateExponentCipher.ProcessData(
-                            decryptedPrivateExponentBytes.data(),
-                            parseObject->encryptedPrivateExponentBytes24,
-                            parseObject->encryptedPrivateExponentByteLength28);
-                    } catch (const CryptoPP::Exception&) {
-                        decryptedPrivateExponent = false;
-                        decryptedPrivateExponentBytes.clear();
-                    }
+                if (parseObject->encryptedPrivateExponentByteLength28 != 0u &&
+                    !feedbackTransformLarge94->FeedbackSizeTransformAdapter_TransformBuffer(
+                        decryptedPrivateExponentBytes.data(),
+                        parseObject->encryptedPrivateExponentBytes24,
+                        parseObject->encryptedPrivateExponentByteLength28)) {
+                    decryptedPrivateExponent = false;
+                    decryptedPrivateExponentBytes.clear();
                 }
             }
 
@@ -2196,7 +2171,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 }
 
 // anchor: launcher.exe:0x447eb0
-uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
+void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
     bool ensuredLazyPubkeyDatValidatorA4 = false;
     if (lazyPubkeyDatValidatorA4 != nullptr && lazyPubkeyDatValidatorA4OwnedState_.object) {
         ensuredLazyPubkeyDatValidatorA4 = true;
@@ -2222,7 +2197,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
     uint8_t* const getPublicKeyRequestPayload = packetBuilder.PayloadBase();
     if (!getPublicKeyRequestPayload) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth failed to initialize Packet_AsGetPublicKeyRequest_0x4b6c74 payload");
-        return 0;
+        return;
     }
 
     getPublicKeyRequestPayload[0] = Packet_AsGetPublicKeyRequest_0x4b6c74::kPayloadTag06;
@@ -2240,13 +2215,13 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
             mxo::auth::kFrameModeAuto,
             &packet)) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth failed to frame Packet_AsGetPublicKeyRequest_0x4b6c74");
-        return 0;
+        return;
     }
 
     if (!sendTarget50) {
         spdlog::warn(
             "AuthBootstrap680_SendGetPublicKeyRequest missing child+0x50 send target; recovered 0x447eb0 tail expects direct virtual send through that field");
-        return 0u;
+        return;
     }
 
     auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(sendTarget50);
@@ -2270,25 +2245,24 @@ uint32_t AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
         fmt::ptr(owner08),
         static_cast<unsigned>(sendResult));
     g_CurrentLoginMediator->authGetPublicKeyRequestSent_ = (sendResult != 0u);
-    return sendResult;
 }
 
 // anchor: launcher.exe:0x4474f0
-uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
+void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
     auto& child = *this;
 
     const char* username = SmallStringMirrorDataOrEmpty(child.string04);
     if (SmallStringMirrorLength(child.string04) == 0u) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without child+0x04 username data");
-        return 0;
+        return;
     }
     if (child.raw08PublicKeyWorkerA8 == nullptr ||
         child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.modulusBytes.empty() ||
         child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.exponentBytes.empty()) {
         spdlog::warn(
             "AuthBootstrap680_SendAuthRequest missing child+0xa8 raw08 worker material; recovered 0x4474f0 consumes that worker through 0x468ea0/0x468f00");
-        return 0u;
+        return;
     }
 
     FillAuthBootstrap680Field54SeedBytesScaffold(child.feedbackSeedHelper54, feedbackSeed84);
@@ -2337,7 +2311,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
             &buildResult.twofishKeyBytes,
             &buildResult.usernameLengthField)) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthRequest plaintext blob from child+0x04/+0x28/+0x30..+0x4f state");
-        return 0;
+        return;
     }
 
     if (requestLayout.fixedHeaderBytes.empty()) {
@@ -2347,12 +2321,12 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
                 &buildResult.keyConfigMd5Bytes,
                 &buildResult.uiConfigMd5Bytes)) {
             spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthRequest fixed auth header bytes");
-            return 0;
+            return;
         }
     } else {
         if (requestLayout.fixedHeaderBytes.size() != 35u) {
             spdlog::info("DIAGNOSTIC: launcher-owned auth rejected AS_AuthRequest fixed header override size={}", requestLayout.fixedHeaderBytes.size());
-            return 0;
+            return;
         }
         buildResult.authHeaderBytes = requestLayout.fixedHeaderBytes;
         buildResult.keyConfigMd5Bytes.assign(
@@ -2369,11 +2343,11 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
             buildResult.blobPlaintextBytes.size(),
             &buildResult.blobCiphertextBytes)) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth failed to encrypt AS_AuthRequest blob through child+0xa8 raw08 worker scaffold");
-        return 0;
+        return;
     }
     if (buildResult.blobCiphertextBytes.size() > 0xffffu) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth rejected oversized AS_AuthRequest ciphertext len={}", buildResult.blobCiphertextBytes.size());
-        return 0;
+        return;
     }
 
     std::vector<uint8_t> payload;
@@ -2397,7 +2371,7 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
             mxo::auth::kFrameModeAuto,
             &buildResult.packet)) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth failed to frame AS_AuthRequest packet bytes");
-        return 0;
+        return;
     }
 
     const uint32_t raw08WorkerExpectedBlobLen =
@@ -2405,11 +2379,10 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
             child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
             buildResult.blobPlaintextBytes.size());
 
-    child.cachedAuthRequestBuildResult_ = buildResult;
     if (!child.sendTarget50) {
         spdlog::warn(
             "AuthBootstrap680_SendAuthRequest missing child+0x50 send target; recovered 0x4474f0 tail expects direct virtual send through that field");
-        return 0u;
+        return;
     }
 
     auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(child.sendTarget50);
@@ -2453,7 +2426,6 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest() {
             BuildHexPreview(feedbackSeed84.data(), feedbackSeed84.size(), feedbackSeed84.size()),
             static_cast<unsigned>(child.feedbackSeedHelper54.nextBufferedOutputByte28));
     }
-    return sendResult;
 }
 
 // anchor: launcher.exe:0x447780

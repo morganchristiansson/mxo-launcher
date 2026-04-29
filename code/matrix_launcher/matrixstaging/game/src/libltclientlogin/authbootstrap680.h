@@ -157,7 +157,6 @@ public:
  std::vector<uint32_t> privateExponentBigIntD8OwnedDigits_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
  std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
- mxo::auth::AuthRequestBuildResult cachedAuthRequestBuildResult_{};
 
  // anchor: launcher.exe:0x445500
  AuthBootstrap680ChildBase_0x4b7134();
@@ -206,7 +205,7 @@ public:
     // anchor: launcher.exe:0x448050
     // Only known direct caller is state2 ready-side handoff at launcher.exe:0x43928b, where
     // assembly loads ECX from CLTLoginMediator +0x680 before CALL 0x448050.
-    uint32_t PrepareAndDispatch(
+    void PrepareAndDispatch(
         CLTLoginMediator& owner,
         void* sendTarget,
         const char* sessionTokenBegin);
@@ -221,13 +220,13 @@ public:
     // anchor: launcher.exe:0x447eb0
     // The state2 ready-side dispatcher calls this directly on the owner `+0x680` auth child when
     // `authRequestReadyA0 == 0`; it is not a standalone write-helper receiver method.
-    uint32_t SendGetPublicKeyRequest();
+    void SendGetPublicKeyRequest();
 
     // anchor: launcher.exe:0x4474f0 / 0x447780 / 0x447f50
     // These helpers stay child-owned alongside `0x448140`; Ghidra currently keeps the old
     // write-helper prefix in the symbol names, but the callsites and ECX setup point at the
     // owner `+0x680` auth child.
-    uint32_t SendAuthRequest();
+    void SendAuthRequest();
     uint32_t RebuildReplyPublicKeyWorkers(
         uint32_t replyPublicKeyId09,
         const uint8_t* modulusBytes,

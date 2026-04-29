@@ -142,17 +142,15 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
-    const uint32_t sendResult =
-        child->PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
+    child->PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
     spdlog::info(
-        "CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
+        "CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch()",
         fmt::ptr(upstreamOrArg),
         static_cast<unsigned>(incomingUpstreamPhaseCode),
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
-        g_CurrentLoginMediator->HasReadyAuthConnectionState2() ? 1u : 0u,
-        static_cast<unsigned>(sendResult));
+        g_CurrentLoginMediator->HasReadyAuthConnectionState2() ? 1u : 0u);
     // Ghidra shows original returns void - return value is effectively ignored by callers
     return;
 }
