@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fstream>
 #include <memory>
 #include <random>
 
@@ -143,40 +144,59 @@ static void ResetAuthBootstrap680RsaPublicKey(CryptoPP::RSA::PublicKey* outPubli
     *outPublicKey = CryptoPP::RSA::PublicKey();
 }
 
+static bool CopyAuthBootstrap680BigIntToBigEndianBytes(
+    const CryptoPP::Integer& value,
+    std::vector<uint8_t>* outBytes) {
+    if (!outBytes || value.IsNegative()) {
+        return false;
+    }
+
+    const size_t byteCount = static_cast<size_t>(value.ByteCount());
+    if (byteCount == 0u) {
+        outBytes->clear();
+        return true;
+    }
+
+    outBytes->assign(byteCount, 0u);
+    value.Encode(outBytes->data(), outBytes->size());
+    return true;
+}
+
 // anchor: launcher.exe:0x447120 / 0x447020
 static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
     CryptoPP::RSA::PublicKey* outPublicKey,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-    const uint8_t* modulusBytes,
-    size_t modulusByteCount,
-    uint8_t exponentByte) {
-    if (!outPublicKey || !ownedState || !modulusBytes || modulusByteCount == 0u || exponentByte == 0u) {
+    const CryptoPP::Integer& modulusInteger,
+    const CryptoPP::Integer& publicExponentInteger) {
+    if (!outPublicKey || !ownedState || modulusInteger.IsNegative() ||
+        publicExponentInteger.IsNegative() || publicExponentInteger.IsZero()) {
         return false;
     }
 
     ResetAuthBootstrap680RsaPublicKey(outPublicKey);
+    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
 
     try {
-        ownedState->publicKey.Initialize(
-            CryptoPP::Integer(modulusBytes, modulusByteCount),
-            CryptoPP::Integer(&exponentByte, 1u));
+        ownedState->publicKey.Initialize(modulusInteger, publicExponentInteger);
         *outPublicKey = ownedState->publicKey;
+        if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &ownedState->modulusBytes) ||
+            !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &ownedState->exponentBytes)) {
+            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
+            return false;
+        }
     } catch (const CryptoPP::Exception&) {
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
 
-    ownedState->modulusBytes.assign(modulusBytes, modulusBytes + modulusByteCount);
-    ownedState->exponentBytes.assign(1u, exponentByte);
     return true;
 }
 
 static bool BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
     std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor>* outWorker,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-    const uint8_t* modulusBytes,
-    size_t modulusByteCount,
-    uint8_t exponentByte) {
+    const CryptoPP::Integer& modulusInteger,
+    const CryptoPP::Integer& publicExponentInteger) {
     if (!outWorker || !ownedState) {
         return false;
     }
@@ -185,9 +205,8 @@ static bool BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
     if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
             &ownedState->publicKey,
             ownedState,
-            modulusBytes,
-            modulusByteCount,
-            exponentByte)) {
+            modulusInteger,
+            publicExponentInteger)) {
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
@@ -205,9 +224,8 @@ static bool BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
 static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
     std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>* outValidator,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-    const uint8_t* modulusBytes,
-    size_t modulusByteCount,
-    uint8_t exponentByte) {
+    const CryptoPP::Integer& modulusInteger,
+    const CryptoPP::Integer& publicExponentInteger) {
     if (!outValidator || !ownedState) {
         return false;
     }
@@ -216,9 +234,8 @@ static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
     if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
             &ownedState->publicKey,
             ownedState,
-            modulusBytes,
-            modulusByteCount,
-            exponentByte)) {
+            modulusInteger,
+            publicExponentInteger)) {
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
@@ -240,10 +257,10 @@ static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
  child.raw08PublicKeyWorkerA8 = nullptr;
  child.replyAuthDataValidatorAC = nullptr;
 
- child.raw08PublicKeyWorkerA8OwnedState_.object.reset();
- ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
- child.replyAuthDataValidatorACOwnedState_.object.reset();
- ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.replyAuthDataValidatorACOwnedState_.publicKeyPair0c);
+ child.raw08PublicKeyWorkerA8Owned_.reset();
+ ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.raw08PublicKeyWorkerA8PublicKeyPair0c_);
+ child.replyAuthDataValidatorACOwned_.reset();
+ ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.replyAuthDataValidatorACPublicKeyPair0c_);
 }
 
 static void ResetAuthBootstrap680FeedbackTransforms(
@@ -913,8 +930,8 @@ AuthBootstrap680ChildBase_0x4b7134::AuthBootstrap680ChildBase_0x4b7134() {
  // +0x94: large transform nulled
  // +0x98: small transform nulled
 
- lazyPubkeyDatValidatorA4OwnedState_.object.reset();
- ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c);
+ lazyPubkeyDatValidatorA4Owned_.reset();
+ ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&lazyPubkeyDatValidatorA4PublicKeyPair0c_);
  lazyPubkeyDatValidatorA4 = nullptr; // +0xa4 = 0
 
  ResetAuthBootstrap680ReplyParseObject(*this);
@@ -1134,49 +1151,98 @@ static bool AuthBootstrap680_TryGetEmbeddedPublicKeyFromPayload(
     return true;
 }
 
+static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
+    AuthBootstrap680ChildBase_0x4b7134& child) {
+    if (child.lazyPubkeyDatValidatorA4 != nullptr && child.lazyPubkeyDatValidatorA4Owned_) {
+        return true;
+    }
+
+    static const CryptoPP::Integer kFallbackModulus(
+        kAuthBootstrap680PubkeyDatFallbackModulus.data(),
+        kAuthBootstrap680PubkeyDatFallbackModulus.size());
+    static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
+    if (!BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+            &child.lazyPubkeyDatValidatorA4Owned_,
+            &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
+            kFallbackModulus,
+            kFallbackPublicExponent)) {
+        child.lazyPubkeyDatValidatorA4Owned_.reset();
+        child.lazyPubkeyDatValidatorA4 = nullptr;
+        return false;
+    }
+
+    child.lazyPubkeyDatValidatorA4 = child.lazyPubkeyDatValidatorA4Owned_.get();
+    return child.lazyPubkeyDatValidatorA4 != nullptr;
+}
+
 // anchor: launcher.exe:0x468f80
 static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
     AuthBootstrap680ChildBase_0x4b7134& child,
-    const uint8_t* modulusBytes,
-    size_t modulusByteCount,
-    uint8_t publicExponentByte,
+    const CryptoPP::Integer& modulusInteger,
+    const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
     size_t signatureByteCount) {
     if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation != 0u) {
         return true;
     }
 
-    if (child.lazyPubkeyDatValidatorA4 == nullptr || !child.lazyPubkeyDatValidatorA4OwnedState_.object) {
-        if (!BuildAuthBootstrap680ReplyAuthDataValidatorAC(
-                &child.lazyPubkeyDatValidatorA4OwnedState_.object,
-                &child.lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
-                kAuthBootstrap680PubkeyDatFallbackModulus.data(),
-                kAuthBootstrap680PubkeyDatFallbackModulus.size(),
-                0x11u)) {
-            child.lazyPubkeyDatValidatorA4OwnedState_.object.reset();
-            child.lazyPubkeyDatValidatorA4 = nullptr;
-            return false;
-        }
-        child.lazyPubkeyDatValidatorA4 = child.lazyPubkeyDatValidatorA4OwnedState_.object.get();
-    }
-    if (child.lazyPubkeyDatValidatorA4 == nullptr) {
+    if (!EnsureAuthBootstrap680LazyPubkeyDatValidator(child)) {
         return false;
     }
 
-    if (!modulusBytes || modulusByteCount != 0x80u || publicExponentByte == 0u ||
-        !signatureBytes || signatureByteCount == 0u) {
+    std::vector<uint8_t> modulusBytes;
+    std::vector<uint8_t> publicExponentBytes;
+    if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &modulusBytes) ||
+        !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &publicExponentBytes) ||
+        modulusBytes.size() != 0x80u || publicExponentBytes.size() != 1u ||
+        publicExponentBytes[0] == 0u || !signatureBytes || signatureByteCount == 0u) {
         return false;
     }
 
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
-    std::copy_n(modulusBytes, modulusByteCount, signedReplyPublicKeyBytes.begin());
-    signedReplyPublicKeyBytes.back() = publicExponentByte;
+    std::copy_n(modulusBytes.data(), modulusBytes.size(), signedReplyPublicKeyBytes.begin());
+    signedReplyPublicKeyBytes.back() = publicExponentBytes[0];
     return VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-        child.lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
+        child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
         signatureBytes,
         signatureByteCount);
+}
+
+// anchor: launcher.exe:0x447dd0
+static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat_SOURCEOWNED(
+    uint32_t replyPublicKeyId09,
+    const CryptoPP::Integer& modulusInteger,
+    const CryptoPP::Integer& publicExponentInteger,
+    const uint8_t* signatureBytes) {
+    std::vector<uint8_t> modulusBytes;
+    std::vector<uint8_t> publicExponentBytes;
+    if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &modulusBytes) ||
+        !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &publicExponentBytes)) {
+        return 0u;
+    }
+
+    // The exact on-disk/sink semantics of `0x447dd0` are still being recovered, but static RE is
+    // clear that `0x447f50` always performs this post-rebuild pubkey.dat-side handoff before
+    // marking child+0xa0 ready. Keep that boundary explicit here instead of smearing it into the
+    // rebuild helper.
+    std::ofstream pubkeyDat("pubkey.dat", std::ios::binary | std::ios::app);
+    if (!pubkeyDat) {
+        return 0u;
+    }
+
+    pubkeyDat.write(reinterpret_cast<const char*>(&replyPublicKeyId09), sizeof(replyPublicKeyId09));
+    pubkeyDat.write(reinterpret_cast<const char*>(modulusBytes.data()),
+                    static_cast<std::streamsize>(modulusBytes.size()));
+    pubkeyDat.write(reinterpret_cast<const char*>(publicExponentBytes.data()),
+                    static_cast<std::streamsize>(publicExponentBytes.size()));
+    const uint8_t terminatorByte = 0u;
+    pubkeyDat.write(reinterpret_cast<const char*>(&terminatorByte), 1);
+    if (signatureBytes != nullptr) {
+        pubkeyDat.write(reinterpret_cast<const char*>(signatureBytes), 0x80);
+    }
+    return pubkeyDat ? 1u : 0u;
 }
 
 // anchor: launcher.exe:0x445610
@@ -1912,8 +1978,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const bool replyAuthDataValidatorAccepted =
                 copyShadowCandidate.VerifyWithValidator(
-                    replyAuthDataValidatorACOwnedState_.object.get(),
-                    replyAuthDataValidatorACOwnedState_.publicKeyPair0c,
+                    replyAuthDataValidatorACOwned_.get(),
+                    replyAuthDataValidatorACPublicKeyPair0c_,
                     authServerTimeBias80);
             if (!replyAuthDataValidatorAccepted) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
@@ -2045,24 +2111,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
 // anchor: launcher.exe:0x447eb0
 void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
-    bool ensuredLazyPubkeyDatValidatorA4 = false;
-    if (lazyPubkeyDatValidatorA4 != nullptr && lazyPubkeyDatValidatorA4OwnedState_.object) {
-        ensuredLazyPubkeyDatValidatorA4 = true;
-    } else {
-        // anchor: launcher.exe:0x447260 / 0x447c10
-        if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
-                &lazyPubkeyDatValidatorA4OwnedState_.object,
-                &lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
-                kAuthBootstrap680PubkeyDatFallbackModulus.data(),
-                kAuthBootstrap680PubkeyDatFallbackModulus.size(),
-                0x11u)) {
-            lazyPubkeyDatValidatorA4 = lazyPubkeyDatValidatorA4OwnedState_.object.get();
-            ensuredLazyPubkeyDatValidatorA4 = true;
-        } else {
-            lazyPubkeyDatValidatorA4OwnedState_.object.reset();
-            lazyPubkeyDatValidatorA4 = nullptr;
-        }
-    }
+    // anchor: launcher.exe:0x447260 / 0x447c10
+    const bool ensuredLazyPubkeyDatValidatorA4 = EnsureAuthBootstrap680LazyPubkeyDatValidator(*this);
 
     Packet_AsGetPublicKeyRequest_0x4b6c74 packetBuilder;
     packetBuilder.InitializePayloadSize();
@@ -2125,8 +2175,8 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
 
     const char* const username = SmallStringMirrorDataOrEmpty(string04);
     if (raw08PublicKeyWorkerA8 == nullptr ||
-        raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.modulusBytes.empty() ||
-        raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c.exponentBytes.empty()) {
+        raw08PublicKeyWorkerA8PublicKeyPair0c_.modulusBytes.empty() ||
+        raw08PublicKeyWorkerA8PublicKeyPair0c_.exponentBytes.empty()) {
         spdlog::warn(
             "AuthBootstrap680_SendAuthRequest missing child+0xa8 raw08 worker material; recovered 0x4474f0 consumes that worker through 0x468ea0/0x468f00");
         return;
@@ -2221,7 +2271,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         plaintextAuthBlob.messageRef08 ? plaintextAuthBlob.messageRef08->PayloadByteCount() : 0u;
     const uint32_t raw08WorkerExpectedBlobLen =
         QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
-            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
+            raw08PublicKeyWorkerA8PublicKeyPair0c_,
             plaintextPayloadByteCount);
     if (raw08WorkerExpectedBlobLen == 0u || raw08WorkerExpectedBlobLen > 0xffffu) {
         spdlog::error(
@@ -2277,10 +2327,10 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     // directly from this send helper.
     const uint32_t plaintextChunkByteCount =
         QueryAuthBootstrap680Raw08PublicKeyWorkerPlaintextChunkByteCountScaffold(
-            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
+            raw08PublicKeyWorkerA8PublicKeyPair0c_);
     const uint32_t ciphertextChunkByteCount =
         QueryAuthBootstrap680Raw08PublicKeyWorkerCiphertextChunkByteCountScaffold(
-            raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c);
+            raw08PublicKeyWorkerA8PublicKeyPair0c_);
     if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
         spdlog::info(
             "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
@@ -2297,7 +2347,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
             std::min<size_t>(plaintextChunkByteCount, plaintextBytesRemaining);
         if (ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen ||
             !EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
-                raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
+                raw08PublicKeyWorkerA8PublicKeyPair0c_,
                 plaintextCursor,
                 currentChunkByteCount,
                 ciphertextCursor + ciphertextBytesWritten,
@@ -2368,67 +2418,46 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
 // anchor: launcher.exe:0x447780
 uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     uint32_t replyPublicKeyId09,
-    const uint8_t* modulusBytes,
-    size_t modulusByteCount,
-    uint8_t publicExponentByte,
-    const uint8_t* signatureBytes,
-    size_t signatureByteCount) {
-    auto& child = *this;
-
-    if (modulusByteCount != 0x80u) {
+    const CryptoPP::Integer& modulusInteger,
+    const CryptoPP::Integer& publicExponentInteger,
+    const uint8_t* signatureBytes) {
+    if (modulusInteger.ByteCount() != 0x80u) {
         return 1u;
     }
 
-    if (lazyPubkeyDatValidatorA4 == nullptr || !lazyPubkeyDatValidatorA4OwnedState_.object) {
-        if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
-                &lazyPubkeyDatValidatorA4OwnedState_.object,
-                &lazyPubkeyDatValidatorA4OwnedState_.publicKeyPair0c,
-                kAuthBootstrap680PubkeyDatFallbackModulus.data(),
-                kAuthBootstrap680PubkeyDatFallbackModulus.size(),
-                0x11u)) {
-            lazyPubkeyDatValidatorA4 = lazyPubkeyDatValidatorA4OwnedState_.object.get();
-        } else {
-            lazyPubkeyDatValidatorA4OwnedState_.object.reset();
-            lazyPubkeyDatValidatorA4 = nullptr;
-        }
-    }
-
-    if (lazyPubkeyDatValidatorA4 == nullptr ||
+    if (!EnsureAuthBootstrap680LazyPubkeyDatValidator(*this) ||
         !AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
-            child,
-            modulusBytes,
-            modulusByteCount,
-            publicExponentByte,
+            *this,
+            modulusInteger,
+            publicExponentInteger,
             signatureBytes,
-            signatureByteCount)) {
+            0x80u)) {
         return 0x19000004u;
     }
 
-    ResetAuthBootstrap680ReplyPublicKeyWorkers(child);
+    ResetAuthBootstrap680ReplyPublicKeyWorkers(*this);
     currentPublicKeyId9C = replyPublicKeyId09;
 
     if (BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
-            &child.raw08PublicKeyWorkerA8OwnedState_.object,
-            &child.raw08PublicKeyWorkerA8OwnedState_.publicKeyPair0c,
-            modulusBytes,
-            modulusByteCount,
-            publicExponentByte)) {
-        child.raw08PublicKeyWorkerA8 = child.raw08PublicKeyWorkerA8OwnedState_.object.get();
+            &raw08PublicKeyWorkerA8Owned_,
+            &raw08PublicKeyWorkerA8PublicKeyPair0c_,
+            modulusInteger,
+            publicExponentInteger)) {
+        raw08PublicKeyWorkerA8 = raw08PublicKeyWorkerA8Owned_.get();
     } else {
-        child.raw08PublicKeyWorkerA8OwnedState_.object.reset();
-        child.raw08PublicKeyWorkerA8 = nullptr;
+        raw08PublicKeyWorkerA8Owned_.reset();
+        raw08PublicKeyWorkerA8 = nullptr;
     }
 
     if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
-            &child.replyAuthDataValidatorACOwnedState_.object,
-            &child.replyAuthDataValidatorACOwnedState_.publicKeyPair0c,
-            modulusBytes,
-            modulusByteCount,
-            publicExponentByte)) {
-        child.replyAuthDataValidatorAC = child.replyAuthDataValidatorACOwnedState_.object.get();
+            &replyAuthDataValidatorACOwned_,
+            &replyAuthDataValidatorACPublicKeyPair0c_,
+            modulusInteger,
+            publicExponentInteger)) {
+        replyAuthDataValidatorAC = replyAuthDataValidatorACOwned_.get();
     } else {
-        child.replyAuthDataValidatorACOwnedState_.object.reset();
-        child.replyAuthDataValidatorAC = nullptr;
+        replyAuthDataValidatorACOwned_.reset();
+        replyAuthDataValidatorAC = nullptr;
     }
 
     return 0u;
@@ -2437,20 +2466,18 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
 // anchor: launcher.exe:0x447f50
 uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
     const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket) {
-    auto* const childBase = static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this);
-    auto& child = *this;
-
     const uint8_t* const replyPayloadBytes =
         static_cast<const uint8_t*>(replyPacket.payloadAlias10);
     if (!replyPayloadBytes) {
         return 1u;
     }
 
-    const uint32_t replyPublicKeyId09 = ReadU32LE(replyPayloadBytes + 0x09u);
-    if (replyPayloadBytes[0x01u] >= 1u) {
-        return replyPayloadBytes[0x01u];
+    const uint32_t replyStatus01 = ReadU32LE(replyPayloadBytes + 0x01u);
+    if (static_cast<int32_t>(replyStatus01) >= 1) {
+        return replyStatus01;
     }
 
+    const uint32_t replyPublicKeyId09 = ReadU32LE(replyPayloadBytes + 0x09u);
     if (replyPublicKeyId09 != currentPublicKeyId9C) {
         const uint8_t* const modulusBytes =
             reinterpret_cast<const uint8_t*>(replyPacket.debugString14);
@@ -2459,35 +2486,47 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
         const uint8_t* const signatureBytes =
             reinterpret_cast<const uint8_t*>(replyPacket.characterIdLow1c);
         const size_t signatureByteCount = static_cast<size_t>(replyPacket.characterIdHigh20);
+        CryptoPP::Integer modulusInteger;
+        CryptoPP::Integer publicExponentInteger;
+        if (!BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
+                &modulusInteger,
+                modulusBytes,
+                modulusByteCount) ||
+            !BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
+                &publicExponentInteger,
+                &publicExponentByte,
+                1u)) {
+            authRequestReadyA0 = 0u;
+            return 1u;
+        }
 
         const uint32_t rebuildResult = RebuildReplyPublicKeyWorkers(
             replyPublicKeyId09,
-            modulusBytes,
-            modulusByteCount,
-            publicExponentByte,
-            signatureBytes,
-            signatureByteCount);
+            modulusInteger,
+            publicExponentInteger,
+            signatureBytes);
         if (rebuildResult != 0u) {
             authRequestReadyA0 = 0u;
             return rebuildResult;
         }
 
-        // anchor: launcher.exe:0x447dd0
-        // The original immediately passes the rebuilt modulus/exponent/signature tuple into an
-        // internal pubkey.dat/debug-sink helper here before marking child+0xa0 ready. The current
-        // source-owned replacement keeps only the worker rebuild plus payload snapshot path.
+        AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat_SOURCEOWNED(
+            replyPublicKeyId09,
+            modulusInteger,
+            publicExponentInteger,
+            signatureBytes);
         spdlog::info(
             "CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleGetPublicKeyReply rebuilt child+0xa4/+0xa8/+0xac from raw0x07 publicKeyId={} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} modulusLen={} signatureLen={} exponentByte=0x{:02x} helper={} module={} childBase={}",
             static_cast<unsigned>(replyPublicKeyId09),
-            fmt::ptr(child.lazyPubkeyDatValidatorA4),
-            fmt::ptr(child.raw08PublicKeyWorkerA8),
-            fmt::ptr(child.replyAuthDataValidatorAC),
+            fmt::ptr(lazyPubkeyDatValidatorA4),
+            fmt::ptr(raw08PublicKeyWorkerA8),
+            fmt::ptr(replyAuthDataValidatorAC),
             static_cast<unsigned>(modulusByteCount),
             static_cast<unsigned>(signatureByteCount),
             static_cast<unsigned>(publicExponentByte),
             fmt::ptr(this),
             fmt::ptr(owner08),
-            fmt::ptr(childBase));
+            fmt::ptr(static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this)));
     }
 
     authRequestReadyA0 = 1u;

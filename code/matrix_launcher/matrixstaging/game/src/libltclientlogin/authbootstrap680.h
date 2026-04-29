@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include <integer.h>
 #include <modes.h>
 #include <twofish.h>
 
@@ -35,20 +36,6 @@ struct AuthBootstrap680Field54HelperOwnedState {
     std::vector<uint8_t> scratchPrefix20;
 };
 
-struct AuthBootstrap680LazyPubkeyDatValidatorOwnedState {
-    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> object;
-    AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
-};
-
-struct AuthBootstrap680Raw08PublicKeyWorkerOwnedState {
-    std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor> object;
-    AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
-};
-
-struct AuthBootstrap680ReplyAuthDataValidatorOwnedState {
-    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> object;
-    AuthBootstrap680RsaPublicKeyPairOwnedState publicKeyPair0c;
-};
 
 // anchor: launcher.exe:0x4b7134 / vtable 0x004b7134
 // Base class containing fields +0x00 through +0xf4
@@ -146,9 +133,12 @@ public:
  // Source-owned trailing storage used to back the recovered child pointers/byte spans above.
  // Keep this tail explicit so we do not need a separate per-child side map.
  AuthBootstrap680Field54HelperOwnedState field54HelperOwnedState_{};
- AuthBootstrap680LazyPubkeyDatValidatorOwnedState lazyPubkeyDatValidatorA4OwnedState_{};
- AuthBootstrap680Raw08PublicKeyWorkerOwnedState raw08PublicKeyWorkerA8OwnedState_{};
- AuthBootstrap680ReplyAuthDataValidatorOwnedState replyAuthDataValidatorACOwnedState_{};
+ std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> lazyPubkeyDatValidatorA4Owned_{};
+ AuthBootstrap680RsaPublicKeyPairOwnedState lazyPubkeyDatValidatorA4PublicKeyPair0c_{};
+ std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor> raw08PublicKeyWorkerA8Owned_{};
+ AuthBootstrap680RsaPublicKeyPairOwnedState raw08PublicKeyWorkerA8PublicKeyPair0c_{};
+ std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> replyAuthDataValidatorACOwned_{};
+ AuthBootstrap680RsaPublicKeyPairOwnedState replyAuthDataValidatorACPublicKeyPair0c_{};
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption> feedbackTransformLarge94Owned_{};
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> feedbackTransformSmall98Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
@@ -227,11 +217,9 @@ public:
     void SendAuthRequest();
     uint32_t RebuildReplyPublicKeyWorkers(
         uint32_t replyPublicKeyId09,
-        const uint8_t* modulusBytes,
-        size_t modulusByteCount,
-        uint8_t publicExponentByte,
-        const uint8_t* signatureBytes,
-        size_t signatureByteCount);
+        const CryptoPP::Integer& modulusInteger,
+        const CryptoPP::Integer& publicExponentInteger,
+        const uint8_t* signatureBytes);
     uint32_t HandleGetPublicKeyReply(
         const Packet_AsGetPublicKeyReply_0x4b6ca4& replyPacket);
 
