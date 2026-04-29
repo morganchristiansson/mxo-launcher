@@ -652,13 +652,14 @@ struct State6Packet0x07FixedPayload {
 class Packet_AsGetPublicKeyReply_0x4b6ca4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
  // anchor: launcher.exe:0x443910
- // `initializeWritablePayload=false` mirrors the local build path that grows the retained
+ // `resolveVariableTailViews=false` mirrors the local build path that grows the retained
  // message-ref by 0x12 bytes and stamps opcode 0x07 plus zeroed trailing fields.
- // `initializeWritablePayload=true` mirrors the incoming-view path that decodes the effective
- // payload start from either direct or headerless storage layout and then dispatches to 0x443410.
+ // `resolveVariableTailViews=true` mirrors the incoming-view path that decodes the effective
+ // payload start from either direct or headerless storage layout and then resolves the
+ // two inherited length-prefixed tail views rooted at payload+0x0d and payload+0x10.
  void InitFromIncomingMessage(
      ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* sourceMessageRef,
-     bool initializeWritablePayload) {
+     bool resolveVariableTailViews) {
   if (messageRef08 && messageRef08 != sourceMessageRef) {
     messageRef08->Release();
   }
@@ -671,7 +672,7 @@ public:
   if (!messageRef08 || !messageRef08->messageStorage0c) {
     payloadPtr04 = 0u;
     payloadAlias10 = nullptr;
-    createRefParam0c = initializeWritablePayload ? 1u : 0u;
+    createRefParam0c = resolveVariableTailViews ? 1u : 0u;
     return;
   }
 
@@ -687,10 +688,10 @@ public:
     messageRef08->headerless10 = 1u;
   }
 
-  createRefParam0c = initializeWritablePayload ? 1u : 0u;
+  createRefParam0c = resolveVariableTailViews ? 1u : 0u;
   payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
 
-  if (!initializeWritablePayload) {
+  if (!resolveVariableTailViews) {
     messageRef08->GrowPayloadByteCount(State6Packet0x07FixedPayload::kFixedByteCount);
     uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
     if (payload) {
@@ -704,21 +705,52 @@ public:
     }
     debugString14 = nullptr;
     payloadSize18 = 0u;
-    packetType1a = 0u;
-    padding1b = 0u;
     characterIdLow1c = 0u;
     characterIdHigh20 = 0u;
-    worldId24 = 0u;
     return;
   }
 
-  InitializePayloadSize();
+  ResolveVariableTailViews();
+ }
+
+ // anchor: launcher.exe:0x443410
+ // Reads the two optional length-prefixed tail fields rooted at payload+0x0d and payload+0x10
+ // and stores their content pointers/lengths into the inherited +0x14/+0x18 and +0x1c/+0x20
+ // slots respectively.
+ void ResolveVariableTailViews() {
+  const uint8_t* payload = static_cast<const uint8_t*>(payloadAlias10);
+  if (!payload) {
+    debugString14 = nullptr;
+    payloadSize18 = 0u;
+    characterIdLow1c = 0u;
+    characterIdHigh20 = 0u;
+    return;
+  }
+
+  const uint16_t firstFieldOffset = *reinterpret_cast<const uint16_t*>(payload + 0x0du);
+  if (firstFieldOffset != 0u) {
+    payloadSize18 = *reinterpret_cast<const uint16_t*>(payload + firstFieldOffset);
+    debugString14 = reinterpret_cast<const char*>(payload + firstFieldOffset + 2u);
+  } else {
+    payloadSize18 = 0u;
+    debugString14 = nullptr;
+  }
+
+  const uint16_t secondFieldOffset = *reinterpret_cast<const uint16_t*>(payload + 0x10u);
+  if (secondFieldOffset != 0u) {
+    characterIdHigh20 = *reinterpret_cast<const uint16_t*>(payload + secondFieldOffset);
+    characterIdLow1c = reinterpret_cast<uint32_t>(payload + secondFieldOffset + 2u);
+  } else {
+    characterIdHigh20 = 0u;
+    characterIdLow1c = 0u;
+  }
  }
 
  // anchor: launcher.exe:0x4439f0 / vtable slot 3
- // Recomputes the effective payload start for the current retained message-ref and clears the
- // inherited reused fields. This matches the original class staying entirely within the inherited
- // Packet_0x4af2a4 layout rather than appending new members.
+ // Recomputes the effective headerless builder payload start from payloadBytes0c[1], resets the
+ // retained message-ref position via the 0x41bb60 helper, grows by that offset and then stamps a
+ // fresh 0x12-byte opcode 0x07 body with zeroed fixed fields. This is the builder reset path,
+ // not the incoming parse-view path.
  void InitializePayloadSize() override {
   if (!messageRef08 || !messageRef08->messageStorage0c) {
     payloadPtr04 = 0u;
@@ -754,11 +786,8 @@ public:
 
   debugString14 = nullptr;
   payloadSize18 = 0u;
-  packetType1a = 0u;
-  padding1b = 0u;
   characterIdLow1c = 0u;
   characterIdHigh20 = 0u;
-  worldId24 = 0u;
  }
 };
 
