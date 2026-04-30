@@ -1024,166 +1024,6 @@ static uint32_t CLTIPSocket_StaticAllocateSocket(
     return static_cast<uint32_t>(socketHandle);
 }
 
-// UNANCHORED internal helper used by the current MonitorPort scaffold.
-static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    const uint32_t listenSocketHandle = CLTIPSocket_StaticAllocateSocket(
-        SOCK_STREAM,
-        IPPROTO_TCP,
-        /*flags=*/0u);
-    if (listenSocketHandle == kInvalidSocketHandle) {
-        return kInvalidSocketHandle;
-    }
-
-    SOCKET listenSocket = static_cast<SOCKET>(listenSocketHandle);
-
-    sockaddr_in listenAddr = {};
-    listenAddr.sin_family = AF_INET;
-    listenAddr.sin_port = htons(portHostOrder);
-    listenAddr.sin_addr.s_addr = ipv4NetworkOrder;
-
-    if (bind(listenSocket, reinterpret_cast<const sockaddr*>(&listenAddr), sizeof(listenAddr)) == SOCKET_ERROR) {
-        closesocket(listenSocket);
-        return kInvalidSocketHandle;
-    }
-
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-        closesocket(listenSocket);
-        return kInvalidSocketHandle;
-    }
-
-    return static_cast<uint32_t>(listenSocket);
-}
-
-// UNANCHORED internal helper used by the current UDPMonitorPort scaffold.
-static uint32_t OpenUdpMonitorSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    const uint32_t udpSocketHandle = CLTIPSocket_StaticAllocateSocket(
-        SOCK_DGRAM,
-        IPPROTO_UDP,
-        /*flags=*/0u);
-    if (udpSocketHandle == kInvalidSocketHandle) {
-        return kInvalidSocketHandle;
-    }
-
-    SOCKET udpSocket = static_cast<SOCKET>(udpSocketHandle);
-
-    BOOL reuseAddr = TRUE;
-    if (setsockopt(
-            udpSocket,
-            SOL_SOCKET,
-            SO_REUSEADDR,
-            reinterpret_cast<const char*>(&reuseAddr),
-            sizeof(reuseAddr)) == SOCKET_ERROR) {
-        closesocket(udpSocket);
-        return kInvalidSocketHandle;
-    }
-
-    sockaddr_in bindAddr = {};
-    bindAddr.sin_family = AF_INET;
-    bindAddr.sin_port = htons(portHostOrder);
-    bindAddr.sin_addr.s_addr = ipv4NetworkOrder;
-
-    if (bind(udpSocket, reinterpret_cast<const sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR) {
-        closesocket(udpSocket);
-        return kInvalidSocketHandle;
-    }
-
-    return static_cast<uint32_t>(udpSocket);
-}
-
-// UNANCHORED internal scaffold helper used by Queue_PushPair growth handling.
-static bool RecenterQueueSlots(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
-    uint32_t additionalBlocks,
-    bool biasTowardTail) {
-    if (!queue || !queue->slotsBase || !queue->slotsCurrent || !queue->slotsLast) {
-        return false;
-    }
-
-    uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-    uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
-    uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-    const uint32_t activeBlocks = static_cast<uint32_t>((slotsLast - slotsCurrent) + 1);
-    const uint32_t neededBlocks = activeBlocks + additionalBlocks;
-
-    uint32_t newCapacity = queue->slotCapacity;
-    uint32_t** newSlotsBase = slotsBase;
-    if (queue->slotCapacity <= (neededBlocks * 2u)) {
-        const uint32_t growthBase = (queue->slotCapacity >= additionalBlocks) ? queue->slotCapacity : additionalBlocks;
-        newCapacity = queue->slotCapacity + growthBase + 2u;
-        newSlotsBase = static_cast<uint32_t**>(std::calloc(newCapacity, sizeof(uint32_t*)));
-        if (!newSlotsBase) {
-            return false;
-        }
-    }
-
-    uint32_t newIndex = (newCapacity - neededBlocks) >> 1;
-    if (biasTowardTail) {
-        newIndex += additionalBlocks;
-    }
-
-    uint32_t** newSlotsCurrent = newSlotsBase + newIndex;
-    std::memmove(newSlotsCurrent, slotsCurrent, activeBlocks * sizeof(uint32_t*));
-
-    if (newSlotsBase != slotsBase) {
-        std::free(slotsBase);
-        queue->slotsBase = newSlotsBase;
-        queue->slotCapacity = newCapacity;
-    }
-
-    queue->slotsCurrent = newSlotsCurrent;
-    queue->block0 = *newSlotsCurrent;
-    queue->end0 = queue->block0 ? (static_cast<uint8_t*>(queue->block0) + 0x80) : nullptr;
-
-    uint32_t** newSlotsLast = newSlotsCurrent + activeBlocks - 1;
-    queue->slotsLast = newSlotsLast;
-    queue->block1 = *newSlotsLast;
-    queue->end1 = queue->block1 ? (static_cast<uint8_t*>(queue->block1) + 0x80) : nullptr;
-    return true;
-}
-
-// UNANCHORED internal scaffold helper used by Queue_PushPair block-growth handling.
-static bool GrowQueue(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
-    const CLTThreadPerClientTCPEngine_0x4b2768_QueuePair* pendingPair) {
-    if (!queue || !queue->slotsLast) {
-        return false;
-    }
-
-    uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-    uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-    const uint32_t tailFreeSlots = queue->slotCapacity - static_cast<uint32_t>(slotsLast - slotsBase);
-    if (tailFreeSlots < 2u) {
-        if (!RecenterQueueSlots(queue, 1, false)) {
-            return false;
-        }
-        slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-    }
-
-    uint32_t* newBlock = QueueTakeRecycledBlockScaffold(queue);
-    if (!newBlock) {
-        newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
-        if (!newBlock) {
-            return false;
-        }
-    } else {
-        std::memset(newBlock, 0, 0x80);
-    }
-
-    slotsLast[1] = newBlock;
-
-    uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
-    if (current1 && pendingPair) {
-        current1[0] = pendingPair->value0;
-        current1[1] = pendingPair->value1;
-    }
-
-    queue->slotsLast = slotsLast + 1;
-    queue->block1 = newBlock;
-    queue->end1 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
-    queue->current1 = newBlock;
-    return true;
-}
-
 }  // namespace
 
 // anchor: launcher.exe:0x4319e0
@@ -1967,8 +1807,68 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
 
     uint8_t* lastPairInBlock = queue->end1 ? (static_cast<uint8_t*>(queue->end1) - 8) : nullptr;
     if (static_cast<void*>(queue->current1) == static_cast<void*>(lastPairInBlock)) {
-        CLTThreadPerClientTCPEngine_0x4b2768_QueuePair pair = {value0, value1};
-        (void)GrowQueue(queue, &pair);
+        uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
+        uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
+        if (!slotsBase || !slotsLast) {
+            return;
+        }
+
+        const uint32_t tailFreeSlots = queue->slotCapacity - static_cast<uint32_t>(slotsLast - slotsBase);
+        if (tailFreeSlots < 2u) {
+            uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
+            if (!slotsCurrent) {
+                return;
+            }
+            const uint32_t activeBlocks = static_cast<uint32_t>((slotsLast - slotsCurrent) + 1);
+            const uint32_t neededBlocks = activeBlocks + 1u;
+            uint32_t newCapacity = queue->slotCapacity;
+            uint32_t** newSlotsBase = slotsBase;
+            if (queue->slotCapacity <= (neededBlocks * 2u)) {
+                const uint32_t growthBase = (queue->slotCapacity >= 1u) ? queue->slotCapacity : 1u;
+                newCapacity = queue->slotCapacity + growthBase + 2u;
+                newSlotsBase = static_cast<uint32_t**>(std::calloc(newCapacity, sizeof(uint32_t*)));
+                if (!newSlotsBase) {
+                    return;
+                }
+            }
+
+            const uint32_t newIndex = (newCapacity - neededBlocks) >> 1;
+            uint32_t** newSlotsCurrent = newSlotsBase + newIndex;
+            std::memmove(newSlotsCurrent, slotsCurrent, activeBlocks * sizeof(uint32_t*));
+            if (newSlotsBase != slotsBase) {
+                std::free(slotsBase);
+                queue->slotsBase = newSlotsBase;
+                queue->slotCapacity = newCapacity;
+            }
+
+            queue->slotsCurrent = newSlotsCurrent;
+            queue->block0 = *newSlotsCurrent;
+            queue->end0 = queue->block0 ? (static_cast<uint8_t*>(queue->block0) + 0x80) : nullptr;
+            uint32_t** newSlotsLast = newSlotsCurrent + activeBlocks - 1;
+            queue->slotsLast = newSlotsLast;
+            queue->block1 = *newSlotsLast;
+            queue->end1 = queue->block1 ? (static_cast<uint8_t*>(queue->block1) + 0x80) : nullptr;
+            slotsLast = newSlotsLast;
+        }
+
+        uint32_t* newBlock = QueueTakeRecycledBlockScaffold(queue);
+        if (!newBlock) {
+            newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
+            if (!newBlock) {
+                return;
+            }
+        } else {
+            std::memset(newBlock, 0, 0x80);
+        }
+
+        slotsLast[1] = newBlock;
+        uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
+        current1[0] = value0;
+        current1[1] = value1;
+        queue->slotsLast = slotsLast + 1;
+        queue->block1 = newBlock;
+        queue->end1 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
+        queue->current1 = newBlock;
         return;
     }
 
@@ -2352,8 +2252,23 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
         return kResultAlreadyMonitored;
     }
 
-    const uint32_t listenSocketHandle = OpenTcpListenSocket(portHostOrder, ipv4NetworkOrder);
+    const uint32_t listenSocketHandle = CLTIPSocket_StaticAllocateSocket(
+        SOCK_STREAM,
+        IPPROTO_TCP,
+        /*flags=*/0u);
     if (listenSocketHandle == kInvalidSocketHandle) {
+        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        return 1u;
+    }
+
+    SOCKET listenSocket = static_cast<SOCKET>(listenSocketHandle);
+    sockaddr_in listenAddr = {};
+    listenAddr.sin_family = AF_INET;
+    listenAddr.sin_port = htons(portHostOrder);
+    listenAddr.sin_addr.s_addr = ipv4NetworkOrder;
+    if (bind(listenSocket, reinterpret_cast<const sockaddr*>(&listenAddr), sizeof(listenAddr)) == SOCKET_ERROR ||
+        listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+        closesocket(listenSocket);
         (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
         return 1u;
     }
@@ -2392,10 +2307,28 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostO
 
     connection->SetEngine(this);
 
-    const uint32_t socketHandle = OpenUdpMonitorSocket(
-        portHostOrder,
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ipv4NetworkOrder)));
+    const uint32_t socketHandle = CLTIPSocket_StaticAllocateSocket(
+        SOCK_DGRAM,
+        IPPROTO_UDP,
+        /*flags=*/0u);
     if (socketHandle == kInvalidSocketHandle) {
+        return 1u;
+    }
+
+    SOCKET udpSocket = static_cast<SOCKET>(socketHandle);
+    BOOL reuseAddr = TRUE;
+    sockaddr_in bindAddr = {};
+    bindAddr.sin_family = AF_INET;
+    bindAddr.sin_port = htons(portHostOrder);
+    bindAddr.sin_addr.s_addr = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ipv4NetworkOrder));
+    if (setsockopt(
+            udpSocket,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            reinterpret_cast<const char*>(&reuseAddr),
+            sizeof(reuseAddr)) == SOCKET_ERROR ||
+        bind(udpSocket, reinterpret_cast<const sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR) {
+        closesocket(udpSocket);
         return 1u;
     }
 
