@@ -2821,72 +2821,24 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
     }
 }
 
-CLTThreadPerClientTCPEngine_0x4b2768_Queue* CLTThreadPerClientTCPEngine_0x4b2768::ActiveQueue0CScaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->queue0C)
-        ? attachment->queue0C
-        : &ownedQueue0C_;
-}
-
-CLTThreadPerClientTCPEngine_0x4b2768_Queue* CLTThreadPerClientTCPEngine_0x4b2768::ActiveQueue34Scaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->queue34)
-        ? attachment->queue34
-        : &ownedQueue34_;
-}
-
-const CLTThreadPerClientTCPEngine_0x4b2768_Queue* CLTThreadPerClientTCPEngine_0x4b2768::ActiveQueue0CScaffold() const {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->queue0C)
-        ? attachment->queue0C
-        : &ownedQueue0C_;
-}
-
-const CLTThreadPerClientTCPEngine_0x4b2768_Queue* CLTThreadPerClientTCPEngine_0x4b2768::ActiveQueue34Scaffold() const {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->queue34)
-        ? attachment->queue34
-        : &ownedQueue34_;
-}
-
-void* CLTThreadPerClientTCPEngine_0x4b2768::ActiveQueueLockScaffold() const {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->queueLock)
-        ? attachment->queueLock
-        : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit);
-}
-
-void* CLTThreadPerClientTCPEngine_0x4b2768::ActiveQueueSignalEventScaffold() const {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->queueSignalEvent)
-        ? attachment->queueSignalEvent
-        : ownedQueueSignalEvent7C_;
-}
-
-void* CLTThreadPerClientTCPEngine_0x4b2768::ActiveCleanupLockScaffold() const {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    return (attachment && attachment->cleanupLock)
-        ? attachment->cleanupLock
-        : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit);
-}
-
 // anchor: launcher.exe:0x435f90
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SignalQueueEventHelper() {
-    HANDLE eventHandle = static_cast<HANDLE>(ActiveQueueSignalEventScaffold());
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    HANDLE eventHandle = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
+        ? attachment->queueSignalEvent
+        : ownedQueueSignalEvent7C_);
     return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
 }
 
 // anchor: launcher.exe:0x435fa0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMilliseconds) {
     (void)LeaveQueueLockHelper();
-    HANDLE eventHandle = static_cast<HANDLE>(ActiveQueueSignalEventScaffold());
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    HANDLE eventHandle = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
+        ? attachment->queueSignalEvent
+        : ownedQueueSignalEvent7C_);
     const DWORD waitResult = eventHandle
         ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reasonMilliseconds))
         : WAIT_FAILED;
@@ -2904,32 +2856,48 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMi
 // Shared helper-body evidence: launcher.exe:0x4147b0 / 0x4147c0.
 // These are source-side wrappers over the recovered lock-helper storage.
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
-    if (CRITICAL_SECTION* crit =
-            CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
+            (attachment && attachment->queueLock)
+                ? attachment->queueLock
+                : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit))) {
         EnterCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
-    if (CRITICAL_SECTION* crit =
-            CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
+            (attachment && attachment->queueLock)
+                ? attachment->queueLock
+                : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit))) {
         LeaveCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
-    if (CRITICAL_SECTION* crit =
-            CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
+            (attachment && attachment->cleanupLock)
+                ? attachment->cleanupLock
+                : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit))) {
         EnterCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
-    if (CRITICAL_SECTION* crit =
-            CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
+            (attachment && attachment->cleanupLock)
+                ? attachment->cleanupLock
+                : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit))) {
         LeaveCriticalSection(crit);
     }
     return 0u;
@@ -2948,17 +2916,28 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         return 0x7000006u;
     }
 
-    CRITICAL_SECTION* queueLock =
-        CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C =
+        (attachment && attachment->queue0C) ? attachment->queue0C : &ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 =
+        (attachment && attachment->queue34) ? attachment->queue34 : &ownedQueue34_;
+    HANDLE activeQueueSignalEvent = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
+        ? attachment->queueSignalEvent
+        : ownedQueueSignalEvent7C_);
+    CRITICAL_SECTION* queueLock = CriticalSectionFromOpaqueStorage(
+        (attachment && attachment->queueLock)
+            ? attachment->queueLock
+            : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit));
     if (queueLock) {
         EnterCriticalSection(queueLock);
     }
 
-    while (waitForSignal && Queue_IsEmpty(ActiveQueue0CScaffold()) && Queue_IsEmpty(ActiveQueue34Scaffold())) {
+    while (waitForSignal && Queue_IsEmpty(activeQueue0C) && Queue_IsEmpty(activeQueue34)) {
         if (queueLock) {
             LeaveCriticalSection(queueLock);
         }
-        if (!ActiveQueueSignalEventScaffold()) {
+        if (!activeQueueSignalEvent) {
             outPair->value0 = 0u;
             outPair->value1 = 0u;
             return 0x700000au;
@@ -2975,10 +2954,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_Queue* selectedQueue = nullptr;
-    if (!Queue_IsEmpty(ActiveQueue34Scaffold())) {
-        selectedQueue = ActiveQueue34Scaffold();
-    } else if (!Queue_IsEmpty(ActiveQueue0CScaffold())) {
-        selectedQueue = ActiveQueue0CScaffold();
+    if (!Queue_IsEmpty(activeQueue34)) {
+        selectedQueue = activeQueue34;
+    } else if (!Queue_IsEmpty(activeQueue0C)) {
+        selectedQueue = activeQueue0C;
     }
 
     if (!selectedQueue) {
@@ -3011,19 +2990,27 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     //   -> signal helper `+0x5c` only on pre-push empty -> non-empty transition
     // - no push-success result is surfaced back to callers; caller-side ownership/lifetime does not
     //   branch on queue-growth success/failure once this path is entered
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* targetQueue = useQueue34 ? ActiveQueue34Scaffold() : ActiveQueue0CScaffold();
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C =
+        (attachment && attachment->queue0C) ? attachment->queue0C : &ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 =
+        (attachment && attachment->queue34) ? attachment->queue34 : &ownedQueue34_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
     if (!targetQueue) {
         return false;
     }
 
-    CRITICAL_SECTION* queueLock =
-        CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
+    CRITICAL_SECTION* queueLock = CriticalSectionFromOpaqueStorage(
+        (attachment && attachment->queueLock)
+            ? attachment->queueLock
+            : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit));
     if (queueLock && !queueLockAlreadyHeld) {
         EnterCriticalSection(queueLock);
     }
 
     const bool queuePairWasEmpty =
-        Queue_IsEmpty(ActiveQueue0CScaffold()) && Queue_IsEmpty(ActiveQueue34Scaffold());
+        Queue_IsEmpty(activeQueue0C) && Queue_IsEmpty(activeQueue34);
     Queue_PushPair(
         targetQueue,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
@@ -3083,18 +3070,29 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the attached arg5 lock
-    CRITICAL_SECTION* queueLock =
-        CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
+    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C =
+        (attachment && attachment->queue0C) ? attachment->queue0C : &ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 =
+        (attachment && attachment->queue34) ? attachment->queue34 : &ownedQueue34_;
+    HANDLE activeQueueSignalEvent = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
+        ? attachment->queueSignalEvent
+        : ownedQueueSignalEvent7C_);
+    CRITICAL_SECTION* queueLock = CriticalSectionFromOpaqueStorage(
+        (attachment && attachment->queueLock)
+            ? attachment->queueLock
+            : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit));
     while (true) {
         if (queueLock) {
             EnterCriticalSection(queueLock);
         }
 
         CLTThreadPerClientTCPEngine_0x4b2768_Queue* selectedQueue = nullptr;
-        if (!Queue_IsEmpty(ActiveQueue34Scaffold())) {
-            selectedQueue = ActiveQueue34Scaffold();
-        } else if (!Queue_IsEmpty(ActiveQueue0CScaffold())) {
-            selectedQueue = ActiveQueue0CScaffold();
+        if (!Queue_IsEmpty(activeQueue34)) {
+            selectedQueue = activeQueue34;
+        } else if (!Queue_IsEmpty(activeQueue0C)) {
+            selectedQueue = activeQueue0C;
         }
 
         if (!selectedQueue) {
@@ -3105,7 +3103,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
                 return;
             }
 
-            if (!ActiveQueueSignalEventScaffold()) {
+            if (!activeQueueSignalEvent) {
                 return;
             }
 
@@ -3163,7 +3161,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} preferType1CallbackBeforeCleanup={}",
-            (selectedQueue == ActiveQueue34Scaffold()) ? "queue34" : "queue0C",
+            (selectedQueue == activeQueue34) ? "queue34" : "queue0C",
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),

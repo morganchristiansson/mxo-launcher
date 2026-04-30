@@ -533,13 +533,6 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue0CScaffold();
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue34Scaffold();
-    const CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue0CScaffold() const;
-    const CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue34Scaffold() const;
-    void* ActiveQueueLockScaffold() const;
-    void* ActiveQueueSignalEventScaffold() const;
-    void* ActiveCleanupLockScaffold() const;
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
