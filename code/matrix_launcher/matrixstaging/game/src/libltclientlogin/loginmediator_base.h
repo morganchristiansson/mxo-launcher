@@ -279,12 +279,8 @@ public:
     std::array<char, 0x20> password20{};     // +0x20
     std::array<uint8_t, 16> keyConfigMd540{}; // +0x40
     std::array<uint8_t, 16> uiConfigMd550{};  // +0x50
-    // +0x60: session token string (SmallString60 - 12 bytes)
-    struct SmallString60 {
-        const char* begin = nullptr;
-        const char* current = nullptr;
-        const char* capacity = nullptr;
-    } sessionToken60;
+    // +0x60: old-MSVC2003 `std::string` / recovered `0x403f90` family
+    std::string sessionToken60;
     uint8_t flag6C = 0;                     // +0x6c
     // Total block size: 0x70 bytes (112 bytes)
 
@@ -303,10 +299,17 @@ public:
         std::copy_n(input.submitKeyConfigMd5Block40.begin(), 0x10, keyConfigMd540.begin());
         // Copy uiConfigMd5 block (16 bytes)
         std::copy_n(input.submitUiConfigMd5Block50.begin(), 0x10, uiConfigMd550.begin());
-        // Copy session token string
-        sessionToken60.begin = input.submitSessionTokenString.begin;
-        sessionToken60.current = input.submitSessionTokenString.current;
-        sessionToken60.capacity = input.submitSessionTokenString.capacity;
+        // `0x41eb80` uses the old-MSVC2003 `std::string::assign(begin, end)` path for the
+        // embedded `+0x60` string member.
+        if (input.submitSessionTokenString.begin == nullptr ||
+            input.submitSessionTokenString.current == nullptr ||
+            input.submitSessionTokenString.current < input.submitSessionTokenString.begin) {
+            sessionToken60.clear();
+        } else {
+            sessionToken60.assign(
+                input.submitSessionTokenString.begin,
+                input.submitSessionTokenString.current);
+        }
         // Copy flag
         flag6C = input.submitRequestFlag6c;
     }
