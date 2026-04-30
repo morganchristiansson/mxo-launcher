@@ -541,6 +541,12 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
+    // UNANCHORED: narrowed queue-family mirror step.
+    // Queue-family phase1 experiment result:
+    // - post-InitClientDLL margin progression still appears to consult arg5-visible queue bytes
+    // - keep the real engine object authoritative, but mirror the inline queue-pair record back to
+    //   the attached shell so client-visible polling can observe the same queue state
+    void SyncAttachedLauncherObjectQueuePairScaffold();
     // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still use
     // this private mirror step so the raw arg5 shell tracks class-owned state changes.
     void SyncAttachedLauncherObjectStateScaffold();
