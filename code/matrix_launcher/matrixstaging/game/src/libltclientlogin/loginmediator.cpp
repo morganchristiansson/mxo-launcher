@@ -2240,42 +2240,6 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 // These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They only provide
 // fixed fallback values for wrapper-facing readers until the recovered owner fields are available.
 
-uint32_t CLTLoginMediator::SelectionVariantUpperBoundExclusive() const {
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    if (stateCode >= 3u) {
-        return static_cast<uint32_t>(selectionRouteState684_.slotRecordCount00_);
-    }
-    return selectionSeed_.variantUpperBoundExclusive_;
-}
-
-uint32_t CLTLoginMediator::SelectedVariantIndexHigh8() const {
-    return selectionSeed_.selectedVariantIndexHigh8_;
-}
-
-uint32_t CLTLoginMediator::SelectedVariantState() const {
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t variantIndex = selectionSeed_.selectedVariantIndexHigh8_;
-    if (stateCode >= 3u && variantIndex < 100u) {
-        return static_cast<uint32_t>(GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex)));
-    }
-    return selectionSeed_.selectedVariantState_;
-}
-
-const char* CLTLoginMediator::MappedSelectionName() const {
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t variantIndex = selectionSeed_.selectedVariantIndexHigh8_;
-    if (stateCode >= 3u && variantIndex < 100u) {
-        if (const char* worldName = LookupRouteHostPrefixBySlot(static_cast<uint8_t>(variantIndex))) {
-            return worldName;
-        }
-    }
-    return selectionSeed_.mappedSelectionName_.c_str();
-}
-
-bool CLTLoginMediator::VariantIndexMatchesSelection(uint32_t variantIndex) const {
-    return variantIndex == selectionSeed_.selectedVariantIndexHigh8_;
-}
-
 uint32_t CLTLoginMediator::ExpectedSelectionDescriptorScratchRequest() const {
     const uint32_t variantHigh8 = (selectionSeed_.selectedVariantIndexHigh8_ & 0xffu) << 24;
     const uint32_t preservedMiddle16 = selectionSeed_.selectedWorldIndexLow24_ & 0x00ffff00u;

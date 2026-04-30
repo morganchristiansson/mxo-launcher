@@ -2284,18 +2284,6 @@ CMarginConnection_0x4aff38::CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngi
 // - `0x41ce80` is the separate connection `+0x98` reply-copy helper, not this C++ destructor body
 CMarginConnection_0x4aff38::~CMarginConnection_0x4aff38() = default;
 
-namespace {
-
-static void** CMarginConnection_LocalCompletionWorkItemVtableScaffold() {
-    // anchor: launcher.exe:0x464870 / data `0x004baa00`
-    // The current source does not need the concrete local dtor body from that vtable family, but
-    // keep a stable non-null vtable pointer in the recovered 12-byte stack work-item shape.
-    static void* vtable[1] = {nullptr};
-    return vtable;
-}
-
-}  // namespace
-
 // anchor: launcher.exe:0x441850
 void CBaseMarginConnection_0x4b64a8::SetMessageCode4SuccessFlag84(bool value) {
     messageCode4SuccessFlag84_ = value;
