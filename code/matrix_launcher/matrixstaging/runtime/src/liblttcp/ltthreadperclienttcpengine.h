@@ -131,23 +131,6 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18 {
     unsigned char keyAndPayload[0x8];
 };
 
-// Launcher-visible shell attachment map used by the current wrapper boundary.
-// This intentionally keeps the raw arg5 shell outside liblttcp while letting the target class own
-// more of the constructor/runtime-visible state that the shell mirrors.
-struct CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment {
-    uint32_t* field04CtorFlags = nullptr;
-    void** field08QueueThreadArray = nullptr;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue0C = nullptr;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue34 = nullptr;
-    void* queueLock = nullptr;
-    void* queueSignalEvent = nullptr;
-    void* cleanupLock = nullptr;
-    void** list80EndpointTreeHead = nullptr;
-    uint32_t* field84EndpointCount = nullptr;
-    void** list8CContextTreeHead = nullptr;
-    uint32_t* field90ContextCount = nullptr;
-};
-
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold) == 0x04, "wait helper size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold) == 0x1c, "lock helper size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
@@ -427,21 +410,6 @@ public:
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
     static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair);
 
-    // UNANCHORED: scaffold bridge because the current liblttcp engine still lives beside the raw
-    // launcher ABI shell.
-    //
-    // Ownership note after the current arg5 structural pass:
-    // - the target class now owns first-class source-level surrogates for the recovered ctor/
-    //   helper/container state
-    // - the wrapper still provides the raw embedded shell addresses consumed by original code
-    // - this attachment map tells the class which live shell surfaces should override the owned
-    //   fallback queue/event/lock state while also exposing which count/head fields on the shell
-    //   should mirror class-owned state directly
-    void AttachLauncherAbiSurfaceScaffold(
-        const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment);
-    // UNANCHORED: explicit detach/reset helper for the launcher ABI bridge.
-    void DetachLauncherAbiSurfaceScaffold();
-
     // Helper-family bodies now source-own the recovered +0x5c/+0x60/+0x98 semantics on the
     // target class side; launcher ABI wrappers only route raw helper entrypoints here.
     // Faithfulness split after the current helper pass:
@@ -530,9 +498,6 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still use
-    // this private mirror step so the raw arg5 shell tracks class-owned state changes.
-    void SyncAttachedLauncherObjectStateScaffold();
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
