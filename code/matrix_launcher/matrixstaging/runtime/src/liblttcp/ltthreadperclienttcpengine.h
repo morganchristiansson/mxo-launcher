@@ -514,10 +514,6 @@ private:
     // Faithfulness note: like the endpoint-tree finder, the original returns the matching tree
     // node or the tree-head sentinel, not the `WorkerThread*` payload.
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTree_Find(uint32_t key);
-    // Source-owned shared engine-slot connection resolver.
-    // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection_0x4b7928`
-    // objects when original caller/object evidence is missing.
-    CMessageConnection_0x4b7928* ResolveConnectionForEngineSlotScaffold(void* contextKey);
     // anchor: launcher.exe:0x431ff0 worker creation/insertion helper.
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CreateAndInsertWorkerThread(
         CMessageConnection_0x4b7928* connection,

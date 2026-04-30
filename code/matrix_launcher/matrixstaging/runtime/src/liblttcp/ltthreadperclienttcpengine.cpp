@@ -2404,10 +2404,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
 // anchor: launcher.exe:0x4325d0
 // vtable: launcher.exe:0x004b2768 slot +0x08
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder) {
-    CMessageConnection_0x4b7928* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
+    CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(contextKey);
     if (!connection || connection->State() != LTTCPEngineConnectionState::kClosed) {
         return 1u;
     }
+
+    connection->SetEngine(this);
 
     const uint32_t socketHandle = OpenUdpMonitorSocket(
         portHostOrder,
@@ -2442,11 +2444,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorEphemeralUDPPort(uint16_t*
     const uint32_t result = UDPMonitorPort(/*portHostOrder=*/0, contextKey, ipv4NetworkOrder);
     if (result == 0u && outBoundPortHostOrder) {
         *outBoundPortHostOrder = 0;
-        if (CMessageConnection_0x4b7928* connection = ResolveConnectionForEngineSlotScaffold(contextKey)) {
+        CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(contextKey);
+        if (connection && connection->SocketHandle() != kInvalidSocketHandle) {
             sockaddr_in boundAddr = {};
             int boundAddrSize = sizeof(boundAddr);
-            if (connection->SocketHandle() != kInvalidSocketHandle &&
-                getsockname(
+            if (getsockname(
                     static_cast<SOCKET>(connection->SocketHandle()),
                     reinterpret_cast<sockaddr*>(&boundAddr),
                     &boundAddrSize) == 0) {
@@ -3530,35 +3532,6 @@ CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* CLTThreadPerClientTCPEngin
         ContextTreeFindNode(ownedContextTreeHead8C_, key);
     return node ? node
                 : reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
-}
-
-CMessageConnection_0x4b7928* CLTThreadPerClientTCPEngine_0x4b2768::ResolveConnectionForEngineSlotScaffold(
-    void* contextKey) {
-    if (!contextKey) {
-        return nullptr;
-    }
-
-    void* normalizedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
-    CMessageConnection_0x4b7928* connection = FindMessageConnection(contextKey);
-    if (!connection && normalizedContextKey != contextKey) {
-        connection = FindMessageConnection(normalizedContextKey);
-    }
-
-    // Static RE of `0x449cd0`, `0x449d20`, and `0x449d40` keeps the public engine slot family on
-    // the direct connection object itself. After queue-context unwrapping above, remaining callers
-    // are expected to already be passing that connection object.
-    if (!connection) {
-        connection = static_cast<CMessageConnection_0x4b7928*>(normalizedContextKey);
-    }
-    if (!connection) {
-        return nullptr;
-    }
-
-    connection->SetEngine(this);
-    if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
-        connection->SetOwnerContext(normalizedContextKey);
-    }
-    return connection;
 }
 
 // anchor: launcher.exe:0x431ff0
