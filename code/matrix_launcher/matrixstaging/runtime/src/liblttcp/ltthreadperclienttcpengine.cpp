@@ -1706,13 +1706,45 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             while (true) {
                 uint32_t wsaError = 0u;
                 bool peerClosed = false;
-                const int receiveResult =
-                    connection->ReceiveReadyReadOperationFragmentScaffold(&wsaError, &peerClosed);
+                CLTTCPReadOperation* readOperationFragment =
+                    new (std::nothrow) CLTTCPReadOperation;
+                if (!readOperationFragment) {
+                    spdlog::warn(
+                        "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread recv fragment allocation failed connection={} socket=0x{:08x}",
+                        fmt::ptr(connection),
+                        socketHandle);
+                    break;
+                }
+
+                // anchor: launcher.exe:0x42fe50 recv / deliver subpath
+                // The original worker thread owns this fragment lifecycle directly rather than
+                // splitting it into a separate connection helper boundary.
+                readOperationFragment->referenceCount04 = 0;
+                readOperationFragment->byteCount08 = 0u;
+                readOperationFragment->AddRef();
+                const int receiveResult = recv(
+                    socket,
+                    reinterpret_cast<char*>(readOperationFragment + 1),
+                    0x1000,
+                    0);
                 if (receiveResult > 0) {
+                    readOperationFragment->SetByteCount(static_cast<uint32_t>(receiveResult));
+                    readOperationFragment->AddRef();
+                    connection->OnReceive(readOperationFragment);
+                    readOperationFragment->Release();
                     continue;
                 }
+
+                // anchor: launcher.exe:0x449fd0
+                // Terminal recv cleanup flows through the connection close-callback seam.
+                connection->OnClose(readOperationFragment, nullptr, nullptr);
                 if (receiveResult == 0) {
-                    break;
+                    peerClosed = true;
+                } else {
+                    wsaError = static_cast<uint32_t>(WSAGetLastError());
+                    if (wsaError == WSAEWOULDBLOCK) {
+                        break;
+                    }
                 }
 
                 spdlog::debug(

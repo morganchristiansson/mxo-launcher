@@ -422,11 +422,6 @@ public:
     // poll, but the original `0x42fe50` same-poll recv-drain loop is still not reconstructed here
     // inside `CLTTCPConnection` itself.
     int PollReceiveAndDeliverReadOperationFragmentsScaffold();
-    // Lower recv/fragment seam used by the worker-thread select loop after readability is already
-    // known. Unlike the legacy poll helper above, this does not run its own select and does not
-    // synthesize transport close side effects on terminal recv outcomes.
-    int ReceiveReadyReadOperationFragmentScaffold(uint32_t* outWsaError = nullptr, bool* outPeerClosed = nullptr);
-
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
     // Inherited shared `CBaseConnection::Close(bool)` body; this table does not add a distinct

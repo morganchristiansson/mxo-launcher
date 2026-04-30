@@ -653,78 +653,9 @@ bool CLTTCPConnection::SendQueueEmptyFlag() const {
     return pendingSendQueueState38_.SendQueueEmptyFlag();
 }
 
-int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
-    uint32_t* outWsaError,
-    bool* outPeerClosed) {
-    if (outWsaError) {
-        *outWsaError = 0u;
-    }
-    if (outPeerClosed) {
-        *outPeerClosed = false;
-    }
-
-    if (socketHandle_ == kInvalidSocketHandle ||
-        (state_ != LTTCPEngineConnectionState::kConnectActive &&
-         state_ != LTTCPEngineConnectionState::kUdpMonitorActive &&
-         state_ != LTTCPEngineConnectionState::kClosing)) {
-        return -1;
-    }
-
-    CLTTCPReadOperation* readOperationFragment =
-        new (std::nothrow) CLTTCPReadOperation;
-    if (!readOperationFragment) {
-        spdlog::warn(
-            "CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold failed fragment allocation this={}",
-            fmt::ptr(this)
-            );
-        return 0;
-    }
-
-    // anchor: launcher.exe:0x42fe50 TCP receive success path
-    // `0x42fe50` does not call a read-operation ctor here.
-    // After the fixed-size `0x100c` allocator returns, the worker writes the live leaf layout
-    // explicitly as:
-    // - `vtable = 0x004b2300`
-    // - `referenceCount04 = 0`
-    // - `byteCount08 = 0`
-    // The C++ `new (std::nothrow) CLTTCPReadOperation` above is only used to materialize that
-    // same live leaf vptr in source before these explicit field writes.
-    readOperationFragment->referenceCount04 = 0;
-    readOperationFragment->byteCount08 = 0u;
-
-    // Keep the same two worker-side fragment refs explicit here:
-    // - one outer worker-owned ref immediately after allocation/setup
-    // - one delivery-temp ref immediately before `OnReceive(fragment)`
-    readOperationFragment->AddRef();
-    const int received = recv(
-        static_cast<SOCKET>(socketHandle_),
-        reinterpret_cast<char*>(readOperationFragment + 1),
-        0x1000,
-        0);
-    if (received <= 0) {
-        readOperationFragment->Release();
-        if (received == 0) {
-            if (outPeerClosed) {
-                *outPeerClosed = true;
-            }
-            return -1;
-        }
-
-        const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
-        if (outWsaError) {
-            *outWsaError = wsaError;
-        }
-        return (wsaError == WSAEWOULDBLOCK) ? 0 : -1;
-    }
-
-    readOperationFragment->SetByteCount(static_cast<uint32_t>(received));
-    readOperationFragment->AddRef();
-    OnReceive(readOperationFragment);
-    readOperationFragment->Release();
-    return received;
-}
-
-// anchor: launcher.exe:0x42fe50 TCP receive subpath
+// UNANCHORED: source-owned narrow nonblocking receive pump used by the current arg5 helper
+// fallback. This is not a standalone original function boundary; the real recv/fragment delivery
+// body belongs to `CLTThreadPerClientTCPEngine_WorkerThread_Run` at launcher.exe:0x42fe50.
 int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     if (socketHandle_ == kInvalidSocketHandle ||
         (state_ != LTTCPEngineConnectionState::kConnectActive &&
@@ -755,9 +686,39 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
 
     uint32_t wsaError = 0u;
     bool peerClosed = false;
-    const int received = ReceiveReadyReadOperationFragmentScaffold(&wsaError, &peerClosed);
-    if (received >= 0) {
+    CLTTCPReadOperation* readOperationFragment =
+        new (std::nothrow) CLTTCPReadOperation;
+    if (!readOperationFragment) {
+        spdlog::warn(
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold failed fragment allocation this={}",
+            fmt::ptr(this));
+        return 0;
+    }
+
+    readOperationFragment->referenceCount04 = 0;
+    readOperationFragment->byteCount08 = 0u;
+    readOperationFragment->AddRef();
+    const int received = recv(
+        static_cast<SOCKET>(socketHandle_),
+        reinterpret_cast<char*>(readOperationFragment + 1),
+        0x1000,
+        0);
+    if (received > 0) {
+        readOperationFragment->SetByteCount(static_cast<uint32_t>(received));
+        readOperationFragment->AddRef();
+        OnReceive(readOperationFragment);
+        readOperationFragment->Release();
         return received;
+    }
+
+    OnClose(readOperationFragment, nullptr, nullptr);
+    if (received == 0) {
+        peerClosed = true;
+    } else {
+        wsaError = static_cast<uint32_t>(WSAGetLastError());
+        if (wsaError == WSAEWOULDBLOCK) {
+            return 0;
+        }
     }
 
     if (peerClosed) {
@@ -773,9 +734,8 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     }
 
     // The legacy helper keeps its older source-owned transport-close side effect for the fallback
-    // launcher bridge seam. The tighter worker-thread path now uses
-    // `ReceiveReadyReadOperationFragmentScaffold()` directly so it can mirror `0x42fe50`
-    // terminal ordering without forcing this older helper to own those later state transitions.
+    // launcher bridge seam even though the original recv/fragment delivery body lives inside
+    // `CLTThreadPerClientTCPEngine_WorkerThread_Run` (`0x42fe50`).
     (void)CloseSocketTransportScaffold(/*graceful=*/false);
     return -1;
 }
