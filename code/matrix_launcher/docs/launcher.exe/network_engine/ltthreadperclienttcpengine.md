@@ -34,11 +34,14 @@ Recovered field roles:
 ## Wrapper boundary
 
 - Current binding model is one active arg5 shell attached to one `CLTThreadPerClientTCPEngine_0x4b2768` sidecar through `CLTThreadPerClientTCPEngine_0x4b2768Binding`.
-- Important queue-family experiment result:
+- Queue-family experiment result:
   - moving live queue/event/lock ownership onto the real engine object did **not** break launcher-side auth flow
-  - but removing shell-visible queue-pair coherence stalled post-`InitClientDLL` margin progression before `CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(status=0)`
-  - restoring shell-visible `+0x0c..+0x5b` queue-pair mirroring was enough to recover the `MarginConnectStatus` handoff
-- Current best read: post-client-start margin polling still consults arg5-visible queue-pair bytes, even though helper entry surfaces at `+0x5c/+0x60` can remain thin wrappers over engine-owned event/lock behavior.
+  - but post-`InitClientDLL` client.dll margin progression still directly consumes the arg5 queue runner / queue subobject family
+  - simple shell queue-pair copying restored visibility but created split-brain mutable queue state and later crashed inside client.dll queue consumption
+- Current best read:
+  - arg5 queue bytes at `+0x0c..+0x5b` must remain the authoritative live completed-operation queue storage while a launcher shell is attached
+  - helper entry surfaces at `+0x5c/+0x60` can still stay as ABI wrappers that forward into engine-owned event/lock behavior
+  - the engine sidecar therefore has to operate on the attached shell queue-pair storage, not on a separately-mutated copied mirror
 
 ## Worker creation / queueing
 

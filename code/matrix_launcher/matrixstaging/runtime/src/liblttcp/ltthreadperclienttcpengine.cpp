@@ -173,6 +173,39 @@ static CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* ActiveLauncherObjectSh
         : nullptr;
 }
 
+static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorageScaffold(
+    CLTThreadPerClientTCPEngine_0x4b2768* self) {
+    if (!self) {
+        return nullptr;
+    }
+
+    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(self)) {
+        return &shell->queuePair0C;
+    }
+
+    return &reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(self)->queuePair0C;
+}
+
+static void MoveQueueRecycledBlocksScaffold(
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* fromQueueRecord,
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* toQueueRecord) {
+    if (!fromQueueRecord || !toQueueRecord || fromQueueRecord == toQueueRecord) {
+        return;
+    }
+
+    auto fromIt = g_QueueRecycledBlocks.find(fromQueueRecord);
+    if (fromIt == g_QueueRecycledBlocks.end()) {
+        return;
+    }
+
+    std::vector<uint32_t*>& targetBlocks = g_QueueRecycledBlocks[toQueueRecord];
+    targetBlocks.insert(
+        targetBlocks.end(),
+        fromIt->second.begin(),
+        fromIt->second.end());
+    g_QueueRecycledBlocks.erase(fromIt);
+}
+
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
     const CLTThreadPerClientTCPEngine_0x4b2768* self) {
     if (!self) {
@@ -2763,6 +2796,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
+    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this)) {
+        shell->queuePair0C = ownedQueuePair0C_;
+        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue00, &shell->queuePair0C.queue00);
+        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue28, &shell->queuePair0C.queue28);
+    }
     SyncAttachedLauncherObjectStateScaffold();
 }
 
@@ -2770,6 +2808,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
     CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
     if (shell) {
+        ownedQueuePair0C_ = shell->queuePair0C;
+        MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue00, &ownedQueuePair0C_.queue00);
+        MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue28, &ownedQueuePair0C_.queue28);
         std::memset(&shell->queuePair0C, 0, sizeof(shell->queuePair0C));
         shell->field04 = 0u;
         shell->field08 = nullptr;
@@ -2783,16 +2824,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
         g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = nullptr;
         g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment = {};
     }
-}
-
-// UNANCHORED: narrowed queue-family mirror step.
-void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectQueuePairScaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    if (!shell) {
-        return;
-    }
-
-    shell->queuePair0C = ownedQueuePair0C_;
 }
 
 // UNANCHORED: private launcher ABI-shell mirror step.
@@ -2818,7 +2849,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
 
     shell->field04 = ctorFlagsField04_;
     shell->field08 = queueThreadArrayField08_;
-    shell->queuePair0C = ownedQueuePair0C_;
     shell->endpointTreeHead80 = ownedEndpointTreeHead80_;
     shell->endpointCount84 = ownedEndpointCount84_;
     shell->contextTreeHead8C = ownedContextTreeHead8C_;
@@ -2890,8 +2920,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         return 0x7000006u;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C = &ownedQueuePair0C_.queue00;
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 = &ownedQueuePair0C_.queue28;
+    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* activeQueuePair =
+        ActiveQueuePairStorageScaffold(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
+        activeQueuePair ? &activeQueuePair->queue00 : nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
+        activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
     CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
     if (queueLock) {
@@ -2935,9 +2969,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     }
 
     const bool popped = Queue_TryPopPair(selectedQueue, outPair);
-    if (popped) {
-        SyncAttachedLauncherObjectQueuePairScaffold();
-    }
     if (queueLock) {
         LeaveCriticalSection(queueLock);
     }
@@ -2958,8 +2989,12 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     //   -> signal helper `+0x5c` only on pre-push empty -> non-empty transition
     // - no push-success result is surfaced back to callers; caller-side ownership/lifetime does not
     //   branch on queue-growth success/failure once this path is entered
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C = &ownedQueuePair0C_.queue00;
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 = &ownedQueuePair0C_.queue28;
+    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* activeQueuePair =
+        ActiveQueuePairStorageScaffold(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
+        activeQueuePair ? &activeQueuePair->queue00 : nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
+        activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
     if (!targetQueue) {
         return false;
@@ -2976,7 +3011,6 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         targetQueue,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
-    SyncAttachedLauncherObjectQueuePairScaffold();
 
     if (queueLock && !queueLockAlreadyHeld) {
         LeaveCriticalSection(queueLock);
@@ -3032,10 +3066,15 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the real engine queue lock
-    // - arg5 +0x5c/+0x60 remain ABI helper entry surfaces only; live queue state stays on the
-    //   recovered engine-owned queue-pair object at +0x0c
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C = &ownedQueuePair0C_.queue00;
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 = &ownedQueuePair0C_.queue28;
+    // - when an arg5 shell is attached, queue bytes at `+0x0c..+0x5b` must stay authoritative for
+    //   client.dll's direct queue runner / subobject ABI expectations, so this consumer and the
+    //   producers both operate on that attached shell queue-pair storage instead of a copied mirror
+    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* activeQueuePair =
+        ActiveQueuePairStorageScaffold(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
+        activeQueuePair ? &activeQueuePair->queue00 : nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
+        activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
     CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
     while (true) {
@@ -3071,9 +3110,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair pair = {};
         const bool popped = Queue_TryPopPair(selectedQueue, &pair);
-        if (popped) {
-            SyncAttachedLauncherObjectQueuePairScaffold();
-        }
         if (queueLock) {
             LeaveCriticalSection(queueLock);
         }

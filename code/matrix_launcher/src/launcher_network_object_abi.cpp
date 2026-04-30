@@ -22,6 +22,8 @@ struct LauncherObjectAbiShell {
     uint32_t field04;                 // +0x04 ctor arg / queue-thread count seed from 0x4366f0
     void* field08;                    // +0x08 queue-thread pointer array (NULL on the current ctorFlags=0 path)
     LauncherObjectQueuePair queuePair0C; // +0x0c..+0x5b inline queue-pair object from 0x436610
+                                          // while attached to a live sidecar, this shell copy is
+                                          // the authoritative client-visible queue storage
     void** subVtable5C;               // +0x5c base wait/event helper vtable (`0x4b3e20` final ctor state)
     LauncherObjectLockHelper helper60; // +0x60..+0x7b helper vtable + CRITICAL_SECTION
     HANDLE field7C;              // +0x7c CreateEventA(NULL,0,0,0)
