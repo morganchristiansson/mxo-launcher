@@ -870,12 +870,13 @@ static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorS
 }
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator_0x4af2b8 sibling slot +0xe4
+// anchor: launcher.exe:0x40e480 matched row path also consults the same +0xe4 status reader
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe4
-// Tighter launcher page-`7` read now keeps this high-word consumer aligned with active
-// selection-entry status, i.e. slot-record status on the auth-valid path.
-static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* self, int32_t variantIndex) {
+// Naming tightened from the old "variant state" guess: this slot is the active selection-entry /
+// slot-record status reader on the auth-valid path, while still preserving wrapper fallback behavior.
+static uint32_t __thiscall Mediator_GetSlotRecordStatusBySelectionIndex(MinimalLoginMediatorStub* self, int32_t selectionIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantState(variantIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetSlotRecordStatusBySelectionIndex(selectionIndex);
 }
 
 
@@ -1463,7 +1464,7 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7SelectionUpperBoundExclusive; // +0xd8
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
     g_LoginMediatorVtable[56] = (void*)Mediator_GetVariantWorldName; // +0xe0
-    g_LoginMediatorVtable[57] = (void*)Mediator_GetVariantState; // +0xe4
+    g_LoginMediatorVtable[57] = (void*)Mediator_GetSlotRecordStatusBySelectionIndex; // +0xe4
     g_LoginMediatorVtable[58] = (void*)Mediator_UnimplementedSlotE8; // +0xe8
     g_LoginMediatorVtable[59] = (void*)Mediator_PersistSelectionContextForState8; // +0xec
     g_LoginMediatorVtable[60] = (void*)Mediator_UnimplementedSlotF0; // +0xf0

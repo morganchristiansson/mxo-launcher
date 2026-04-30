@@ -564,7 +564,10 @@ public:
     // +0xe0
     virtual const char* GetVariantWorldName(uint32_t variantIndex) = 0;
     // +0xe4
-    virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
+    // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 and page-7 row builder at 0x40e480
+    // High-word active-selection / slot-record status reader; valid matched rows map directly to
+    // owner-side slot-record status, while negative / fallback indices stay wrapper-defined.
+    virtual uint8_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const = 0;
     // +0xe8
     virtual uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) = 0;
     // +0xec

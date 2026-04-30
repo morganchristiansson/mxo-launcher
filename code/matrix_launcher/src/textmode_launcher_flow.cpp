@@ -302,7 +302,8 @@ static bool BuildTextModeSelectionRows(std::vector<TextModeLauncherSelectionRow>
             row.selectionIndexHighWord = activeEntryIndex & 0xffffu;
             row.descriptorStatus = descriptorStatus;
             row.slotRecordStatus =
-                mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantState(static_cast<int32_t>(activeEntryIndex));
+                mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetSlotRecordStatusBySelectionIndex(
+                    static_cast<int32_t>(activeEntryIndex));
             CopyTextModeBuffer(row.worldName, sizeof(row.worldName), worldName);
             CopyTextModeBuffer(
                 row.selectionName,
@@ -317,8 +318,9 @@ static bool BuildTextModeSelectionRows(std::vector<TextModeLauncherSelectionRow>
             row.descriptorIndexLowWord = descriptorIndex & 0xffffu;
             row.selectionIndexHighWord = kLauncherSelectionCreateHighWord;
             row.descriptorStatus = descriptorStatus;
-            row.slotRecordStatus =
-                mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantState(-1);
+            // anchor: launcher.exe:0x40e480 placeholder rows are synthetic and pack high word 0xffff;
+            // the original builder does not consult slot +0xe4 for this path.
+            row.slotRecordStatus = 7u;
             CopyTextModeBuffer(row.worldName, sizeof(row.worldName), worldName);
             CopyTextModeBuffer(row.selectionName, sizeof(row.selectionName), "- - -");
             outRows->push_back(row);
@@ -345,7 +347,8 @@ static bool LauncherSelectionList_ResolveSelectionFromRow(
     const uint32_t descriptorStatus =
         mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldSelectionGateByteByIndex(descriptorIndex);
     const uint32_t slotRecordStatus =
-        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantState(signedSelectionIndex);
+        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetSlotRecordStatusBySelectionIndex(
+            signedSelectionIndex);
     const char* worldName = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldNameByIndex(descriptorIndex);
 
     if (!worldName || !LauncherSelectionList_RowAllowsPrimaryAction(descriptorStatus) ||

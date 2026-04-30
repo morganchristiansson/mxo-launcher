@@ -1237,24 +1237,25 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
 }
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator_0x4af2b8 sibling slot +0xe4
+// anchor: launcher.exe:0x40e480 matched row path also consults the same +0xe4 status reader
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe4
-// Tighter launcher page-`7` read now makes this high-word consumer better fit the active
-// selection-entry / slot-record index on the auth-valid path.
-uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
+// Naming tightened from the old "variant state" guess: on the auth-valid path this is the
+// active selection-entry / slot-record status reader, backed directly by owner slot records.
+uint8_t CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const {
     const bool stateAllowsRecoveredSelectionRouteRead =
         currentState_ != nullptr && currentState_->GetStateId() > 2u;
 
     uint32_t state = 3u;
     const char* source = "arg6-selection-fallback";
     if (stateAllowsRecoveredSelectionRouteRead) {
-        if (variantIndex >= 0 && variantIndex <= 0xff) {
-            state = GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex));
+        if (selectionIndex >= 0 && selectionIndex <= 0xff) {
+            state = GetSlotRecordStatusByIndex(static_cast<uint8_t>(selectionIndex));
             source = "owner+0x688.status+0x0b";
         } else {
             source = "owner+0x688.<out-of-range>";
         }
-    } else if (variantIndex >= 0) {
-        const uint32_t unsignedVariantIndex = static_cast<uint32_t>(variantIndex);
+    } else if (selectionIndex >= 0) {
+        const uint32_t unsignedVariantIndex = static_cast<uint32_t>(selectionIndex);
         if (unsignedVariantIndex < this->SelectionVariantUpperBoundExclusive() &&
             this->VariantIndexMatchesSelection(unsignedVariantIndex)) {
             state = this->SelectedVariantState();
@@ -1266,8 +1267,8 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
         source = "negative-index";
     }
     spdlog::info(
-        "MediatorStub::GetVariantState(+0xe4 variantIndex={}) -> {} [source={} configuredVariant=0x{:02x} configuredState={}]",
-        variantIndex,
+        "CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(+0xe4 selectionIndex={}) -> {} [source={} configuredVariant=0x{:02x} configuredState={}]",
+        selectionIndex,
         state,
         source,
         this->SelectedVariantIndexHigh8(),

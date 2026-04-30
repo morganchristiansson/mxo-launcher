@@ -566,7 +566,8 @@ public:
     // string reader reused by the launcher page-`7` world-list path
     const char* GetVariantWorldName(uint32_t variantIndex) override;
     // +0xe4
-    uint8_t GetVariantState(int32_t variantIndex) const override;
+    // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 and page-7 row builder at 0x40e480
+    uint8_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const override;
     // +0x164
     bool RequestAuthConnectionCloseWaitEvent1() override;
 
