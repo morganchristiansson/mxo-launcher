@@ -612,7 +612,7 @@ bool BuildNoGuiProcessLoginRequestInput(
     outInput->submitUsername[outInput->submitUsername.size() - 1u] = '\0';
     std::strncpy(outInput->submitPassword.data(), password, outInput->submitPassword.size() - 1u);
     outInput->submitPassword[outInput->submitPassword.size() - 1u] = '\0';
-    outInput->submitSessionTokenString.Clear();
+    outInput->submitSessionTokenString.clear();
     outInput->submitRequestFlag6c = 0u;
     return true;
 }

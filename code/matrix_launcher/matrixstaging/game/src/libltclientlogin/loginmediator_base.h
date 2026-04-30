@@ -221,42 +221,28 @@ public:
     // - `+0x20` = password
     // - `+0x40` = key-config md5 block
     // - `+0x50` = ui-config md5 block
-    // - `+0x60` = session-token string triple
+    // - `+0x60` = old-MSVC2003 `std::string` session-token member
     // - `+0x6c` = request flag byte
     // - on the happy path this runs while current helper is still state0
     // - the owner path copies this into owner `+0x94`, clears owner `+0xf4`, then moves to
     //   helper/state `2`
     // So state2 is the first post-submit helper here, not the startup default helper.
-    struct SessionTokenString60 {
-        const char* begin = nullptr;
-        const char* current = nullptr;
-        const char* capacity = nullptr;
-
-        bool Empty() const { return begin == current; }
-        void Clear() {
-            begin = nullptr;
-            current = nullptr;
-            capacity = nullptr;
-        }
-    };
-
     std::array<char, 0x20> submitUsername{};          // input `+0x00 .. +0x1f`
     std::array<char, 0x20> submitPassword{};          // input `+0x20 .. +0x3f`
     std::array<uint8_t, 16> submitKeyConfigMd5Block40{}; // input `+0x40 .. +0x4f`
     std::array<uint8_t, 16> submitUiConfigMd5Block50{};  // input `+0x50 .. +0x5f`
-    SessionTokenString60 submitSessionTokenString{};  // input `+0x60 .. +0x6b`
+    std::string submitSessionTokenString{};           // input `+0x60 .. +0x6b`
     uint8_t submitRequestFlag6c = 0;                  // input `+0x6c`
 
     bool HasUsername() const { return submitUsername[0] != '\0'; }
     bool HasPassword() const { return submitPassword[0] != '\0'; }
-    bool HasSessionToken() const { return !submitSessionTokenString.Empty(); }
+    bool HasSessionToken() const { return !submitSessionTokenString.empty(); }
 
     // anchor: launcher.exe:0x407d50
-    // Fidelity note: the original helper frees pooled or heap-backed storage for the session-token
-    // triple. Our source model treats this input as non-owning, so the safe equivalent is to clear
-    // the pointer triple without attempting to free foreign storage.
+    // The `+0x60` member is the same old-MSVC2003 `std::string` family recovered elsewhere.
+    // Clearing it is the source-level stand-in for releasing its storage.
     void ReleaseSubmitSessionTokenStringStorage() {
-        submitSessionTokenString.Clear();
+        submitSessionTokenString.clear();
     }
 };
 
@@ -265,7 +251,9 @@ static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitPassword) == 0x20
 static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitKeyConfigMd5Block40) == 0x40);
 static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitUiConfigMd5Block50) == 0x50);
 static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitSessionTokenString) == 0x60);
-static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitRequestFlag6c) == 0x6c);
+// Source uses native `std::string` for the old-MSVC2003 `+0x60` member, so the trailing
+// `submitRequestFlag6c` byte no longer lands at native host offset `0x6c` even though the
+// recovered launcher layout still does.
 
 // anchor: launcher.exe:0x41eb80
 // Owner-side auth/bootstrap source block at owner +0x94.
@@ -303,9 +291,7 @@ public:
         // then follows the old-MSVC2003 `std::string::assign(begin, end)` path.
         if (reinterpret_cast<const void*>(&input.submitSessionTokenString) !=
             reinterpret_cast<const void*>(&sessionToken60)) {
-            sessionToken60.assign(
-                input.submitSessionTokenString.begin,
-                input.submitSessionTokenString.current);
+            sessionToken60.assign(input.submitSessionTokenString);
         }
         // Copy flag
         flag6C = input.submitRequestFlag6c;
