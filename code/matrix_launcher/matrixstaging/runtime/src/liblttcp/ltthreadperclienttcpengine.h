@@ -511,7 +511,9 @@ private:
     // node or the tree-head sentinel, not the `AcceptThread*` payload.
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTree_Find(const LTTCPEndpointKey_0x44b070& key);
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
-    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindWorker(void* contextKey);
+    // Faithfulness note: like the endpoint-tree finder, the original returns the matching tree
+    // node or the tree-head sentinel, not the `WorkerThread*` payload.
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTree_Find(uint32_t key);
     // Source-owned shared engine-slot connection resolver.
     // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection_0x4b7928`
     // objects when original caller/object evidence is missing.
@@ -527,6 +529,12 @@ private:
     // UNANCHORED: source-owned teardown helper for the direct `WorkerThread` payload stored at
     // `[contextNode+0x14]`.
     void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread);
+    // anchor: launcher.exe:0x4364d0
+    // Pop one completed-operation pair from queue34 first, else queue0C. Returns launcher-style
+    // result codes and writes a null pair on empty/non-threaded early-return cases.
+    uint32_t TryPopCompletedOperation(
+        CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
+        bool waitForSignal);
     // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
     // while still returning `false` to synthetic callers when no attached target queue exists.
     // Unlike original `0x436820`, this source-owned helper exposes queue availability to bounded

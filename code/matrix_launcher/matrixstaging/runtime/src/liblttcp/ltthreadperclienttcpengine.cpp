@@ -2803,14 +2803,13 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
         touchedConnectionState = true;
     }
 
-    if (CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* worker = FindWorker(cleanupContextKey)) {
-        CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node = ContextTreeFindNode(
-            ownedContextTreeHead8C_,
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worker->ContextKey())));
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* contextTreeSentinel =
+        reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
+        ContextTree_Find(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cleanupContextKey)));
+    if (node != contextTreeSentinel && node->_M_valptr()->second != nullptr) {
         workerPayload = ContextTreeDetachPayload(this, node);
-        if (node) {
-            (void)ContextTreeEraseNode(this, ownedContextTreeHead8C_, node);
-        }
+        (void)ContextTreeEraseNode(this, ownedContextTreeHead8C_, node);
         result = kResultSuccess;
     } else {
         if (!touchedConnectionState) {
@@ -3036,6 +3035,68 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
     return 0u;
 }
 
+// anchor: launcher.exe:0x4364d0
+uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
+    CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
+    bool waitForSignal) {
+    if (!outPair) {
+        return 0x700000a;
+    }
+    if (ctorFlagsField04_ != 0u) {
+        outPair->value0 = 0u;
+        outPair->value1 = 0u;
+        return 0x7000006u;
+    }
+
+    CRITICAL_SECTION* queueLock =
+        CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
+    if (queueLock) {
+        EnterCriticalSection(queueLock);
+    }
+
+    while (waitForSignal && Queue_IsEmpty(ActiveQueue0CScaffold()) && Queue_IsEmpty(ActiveQueue34Scaffold())) {
+        if (queueLock) {
+            LeaveCriticalSection(queueLock);
+        }
+        if (!ActiveQueueSignalEventScaffold()) {
+            outPair->value0 = 0u;
+            outPair->value1 = 0u;
+            return 0x700000au;
+        }
+        const uint32_t waitResult = WaitQueueEventHelper(INFINITE);
+        if (waitResult != 0u && waitResult != 3u) {
+            outPair->value0 = 0u;
+            outPair->value1 = 0u;
+            return 0x700000au;
+        }
+        if (queueLock) {
+            EnterCriticalSection(queueLock);
+        }
+    }
+
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* selectedQueue = nullptr;
+    if (!Queue_IsEmpty(ActiveQueue34Scaffold())) {
+        selectedQueue = ActiveQueue34Scaffold();
+    } else if (!Queue_IsEmpty(ActiveQueue0CScaffold())) {
+        selectedQueue = ActiveQueue0CScaffold();
+    }
+
+    if (!selectedQueue) {
+        if (queueLock) {
+            LeaveCriticalSection(queueLock);
+        }
+        outPair->value0 = 0u;
+        outPair->value1 = 0u;
+        return 0x700000au;
+    }
+
+    const bool popped = Queue_TryPopPair(selectedQueue, outPair);
+    if (queueLock) {
+        LeaveCriticalSection(queueLock);
+    }
+    return popped ? 0u : 0x700000au;
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     void* workItem,
@@ -3220,11 +3281,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
                 return;
             }
 
-            // Bounded fidelity step from the shared `0x436b10` / `0x62531c10` queue-consumer family:
-            // when both queues are empty, original code routes through arg5 helper `+0x5c` for the
-            // wait path instead of immediately returning. With the current ownership move, that
-            // helper body now lives on the engine side even though the launcher ABI shell still
-            // supplies the raw embedded helper address when original code calls it directly.
             if (!ActiveQueueSignalEventScaffold()) {
                 return;
             }
@@ -3248,9 +3304,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         void* workItem = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value0));
         void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
         if (!workItem) {
-            // Current best read: a null work item is the shutdown-style queue sentinel.
-            // Original `0x436f56..0x436fa8` cascades shutdown via the normal enqueue helper path,
-            // not by open-coding another raw queue write.
             (void)EnqueueCompletedOperationScaffold(
                 nullptr,
                 nullptr,
@@ -3294,13 +3347,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             sameWorkerThreadCloseSelfDispatch ? 1u : 0u);
 
         if (sameWorkerThreadCloseSelfDispatch) {
-            // Bounded single-process bridge correction:
-            // - on the replacement path we may dequeue the close work on the same socket worker
-            //   thread that produced it
-            // - if we run slot-12 cleanup first there, `Stop(true)` hits `ExitThread(0)` on the
-            //   current thread and we never reach the later margin callback / event-0x0f tail
-            // - keep the normal original order everywhere else, but on this one self-dispatch seam
-            //   let the callback run before worker teardown
             if (context) {
                 QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
             }
@@ -3335,8 +3381,24 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
         static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(queueThreadArrayField08_);
     const uint32_t existingQueueThreadCount = ctorFlagsField04_;
     if (existingQueueThreadCount == 0u) {
-        while (!Queue_IsEmpty(ActiveQueue0CScaffold()) || !Queue_IsEmpty(ActiveQueue34Scaffold())) {
-            RunCompletedOperationQueue(/*nonBlocking=*/true);
+        CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair pair = {};
+        while (TryPopCompletedOperation(&pair, /*waitForSignal=*/false) == 0u) {
+            void* workItem = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value0));
+            void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
+            if (workItem != nullptr && context != nullptr) {
+                const uint32_t workType = QueueWorkItem_GetType(workItem);
+                if (workType == kWorkTypeClose) {
+                    CleanupConnection(context);
+                }
+                if (CBaseConnection* queuedBaseConnection = CBaseConnection_FromQueueContextScaffold(context)) {
+                    QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
+                    if (workType == kWorkTypeClose &&
+                        QueuedConnection_ShouldAutoReleaseAfterType1(context, queuedBaseConnection)) {
+                        QueuedConnection_ReleaseAfterType1(context, queuedBaseConnection);
+                    }
+                }
+                QueueWorkItem_Release(workItem);
+            }
         }
         return;
     }
@@ -3453,16 +3515,11 @@ CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* CLTThreadPerClientTCPEngi
 }
 
 // anchor: launcher.exe:0x42fe10
-CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0x4b2768::FindWorker(void* contextKey) {
-    CMessageConnection_0x4b7928* connection = FindMessageConnection(contextKey);
-    if (!connection) {
-        return nullptr;
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node = ContextTreeFindNode(
-        ownedContextTreeHead8C_,
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(connection)));
-    return node ? node->_M_valptr()->second : nullptr;
+CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* CLTThreadPerClientTCPEngine_0x4b2768::ContextTree_Find(uint32_t key) {
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
+        ContextTreeFindNode(ownedContextTreeHead8C_, key);
+    return node ? node
+                : reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
 }
 
 CMessageConnection_0x4b7928* CLTThreadPerClientTCPEngine_0x4b2768::ResolveConnectionForEngineSlotScaffold(
