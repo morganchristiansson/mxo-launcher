@@ -62,8 +62,9 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
         }
 
         const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
-        g_CurrentLoginMediator->ResetMarginConnectAttemptCountScaffold();
         if (nextHelperStateId != 13u) {
+            // anchor: launcher.exe:0x439473 - direct owner+0x24 reset before helper/state3 switch
+            g_CurrentLoginMediator->marginBeginCount24_ = 0u;
             (void)g_CurrentLoginMediator->SetCurrentState(3u);
         }
         g_CurrentLoginMediator->PostError(6u);

@@ -711,8 +711,6 @@ public:
     void SetAuthPeerCloseQueuedScaffold(bool value) { authPeerCloseQueuedScaffold_ = value; }
     void SetMarginPeerCloseQueuedScaffold(bool value) { marginPeerCloseQueuedScaffold_ = value; }
 
-void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
-
     // launcher.exe:0x43b300 / full helper-dispatch table seed
     // Current best read:
     // - the decompiled routine seeds helper/state slots `0..19` in one contiguous pass
