@@ -79,7 +79,7 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     //     SkinToneID, BodyID, HeadID, HairID, HairColorID, TattooID, FacialHairID,
     //     FacialHairColorID, StartingHat, StartingGlasses, StartingShirt, StartingGloves,
     //     StartingCoat, StartingPants, StartingTights, StartingShoes, TraitID
-    //   - calls `0x41af70` to forward the completed packet-envelope object through the current
+    //   - calls `0x41af70` to forward the completed stack-local packet builder through the current
     //     margin connection send path (`0x448cf0`), not to serialize raw bytes itself
     //   - then posts event `0x15`
     // Active-path caution:

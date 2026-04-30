@@ -26,7 +26,7 @@ struct State11Packet0x4dFixedPayload {
 
 struct State11Packet0x4dBuilderRawScaffold {
     // anchor family: launcher.exe vtable `0x004b53c8`
-    // Current best local helper shape on top of the shared `0x439840` envelope front matter:
+    // Current best local helper shape on top of the shared `0x439840` packet front matter:
     // - `+0x10` = packet payload base used by the fixed-field writers
     // - `+0x14/+0x1c/+0x24/+0x2c` = repeated reservation triplets
     //   `(write pointer, reserved content byte count)` for the four appended strings
@@ -243,7 +243,7 @@ static_assert(sizeof(Packet_MsLoadCharacterRequest_0x4b5418) == 0x28, "Packet_Ms
 }  // namespace mxo::ltlogin
 
 // =============================================================================
-// Packet builder envelope base - shared helpers (source-only convenience)
+// Packet builder base - shared helpers (source-only convenience)
 // =============================================================================
 // Note: These helpers are source-only conveniences. The original launcher.exe
 // uses direct payload manipulation inlined into the packet-specific builders.
@@ -581,7 +581,7 @@ static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::
 // anchor: launcher.exe:0x4449c0 = Packet_AsGetPublicKeyRequest_0x4b6c74::AuthBootstrap680AuthReplyParseObject_Copy
 //
 // Source-semantic model:
-// - outbound role: compact raw-auth opcode `0x06` builder using the inherited packet envelope
+// - outbound role: compact raw-auth opcode `0x06` builder using the inherited packet base
 // - inbound role: larger auth-reply parse shell used by opcode `0x0b` ctor/copy helper family
 //
 // Fidelity note:

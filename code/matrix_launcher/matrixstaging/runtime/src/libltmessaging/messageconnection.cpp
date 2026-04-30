@@ -1122,9 +1122,9 @@ uint32_t CMessageConnection_0x4b7928::SubmitMessageRefBytes(
 // anchor: launcher.exe:0x448cf0 / CMessageConnection_SendPacket
 // Faithful mirror of the original message-ref-based `CMessageConnection::SendPacket` family.
 // Inherited margin/auth send path reached from mediator send helper via connection wrapper
-// 0x41cf30. Consumes the envelope/shared message object extracted from the stack-local packet
-// builder, performs packet-agenda filtering, then reaches CMessageConnection_SubmitEnvelopeBytes
-// (0x448a00).
+// 0x41cf30. Consumes the retained outer message-ref extracted from the stack-local packet
+// builder at `+0x08`, performs packet-agenda filtering, then reaches
+// CMessageConnection_SubmitEnvelopeBytes (0x448a00).
 //
 // Ghidra globals documentation:
 // - g_bMessageConnectionGlobalSendLoggingEnabled (launcher.exe:0x4f8364) - master toggle for send logging

@@ -972,16 +972,15 @@ public:
     bool State10HasReadyConnectionState2() const;
 
     // anchor: launcher.exe:0x41af70
-    // Original call shape is mediator-thiscall plus one stack-local packet-envelope object built by
-    // helpers like `0x43ac10/0x43ada0`, then a tail jump to current margin connection vtable
-    // `+0x24`.
+    // Original call shape is mediator-thiscall plus one stack-local `Packet_0x4af2a4`-family
+    // object built by helpers like `0x43ac10/0x43ada0`, then a tail jump to current margin
+    // connection vtable `+0x24`.
     // Newer Ghidra tightening now makes that two-step downstream bridge more concrete:
-    // - `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
+    // - `+0x24` = `0x41cf30 = CMessageConnection_ForwardPacketBuilderToSendPacket`
     // - that wrapper forwards packet-builder `+0x08` (the retained outer message-ref object)
     //   into `+0x28` = inherited `CMessageConnection_0x4b7928::SendPacket` / `0x448cf0`
     // - `0x448cf0` consumes that message-ref object, not bare payload bytes
-    // - caller passes the real stack-local `Packet_0x4af2a4`-family object, not a synthetic
-    //   source-only envelope wrapper
+    // - caller passes the real stack-local packet-builder object, not a synthetic wrapper
     void SendCurrentMarginPacket(
         mxo::liblttcp::Packet_0x4af2a4& packetBuilder);
 

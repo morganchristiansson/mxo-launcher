@@ -133,7 +133,7 @@ namespace mxo::liblttcp {
 //     through to owner callbacks instead of using these helper objects
 // - inherited send path now tightens better as:
 //   - vtable slot 10 / `0x448cf0` = `CMessageConnection_0x4b7928::SendPacket`
-//   - consumes the retained outer message-ref object from local envelope `+0x08`, performs
+//   - consumes the retained outer message-ref object from local packet-builder `+0x08`, performs
 //     packet-agenda filtering, then reaches the lower submit helper `0x448a00`
 //   - that lower helper forwards final byte pointer/size together with `self` to engine `+0x20`
 //   - current best engine mapping there is slot-8 / SendBuffer
@@ -371,7 +371,7 @@ struct CMessageConnectionPacketBuilderReservationScaffold {
 static_assert(sizeof(CMessageConnectionPacketBuilderReservationScaffold) == 0x08, "packet-builder reservation size mismatch");
 
 struct CMessageConnectionPacketBuilderPayloadScaffold {
-    // Common active derived local packet-builder shape laid on top of the raw `0x439840` envelope
+    // Common active derived local packet-builder shape laid on top of the raw `0x439840` packet
     // by families such as:
     // - `0x004b53b4` / packet `0x0a`
     // - `0x004b53f0` / packet `0x0d`
@@ -379,14 +379,14 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
     // - `0x004b5364` / packet `0x06`
     // - `0x004b6524` / packet `0x01 + length-prefixed blob`
     // - `0x004b6560` / packet `0x03 + 16-byte challenge response`
-    // Current best common raw fields after the base envelope front matter:
+    // Current best common raw fields after the base packet front matter:
     // - `+0x0c` = helper-local byte/flag cleared by the init/reset helpers
     // - `+0x10` = packet payload base pointer used by the fixed-field writers and reservation
     //   helpers as the offset base
     // Recovered raw local packet-builder front matter initialized by `0x439840` and used by
     // fixed-payload builders before `0x41af70 -> 0x41cf30` forwards the retained message-ref.
     // Layout mirrors the real `Packet_0x4af2a4` front matter without requiring a synthetic
-    // source-only envelope wrapper type:
+    // source-only wrapper type:
     // - `+0x00` = local helper vtable / derived builder vtable slot
     // - `+0x04` = payload base cached as `messageRef+0x0c -> inner+0x0c`
     // - `+0x08` = retained outer message-ref object consumed by `0x448cf0`
@@ -402,7 +402,7 @@ static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, messageRe
 
 // anchor: launcher.exe:0x004af2a4 / vtable
 // anchor: launcher.exe:0x439840 / ctor
-// Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef
+// Shared packet builder base class. Uses CMessageConnectionMessage_CreateRef
 // for internal message storage. This is the shared base pattern used by
 // CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
 // Note: Ghidra decompiler shows this as a component within Packet_AsAuthReply_0x4b5328.
@@ -414,7 +414,7 @@ static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, messageRe
 // - +0x10: return builder +0x10 packet-payload base (0x00481760)
 class Packet_0x4af2a4 {
 public:
-    // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
+    // Shared packet builder front-matter fields (no raw vtable ptr - uses C++ virtual):
     // +0x00: vtable pointer (C++ implicit)
     uint32_t payloadPtr04 = 0;           // +0x04: payload base pointer (was: nopatchLauncherVersionValue04)
     CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
@@ -568,7 +568,7 @@ public:
         }
     }
 
-    // Allow default construction for stack-local envelope instances
+    // Allow default construction for stack-local packet-builder instances
     Packet_CertChallenge_0x4b6538();
 
     // anchor: launcher.exe:0x441920 -> CLTLoginMediatorPacketBuilderEnvelope_ctor_MessageRefAndFlag
