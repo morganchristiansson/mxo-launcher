@@ -140,23 +140,30 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
         case 7:
         case 8:
         case 13: {
-            // Exact `0x439300 -> 0x41e500` consequence to preserve:
-            // - this branch forwards owner byte `+0xcc8` as arg2
-            // - `0x41e500` only refreshes route/address state on `arg2 == 0`
-            // - so on the live state8/state13 continuation path the returned route-text pointer is
-            //   forwarded even when current source still has no populated route-string table entry
+            // `0x439328..0x439345`
+            // - read owner byte `+0xcc8`
+            // - pass it to owner vtable `+0xe0(slot, 0)`
+            // - forward the returned route-host text into `0x41e500`
+            // - call `0x41e500` with cachedRouteSelector == 0
             BeginMarginConnectionForState4Case(
                 g_CurrentLoginMediator,
                 g_CurrentLoginMediator->ResolveMarginRouteFromCurrentCharacterSlot(),
-                g_CurrentLoginMediator->CurrentCharacterRouteIndexCc8Scaffold());
+                0u);
+            return;
+        }
+
+        case 10: {
+            BeginMarginConnectionForState4Case(
+                g_CurrentLoginMediator,
+                g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
+                    g_CurrentLoginMediator->createCharacterData108.selectedWorldField24),
+                0u);
             return;
         }
 
         default: {
-            // Current source-owned mirror for the default branch's owner `+0x104` dword remains
-            // `marginRouteState_.currentWorldId`; keep the field meaning provisional and
-            // treat it as the recovered descriptor selector for the original
-            // `!= -1 -> owner vtable +0xfc -> if non-null call 0x41e500` structure here.
+            // Source-owned bridge over the original default branch:
+            // owner `+0x104 != -1` -> owner vtable `+0xfc(index)` -> if non-null call `0x41e500`.
             const int32_t field104Value = g_CurrentLoginMediator->marginRouteState_.currentWorldId;
             if (field104Value == -1) {
                 return;
@@ -171,15 +178,6 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
                 g_CurrentLoginMediator,
                 routeHostText,
                 0u);
-        }
-
-        case 10: {
-            BeginMarginConnectionForState4Case(
-                g_CurrentLoginMediator,
-                g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
-                    g_CurrentLoginMediator->createCharacterData108.selectedWorldField24),
-                static_cast<uint8_t>(
-                    g_CurrentLoginMediator->createCharacterData108.selectedWorldField24 & 0xffu));
             return;
         }
     }
