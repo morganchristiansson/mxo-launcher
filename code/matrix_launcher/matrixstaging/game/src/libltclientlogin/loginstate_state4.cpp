@@ -57,7 +57,7 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
             // - direct owner `+0x24 = 0`
             // - switch helper/state to `3`
             cachedUpstreamOrArg_0x4 = nullptr;
-            g_CurrentLoginMediator->marginRouteState_.currentWorldId = -1;
+            g_CurrentLoginMediator->marginCurrentWorldId104_ = -1;
             g_CurrentLoginMediator->marginBeginCount24_ = 0u;
             (void)g_CurrentLoginMediator->SetCurrentState(3u);
         }
@@ -70,7 +70,7 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
             static_cast<unsigned>(nextHelperStateId),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
             fmt::ptr(cachedUpstreamOrArg_0x4),
-            g_CurrentLoginMediator->marginRouteState_.currentWorldId);
+            g_CurrentLoginMediator->marginCurrentWorldId104_);
         return 1u;
     }
 
@@ -83,7 +83,7 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
     // - post event `0x0e`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     cachedUpstreamOrArg_0x4 = nullptr;
-    g_CurrentLoginMediator->marginRouteState_.currentWorldId = -1;
+    g_CurrentLoginMediator->marginCurrentWorldId104_ = -1;
     const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
     g_CurrentLoginMediator->PostEvent(0x0eu);
     spdlog::info(
@@ -151,7 +151,7 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
             // - read owner dword `+0x104`
             // - if it is not `-1`, call owner vtable `+0xfc(index)`
             // - only when the returned pointer is non-null call `0x41e500`
-            const int32_t field104Value = g_CurrentLoginMediator->marginRouteState_.currentWorldId;
+            const int32_t field104Value = g_CurrentLoginMediator->marginCurrentWorldId104_;
             if (field104Value == -1) {
                 return;
             }

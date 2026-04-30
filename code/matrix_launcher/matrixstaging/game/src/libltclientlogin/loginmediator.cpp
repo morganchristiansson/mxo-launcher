@@ -197,7 +197,6 @@ CLTLoginMediator::CLTLoginMediator()
       currentState_(nullptr),
       authPeerCloseQueuedScaffold_(false),
       marginPeerCloseQueuedScaffold_(false),
-      marginRouteState_{},
       marginAddressList3c_{},
       authBootstrapChild680_(nullptr),
       launchPadClient65c_(nullptr),

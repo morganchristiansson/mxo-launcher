@@ -318,21 +318,6 @@ public:
         void* helper78B4 = nullptr;  // slot 19 / phase-code 19 / CLTLoginState_State19_0x4b0c28
     };
 
-    struct MarginRouteState {
-        // Current concrete inputs recovered from launcher `0x439300`:
-        // - owner byte `+0xcc8`
-        // - owner dword `+0x12c`
-        // - owner dword `+0x104`
-        // - owner vtable surfaces `+0xe0 / +0xfc / +0x10c`
-        //
-        // Keep the two dword names provisional for now:
-        // the active disassembly only proves that `0x439300` forwards them into owner vtable
-        // `+0xfc`, not that they are semantically settled world ids on every branch.
-        uint32_t pendingWorldId = 0;
-        int32_t currentWorldId = -1;
-        std::string routeHostPrefix;
-    };
-
     // Fidelity note: the old source-only `PostAuthMarginLoadingState` wrapper has been retired.
     // Static-RE now shows this region is just ordinary `CLTLoginMediator` storage, with the
     // canonical state8 persistence object living directly at owner `+0xf1c`.
@@ -1062,7 +1047,10 @@ public:
     // owner `+0x80` - world list count or auth/status (used by state4 slot2)
     uint32_t worldListCountOrStatus80 = 0;
 
-    MarginRouteState marginRouteState_;
+    // owner `+0x104`; `0x439300/0x4393a4` compare against `-1`, then forward through owner
+    // vtable `+0xfc(index)` on the default state4 branch. Keep the role provisional but keep the
+    // field on the mediator itself, not in a synthetic wrapper.
+    int32_t marginCurrentWorldId104_ = -1;
     // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x3c`.
     // Recovered original in-object layout:
     // - `+0x3c` = begin pointer

@@ -255,8 +255,8 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
 
     // anchor: launcher.exe:0x4402af-0x4402c4
     // Original: SetCurrentState(g_Mediator, 0xb) then PostEvent(g_Mediator, 0x14).
-    // No helper-state null-check, no expectedMarginRequestName_ write, no marginRouteState_
-    // writes. The parse-object virtual destructor runs at 0x4402e7-0x4402f0 before return.
+    // No helper-state null-check and no extra margin-routing sidecar writes here.
+    // The parse-object virtual destructor runs at 0x4402e7-0x4402f0 before return.
     (void)g_CurrentLoginMediator->SetCurrentState(0x0bu);
     g_CurrentLoginMediator->PostEvent(0x14u);
     spdlog::info(
