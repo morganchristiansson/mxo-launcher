@@ -2181,7 +2181,6 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
         fmt::ptr(this),
         fmt::ptr(owner08),
         static_cast<unsigned>(sendResult));
-    g_CurrentLoginMediator->authGetPublicKeyRequestSent_ = (sendResult != 0u);
 }
 
 // anchor: launcher.exe:0x4474f0
@@ -2409,7 +2408,6 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         fmt::ptr(owner08),
         fmt::ptr(childBase),
         static_cast<unsigned>(sendResult));
-    g_CurrentLoginMediator->authRequestSent_ = true;
 
     spdlog::info(
         "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId={} loginType={} blobLen={} raw08WorkerExpectedBlobLen={} usernameLengthField={} plaintextPayloadLen={} plaintextUsernameFieldOffset=0x{:04x} ciphertextFieldOffset=0x{:04x} childSendTarget50={} childRaw08PublicKeyWorkerA8={} childString04Len={} childString10Len={} childString1CLen={} feedbackSeed84='{}' helper54NextBufferedByte28=0x{:08x}",

@@ -210,18 +210,8 @@ CLTLoginMediator::CLTLoginMediator()
       authUsername_(),
       authPassword_(),
       authLauncherVersion_(76005),
-      authCurrentPublicKeyId_(0),
-      authLoginType_(1),
       authKeyConfigMd5_(),
       authUiConfigMd5_(),
-      authGetPublicKeyRequestSent_(false),
-      authRequestSent_(false),
-      authChallengeResponseSent_(false),
-      lastAuthRequestBuildResult_(),
-      lastAuthConnectStatus_(0),
-      lastMarginConnectStatus_(0),
-      authConnectStatusCount_(0),
-      marginConnectStatusCount_(0),
       expectedAuthRequestName_(nullptr),
       expectedMarginRequestName_(nullptr) {
     InitializeObserverTree674();
@@ -2303,13 +2293,6 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 // Source-owned selection fallback helpers.
 // These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They only provide
 // fixed fallback values for wrapper-facing readers until the recovered owner fields are available.
-uint32_t CLTLoginMediator::SelectionWorldUpperBoundExclusive() const {
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    if (stateCode >= 3u && worldListPacketCountD80_ != 0u) {
-        return static_cast<uint32_t>(worldListPacketCountD80_);
-    }
-    return selectionSeed_.worldUpperBoundExclusive_;
-}
 
 uint32_t CLTLoginMediator::SelectionVariantUpperBoundExclusive() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
@@ -2317,10 +2300,6 @@ uint32_t CLTLoginMediator::SelectionVariantUpperBoundExclusive() const {
         return static_cast<uint32_t>(selectionRouteState684_.slotRecordCount00_);
     }
     return selectionSeed_.variantUpperBoundExclusive_;
-}
-
-uint32_t CLTLoginMediator::SelectedWorldIndexLow24() const {
-    return selectionSeed_.selectedWorldIndexLow24_;
 }
 
 uint32_t CLTLoginMediator::SelectedVariantIndexHigh8() const {
@@ -2436,29 +2415,6 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
 }
 
 
-
-
-/// INFIDEL - original builds inline. Commented out.
-// bool CLTLoginMediator::RebuildMarginAddressList() {
-//     const std::string resolvedHostName = ResolvedMarginHostName();
-//     marginAddressListResolvedHostName3c_ = resolvedHostName;
-//     if (resolvedHostName.empty()) {
-//         marginAddressList3c_.Reset();
-//         return false;
-//     }
-//     uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
-//     if (ignoreHostsFileForMargin_) {
-//         flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
-//     }
-//     return marginAddressList3c_.Reinit(resolvedHostName.c_str(), flags);
-// }
-//
-// bool CLTLoginMediator::SelectMarginEndpointIpv4() {
-//     marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
-//     return marginSelectedIpv4_7c_ != 0u;
-// }
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 // ILTLoginMediator_0x4af2b8::Default - static member initialization (original: launcher.exe:0x4d2c58)
 ILTLoginMediator_0x4af2b8* ILTLoginMediator_0x4af2b8::Default = new mxo::ltlogin::CLTLoginMediator();
 

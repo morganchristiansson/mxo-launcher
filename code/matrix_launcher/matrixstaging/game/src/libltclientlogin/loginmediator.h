@@ -335,60 +335,6 @@ public:
         std::string exactMarginHostName;
     };
 
-
-    struct State9CallbackBlob18cSketch {
-        // anchor: launcher.exe:0x41e690 / mediator vtable `+0x18c`
-        // Focused active source home for this callback84/blob contract:
-        // - `loginmediator_state9.cpp`
-        // - `loginmediator_state9_submit_scaffold.h`
-        // Current best fixed layout:
-        // - `+0x00/+0x04` = current slot-record id low/high
-        // - `+0x08/+0x0c` = caller args (`900, 0` on the client callback84 path)
-        // - `+0x10..+0x1f` = 16-byte transform region
-        //   - seeded from owner `+0xf18`
-        //   - source material resolved through mediator `+0xd4`
-        //   - original `+0xd4` body is the tiny live-pointer read `owner +0x1c + 0x85`
-        //   - active replacement mirrors the recovered challenge key into that live field early
-        //   - keep the older launcher-owned bootstrap sidecar as bounded fallback on `+0xd4`
-        //     until runtime evidence is stable enough to prune it without risking game entry
-        //   - transformed in place through `0x41df60 / 0x44b190 / 0x44b570`
-        // Current source-owned provenance answer for owner `+0xf18`:
-        // - zero-init at `0x41ee60`
-        // - non-init write at `0x440780` on state6 opcode-`9` success
-        // Newer runtime+static tightening now closes the active one-block tail enough for a live
-        // source-owned `+0x18c` path too:
-        // - `AssemblyTwofish`
-        // - `IV`
-        // - `FeedbackSize`
-        // - zero-IV one-block transform over `[ownerF18, 0, 0, 0]`
-        uint32_t currentSlotIdLow00 = 0;
-        uint32_t currentSlotIdHigh04 = 0;
-        uint32_t callerArg08 = 0;
-        uint32_t callerArg0c = 0;
-        std::array<uint8_t, 16> transformedRegion10{};
-    };
-
-    struct State8SelectionContextSnapshotState {
-        // owner writeback area filled by `0x41c1f0` on the active state `3(wait) -> 8` branch.
-        // Keep the boundary explicit:
-        // - state3 is just the current waiting helper at that stop
-        // - the owner-side mediator method owns this writeback and helper advance
-        // This is the persisted selection/config snapshot, not the later post-auth appearance/name block.
-        uint8_t slotOrSelectionIndexCc8 = 0;           // `+0xcc8`
-        std::array<uint8_t, 7> paddingCc9{};           // `+0xcc9 .. +0xccf`
-        std::array<uint32_t, 4> blockCd0{};            // `+0xcd0 .. +0xcdf`
-        std::array<uint32_t, 4> blockCe0{};            // `+0xce0 .. +0xcef`
-        std::array<uint32_t, 4> blockCf0{};            // `+0xcf0 .. +0xcff`
-        std::array<uint32_t, 4> blockD00{};            // `+0xd00 .. +0xd0f`
-        std::array<uint32_t, 4> blockD10{};            // `+0xd10 .. +0xd1f`
-        std::array<uint32_t, 4> blockD20{};            // `+0xd20 .. +0xd2f`
-        std::array<uint32_t, 4> blockD30{};            // `+0xd30 .. +0xd3f`
-        std::array<uint32_t, 4> blockD40{};            // `+0xd40 .. +0xd4f`
-        std::array<uint32_t, 4> blockD50{};            // `+0xd50 .. +0xd5f`
-        std::array<uint32_t, 4> blockD60{};            // `+0xd60 .. +0xd6f`
-        std::array<uint32_t, 4> blockD70{};            // `+0xd70 .. +0xd7f`
-    };
-
     // Fidelity note: the old source-only `PostAuthMarginLoadingState` wrapper has been retired.
     // Static-RE now shows this region is just ordinary `CLTLoginMediator` storage, with the
     // canonical state8 persistence object living directly at owner `+0xf1c`.
@@ -808,9 +754,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   descriptor/profile bridges still reached from launcher/client scaffolding
     // Source-owned arg6 bootstrap fallback helpers.
     // These are replacement-side helpers, not recovered launcher.exe vtable slots.
-    uint32_t SelectionWorldUpperBoundExclusive() const;
     uint32_t SelectionVariantUpperBoundExclusive() const;
-    uint32_t SelectedWorldIndexLow24() const;
     uint32_t SelectedVariantIndexHigh8() const;
     uint32_t SelectedVariantState() const;
     const char* MappedSelectionName() const;
@@ -886,8 +830,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   later world-list sender
     // - state1/state2 should therefore call the separate owner+0x680 child directly instead of
     //   routing through a fake mediator-owned auth-bootstrap method
-
-    void ResetAuthConnectRetryStateScaffold();
 
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
@@ -1374,28 +1316,9 @@ public:
     std::string authUsername_;
     std::string authPassword_;
     uint32_t authLauncherVersion_;
-    uint32_t authCurrentPublicKeyId_;
-    uint8_t authLoginType_;
     std::vector<uint8_t> authKeyConfigMd5_;
     std::vector<uint8_t> authUiConfigMd5_;
-    bool authGetPublicKeyRequestSent_;
-    bool authRequestSent_;
-    bool authChallengeResponseSent_;
-    mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
-    // Replacement-only compatibility auth payload copy:
-    // - auth leaf/base dispatch now keeps `0x449a30` thin again
-    // - when current source still needs raw auth payload bytes, state2 / owner+0x680 child copies
-    //   the logical payload span there after resolving the incoming auth-message object
-    // - later raw-`0x0b` selected-slot handling and state9 callback84 opcode fallback still
-    //   consult this storage
-    std::vector<uint8_t> stagedIncomingAuthPacketBytes_;
 
-
-
-    uint32_t lastAuthConnectStatus_;
-    uint32_t lastMarginConnectStatus_;
-    uint32_t authConnectStatusCount_;
-    uint32_t marginConnectStatusCount_;
     const char* expectedAuthRequestName_;
     const char* expectedMarginRequestName_;
 
