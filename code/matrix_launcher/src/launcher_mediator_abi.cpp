@@ -253,8 +253,22 @@ static const char* DescribeKnownMediatorObserver(void* observer) {
     }
 }
 
-static std::string DescribeRouteDescriptorText(
-    const mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* descriptor) {
+namespace {
+struct Msvc2003StdStringView {
+    const char* begin = nullptr;
+    const char* current = nullptr;
+    const char* capacity = nullptr;
+};
+
+static Msvc2003StdStringView BuildMsvc2003StdStringView(std::string_view text) {
+    Msvc2003StdStringView view{};
+    view.begin = text.data();
+    view.current = text.data() + text.size();
+    view.capacity = view.current;
+    return view;
+}
+
+static std::string DescribeRouteDescriptorText(const Msvc2003StdStringView* descriptor) {
     if (!descriptor || !descriptor->begin || !descriptor->current || descriptor->current < descriptor->begin) {
         return "<empty>";
     }
@@ -263,6 +277,7 @@ static std::string DescribeRouteDescriptorText(
     }
     return std::string(descriptor->begin, descriptor->current);
 }
+}  // namespace
 
 // anchor: launcher.exe dynamic initializer uses the registration string at 0x4ab34c for ILTLoginMediator_0x4af2b8.Default
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x00
@@ -807,9 +822,11 @@ static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediat
 
 // anchor: launcher.exe:0x41f1b0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xd0
-static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
+static Msvc2003StdStringView* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460();
+    static thread_local Msvc2003StdStringView view;
+    view = BuildMsvc2003StdStringView(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460());
+    return &view;
 }
 
 // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
@@ -912,21 +929,21 @@ static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLogin
 // - wrapper also logs the exact client return address so the successful post-0x18 route can prove
 //   whether the current run actually executed the event-0x18 body or skipped it on observer byte
 //   `this+0xcc`
-static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
+static Msvc2003StdStringView* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* const descriptor =
-        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30();
-    const std::string descriptorText = DescribeRouteDescriptorText(descriptor);
+    static thread_local Msvc2003StdStringView descriptorView;
+    descriptorView = BuildMsvc2003StdStringView(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30());
+    const std::string descriptorText = DescribeRouteDescriptorText(&descriptorView);
     spdlog::info(
         "MediatorStub::GetRouteDescriptor10c caller={} [{}] result={} begin={} current={} text='{}'",
         fmt::ptr(returnAddress),
         DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(descriptor),
-        fmt::ptr(descriptor ? descriptor->begin : nullptr),
-        fmt::ptr(descriptor ? descriptor->current : nullptr),
+        fmt::ptr(&descriptorView),
+        fmt::ptr(descriptorView.begin),
+        fmt::ptr(descriptorView.current),
         descriptorText);
-    return descriptor;
+    return &descriptorView;
 }
 
 // anchor: launcher.exe:0x41af50

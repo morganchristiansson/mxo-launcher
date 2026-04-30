@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <array>
 #include <vector>
 
@@ -137,30 +138,10 @@ static_assert(sizeof(Packet_WorldList_0x4b533c) >= sizeof(mxo::liblttcp::Packet_
 
 // Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
 // Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under
-// `0x004b01c8`:
-// - wrapper `+0x40` consumes an outer selection-descriptor object
-// - wrapper `+0x44` consumes an outer current-slot object
-// - both wrappers are built in `src/launcher_mediator_abi.cpp`
-// - the launcher-owned mediator returns the underlying
-//   `Packet_AsAuthReply_0x4b5328 *` payload pointer for those slots
-struct RouteDescriptor30SmallStringLikeSketch {
-    // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
-    // Shared 3-dword string-state layout used by the owner route-descriptor field at `+0x30`.
-    // Wrapper callers currently consume it through arg6 `+0x10c`.
-    const char* begin = nullptr;
-    const char* current = nullptr;
-    const char* capacity = nullptr;
-};
-
 // Ghidra evidence currently points at the `0x403f90` family being old-MSVC2003
 // `std::basic_string<char>` / `std::string`. Source therefore uses direct `std::string`
-// storage and only keeps tiny helper shims for the recovered method boundaries and the
-// wrapper-facing `begin/current/capacity` sketch.
-inline void SyncStringSketch(RouteDescriptor30SmallStringLikeSketch& sketch, const std::string& value) {
-    sketch.begin = value.c_str();
-    sketch.current = sketch.begin + value.size();
-    sketch.capacity = sketch.current;
-}
+// storage and exposes semantic string views; the raw three-pointer layout view now lives only
+// inside `src/launcher_mediator_abi.cpp` where the launcher/client ABI shim actually needs it.
 
 inline const char* StringBeginOrNull(const std::string& value) {
     return value.empty() ? nullptr : value.c_str();
@@ -575,7 +556,7 @@ public:
     // +0xcc
     virtual uint32_t GetState8Section11Dword145c() const = 0;
     // +0xd0
-    virtual RouteDescriptor30SmallStringLikeSketch* GetState8Section11String1460() = 0;
+    virtual std::string_view GetState8Section11String1460() const = 0;
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8
@@ -605,7 +586,7 @@ public:
     // +0x108
     virtual uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
     // +0x10c
-    virtual RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() = 0;
+    virtual std::string_view GetRouteDescriptor30() const = 0;
     // +0x110
     void UnknownSlot68();
     // +0x114

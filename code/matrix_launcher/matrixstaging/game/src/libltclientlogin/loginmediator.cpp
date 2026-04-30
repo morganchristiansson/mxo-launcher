@@ -1138,24 +1138,21 @@ uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
 }
 
 // anchor: launcher.exe:0x41f1b0 / vtable +0xd0
-RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11String1460() {
+std::string_view CLTLoginMediator::GetState8Section11String1460() const {
     const CLTLoginMediatorCharacterPersistenceData_0x41d900& snapshot = state8PersistenceDataF1c;
-    state8Section11String1460_.begin = snapshot.section11StringBegin544;
-    state8Section11String1460_.current = snapshot.section11StringCurrent548;
-    state8Section11String1460_.capacity = snapshot.section11StringCapacity54c;
+    const char* const begin = snapshot.section11StringBegin544;
+    const char* const current = snapshot.section11StringCurrent548;
+    const std::string_view value =
+        (begin && current && current >= begin) ? std::string_view(begin, static_cast<size_t>(current - begin))
+                                               : std::string_view{};
 
-    const char* text =
-        (snapshot.section11StringBegin544 &&
-         snapshot.section11StringBegin544 != snapshot.section11StringCurrent548)
-            ? snapshot.section11StringBegin544
-            : "<empty>";
     spdlog::info(
         "CLTLoginMediator::GetState8Section11String1460(+0xd0) -> begin={} current={} owner={} text='{}'",
-        fmt::ptr(state8Section11String1460_.begin),
-        fmt::ptr(state8Section11String1460_.current),
+        fmt::ptr(begin),
+        fmt::ptr(current),
         fmt::ptr(this),
-        text);
-    return &state8Section11String1460_;
+        value.empty() ? "<empty>" : std::string(value));
+    return value;
 }
 
 // anchor: launcher.exe:0x41b4f0 +0xd4
@@ -1557,10 +1554,9 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
 }
 
 // anchor: launcher.exe:0x41f2c0 slot +0x10c
-RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30() {
+std::string_view CLTLoginMediator::GetRouteDescriptor30() const {
     // Static-RE body is the tiny accessor `return &this->mbr_0x30`.
-    SyncStringSketch(routeDescriptor30Sketch_, routeDescriptor30_);
-    return &routeDescriptor30Sketch_;
+    return routeDescriptor30_;
 }
 
 // anchor: launcher.exe:0x41af50 +0x118

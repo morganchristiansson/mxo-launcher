@@ -6,6 +6,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
@@ -600,7 +601,7 @@ public:
     uint32_t GetState8Section11Dword145c() const override;
     // +0xd0
     // sibling state8 section-`0x0b` small-string-like getter; launcher getter returns owner `+0x1460`
-    RouteDescriptor30SmallStringLikeSketch* GetState8Section11String1460() override;
+    std::string_view GetState8Section11String1460() const override;
     // +0xd8
     // anchor: launcher.exe:0x41af00 / exact body returns owner byte `+0x684` only when the
     // current helper/state code is `>= 3`
@@ -913,7 +914,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator_0x4af2b8.Default slot +0x10c
     // Keep the ABI-compatibility small-string object explicit instead of collapsing it into the
     // owner-side route-text helper family.
-    RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
+    std::string_view GetRouteDescriptor30() const override;
     // anchor: launcher.exe:0x41af50 / ILTLoginMediator_0x4af2b8.Default slot +0x118
     // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape lives directly
     // on the owner at `+0x1470/+0x1474/+0x1478`, so this getter can stay close to the original
@@ -1241,11 +1242,9 @@ public:
     // Those fake outer objects now live in `src/launcher_mediator_abi.cpp` instead of the
     // launcher-owned mediator model so the owner-side slot-record family can stay aligned with
     // `0x41f2e0 / 0x41f300`.
-    // - `+0xd0`  = owner `+0x1460` small-string-like state8 section-11 view
-    // - `+0x10c` = owner `+0x30` small-string-like route descriptor
+    // - `+0xd0`  = owner `+0x1460` state8 section-11 string view
+    // - `+0x10c` = owner `+0x30` route descriptor, modeled directly as `std::string`
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
-    RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
-    RouteDescriptor30SmallStringLikeSketch routeDescriptor30Sketch_{};
     std::string routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
