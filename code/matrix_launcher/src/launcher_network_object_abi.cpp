@@ -234,19 +234,9 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
         return NULL;
     }
 
-    void* priorList80 = owner->list80;
-    void* priorList8C = owner->list8C;
-
     LauncherObjectAbiAttachment attachment = {};
     attachment.launcherObjectShell = owner;
     engine->AttachLauncherAbiSurfaceScaffold(attachment);
-
-    if (priorList80 && priorList80 != owner->list80) {
-        std::free(priorList80);
-    }
-    if (priorList8C && priorList8C != owner->list8C) {
-        std::free(priorList8C);
-    }
 
     return engine;
 }
@@ -581,24 +571,13 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
         object->vtable = LauncherObjectPrimaryVtable();
     }
 
-    LauncherObjectListHead24* list80 =
-        static_cast<LauncherObjectListHead24*>(std::malloc(sizeof(LauncherObjectListHead24)));
-    if (!list80) {
-        spdlog::warn("launcher arg5 ABI shell failed to allocate +0x80 list head");
-        return false;
-    }
-    InitializeLauncherObjectListHead24(list80);
-    object->list80 = list80;
+    // Tree-family pruning step:
+    // - the shell no longer pre-allocates fake +0x80/+0x8c tree heads
+    // - once attached, those bytes are filled from the real engine object's authoritative tree
+    //   storage via AttachLauncherAbiSurfaceScaffold/SyncAttachedLauncherObjectStateScaffold
+    object->list80 = NULL;
     object->field84 = 0;
-
-    LauncherObjectListHead18* list8C =
-        static_cast<LauncherObjectListHead18*>(std::malloc(sizeof(LauncherObjectListHead18)));
-    if (!list8C) {
-        spdlog::warn("launcher arg5 ABI shell failed to allocate +0x8c list head");
-        return false;
-    }
-    InitializeLauncherObjectListHead18(list8C);
-    object->list8C = list8C;
+    object->list8C = NULL;
     object->field90 = 0;
 
     object->helper98.vtable = LauncherObjectSubVtable98();
