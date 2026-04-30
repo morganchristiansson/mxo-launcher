@@ -148,8 +148,6 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& LauncherObjec
 // This is the non-synthetic path for later arg5 dispatch after launcher startup has already
 // performed the one real create/store/register handoff at `0x40a380`.
 static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* ResolveLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner);
-// UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
-static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* GetOrCreateLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner);
 
 static void InitializeLauncherObjectListHead24(LauncherObjectListHead24* head) {
     if (!head) return;
@@ -208,6 +206,33 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* ResolveLauncherObjec
         return NULL;
     }
 
+    return binding.Engine();
+}
+
+// UNANCHORED: launcher startup bind helper for the single current arg5 object.
+// This is only for the real `0x40a380` create/store/register handoff path; later arg5 dispatch
+// must resolve the already-registered binding rather than lazily creating/rebinding it.
+mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAbiShell(void* ownerPtr) {
+    LauncherObjectAbiShell* owner = static_cast<LauncherObjectAbiShell*>(ownerPtr);
+    if (!owner) {
+        return NULL;
+    }
+
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& binding = LauncherObjectEngineBinding();
+    if (binding.Owner() != owner) {
+        if (!binding.Bind(owner)) {
+            spdlog::warn(
+                "launcher arg5 ABI shell failed to bind CLTThreadPerClientTCPEngine_0x4b2768 sidecar for {}",
+                fmt::ptr(owner));
+            return NULL;
+        }
+    }
+
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = binding.Engine();
+    if (!engine) {
+        return NULL;
+    }
+
     void* priorList80 = owner->list80;
     void* priorList8C = owner->list8C;
 
@@ -223,7 +248,7 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* ResolveLauncherObjec
     attachment.field84EndpointCount = &owner->field84;
     attachment.list8CContextTreeHead = &owner->list8C;
     attachment.field90ContextCount = &owner->field90;
-    binding.Engine()->AttachLauncherAbiSurfaceScaffold(attachment);
+    engine->AttachLauncherAbiSurfaceScaffold(attachment);
 
     if (priorList80 && priorList80 != owner->list80) {
         std::free(priorList80);
@@ -232,34 +257,7 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* ResolveLauncherObjec
         std::free(priorList8C);
     }
 
-    return binding.Engine();
-}
-
-// UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
-static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* GetOrCreateLauncherObjectEngineSidecar(
-    LauncherObjectAbiShell* owner) {
-    if (!owner) return NULL;
-
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& binding = LauncherObjectEngineBinding();
-    if (binding.Owner() != owner) {
-        if (!binding.Bind(owner)) {
-            spdlog::warn("launcher arg5 ABI shell failed to bind CLTThreadPerClientTCPEngine_0x4b2768 sidecar for {}", fmt::ptr(owner));
-            return NULL;
-        }
-    }
-
-    return ResolveLauncherObjectEngineSidecar(owner);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-// Faithfulness note:
-// - this is now the startup-side bind helper for the single current launcher arg5 object
-// - later arg5 virtual/helper dispatch inside this TU should prefer the registered binding resolver
-//   instead of recreating ownership through `GetOrCreate...`
-// - it must not lazily perform the launcher startup arg5 -> arg6 handoff; that ownership stays at
-//   `launcher.exe:0x40a380`
-mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAbiShell(void* ownerPtr) {
-    return GetOrCreateLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(ownerPtr));
+    return engine;
 }
 
 // UNANCHORED: replacement arg5 internal teardown helper.
@@ -307,10 +305,6 @@ static uint32_t __thiscall LauncherObject_MonitorPort(
     void* ownerContext,
     void* reservedArg3) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
     return engine->MonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         ownerContext,
@@ -325,10 +319,6 @@ static uint32_t __thiscall LauncherObject_UDPMonitorPort(
     void* contextKey,
     void* ipv4NetworkOrder) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
     return engine->UDPMonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         contextKey,
@@ -343,10 +333,6 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
     void* contextKey,
     void* ipv4NetworkOrder) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
     uint16_t boundPortHostOrder = 0;
     return engine->MonitorEphemeralUDPPort(
         outBoundPortHostOrder ? static_cast<uint16_t*>(outBoundPortHostOrder) : &boundPortHostOrder,
@@ -359,8 +345,7 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
 static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
     LauncherObjectAbiShell* self,
     void* arg1) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    return engine ? engine->Slot4_42F7C0(arg1) : 0u;
+    return ResolveLauncherObjectEngineSidecar(self)->Slot4_42F7C0(arg1);
 }
 
 // anchor: launcher.exe:0x431840
@@ -371,10 +356,6 @@ static uint32_t __thiscall LauncherObject_UnmonitorPort(
     void** outOwnerContext,
     void* ipv4NetworkOrder) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
     return engine->UnmonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         outOwnerContext,
@@ -386,12 +367,7 @@ static uint32_t __thiscall LauncherObject_UnmonitorPort(
 static uint32_t __thiscall LauncherObject_Connect(
     LauncherObjectAbiShell* self,
     void* contextKey) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
-    return engine->Connect(contextKey);
+    return ResolveLauncherObjectEngineSidecar(self)->Connect(contextKey);
 }
 
 // anchor: launcher.exe:0x42f970
@@ -400,12 +376,7 @@ static uint32_t __thiscall LauncherObject_Close(
     LauncherObjectAbiShell* self,
     void* contextKey,
     uint32_t graceful) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
-    return engine->Close(contextKey, graceful != 0u);
+    return ResolveLauncherObjectEngineSidecar(self)->Close(contextKey, graceful != 0u);
 }
 
 // anchor: launcher.exe:0x42fbd0
@@ -417,10 +388,6 @@ static uint32_t __thiscall LauncherObject_SendBuffer(
     void* contextKey,
     void* completionContext) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    if (!engine) {
-        return 0;
-    }
-
     return engine->SendBuffer(
         buffer,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
@@ -438,14 +405,12 @@ static uint32_t __thiscall LauncherObject_SendBufferWithEndpoint(
     void* contextKey,
     void* ownershipMode) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    return engine
-        ? engine->SendBufferWithEndpoint(
-            buffer,
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
-            static_cast<mxo::liblttcp::LTTCPEndpointKey_0x44b070*>(remoteEndpoint),
-            contextKey,
-            ownershipMode)
-        : 0u;
+    return engine->SendBufferWithEndpoint(
+        buffer,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
+        static_cast<mxo::liblttcp::LTTCPEndpointKey_0x44b070*>(remoteEndpoint),
+        contextKey,
+        ownershipMode);
 }
 
 // anchor: launcher.exe:0x443810
@@ -453,8 +418,7 @@ static uint32_t __thiscall LauncherObject_SendBufferWithEndpoint(
 static uint32_t __thiscall LauncherObject_Slot10_443810(
     LauncherObjectAbiShell* self,
     void* arg1) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    return engine ? engine->Slot10_443810(arg1) : 0u;
+    return ResolveLauncherObjectEngineSidecar(self)->Slot10_443810(arg1);
 }
 
 // UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
@@ -469,8 +433,7 @@ static uint32_t __thiscall LauncherObject_Slot11_431670(
     void* arg1,
     uint32_t* out0,
     uint32_t* out1) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    return engine ? engine->Slot11_431670(arg1, out0, out1) : 0u;
+    return ResolveLauncherObjectEngineSidecar(self)->Slot11_431670(arg1, out0, out1);
 }
 
 // anchor: launcher.exe:0x4316a0
@@ -478,8 +441,7 @@ static uint32_t __thiscall LauncherObject_Slot11_431670(
 static uint32_t __thiscall LauncherObject_CleanupConnection(
     LauncherObjectAbiShell* self,
     void* contextKey) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    return engine ? engine->CleanupConnection(contextKey) : 0u;
+    return ResolveLauncherObjectEngineSidecar(self)->CleanupConnection(contextKey);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -743,9 +705,8 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
 
 // UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
 void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking) {
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(launcherObjectPtr))) {
-        engine->RunCompletedOperationQueue(nonBlocking);
-    }
+    ResolveLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(launcherObjectPtr))
+        ->RunCompletedOperationQueue(nonBlocking);
 }
 
 // UNANCHORED: public replacement-launcher entrypoint for the original 0x40a380 allocation + ctor

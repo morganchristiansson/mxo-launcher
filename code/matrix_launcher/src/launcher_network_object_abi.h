@@ -4,10 +4,9 @@ namespace mxo::liblttcp {
 class CLTThreadPerClientTCPEngine_0x4b2768;
 }
 
-// UNANCHORED: launcher-owned bridge from the arg5 ABI shell to the shared liblttcp engine sidecar.
-// Keep the raw launcher-object layout in `launcher_network_object_abi.cpp`, but let other
-// launcher-side surfaces resolve the real engine instead of reinterpreting the ABI shell pointer as
-// a `CLTThreadPerClientTCPEngine_0x4b2768*`.
+// UNANCHORED: launcher-owned startup bind helper from the arg5 ABI shell to the shared liblttcp
+// engine sidecar. This belongs to the real `0x40a380` create/store/register handoff path, not to
+// arbitrary later arg5 dispatch.
 mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAbiShell(void* ownerPtr);
 
 // UNANCHORED: launcher-owned replacement for the original 0x40a380 allocation + ctor path.
