@@ -66,12 +66,12 @@ static ParsedState10ClaimCharacterNameReplyScaffold ParseState10ClaimCharacterNa
 
 }  // namespace
 
-// anchor: launcher.exe vtable 0x004b512c
+// anchor: launcher.exe vtable 0x4b512c
 const char* CLTLoginState_State10_0x4b512c::DebugName() const {
     return "CLTLoginState_State10_0x4b512c";
 }
 
-// anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
+// anchor: launcher.exe:0x43bf90 (vtable 0x4b512c slot 3)
 void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     (void)upstreamOrArg;
     if (!g_CurrentLoginMediator) {
@@ -168,7 +168,7 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
     return;
 }
 
-// anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
+// anchor: launcher.exe:0x4401a0 (vtable 0x4b512c slot 6)
 uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
         mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!g_CurrentLoginMediator || !messageRef) {
@@ -296,7 +296,11 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
     g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[appendedSlotIndex] =
         selectedWorldDescriptor.inlineNamePlus03;
-    g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
+    // anchor: launcher.exe:0x440268-0x440272
+    // Static RE shows a direct write to owner +0xcc8 / selectionRouteState684_.currentSlotOrSelectionIndex644_
+    // followed by incrementing the slot count. Do not use the broader scaffold helper here because
+    // `0x4401a0` does not show the extra mirrored writes to owner +0xcc8 sidecars.
+    g_CurrentLoginMediator->selectionRouteState684_.SetCurrentSlotOrSelectionIndex644(appendedSlotIndex);
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 
     // anchor: launcher.exe:0x440274-0x440283
@@ -330,7 +334,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     return 1u;
 }
 
-// anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
+// anchor: launcher.exe:0x438ca0 (vtable 0x4b512c slot 7)
 uint32_t CLTLoginState_State10_0x4b512c::GetStateId() const {
     return 10;
 }
