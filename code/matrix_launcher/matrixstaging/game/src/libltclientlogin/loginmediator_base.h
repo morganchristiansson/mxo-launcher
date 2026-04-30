@@ -269,9 +269,10 @@ static_assert(offsetof(SubmitLoginRequestInput_0x407d50, submitRequestFlag6c) ==
 
 // anchor: launcher.exe:0x41eb80
 // Owner-side auth/bootstrap source block at owner +0x94.
-// Has a method CopyFromSubmitLoginRequestInput that copies from the input to this block.
+// Static-RE now supports keeping this as a real embedded class with one confirmed method:
+// `OwnerAuthBootstrapSource94_0x41eb80::CopyFromSubmitLoginRequestInput`.
 // Also has a separate session token string at +0xf4 (block offset +0x60).
-class OwnerAuthBootstrapSource94 {
+class OwnerAuthBootstrapSource94_0x41eb80 {
 public:
     // Layout matches owner+0x94 block
     std::array<char, 0x20> username00{};    // +0x00
