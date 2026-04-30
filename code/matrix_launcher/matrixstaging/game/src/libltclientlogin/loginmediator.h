@@ -328,11 +328,9 @@ public:
         // Keep the two dword names provisional for now:
         // the active disassembly only proves that `0x439300` forwards them into owner vtable
         // `+0xfc`, not that they are semantically settled world ids on every branch.
-        uint8_t currentCharacterOrRouteIndex = 0;
         uint32_t pendingWorldId = 0;
         int32_t currentWorldId = -1;
         std::string routeHostPrefix;
-        std::string exactMarginHostName;
     };
 
     // Fidelity note: the old source-only `PostAuthMarginLoadingState` wrapper has been retired.
@@ -365,14 +363,6 @@ public:
 
         // anchor: launcher.exe:0x41dd00 / embedded owner subobject destroy/final release
         void DestroySelectionRouteState();
-
-        uint8_t CurrentSlotOrSelectionIndex644() const {
-            return currentSlotOrSelectionIndex644_;
-        }
-
-        void SetCurrentSlotOrSelectionIndex644(uint8_t slotIndex) {
-            currentSlotOrSelectionIndex644_ = slotIndex;
-        }
 
         // Source-owned mirrors of the original embedded helper layout:
         // - `+0x00`  = active slot-record count
@@ -681,8 +671,6 @@ public:
     // The replacement launcher should eventually populate these from the same launcher-owned
     // config path instead of treating connection setup as generic ad-hoc socket work.
 
-    std::string ResolvedMarginHostName() const;
-
     bool AuthPeerCloseQueuedScaffold() const { return authPeerCloseQueuedScaffold_; }
     bool MarginPeerCloseQueuedScaffold() const { return marginPeerCloseQueuedScaffold_; }
     void SetAuthPeerCloseQueuedScaffold(bool value) { authPeerCloseQueuedScaffold_ = value; }
@@ -811,12 +799,7 @@ public:
     static constexpr uint32_t kReceiveActionBeginMarginAfterAuthReply = 1u << 0;
 
     // launcher.exe owner-vtable surfaces currently recovered from the state4 margin dispatcher.
-    // Keep these helpers narrow and structural:
-    // - `0x439300` decides which helper to call
-    // - these mediator methods only mirror the owner-side route-string getters that feed `0x41e500`
-    const char* ResolveMarginRouteFromCurrentCharacterSlot() const;            // current best anchor: recovered route-host helper `0x41b260`
-    const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
-    const char* ResolveMarginRouteDescriptor() const;                          // current best owner-side route-text resolver used to back arg6 `+0x10c`
+    // Keep the recovered owner slots explicit instead of adding state4-specific bridge helpers.
     // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator_0x4af2b8.Default slot +0x10c
     // Keep the ABI-compatibility small-string object explicit instead of collapsing it into the
     // owner-side route-text helper family.
@@ -900,8 +883,6 @@ public:
     //   route strings + current-slot byte `+0xcc8` + snapshot body `+0xcd0..+0xd7f`
     // - replacement now models that ownership island as the nested
     //   `CLTLoginMediatorSelectionRouteState` class and keeps the anchored method boundaries there
-
-    void SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex);
 
     // =============================================================================
     // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
@@ -998,14 +979,6 @@ public:
     // They are used to faithfully reconstruct the original launcher's margin packet building
     // and load character reply handling logic.
     // =============================================================================
-
-    // Source-owned bridge over original owner byte `+0xcc8`.
-    // Fidelity tightening from `0x41f300`:
-    // - owner vtable `+0x44` directly reads the embedded selection-route helper byte
-    // - current source now treats `selectionRouteState684_.currentSlotOrSelectionIndex644_`
-    //   as the canonical mirror of that owner byte and keeps the later post-auth fields synced
-    //   through `SetCurrentCharacterRouteIndexCc8Scaffold`
-    uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
 
  // State-owned slot-6 bodies mutate this mediator-owned owner-state block directly.
 
@@ -1244,8 +1217,6 @@ public:
     uint32_t replySectionData13cc = 0;
     uint32_t replySectionData13d0 = 0;
     uint8_t section0Flag13f6 = 0;
-    uint8_t characterRouteIndexCc8 = 0;
-
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18
     // launcher.exe:0x4f78b8 owner-side world-list packet pointer table (`+0xd84`).
     // Static-RE from `0x41ee60` ctor plus owner readers `0x41b2e0/0x41b320/0x41b360/0x41b3a0` shows:

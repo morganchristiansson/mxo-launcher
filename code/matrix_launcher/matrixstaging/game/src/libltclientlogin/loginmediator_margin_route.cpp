@@ -8,55 +8,6 @@ namespace {
 
 }  // namespace
 
-uint8_t CLTLoginMediator::CurrentCharacterRouteIndexCc8Scaffold() const {
-    // anchor relation: launcher.exe:0x41f300 / owner vtable +0x44
-    // Owner `+0x44` reads the embedded selection-route subobject byte directly and forwards it
-    // into owner `+0x40`.
-    return selectionRouteState684_.CurrentSlotOrSelectionIndex644();
-}
-
-void CLTLoginMediator::SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex) {
-    selectionRouteState684_.SetCurrentSlotOrSelectionIndex644(slotIndex);
-    characterRouteIndexCc8 = slotIndex;
-    marginRouteState_.currentCharacterOrRouteIndex = slotIndex;
-}
-
-const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {
-    // Address anchors:
-    // - launcher.exe:0x439300 case `7/8/0xd`
-    // - owner byte `+0xcc8`
-    // - owner vtable `+0xe0`
-    //
-    // Current best source-owned mirror returns the reconstructed route-host string triple's first
-    // string for the current owner `+0xcc8` slot/index.
-    if (const char* routeHost = LookupRouteHostPrefixBySlot(CurrentCharacterRouteIndexCc8Scaffold())) {
-        return routeHost;
-    }
-
-    // Current bounded stand-in for the still-unrecovered earlier producer of owner
-    // `+0x30/+0x3c/+0x6c` on the existing-character path:
-    // when the per-slot route table is not populated yet, reuse the owner `+0x30`
-    // route-descriptor string directly.
-    return StringBeginOrNull(routeDescriptor30_);
-}
-
-const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const {
-    // Address anchors:
-    // - launcher.exe:0x439300 case `10`
-    // - owner dword `+0x12c`
-    // - owner vtable `+0xfc`
-    //
-    // Fresh tightening from `0x41c3c0` + `0x4401a0`:
-    // - `0x41c3c0` bounds-checks input `+0x24` against owner vtable `+0xf8`
-    // - later `0x4401a0` indexes owner `+0xd84` using owner `+0x12c`
-    // - current best read is therefore that the state4 case-10 branch forwards a
-    //   world-descriptor index/selector here, not a direct world-id payload
-    if (descriptorIndex >= worldListPacketCountD80_) {
-        return nullptr;
-    }
-    return GetWorldListNameByIndex(static_cast<uint8_t>(descriptorIndex));
-}
-
 // anchor: launcher.exe:0x41e500
 uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint8_t cachedRouteSelector) {
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`

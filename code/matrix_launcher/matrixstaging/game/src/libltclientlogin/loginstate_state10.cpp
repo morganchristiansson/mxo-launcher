@@ -234,7 +234,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Static RE shows a direct write to owner +0xcc8 / selectionRouteState684_.currentSlotOrSelectionIndex644_
     // followed by incrementing the slot count. Do not use the broader scaffold helper here because
     // `0x4401a0` does not show the extra mirrored writes to owner +0xcc8 sidecars.
-    g_CurrentLoginMediator->selectionRouteState684_.SetCurrentSlotOrSelectionIndex644(appendedSlotIndex);
+    g_CurrentLoginMediator->selectionRouteState684_.currentSlotOrSelectionIndex644_ = appendedSlotIndex;
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 
     // anchor: launcher.exe:0x440274-0x440283

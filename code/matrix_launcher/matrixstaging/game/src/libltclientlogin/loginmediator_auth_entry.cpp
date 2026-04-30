@@ -84,22 +84,10 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
 // The original anchor at launcher.exe:0x41b1e8..0x41b1ef directly reads g_qsAuthServerDNSName.
 // (inline refresh happens in Initialize and BeginAuthConnection)
 //     BuildMarginEndpoint();
-//     if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
+//     if (owner+0x30 is non-empty && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
 //         BuildMarginEndpoint();
 //     }
 // }
-
-// Faithful bounded helper around owner `+0x30` usage in `0x41e500`.
-std::string CLTLoginMediator::ResolvedMarginHostName() const {
-    if (!marginRouteState_.exactMarginHostName.empty()) {
-        return marginRouteState_.exactMarginHostName;
-    }
-    if (const char* const routeDescriptorBegin = StringBeginOrNull(routeDescriptor30_);
-        routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
-        return std::string(routeDescriptorBegin) + g_marginServerDNSName;
-    }
-    return std::string();
-}
 
 
 

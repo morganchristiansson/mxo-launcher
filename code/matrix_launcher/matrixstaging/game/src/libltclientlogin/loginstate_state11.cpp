@@ -298,7 +298,7 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
     g_CurrentLoginMediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
-        g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
+        g_CurrentLoginMediator->selectionRouteState684_.currentSlotOrSelectionIndex644_ = 0xffu;
         (void)g_CurrentLoginMediator->SetCurrentState(3u);
         g_CurrentLoginMediator->PostError(12u);
         spdlog::info(

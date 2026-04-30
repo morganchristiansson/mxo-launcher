@@ -1332,9 +1332,9 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
  return 0u;
  }
 
- // anchor: launcher.exe:0x41c390 = SetCurrentCharacterRouteIndexCc8Scaffold
+ // anchor: launcher.exe:0x41c390 / direct owner-byte write
  // Write slot index to owner +0xcc8 / selectionRouteState684_.currentSlotOrSelectionIndex644_
- SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(input.slotOrSelectionIndex00));
+ selectionRouteState684_.currentSlotOrSelectionIndex644_ = static_cast<uint8_t>(input.slotOrSelectionIndex00);
 
  // anchor: launcher.exe:0x41c1f0 body - direct field copies from param_1 to selectionRouteState684_
  // Original directly assigns: (this->selectionRouteState684).currentSlotOrSelectionIndex644 = (byte)*param_1;
@@ -1361,7 +1361,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
 
  spdlog::info(
  "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} oldState={} currentState={} state8EntryResult=0x{:08x}",
- selectionRouteState684_.CurrentSlotOrSelectionIndex644(),
+ selectionRouteState684_.currentSlotOrSelectionIndex644_,
  selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
  selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
  oldState ? oldState->DebugName() : "<null>",
@@ -1373,7 +1373,8 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
 // anchor: launcher.exe:0x41c390 +0xf0
 uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) {
     if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectedSlotRecordIndex < 100u) {
-        SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu));
+        selectionRouteState684_.currentSlotOrSelectionIndex644_ =
+            static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu);
         if (LoginHelperStateByIdScaffold(7u) != nullptr) {
             (void)SetCurrentState(7u);
         }
@@ -2239,7 +2240,8 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 
 // anchor: launcher.exe:0x41f2d0 / owner vtable +0x3c
 uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
-    const uint32_t selectionIndex = static_cast<uint32_t>(CurrentCharacterRouteIndexCc8Scaffold());
+    const uint32_t selectionIndex =
+        static_cast<uint32_t>(selectionRouteState684_.currentSlotOrSelectionIndex644_);
     if (g_LastLoggedDefaultSelectionIndex3c != selectionIndex) {
         g_LastLoggedDefaultSelectionIndex3c = selectionIndex;
         spdlog::debug(
@@ -2303,7 +2305,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         "CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold wrote '{}' characterCount={} currentIndex=0x{:02x}",
         outputPath,
         persistedCount,
-        static_cast<unsigned>(characterRouteIndexCc8));
+        static_cast<unsigned>(selectionRouteState684_.currentSlotOrSelectionIndex644_));
 }
 
 
