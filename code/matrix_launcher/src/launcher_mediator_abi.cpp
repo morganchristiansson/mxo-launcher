@@ -954,30 +954,41 @@ static Msvc2003StdStringView* __thiscall Mediator_GetRouteDescriptor10c(MinimalL
 // - immediate event-0x18 helper `0x621c6d90` and later consumer `0x62017150` both use this slot
 // - wrapper logs the exact client return address so successful runs can show whether only the
 //   immediate event-0x18 helper fired or the later metric-matcher path also ran
-static mxo::ltlogin::LateEntryList1470VectorLikeSketch* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
+struct Msvc2003StdStringVectorView {
+    Msvc2003StdStringView* begin = nullptr;
+    Msvc2003StdStringView* current = nullptr;
+    Msvc2003StdStringView* capacity = nullptr;
+};
+
+static Msvc2003StdStringVectorView* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    mxo::ltlogin::LateEntryList1470VectorLikeSketch* const list =
-        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
-    size_t entryCount = 0u;
-    const char* firstEntry = "<empty>";
-    if (list && list->begin && list->current && list->current >= list->begin) {
-        entryCount = static_cast<size_t>(list->current - list->begin);
-        if (entryCount != 0u && list->begin->begin && list->begin->begin[0] != '\0') {
-            firstEntry = list->begin->begin;
-        }
+    static thread_local std::vector<Msvc2003StdStringView> entryViews;
+    static thread_local Msvc2003StdStringVectorView vectorView;
+
+    const std::vector<std::string>& list = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
+    entryViews.clear();
+    entryViews.reserve(list.size());
+    for (const std::string& entry : list) {
+        entryViews.push_back(BuildMsvc2003StdStringView(entry));
     }
+
+    vectorView.begin = entryViews.empty() ? nullptr : entryViews.data();
+    vectorView.current = entryViews.empty() ? nullptr : entryViews.data() + entryViews.size();
+    vectorView.capacity = entryViews.empty() ? nullptr : entryViews.data() + entryViews.capacity();
+
+    const char* firstEntry = (!list.empty() && !list.front().empty()) ? list.front().c_str() : "<empty>";
     spdlog::info(
         "MediatorStub::GetLateEntryList118 caller={} [{}] result={} begin={} current={} capacity={} entryCount={} firstEntry='{}'",
         fmt::ptr(returnAddress),
         DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(list),
-        fmt::ptr(list ? list->begin : nullptr),
-        fmt::ptr(list ? list->current : nullptr),
-        fmt::ptr(list ? list->capacity : nullptr),
-        entryCount,
+        fmt::ptr(&vectorView),
+        fmt::ptr(vectorView.begin),
+        fmt::ptr(vectorView.current),
+        fmt::ptr(vectorView.capacity),
+        list.size(),
         firstEntry);
-    return list;
+    return &vectorView;
 }
 
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.

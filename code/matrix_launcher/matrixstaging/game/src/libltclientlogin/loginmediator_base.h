@@ -182,30 +182,6 @@ inline int StringCompareNoCase(const std::string& value, const char* other) {
 #endif
 }
 
-struct LateEntryList1470EntrySketch {
-    // anchor: launcher.exe:0x41af50 / owner vtable `+0x118`
-    // Newer tightening from `0x41f840 -> 0x41f640` plus client consumer `0x62017150`:
-    // - owner `+0x1470` is a vector of 12-byte string-triple objects
-    // - owner slot `+0x190 / 0x41f840` appends one entry by forwarding to
-    //   `0x41f640 = StringTripleArray_Append`
-    // - `0x41f640 / 0x41f3e0 / 0x41e410 / 0x41eb20` together show these entries own their copied
-    //   character buffers rather than borrowing caller pointers
-    // - later client code reads the first dword of each entry as a filename-like string and maps
-    //   it through `FUN_622a9cf0` / `METR` metadata
-    char* begin = nullptr;
-    char* current = nullptr;
-    char* capacity = nullptr;
-};
-
-struct LateEntryList1470VectorLikeSketch {
-    // anchor: launcher.exe:0x41af50 / owner vtable `+0x118`
-    // Wrapper-facing late-runtime object shape returned through arg6 `+0x118`.
-    // The observer callback reads this as a begin/current/capacity triple over 12-byte entries.
-    // Owner-side `+0x1470/+0x1474/+0x1478` is this same vector header.
-    LateEntryList1470EntrySketch* begin = nullptr;
-    LateEntryList1470EntrySketch* current = nullptr;
-    LateEntryList1470EntrySketch* capacity = nullptr;
-};
 
 // SessionCallbackHelper65cSketch is now LaunchPadClient_0x4b0e48 (see launchpad.h)
 // The session callback helper at CLTLoginMediator +0x65c is a LaunchPadClient instance.
@@ -592,7 +568,7 @@ public:
     // +0x114
     void UnknownSlot69();
     // +0x118
-    virtual LateEntryList1470VectorLikeSketch* GetLateEntryList1470() = 0;
+    virtual const std::vector<std::string>& GetLateEntryList1470() const = 0;
     // +0x11c
     void UnknownSlot71();
     // +0x120

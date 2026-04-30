@@ -283,7 +283,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
             authBootstrapChild.SetPromptPasswordF8AndSecurIdFlag(passwordText);
             spdlog::info(
                 "AuthBootstrap680SetPromptPasswordF8AndSecurIdFlag childStringF8Len={} promptForSecurId={}",
-                static_cast<unsigned>(authBootstrapChild.stringF8.owned.size()),
+                static_cast<unsigned>(authBootstrapChild.stringF8.size()),
                 static_cast<unsigned>(authBootstrapChild.crashReporterPromptForSecurId104));
 
             if (!g_authBootstrap680State2AuthReplySuccessOneTimeGate) {

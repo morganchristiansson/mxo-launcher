@@ -451,12 +451,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     const uint16_t metricId = ReadU16LE(payloadBytes + metricOffset);
     const char* const filename = ResolveClientMetricFilenameById(metricId);
     if (filename && filename[0] != '\0') {
-      const size_t filenameLength = std::strlen(filename);
-      LateEntryList1470EntrySketch metricFilenameStringTriple{};
-      metricFilenameStringTriple.begin = const_cast<char*>(filename);
-      metricFilenameStringTriple.current = metricFilenameStringTriple.begin + filenameLength;
-      metricFilenameStringTriple.capacity = metricFilenameStringTriple.current + 1u;
-      g_CurrentLoginMediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple);
+      g_CurrentLoginMediator->AppendLateEntryStringTriple1470Scaffold(filename);
       ++resolvedMetricFilenameCount;
       continue;
     }

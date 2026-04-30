@@ -19,12 +19,11 @@ namespace mxo::ltlogin {
 
 struct AuthBootstrap680RsaPublicKeyPairOwnedState;
 
-struct AuthBootstrap680SmallStringMirror {
-    const char* begin = nullptr;
-    const char* current = nullptr;
-    const char* capacity = nullptr;
-    std::string owned;
-};
+// Transitional compatibility alias while surrounding runtime/messageconnection headers still refer
+// to the recovered child string fields by their older mirror name. Semantically these are now
+// modeled directly as std::string.
+using AuthBootstrap680SmallStringMirror = std::string;
+
 
 class __attribute__((packed)) AuthBootstrapReplyCopyShadowF4_0x44add0 {
 public:

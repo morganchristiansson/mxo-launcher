@@ -919,13 +919,12 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape lives directly
     // on the owner at `+0x1470/+0x1474/+0x1478`, so this getter can stay close to the original
     // tiny `lea eax,[ecx+0x1470]; ret`.
-    LateEntryList1470VectorLikeSketch* GetLateEntryList1470() override;
+    const std::vector<std::string>& GetLateEntryList1470() const override;
     // anchor: launcher.exe:0x41f5f0 / owner helper clearing owner `+0x1470`
     void ClearLateEntryList1470Scaffold();
     // anchor: launcher.exe:0x41f840 / owner vtable +0x190
-    // Keep this wrapper tiny like the original: it forwards owner `+0x1470` into the lower-level
-    // string-triple array append helper.
-    void AppendLateEntryStringTriple1470Scaffold(const LateEntryList1470EntrySketch* sourceEntry);
+    // Keep this wrapper tiny like the original: it appends one recovered late-entry string.
+    void AppendLateEntryStringTriple1470Scaffold(std::string_view sourceEntry);
     // Wrapper-facing selection profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator_0x4af2b8.Default +0x40/+0x44` object
@@ -1247,11 +1246,9 @@ public:
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     std::string routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
-    // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
-    // - entries are 12-byte owned string-triples copied by `0x41f640`
-    // - growth / destruction helpers around this header now mirror the original array semantics
-    //   directly instead of routing through STL containers
-    LateEntryList1470VectorLikeSketch lateEntryList1470_{};
+    // semantic model is `std::vector<std::string>`; the old-MSVC vector/string layout view is now
+    // synthesized only inside `src/launcher_mediator_abi.cpp`.
+    std::vector<std::string> lateEntryList1470_{};
     // Narrow source-owned post-state9 / post-state12 owner collaborators from
     // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.
     // Strongest current origin: deeper client init owner/arg6 vtable `+0x124`

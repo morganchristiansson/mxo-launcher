@@ -869,15 +869,12 @@ static bool EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
 
 namespace {
 
-static void ClearSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror) {
-    mirror.owned.clear();
-    mirror.begin = nullptr;
-    mirror.current = nullptr;
-    mirror.capacity = nullptr;
+static void ClearSmallStringMirror(std::string& mirror) {
+    mirror.clear();
 }
 
 static void AssignSmallStringMirror(
-    AuthBootstrap680SmallStringMirror& mirror,
+    std::string& mirror,
     const char* begin,
     const char* current) {
     ClearSmallStringMirror(mirror);
@@ -885,10 +882,7 @@ static void AssignSmallStringMirror(
         return;
     }
 
-    mirror.owned.assign(begin, current);
-    mirror.begin = mirror.owned.c_str();
-    mirror.current = mirror.begin + mirror.owned.size();
-    mirror.capacity = mirror.current;
+    mirror.assign(begin, current);
 }
 
 static size_t BoundedCStringLength(const char* text, size_t maxBytes) {
@@ -903,7 +897,7 @@ static size_t BoundedCStringLength(const char* text, size_t maxBytes) {
     return length;
 }
 
-static void AssignSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror, const char* text) {
+static void AssignSmallStringMirror(std::string& mirror, const char* text) {
     if (!text) {
         ClearSmallStringMirror(mirror);
         return;
@@ -911,14 +905,12 @@ static void AssignSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror, c
     AssignSmallStringMirror(mirror, text, text + std::char_traits<char>::length(text));
 }
 
-static size_t SmallStringMirrorLength(const AuthBootstrap680SmallStringMirror& mirror) {
-    return (mirror.begin && mirror.current && mirror.current >= mirror.begin)
-        ? static_cast<size_t>(mirror.current - mirror.begin)
-        : 0u;
+static size_t SmallStringMirrorLength(const std::string& mirror) {
+    return mirror.size();
 }
 
-static const char* SmallStringMirrorDataOrEmpty(const AuthBootstrap680SmallStringMirror& mirror) {
-    return mirror.begin ? mirror.begin : "";
+static const char* SmallStringMirrorDataOrEmpty(const std::string& mirror) {
+    return mirror.empty() ? "" : mirror.c_str();
 }
 
 }  // namespace
@@ -990,10 +982,8 @@ AuthBootstrap680Child_0x441290::~AuthBootstrap680Child_0x441290() {
      opaqueReplyBlob10C = nullptr;
  }
 
- // +0xf8: stringF8 - free if begin != current (FUN_00403c20 pattern)
- if (stringF8.begin != nullptr && stringF8.begin != stringF8.current) {
-     stringF8 = {};
- }
+ // +0xf8: stringF8 - source now models this directly as std::string
+ stringF8.clear();
 
  // Base class destructor handles +0x00..+0xf4
 }
@@ -1002,10 +992,7 @@ AuthBootstrap680Child_0x441290::~AuthBootstrap680Child_0x441290() {
 void AuthBootstrap680Child_0x441290::SetPromptPasswordF8AndSecurIdFlag(
     const char* promptPasswordWithOptionalSecurId) {
     if (promptPasswordWithOptionalSecurId == nullptr) {
-        stringF8.owned.clear();
-        stringF8.begin = nullptr;
-        stringF8.current = nullptr;
-        stringF8.capacity = nullptr;
+        stringF8.clear();
         crashReporterPromptForSecurId104 = 0u;
         return;
     }
@@ -1028,10 +1015,7 @@ void AuthBootstrap680Child_0x441290::SetPromptPasswordF8AndSecurIdFlag(
         promptPassword.resize(promptPassword.size() - 7u);
     }
 
-    stringF8.owned = std::move(promptPassword);
-    stringF8.begin = stringF8.owned.c_str();
-    stringF8.current = stringF8.begin + stringF8.owned.size();
-    stringF8.capacity = stringF8.current;
+    stringF8 = std::move(promptPassword);
     crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
 }
 
@@ -1303,10 +1287,10 @@ AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {
  // +0x54: feedbackSeedHelper54 - clear/reset (calls FUN_0041c750 pattern for each buffer)
  feedbackSeedHelper54 = {};
 
- // +0x04..+0x24: small string mirrors cleared (three groups of three pointers)
- string04 = {};
- string10 = {};
- string1C = {};
+ // +0x04..+0x24: source now models these directly as std::string values
+ string04.clear();
+ string10.clear();
+ string1C.clear();
 
  // Erase owned state from global map
 
@@ -1316,15 +1300,9 @@ AuthBootstrap680ChildBase_0x4b7134::~AuthBootstrap680ChildBase_0x4b7134() {
 // Handles +0x04 (string04), +0x10 (string10), +0x28..+0x4c (block30, block40, sendTarget50, loginType28, launcherVersion2C)
 // +0xf0 (authReplyParseObjectF0), +0xf4 (authReplyCopyShadowF4)
 void AuthBootstrap680ChildBase_0x4b7134::ClearReplyParseAndCopyShadowFields() {
- // +0x04: string04 small string mirror - zero if begin != capacity
- if (string04.begin != nullptr && string04.begin != string04.capacity) {
- string04 = {};
- }
-
- // +0x10: string10 small string mirror - zero if begin != capacity
- if (string10.begin != nullptr && string10.begin != string10.capacity) {
- string10 = {};
- }
+ // +0x04/+0x10: source now models these directly as std::string values.
+ string04.clear();
+ string10.clear();
 
  // +0x28..+0x4c: zero these fields
  loginType28 = 0u;

@@ -91,9 +91,9 @@ public:
  // - child `+0x30 .. +0x3f` <- owner `+0x94 + 0x40 .. + 0x4f`
  // - child `+0x40 .. +0x4f` <- owner `+0x94 + 0x50 .. + 0x5f`
  // - child `+0x50` <- owner-side send target result returned to `0x439210`
- AuthBootstrap680SmallStringMirror string04; // original child `+0x04`
- AuthBootstrap680SmallStringMirror string10; // original child `+0x10`
- AuthBootstrap680SmallStringMirror string1C; // original child `+0x1c`
+ std::string string04; // original child `+0x04`
+ std::string string10; // original child `+0x10`
+ std::string string1C; // original child `+0x1c`
  uint32_t loginType28 = 0; // original child `+0x28`; current ready-branch call shape pushes immediate `1`; `0x4474f0` later uses the low byte as raw `0x08` loginType
  uint32_t launcherVersion2C = 0; // original child `+0x2c`; `0x447eb0` uses it in raw `0x06`
  std::array<uint8_t, 16> block30{}; // original child `+0x30 .. +0x3f`
@@ -168,7 +168,7 @@ public:
  // - it is not evidence that the original child type was literally named after the mediator
  // - state and owner code should call the child directly instead of routing through fake
  // mediator methods
-    AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; `0x441330` writes the prompt-password small-string neighboring the `+0xf0` auth-reply parse/copy family, and owner vtable `+0x60 / 0x41f3c0` later surfaces its begin pointer
+    std::string stringF8;  // original child `+0xf8 .. +0x100`; `0x441330` writes the prompt-password small-string neighboring the `+0xf0` auth-reply parse/copy family, and owner vtable `+0x60 / 0x41f3c0` later surfaces its begin pointer
     uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; sibling `0x441330` SecurID-tail flag surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`
     void* opaqueReplyBlob108 = nullptr;          // original child `+0x108`; `0x441170` copies parse-object field `+0x2c/+0x30` (raw reply-header offset `+0x0f`) from the copied `+0xf0` family
