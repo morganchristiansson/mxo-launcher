@@ -1201,16 +1201,21 @@ uint32_t CLTThread::Start(int startPriority) {
         }
     };
 
-    std::lock_guard<std::mutex> lock(stateMutex_);
-    if (threadHandle_ != 0) {
-        const DWORD waitResult = WaitForSingleObject(reinterpret_cast<HANDLE>(threadHandle_), 0);
-        if (waitResult == WAIT_TIMEOUT) {
-            return kStartAlreadyRunning;
+    // anchor: launcher.exe:0x4528d8
+    // virtual self-dispatch through vtable slot +0x10 (`IsRunning`) before attempting
+    // `_beginthreadex`, rather than open-coding the wait probe here.
+    if (IsRunning()) {
+        return kStartAlreadyRunning;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        if (threadHandle_ != 0) {
+            CloseHandle(reinterpret_cast<HANDLE>(threadHandle_));
+            threadHandle_ = 0;
+            threadId_ = 0;
+            running_ = false;
         }
-        CloseHandle(reinterpret_cast<HANDLE>(threadHandle_));
-        threadHandle_ = 0;
-        threadId_ = 0;
-        running_ = false;
     }
 
     unsigned threadId = 0;
@@ -1287,13 +1292,13 @@ int CLTThread::Stop(bool waitAfterTerminate) {
         ExitThread(0);
     }
 
-    {
+    // anchor: launcher.exe:0x452685
+    // external stop path also self-dispatches through vtable slot +0x10 (`IsRunning`) while
+    // deciding whether the handle still needs force-termination.
+    if (!IsRunning()) {
         std::lock_guard<std::mutex> lock(stateMutex_);
-        const DWORD waitResult = WaitForSingleObject(reinterpret_cast<HANDLE>(threadHandle_), 0);
-        if (waitResult != WAIT_TIMEOUT) {
-            running_ = false;
-            return 0;
-        }
+        running_ = false;
+        return 0;
     }
 
     (void)TerminateThread(reinterpret_cast<HANDLE>(threadHandle), 0);
