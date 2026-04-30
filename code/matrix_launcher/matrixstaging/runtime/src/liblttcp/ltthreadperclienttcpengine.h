@@ -205,9 +205,9 @@ protected:
     virtual void Run();
     // anchor: launcher.exe:0x452770
     virtual void LogExit();
-    // UNANCHORED: source-owned wrapper mirroring `_StartAddress_00452800` thread-entry sequencing.
+    // anchor: launcher.exe:0x452800
     uint32_t ExecuteThreadMainScaffold();
-    // UNANCHORED: source-owned `_beginthreadex` entry thunk for ExecuteThreadMainScaffold.
+    // anchor: launcher.exe:0x452800 / `_beginthreadex` start thunk
     static unsigned __stdcall ThreadStartAddressScaffold(void* parameter);
 
     std::string threadName_;
@@ -441,9 +441,6 @@ public:
         const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment);
     // UNANCHORED: explicit detach/reset helper for the launcher ABI bridge.
     void DetachLauncherAbiSurfaceScaffold();
-    // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still call this
-    // so the raw arg5 object shell can mirror class-owned state changes.
-    void SyncAttachedLauncherObjectStateScaffold();
 
     // Helper-family bodies now source-own the recovered +0x5c/+0x60/+0x98 semantics on the
     // target class side; launcher ABI wrappers only route raw helper entrypoints here.
@@ -533,6 +530,9 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
+    // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still use
+    // this private mirror step so the raw arg5 shell tracks class-owned state changes.
+    void SyncAttachedLauncherObjectStateScaffold();
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);

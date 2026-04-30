@@ -1088,7 +1088,6 @@ uint32_t CLTThread::Start(int startPriority) {
 
     startPriority_ = startPriority;
     suspendDepth_ = 0;
-    running_ = true;
     threadId_ = static_cast<uint32_t>(threadId);
 
     if (startPriority != 2) {
@@ -1232,7 +1231,7 @@ void CLTThread::LogExit() {
     }
 }
 
-// UNANCHORED: source-owned wrapper mirroring `_StartAddress_00452800` thread-entry sequencing.
+// anchor: launcher.exe:0x452800
 uint32_t CLTThread::ExecuteThreadMainScaffold() {
     {
         std::lock_guard<std::mutex> lock(stateMutex_);
@@ -1256,7 +1255,7 @@ uint32_t CLTThread::ExecuteThreadMainScaffold() {
     return 0;
 }
 
-// UNANCHORED: source-owned `_beginthreadex` entry thunk for ExecuteThreadMainScaffold.
+// anchor: launcher.exe:0x452800 / `_beginthreadex` start thunk
 unsigned __stdcall CLTThread::ThreadStartAddressScaffold(void* parameter) {
     CLTThread* self = static_cast<CLTThread*>(parameter);
     return self ? self->ExecuteThreadMainScaffold() : 0u;
@@ -2742,7 +2741,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     return result;
 }
 
-// UNANCHORED: launcher ABI-shell attachment/mirror entrypoint.
+// UNANCHORED: launcher ABI-shell attachment entrypoint.
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
@@ -2779,7 +2778,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
     g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments.erase(this);
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// UNANCHORED: private launcher ABI-shell mirror step.
 void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffold() {
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking = FindEngineEndpointPayloadBacking(this);
     CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
