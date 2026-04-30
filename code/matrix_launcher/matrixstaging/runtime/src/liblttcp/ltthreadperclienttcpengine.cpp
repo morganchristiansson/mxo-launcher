@@ -2103,6 +2103,53 @@ static void QueuedConnection_ReleaseAfterType1(
         fmt::ptr(queuedConnection));
 }
 
+struct CompletedOperationDispatchTarget {
+    CBaseConnection* baseConnection = nullptr;
+    CLTTCPConnection* tcpConnection = nullptr;
+};
+
+// UNANCHORED internal helper for the current source-side consumer scaffold.
+static CompletedOperationDispatchTarget ResolveCompletedOperationDispatchTarget(
+    CLTThreadPerClientTCPEngine_0x4b2768* engine,
+    void* queuedContext) {
+    CompletedOperationDispatchTarget target = {};
+    if (!queuedContext) {
+        return target;
+    }
+
+    if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(queuedContext)) {
+        target.baseConnection = completionTarget;
+        target.tcpConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
+        return target;
+    }
+
+    if (CMessageConnection_0x4b7928* directConnection = engine->FindMessageConnection(queuedContext)) {
+        target.baseConnection = directConnection;
+        target.tcpConnection = dynamic_cast<CLTTCPConnection*>(directConnection);
+    }
+    return target;
+}
+
+// UNANCHORED internal helper isolating the replacement-only same-worker close self-dispatch seam.
+static bool HandleSameWorkerThreadCloseSelfDispatchScaffold(
+    CLTThreadPerClientTCPEngine_0x4b2768* engine,
+    void* queuedContext,
+    CBaseConnection* queuedBaseConnection,
+    void* workItem,
+    bool shouldAutoReleaseContext) {
+    if (queuedContext) {
+        QueuedConnection_OnOperationCompleted(queuedContext, queuedBaseConnection, workItem);
+    }
+    if (shouldAutoReleaseContext) {
+        QueuedConnection_ReleaseAfterType1(queuedContext, queuedBaseConnection);
+    }
+    QueueWorkItem_Release(workItem);
+    if (queuedContext) {
+        engine->CleanupConnection(queuedContext);
+    }
+    return true;
+}
+
 // Keep the implementation intentionally conservative.
 // These methods currently provide original-name structure and evidence-backed state
 // shaping, but they are not yet the fully faithful runtime path used by arg5.
@@ -3337,17 +3384,10 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
 
-        CBaseConnection* queuedBaseConnection = nullptr;
-        CLTTCPConnection* queuedConnection = nullptr;
-        if (context) {
-            if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
-                queuedBaseConnection = completionTarget;
-                queuedConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
-            } else if (CMessageConnection_0x4b7928* directConnection = FindMessageConnection(context)) {
-                queuedBaseConnection = directConnection;
-                queuedConnection = dynamic_cast<CLTTCPConnection*>(directConnection);
-            }
-        }
+        const CompletedOperationDispatchTarget dispatchTarget =
+            ResolveCompletedOperationDispatchTarget(this, context);
+        CBaseConnection* queuedBaseConnection = dispatchTarget.baseConnection;
+        CLTTCPConnection* queuedConnection = dispatchTarget.tcpConnection;
         const bool shouldAutoReleaseContext =
             isType1 && QueuedConnection_ShouldAutoReleaseAfterType1(context, queuedBaseConnection);
         const bool detectedSameWorkerThreadCloseSelfDispatch =
@@ -3368,16 +3408,12 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             sameWorkerThreadCloseSelfDispatch ? 1u : 0u);
 
         if (sameWorkerThreadCloseSelfDispatch) {
-            if (context) {
-                QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
-            }
-            if (shouldAutoReleaseContext) {
-                QueuedConnection_ReleaseAfterType1(context, queuedBaseConnection);
-            }
-            QueueWorkItem_Release(workItem);
-            if (context) {
-                CleanupConnection(context);
-            }
+            (void)HandleSameWorkerThreadCloseSelfDispatchScaffold(
+                this,
+                context,
+                queuedBaseConnection,
+                workItem,
+                shouldAutoReleaseContext);
             return;
         }
 
@@ -3408,14 +3444,16 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
+                const CompletedOperationDispatchTarget dispatchTarget =
+                    ResolveCompletedOperationDispatchTarget(this, context);
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }
-                if (CBaseConnection* queuedBaseConnection = CBaseConnection_FromQueueContextScaffold(context)) {
-                    QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
+                if (dispatchTarget.baseConnection != nullptr) {
+                    QueuedConnection_OnOperationCompleted(context, dispatchTarget.baseConnection, workItem);
                     if (workType == kWorkTypeClose &&
-                        QueuedConnection_ShouldAutoReleaseAfterType1(context, queuedBaseConnection)) {
-                        QueuedConnection_ReleaseAfterType1(context, queuedBaseConnection);
+                        QueuedConnection_ShouldAutoReleaseAfterType1(context, dispatchTarget.baseConnection)) {
+                        QueuedConnection_ReleaseAfterType1(context, dispatchTarget.baseConnection);
                     }
                 }
                 QueueWorkItem_Release(workItem);
