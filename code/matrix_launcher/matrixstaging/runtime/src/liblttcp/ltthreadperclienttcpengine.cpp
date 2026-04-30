@@ -2049,7 +2049,8 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
         InitializeContextTreeHead18(ownedContextTreeHead8C_);
     }
 
-    RefreshOwnedLauncherMirrorStateScaffold();
+    ownedEndpointCount84_ = 0u;
+    ownedContextCount90_ = 0u;
 
     // Original base ctor 0x4366f0 allocates queue-thread children only when the effective
     // ctor flag/count at +0x04 is non-zero. The current scaffold still enters through a
@@ -2778,7 +2779,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
     g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments.erase(this);
 }
 
-void CLTThreadPerClientTCPEngine_0x4b2768::RefreshOwnedLauncherMirrorStateScaffold() {
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffold() {
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking = FindEngineEndpointPayloadBacking(this);
     CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
     ownedEndpointCount84_ = endpointBacking
@@ -2787,23 +2789,12 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RefreshOwnedLauncherMirrorStateScaffo
     ownedContextCount90_ = contextBacking
         ? static_cast<uint32_t>(contextBacking->entries.size())
         : 0u;
-
-    // Current direct `_Rb_tree` API pass:
-    // - `_Rb_tree_insert_and_rebalance` and `_Rb_tree_rebalance_for_erase` already keep the
-    //   header `root/leftmost/rightmost` links live for non-empty trees
-    // - so this mirror refresh only has to restore the canonical empty-header state when the
-    //   source-owned payload backing becomes empty
     if (ownedEndpointTreeHead80_ && ownedEndpointCount84_ == 0u) {
         InitializeEndpointTreeHead24(ownedEndpointTreeHead80_);
     }
     if (ownedContextTreeHead8C_ && ownedContextCount90_ == 0u) {
         InitializeContextTreeHead18(ownedContextTreeHead8C_);
     }
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffold() {
-    RefreshOwnedLauncherMirrorStateScaffold();
     CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
         FindEngineLauncherAbiAttachment(this);
     if (!attachment) {

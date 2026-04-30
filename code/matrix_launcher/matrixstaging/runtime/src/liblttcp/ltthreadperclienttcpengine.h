@@ -533,9 +533,6 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: launcher-visible mirror refresh for the recovered +0x80/+0x8c sentinel heads and
-    // count dwords.
-    void RefreshOwnedLauncherMirrorStateScaffold();
     CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue0CScaffold();
     CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue34Scaffold();
     const CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue0CScaffold() const;
