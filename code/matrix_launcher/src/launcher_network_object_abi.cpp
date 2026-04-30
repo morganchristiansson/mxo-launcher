@@ -409,8 +409,9 @@ static uint32_t __thiscall LauncherObject_Slot10_443810(
 // storage rather than using shell-local critical-section state.
 static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot0(void* self);
 static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot1(void* self);
-// UNANCHORED: cleanup-lock helper wrappers for arg5 +0x98 still use the shell-local helper family
-// pending a later collapse of that storage.
+// UNANCHORED: cleanup-lock helper wrappers for arg5 +0x98 now also forward into the real
+// engine-owned cleanup lock. Keep the shell-local CRITICAL_SECTION initialized as inert ABI
+// backing in case client/runtime code still probes the embedded bytes directly.
 static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot0(void* self);
 static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot1(void* self);
 
@@ -430,11 +431,6 @@ static uint32_t __thiscall LauncherObject_CleanupConnection(
     LauncherObjectAbiShell* self,
     void* contextKey) {
     return ResolveLauncherObjectEngineSidecar(self)->CleanupConnection(contextKey);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static CRITICAL_SECTION* LauncherObjectCritFromHelper(void* self) {
-    return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
 
 static LauncherObjectAbiShell* LauncherObjectFromSubobject(void* self, size_t offset) {
@@ -461,18 +457,20 @@ static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot1(void* self) {
 
 // UNANCHORED: cleanup-lock helper enter for arg5 +0x98.
 static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot0(void* self) {
-    if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
-        EnterCriticalSection(crit);
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
+            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x98))) {
+        return engine->EnterCleanupLockHelper();
     }
-    return 0u;
+    return 1u;
 }
 
 // UNANCHORED: cleanup-lock helper leave for arg5 +0x98.
 static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot1(void* self) {
-    if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
-        LeaveCriticalSection(crit);
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
+            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x98))) {
+        return engine->LeaveCleanupLockHelper();
     }
-    return 0u;
+    return 1u;
 }
 
 // anchor: launcher.exe:0x435f90

@@ -2892,18 +2892,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    if (CRITICAL_SECTION* crit = shell ? &shell->cleanupLockHelper98.crit : &ownedCleanupLockHelper98_.crit) {
-        EnterCriticalSection(crit);
-    }
+    EnterCriticalSection(&ownedCleanupLockHelper98_.crit);
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    if (CRITICAL_SECTION* crit = shell ? &shell->cleanupLockHelper98.crit : &ownedCleanupLockHelper98_.crit) {
-        LeaveCriticalSection(crit);
-    }
+    LeaveCriticalSection(&ownedCleanupLockHelper98_.crit);
     return 0u;
 }
 

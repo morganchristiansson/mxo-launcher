@@ -40,8 +40,9 @@ Recovered field roles:
   - simple shell queue-pair copying restored visibility but created split-brain mutable queue state and later crashed inside client.dll queue consumption
 - Current best read:
   - arg5 queue bytes at `+0x0c..+0x5b` must remain the authoritative live completed-operation queue storage while a launcher shell is attached
-  - helper entry surfaces at `+0x5c/+0x60` can still stay as ABI wrappers that forward into engine-owned event/lock behavior
+  - helper entry surfaces at `+0x5c/+0x60` can stay as ABI wrappers that forward into engine-owned event/lock behavior
   - the engine sidecar therefore has to operate on the attached shell queue-pair storage, not on a separately-mutated copied mirror
+  - current cleanup-lock pruning pass routes arg5 `+0x98` helper calls into the engine-owned cleanup lock while still leaving the shell-local embedded `CRITICAL_SECTION` initialized as inert ABI backing until we prove no raw byte/probe dependence remains
 
 ## Worker creation / queueing
 
