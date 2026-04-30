@@ -633,51 +633,15 @@ Packet_AsAuthReply_0x4b5328* CLTLoginMediator::GetCurrentAuthReplyPacket44() {
 }
 
 // anchor: launcher.exe:0x41f350 / vtable +0x48
+// Exact tiny body: read child `+0x108` with no fallback/scaffold logic.
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
-    const Packet_AsAuthReply_0x4b5328* slotRecord =
-        const_cast<CLTLoginMediator*>(this)->GetCurrentAuthReplyPacket44();
-    if (!slotRecord) {
-        slotRecord = const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(0u);
-    }
-
-    const auto& ownerState = *this;
-    const ActiveCharacterStateViewScaffold characterState = DescribeActiveCharacterStateScaffold();
-    const char* worldOrSelectionName = MappedSelectionName();
-    const char* source = "arg6-selection";
-
-    if (slotRecord && slotRecord->debugString14) {
-        worldOrSelectionName = slotRecord->debugString14;
-        source = "slotRecord+0x14";
-    } else if (ownerState.characterNameBufferF1c[0]) {
-        worldOrSelectionName = ownerState.characterNameBufferF1c;
-        source = "owner+0xf1c";
-    } else if (ownerState.createCharacterData108.characterName00[0]) {
-        worldOrSelectionName = ownerState.createCharacterData108.characterName00.data();
-        source = "owner+0x108";
-    } else if (characterState.characterName && characterState.characterName[0]) {
-        worldOrSelectionName = characterState.characterName;
-        source = "active-character-state";
-    }
-
-    spdlog::debug(
-        "CLTLoginMediator::GetWorldOrSelectionName(+0x48) -> '{}' [source={} currentSlot='{}' profile='{}' mappedSelection='{}']",
-        NonEmptyTextOrPlaceholder(worldOrSelectionName),
-        source,
-        (slotRecord && slotRecord->debugString14)
-            ? slotRecord->debugString14
-            : "<empty>",
-        NonEmptyTextOrPlaceholder(ownerAuthBootstrapSource94_.username00.data()),
-        NonEmptyTextOrPlaceholder(MappedSelectionName()));
-    return worldOrSelectionName;
+    return static_cast<const char*>(authBootstrapChild680_->opaqueReplyBlob108);
 }
 
 // anchor launcher.exe:0x41f360 / vtable +0x4c
+// Exact tiny body: read child `+0x10c` with no fallback/scaffold logic.
 const char* CLTLoginMediator::GetProfileOrSessionName() const {
-    const char* profileOrSessionName = ownerAuthBootstrapSource94_.username00.data();
-    spdlog::debug(
-        "CLTLoginMediator::GetProfileOrSessionName(+0x4c) -> '{}'",
-        NonEmptyTextOrPlaceholder(profileOrSessionName));
-    return profileOrSessionName;
+    return static_cast<const char*>(authBootstrapChild680_->opaqueReplyBlob10C);
 }
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50

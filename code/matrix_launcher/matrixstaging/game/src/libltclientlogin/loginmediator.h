@@ -452,9 +452,11 @@ public:
     // anchor: launcher.exe:0x41f2d0 / exact tiny body returns owner byte `+0xcc8`
     uint32_t GetDefaultSelectionIndex() const override;
     // +0x48
-    // Current best wrapper-facing name from the later `Profiles\%s\%s_%X\` builder.
+    // anchor: launcher.exe:0x41f350 / exact tiny body returns child `+0x108`
+    // Current wrapper-facing names remain provisional; the original body is only a direct child-field read.
     const char* GetWorldOrSelectionName() const override;
     // +0x4c
+    // anchor: launcher.exe:0x41f360 / exact tiny body returns child `+0x10c`
     const char* GetProfileOrSessionName() const override;
     // +0x54
     bool HasBootstrapRaw08AuxHandle54() const override;
@@ -610,7 +612,6 @@ public:
     // (`0x4f78b8 = g_CurrentLoginMediator`). Keep callers on this hook instead of reaching into a
     // TU-local global directly.
     ActiveCharacterStateViewScaffold DescribeOwnCharacterStateScaffold() const;
-    ActiveCharacterStateViewScaffold DescribeActiveCharacterStateScaffold() const;
 
     // anchor: launcher.exe:0x41b450
     // Recovered helper-state switcher:
@@ -696,7 +697,6 @@ public:
     void* GetStartupDistrObjExecutive8c() const;
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
-    uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
 
     // Recovered config anchors:
     // - launcher `qsAuthServerDNSName` / `AuthServerPort`
