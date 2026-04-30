@@ -725,12 +725,6 @@ public:
     // Active replacement note:
     // - the current no-GUI launcher path no longer keeps a synthetic pre-auth world-list sidecar
     // - selection now runs after auth success and consumes the recovered owner tables directly
-    // - the narrow arg6 selection scratch below remains only as a fixed fallback for wrapper-facing
-    //   descriptor/profile bridges still reached from launcher/client scaffolding
-    // Source-owned arg6 bootstrap fallback helpers.
-    // These are replacement-side helpers, not recovered launcher.exe vtable slots.
-    uint32_t ExpectedSelectionDescriptorScratchRequest() const;
-    bool SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
 
     // Wrapper-facing world-descriptor family (`+0xf8 .. +0x108`).
     // Keep the wrapper/owner split explicit:

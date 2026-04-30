@@ -2236,25 +2236,6 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 //   - late-login arg6 slots `+0xd4/+0x124/+0x18c` live separately under:
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
-// Source-owned selection fallback helpers.
-// These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They only provide
-// fixed fallback values for wrapper-facing readers until the recovered owner fields are available.
-
-uint32_t CLTLoginMediator::ExpectedSelectionDescriptorScratchRequest() const {
-    const uint32_t variantHigh8 = (selectionSeed_.selectedVariantIndexHigh8_ & 0xffu) << 24;
-    const uint32_t preservedMiddle16 = selectionSeed_.selectedWorldIndexLow24_ & 0x00ffff00u;
-    const uint32_t lowByteOverwrittenWithVariant = selectionSeed_.selectedVariantIndexHigh8_ & 0xffu;
-    return variantHigh8 | preservedMiddle16 | lowByteOverwrittenWithVariant;
-}
-
-bool CLTLoginMediator::SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const {
-    const uint32_t normalizedSelectionIndex = selectionIndex & 0xffffffffu;
-    if ((normalizedSelectionIndex & 0x00ffffffu) == selectionSeed_.selectedWorldIndexLow24_) {
-        return true;
-    }
-    return normalizedSelectionIndex == ExpectedSelectionDescriptorScratchRequest();
-}
-
 // anchor: launcher.exe:0x41f2d0 / owner vtable +0x3c
 uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
     const uint32_t selectionIndex = static_cast<uint32_t>(CurrentCharacterRouteIndexCc8Scaffold());

@@ -376,9 +376,9 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetDefaultSelectionIndex();
 }
 
-// UNANCHORED: C helper behind the recovered +0x40 ABI wrapper.
-// The fake outer object is wrapper-owned; the launcher-side mediator keeps only the anchored
-// owner `+0x40 / +0x44` raw slot-record accessors at `0x41f2e0 / 0x41f300`.
+// anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
+// Wrapper-facing bridge: preserve the fake outer object shape the client expects, but keep the
+// owner-side lookup faithful to the direct slot-index reader.
 extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     MinimalLoginMediatorStub* self,
     uint32_t selectionIndex,
@@ -390,33 +390,8 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
         return nullptr;
     }
 
-    const uint32_t low24 = selectionIndex & 0x00ffffffu;
-    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
-    const uint32_t expectedScratchRequest = mediator->ExpectedSelectionDescriptorScratchRequest();
-    const bool matchedConfiguredRequest = mediator->SelectionDescriptorMatchesRequest(selectionIndex);
-    const uint8_t currentSlotIndex = mediator->CurrentCharacterRouteIndexCc8Scaffold();
-    const bool matchedCurrentSlotIndexRequest =
-        high8 == 0u && low24 == static_cast<uint32_t>(currentSlotIndex);
-
-    const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* const currentSlotRecord =
-        (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
-            ? mediator->GetCurrentAuthReplyPacket44()
-            : nullptr;
-
-    if (!currentSlotRecord) {
-        spdlog::debug(
-            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={}]",
-            static_cast<unsigned>(selectionIndex),
-            static_cast<unsigned>(low24),
-            static_cast<unsigned>(high8),
-            static_cast<unsigned>(currentSlotIndex),
-            static_cast<unsigned>(expectedScratchRequest),
-            matchedConfiguredRequest ? 1u : 0u,
-            matchedCurrentSlotIndexRequest ? 1u : 0u);
-    }
-
     return BuildMediatorSelectionDescriptorObject40AbiShim(
-        currentSlotRecord,
+        mediator->GetAuthReplyPacketByIndex40(selectionIndex),
         selectionIndex,
         mediator->GetDefaultSelectionIndex());
 }
