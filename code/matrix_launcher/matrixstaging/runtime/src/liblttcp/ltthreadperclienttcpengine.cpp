@@ -164,7 +164,7 @@ static CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& EnsureEngineL
     return g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment;
 }
 
-static CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* ActiveLauncherObjectShellMirror(
+static CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* AttachedLauncherObjectShell(
     const CLTThreadPerClientTCPEngine_0x4b2768* self) {
     CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
         FindEngineLauncherAbiAttachment(self);
@@ -179,31 +179,14 @@ static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorag
         return nullptr;
     }
 
-    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(self)) {
-        return &shell->queuePair0C;
-    }
-
+    // Fidelity correction:
+    // - `0x436610/0x436820/0x4364d0/0x436b10` operate on the engine object's inline `+0x0c..+0x5b`
+    //   queue-pair storage
+    // - the launcher ABI shell exists only so client.dll can keep using original MSVC `this`
+    //   identities and helper subobject entrypoints
+    // - queue bytes should therefore stay authoritative on the native engine object, not bounce
+    //   through a copied shell mirror
     return &reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(self)->queuePair0C;
-}
-
-static void MoveQueueRecycledBlocksScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* fromQueueRecord,
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* toQueueRecord) {
-    if (!fromQueueRecord || !toQueueRecord || fromQueueRecord == toQueueRecord) {
-        return;
-    }
-
-    auto fromIt = g_QueueRecycledBlocks.find(fromQueueRecord);
-    if (fromIt == g_QueueRecycledBlocks.end()) {
-        return;
-    }
-
-    std::vector<uint32_t*>& targetBlocks = g_QueueRecycledBlocks[toQueueRecord];
-    targetBlocks.insert(
-        targetBlocks.end(),
-        fromIt->second.begin(),
-        fromIt->second.end());
-    g_QueueRecycledBlocks.erase(fromIt);
 }
 
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -2796,26 +2779,20 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
-    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this)) {
-        shell->queuePair0C = ownedQueuePair0C_;
-        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue00, &shell->queuePair0C.queue00);
-        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue28, &shell->queuePair0C.queue28);
-    }
     SyncAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(this);
     if (shell) {
-        ownedQueuePair0C_ = shell->queuePair0C;
-        MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue00, &ownedQueuePair0C_.queue00);
-        MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue28, &ownedQueuePair0C_.queue28);
-        std::memset(&shell->queuePair0C, 0, sizeof(shell->queuePair0C));
         shell->field04 = 0u;
         shell->field08 = nullptr;
+        shell->queueSignalEvent7C = nullptr;
         shell->endpointTreeHead80 = nullptr;
+        shell->endpointCount84 = 0u;
         shell->contextTreeHead8C = nullptr;
+        shell->contextCount90 = 0u;
     }
 
     if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
@@ -2840,15 +2817,25 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
     if (ownedContextTreeHead8C_ && ownedContextCount90_ == 0u) {
         InitializeContextTreeHead18(ownedContextTreeHead8C_);
     }
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(this);
     if (!shell) {
         return;
     }
 
+    // Fidelity correction:
+    // - this is not queue push/pop synchronization across the ABI boundary
+    // - it only publishes engine-owned fields that original launcher/client code may read directly
+    //   from the raw arg5 shell bytes between virtual calls
+    // - queue mechanics now stay native on the engine object and helper/primary wrappers forward
+    //   behavior directly instead of treating the shell copy as authoritative storage
     shell->field04 = ctorFlagsField04_;
     shell->field08 = queueThreadArrayField08_;
+    shell->queueSignalEvent7C = ownedQueueSignalEvent7C_;
     shell->endpointTreeHead80 = ownedEndpointTreeHead80_;
+    shell->endpointCount84 = ownedEndpointCount84_;
     shell->contextTreeHead8C = ownedContextTreeHead8C_;
+    shell->contextCount90 = ownedContextCount90_;
 }
 
 // anchor: launcher.exe:0x435f90
@@ -3056,9 +3043,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the real engine queue lock
-    // - when an arg5 shell is attached, queue bytes at `+0x0c..+0x5b` must stay authoritative for
-    //   client.dll's direct queue runner / subobject ABI expectations, so this consumer and the
-    //   producers both operate on that attached shell queue-pair storage instead of a copied mirror
+    // - wrapper-owned arg5 shells no longer shadow queue storage; helper/primary ABI thunks call
+    //   back into the native engine object, whose inline `+0x0c..+0x5b` bytes remain the single
+    //   authoritative queue-pair state
     CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* activeQueuePair =
         ActiveQueuePairStorageScaffold(this);
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
