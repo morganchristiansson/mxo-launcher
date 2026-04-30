@@ -873,12 +873,18 @@ public:
 
 class CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0 {
 public:
-    // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
-    // by `0x44d910`.
-    // Original shape is the larger/decrypting CBC Twofish branch reused by the auth-bootstrap
-    // transform family. Safe flattening step 2 keeps only the stored 16-byte seed plus configured
-    // flag here; the direct Crypto++ CBC object is created transiently where needed instead of
-    // being preserved as a fake launcher-local adapter member.
+    // Source-owned mirror only.
+    // Static-RE says the concrete launcher-owned object with vtable `0x004b86f0` is the READ
+    // HELPER, not a standalone Crypto++ class. `0x44d500` then builds transient Crypto++ pipeline
+    // pieces around each stored seed candidate:
+    // - pooled read-prefix sink object (`0x44cf70` / vtable `0x004b8380`)
+    // - `StreamTransformationFilter_ctor(...)`
+    // - decrypting CBC Twofish transform pulled from the worker collection at helper
+    //   `+0x10/+0x14/+0x18`
+    //
+    // OOAnalyzer's giant `cls_0x4c0540` bucket is not this family: vtable inspection at
+    // `0x004c0540` shows unrelated work-item/header methods such as `0x4816f0` (get work type)
+    // and `0x481750` (return field `+0xc`).
     std::array<uint8_t, 16> associatedSeedBytes{};
     bool hasConfiguredFeedbackTransform = false;
 
@@ -1024,7 +1030,7 @@ public:
     // - owner `+0x04`
     // - inserted at agenda `+0x40` by
     //   `0x469740 = CMessageConnectionPacketAgenda_InstallStreamPacketEncryptionModule`
-    // - therefore the concrete module-side **read helper**
+    // - therefore the concrete module-side **read helper** with vtable `0x004b86f0`
     // - original helper `+0x0c` is a small repeated-success control dword consumed by `0x44d2e0`
     // - original helper `+0x10/+0x14/+0x18` are the read-worker vector front matter consumed by
     //   `0x44d500 / 0x44d770 / 0x44d130`

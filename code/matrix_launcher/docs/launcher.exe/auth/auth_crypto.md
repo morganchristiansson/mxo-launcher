@@ -69,6 +69,29 @@ Static-RE on the last two public helpers showed their only live launcher.exe cal
 
 So the old public `EncryptMarginPayloadPacket(...)` / `DecryptMarginPayloadPacket(...)` wrappers were another source-owned layer. They were removed from `auth_crypto.h`, and the narrow surviving payload encrypt/decrypt scaffolds now live next to their only validated callers in `matrixstaging/runtime/src/libltmessaging/messageconnection.cpp`.
 
+## Follow-up: read-helper family is not `cls_0x4c0540`
+
+The suspicious OOAnalyzer bucket `cls_0x4c0540` does **not** match the stream-packet read helper family.
+
+Static-RE evidence:
+
+- the actual read-helper vtable is `0x004b86f0`
+  - `+0x00 = 0x44d980` deleting destructor wrapper
+  - `+0x04 = 0x44bb60`
+  - `+0x08 = 0x44bb80`
+  - `+0x0c = 0x44d500` read transform-and-dispatch
+  - `+0x10 = 0x44c670` chained-helper delegate
+- `0x44d500` iterates a helper-owned worker collection and wraps each candidate with transient Crypto++ plumbing plus a pooled read-prefix sink before calling `CPacketDecryptor_DecryptPacket`
+- vtable `0x004c0540` instead contains unrelated work-item/header methods such as:
+  - `0x4816f0` = get work type from `[this+4]`
+  - `0x481750` = return `[this+0xc]`
+
+So the best current model is:
+
+- `CStreamPacketEncryptionModuleReadHelper_0x4b86f0` = real launcher helper family
+- `CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0` = source-owned seed-holder mirror for the helper's worker collection
+- transient Crypto++ classes participate inside `0x44d500`, but the helper itself is not a Crypto++ class renamed badly by OOAnalyzer
+
 ## Result
 
 All source-owned structs were deleted from `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`, and the remaining packet encrypt/decrypt wrappers were also removed from the public auth header.

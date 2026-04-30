@@ -531,11 +531,6 @@ static void CStreamPacketEncryptionModuleReadHelper_RecordSuccessfulTransformInd
     }
 }
 
-static std::vector<uint8_t> CStreamPacketEncryptionWorker_KeyBytes(
-    const std::array<uint8_t, 16>& seedBytes) {
-    return std::vector<uint8_t>(seedBytes.begin(), seedBytes.end());
-}
-
 static CMessageConnectionMessageRef_0x4ba23c* CMessageConnectionMessageRefHandle_AssignRetained(
     CMessageConnectionMessageRef_0x4ba23c** slot,
     CMessageConnectionMessageRef_0x4ba23c* newMessageRef) {
@@ -631,9 +626,12 @@ void CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::ResetForSeed(
 bool CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::TryTransform(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
-    // Source still keeps the confirmed packet semantic at the worker boundary here while the old
-    // large/decrypting adapter identity has been flattened away; only the seed-driven direct
-    // Crypto++ behavior remains relevant.
+    // anchor: launcher.exe:0x44d500 -> `CPacketDecryptor_DecryptPacket` (`0x44bca0`)
+    // This source worker is only a seed-holder mirror for the helper-owned worker collection.
+    // The original helper body wraps each candidate transform with a temporary prefix sink and
+    // stream filter, then calls the packet decryptor. The important proven semantic here is:
+    // decrypt payload bytes with the current seed candidate and only succeed when a concrete
+    // output message-ref payload is produced.
     if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         return false;
     }
@@ -762,12 +760,15 @@ void CStreamPacketEncryptionModuleReadHelper_0x4b86f0::HandleOpaqueMessageRef(
         static_cast<CMessageConnectionMessageRef_0x4ba23c*>(opaqueMessageRef);
     if (!inputMessageRef || transformWorkers.empty()) {
         collectionControl0c = 0u;
+        transformedOutput.Reset();
         ForwardToNextHelper(nullptr);
         return;
     }
 
+    transformedOutput.Reset();
     for (size_t workerIndex = 0; workerIndex < transformWorkers.size(); ++workerIndex) {
-        if (!transformWorkers[workerIndex].TryTransform(*inputMessageRef, &transformedOutput)) {
+        if (!transformWorkers[workerIndex].TryTransform(*inputMessageRef, &transformedOutput) ||
+            transformedOutput.MessageRef() == nullptr) {
             continue;
         }
         CStreamPacketEncryptionModuleReadHelper_RecordSuccessfulTransformIndex(
