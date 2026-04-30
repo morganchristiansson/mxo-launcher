@@ -6,19 +6,6 @@
 #include <system_error>
 
 namespace mxo::ltlogin {
-namespace {
-
-static uint32_t BeginMarginConnectionForState4Case(
-    CLTLoginMediator* mediator,
-    const char* routeHostText,
-    uint8_t cachedRouteSelector) {
-    if (!mediator) {
-        return 0u;
-    }
-    return mediator->BeginMarginConnection(routeHostText, cachedRouteSelector);
-}
-
-}  // namespace
 
 // anchor: launcher.exe vtable 0x4b503c
 const char* CLTLoginState_State4_0x4b503c::DebugName() const {
@@ -129,10 +116,9 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     switch (upstreamPhaseCode) {
         case 6: {
-            const std::string routeDescriptor30 = g_CurrentLoginMediator->ResolvedMarginHostName();
-            BeginMarginConnectionForState4Case(
-                g_CurrentLoginMediator,
-                routeDescriptor30.empty() ? nullptr : routeDescriptor30.c_str(),
+            const std::string_view routeDescriptor30 = g_CurrentLoginMediator->GetRouteDescriptor30();
+            g_CurrentLoginMediator->BeginMarginConnection(
+                routeDescriptor30.empty() ? nullptr : routeDescriptor30.data(),
                 0u);
             return;
         }
@@ -142,42 +128,38 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
         case 13: {
             // `0x439328..0x439345`
             // - read owner byte `+0xcc8`
-            // - pass it to owner vtable `+0xe0(slot, 0)`
+            // - call owner vtable `+0xe0(slot, 0)`
             // - forward the returned route-host text into `0x41e500`
-            // - call `0x41e500` with cachedRouteSelector == 0
-            BeginMarginConnectionForState4Case(
-                g_CurrentLoginMediator,
-                g_CurrentLoginMediator->ResolveMarginRouteFromCurrentCharacterSlot(),
+            const uint8_t routeSlot = g_CurrentLoginMediator->CurrentCharacterRouteIndexCc8Scaffold();
+            g_CurrentLoginMediator->BeginMarginConnection(
+                g_CurrentLoginMediator->GetVariantWorldName(routeSlot),
                 0u);
             return;
         }
 
         case 10: {
-            BeginMarginConnectionForState4Case(
-                g_CurrentLoginMediator,
-                g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
+            g_CurrentLoginMediator->BeginMarginConnection(
+                g_CurrentLoginMediator->GetWorldNameByIndex(
                     g_CurrentLoginMediator->createCharacterData108.selectedWorldField24),
                 0u);
             return;
         }
 
         default: {
-            // Source-owned bridge over the original default branch:
-            // owner `+0x104 != -1` -> owner vtable `+0xfc(index)` -> if non-null call `0x41e500`.
+            // `0x439398..0x4393c4`
+            // - read owner dword `+0x104`
+            // - if it is not `-1`, call owner vtable `+0xfc(index)`
+            // - only when the returned pointer is non-null call `0x41e500`
             const int32_t field104Value = g_CurrentLoginMediator->marginRouteState_.currentWorldId;
             if (field104Value == -1) {
                 return;
             }
             const char* const routeHostText =
-                g_CurrentLoginMediator->ResolveMarginRouteFromDescriptorIndex(
-                    static_cast<uint32_t>(field104Value));
+                g_CurrentLoginMediator->GetWorldNameByIndex(static_cast<uint32_t>(field104Value));
             if (routeHostText == nullptr) {
                 return;
             }
-            BeginMarginConnectionForState4Case(
-                g_CurrentLoginMediator,
-                routeHostText,
-                0u);
+            g_CurrentLoginMediator->BeginMarginConnection(routeHostText, 0u);
             return;
         }
     }
