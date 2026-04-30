@@ -25,6 +25,12 @@ Recovered field roles:
   - endpoint node payload `[node+0x20]` = `AcceptThread*`
   - context node payload `[node+0x14]` = `WorkerThread*`
 
+## Wrapper boundary
+
+- The launcher arg5 shell still needs queue/event/lock/tree state mirrored into the bound engine sidecar.
+- Current source models that bridge as a single active attachment, not as a pretend multi-engine attachment map.
+- This matches current launcher startup reality: one arg5 shell binds to one `CLTThreadPerClientTCPEngine_0x4b2768` sidecar through `CLTThreadPerClientTCPEngine_0x4b2768Binding`.
+
 ## Worker creation / queueing
 
 - `0x431ff0` allocates a worker thread, stores it at `[connection+0x08]`, inserts it into the context tree under the `+0x98` cleanup lock, and optionally starts it.

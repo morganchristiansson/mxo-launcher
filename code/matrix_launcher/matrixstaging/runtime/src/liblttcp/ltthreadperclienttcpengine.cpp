@@ -141,8 +141,13 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking {
     std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry>> entries;
 };
 
-static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment>
-    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments;
+struct CLTThreadPerClientTCPEngine_0x4b2768_SingleLauncherAbiAttachment {
+    CLTThreadPerClientTCPEngine_0x4b2768* engine = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment attachment = {};
+};
+
+static CLTThreadPerClientTCPEngine_0x4b2768_SingleLauncherAbiAttachment
+    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment;
 static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking>
     g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings;
 static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking>
@@ -153,15 +158,15 @@ static CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* FindEngineLau
     if (!self) {
         return nullptr;
     }
-    auto it = g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments.find(
-        const_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(self));
-    return (it != g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments.end()) ? &it->second
-                                                                          : nullptr;
+    return (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == self)
+        ? &g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment
+        : nullptr;
 }
 
 static CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& EnsureEngineLauncherAbiAttachment(
     CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    return g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments[self];
+    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = self;
+    return g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment;
 }
 
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -577,7 +582,10 @@ static bool ContextTreeEraseNode(
 }
 
 static void EraseEngineBackings(CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments.erase(self);
+    if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == self) {
+        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = nullptr;
+        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment = {};
+    }
     g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings.erase(self);
     g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings.erase(self);
 }
@@ -2775,7 +2783,10 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
         *attachment->field90ContextCount = 0u;
     }
 
-    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachments.erase(this);
+    if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
+        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = nullptr;
+        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment = {};
+    }
 }
 
 // UNANCHORED: private launcher ABI-shell mirror step.
