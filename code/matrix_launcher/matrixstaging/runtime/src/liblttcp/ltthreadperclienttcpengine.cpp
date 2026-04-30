@@ -513,6 +513,27 @@ static bool ContextTreeAttachPayload(
     return true;
 }
 
+// Source-owned adapter for the original `0x4196b0 -> 0x420ba0` insert-unique flow where the
+// key/value pair is materialized before the helper call instead of inserted first and patched later.
+static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeInsertUniqueWorkerNode(
+    CLTThreadPerClientTCPEngine_0x4b2768* self,
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
+    uint32_t key,
+    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload,
+    bool* outInserted) {
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
+        ContextTreeInsertUniqueNode(self, head, key, outInserted);
+    if (!node) {
+        return nullptr;
+    }
+    if (outInserted && *outInserted) {
+        if (!ContextTreeAttachPayload(self, node, std::move(payload))) {
+            return nullptr;
+        }
+    }
+    return node;
+}
+
 static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> ContextTreeDetachPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node) {
@@ -3560,35 +3581,31 @@ CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0
         return nullptr;
     }
 
-    connection->SetEngine(this);
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> worker =
         std::make_unique<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread>(connection, datagramMode);
-    if (!worker) {
-        return nullptr;
-    }
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* createdWorker = worker.get();
+    connection->SetWorkerThreadScaffold(createdWorker);
 
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* result = nullptr;
     const uint32_t key = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(connection));
     (void)EnterCleanupLockHelper();
     bool inserted = false;
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node = ContextTreeInsertUniqueNode(
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node = ContextTreeInsertUniqueWorkerNode(
         this,
         ownedContextTreeHead8C_,
         key,
+        std::move(worker),
         &inserted);
-    if (node && inserted) {
-        if (ContextTreeAttachPayload(this, node, std::move(worker))) {
-            result = node->_M_valptr()->second;
-        }
-    } else if (node) {
-        result = node->_M_valptr()->second;
-    }
+    result = node ? node->_M_valptr()->second : nullptr;
     (void)LeaveCleanupLockHelper();
 
-    if (result) {
-        connection->SetWorkerThreadScaffold(result);
+    if (!result) {
+        connection->SetWorkerThreadScaffold(nullptr);
+        return nullptr;
     }
-    if (result && startThread) {
+    connection->SetEngine(this);
+    connection->SetWorkerThreadScaffold(result);
+    if (startThread) {
         (void)result->Start(/*startPriority=*/2);
     }
     return result;
