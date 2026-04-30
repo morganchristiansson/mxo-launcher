@@ -113,8 +113,9 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         // shows a read and the pointed-at bytes are zero, so model the second concatenation input
         // as empty until a real initializer/write is recovered.
         // anchor: launcher.exe:0x4043b0 = recovered basic_string concat helper
-        // Current source equivalent of the launcher concat helper.
-        std::string rebuiltAddressListInput = routeDescriptor30_ + std::string{};
+        // Current static evidence only proves the second input is empty here, so this reduces to a
+        // plain copy of the recovered route-descriptor string.
+        std::string rebuiltAddressListInput = routeDescriptor30_;
 
         if (const char* const rebuiltBegin = StringBeginOrNull(rebuiltAddressListInput);
             rebuiltBegin != nullptr) {
