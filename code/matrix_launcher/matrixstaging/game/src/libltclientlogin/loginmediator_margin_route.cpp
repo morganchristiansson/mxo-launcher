@@ -98,10 +98,10 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
                 marginHost);
             return 0u;
         }
-        marginEndpoint_.family = 2;
-        marginEndpoint_.portNetworkOrder =
+        marginEndpoint6c_.family = 2;
+        marginEndpoint6c_.portNetworkOrder =
             static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
-        marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
+        marginEndpoint6c_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
     } else if (const char* const routeDescriptorBegin = StringBeginOrNull(routeDescriptor30_);
                routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
         marginHost = std::string(routeDescriptorBegin) + g_marginServerDNSName;
@@ -111,17 +111,17 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     marginSelectedIpv4_7c_ = 0u;
 
     // Original does NOT call SetRemoteHostName - only sets endpoint
-    connection->remoteEndpoint_ = marginEndpoint_;
+    connection->remoteEndpoint_ = marginEndpoint6c_;
 
     // Call Connect via vtable+0x1c (same as BeginAuthConnection)
-    const uint32_t result = connection->Connect(marginEndpoint_);
+    const uint32_t result = connection->Connect(marginEndpoint6c_);
     spdlog::info(
         "CLTLoginMediator::BeginMarginConnection resolvedHost='{}' routeHostText='{}' selector=0x{:02x} beginCount={} selectedIpv4=0x{:08x} port={} ensureConnectedResult=0x{:08x}",
         marginHost.empty() ? std::string("<empty>") : marginHost,
         (routeHostText && routeHostText[0]) ? std::string(routeHostText) : std::string("<empty>"),
         cachedRouteSelector,
         marginBeginCount24_,
-        marginEndpoint_.ipv4NetworkOrder,
+        marginEndpoint6c_.ipv4NetworkOrder,
         portHostOrder,
         result);
     if (result == 0u) {
@@ -129,7 +129,7 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
             "CLTLoginMediator::BeginMarginConnection connect failed host='{}' port={} ip=0x{:08x} selector={} beginCount={}",
             marginHost.empty() ? std::string("<empty>") : marginHost,
             marginServerPortHostOrder_,
-            marginEndpoint_.ipv4NetworkOrder,
+            marginEndpoint6c_.ipv4NetworkOrder,
             cachedRouteSelector,
             marginBeginCount24_);
     }

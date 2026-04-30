@@ -105,21 +105,6 @@ static void EraseMarginBootstrapState(const CLTLoginMediator* mediator) {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static mxo::liblttcp::LTTCPEndpointKey_0x44b070 BuildLoopbackEndpoint(uint16_t portHostOrder) {
-    mxo::liblttcp::LTTCPEndpointKey_0x44b070 key = {};
-    key.family = 2;  // AF_INET
-    key.portNetworkOrder = static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
-    key.ipv4NetworkOrder = 0;
-    return key;
-}
-
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static const char* NonEmptyTextOrPlaceholder(const char* value) {
-    return (value && value[0]) ? value : "<empty>";
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t maxPreviewBytes) {
     if (!bytes || byteCount == 0u || maxPreviewBytes == 0u) {
         return "<empty>";
@@ -204,8 +189,6 @@ CLTLoginMediator::CLTLoginMediator()
           authServerPortHostOrder_(11000),
       marginServerPortHostOrder_(10000),
       ignoreHostsFileForMargin_(false),
-      authEndpoint_(BuildLoopbackEndpoint(authServerPortHostOrder_)),
-      marginEndpoint_(BuildLoopbackEndpoint(marginServerPortHostOrder_)),
       authUsername_(),
       authPassword_(),
       authLauncherVersion_(76005),

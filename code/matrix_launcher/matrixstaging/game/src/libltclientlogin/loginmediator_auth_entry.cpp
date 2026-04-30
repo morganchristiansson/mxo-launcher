@@ -168,7 +168,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
     const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
     if (nextIpv4 != 0u) {
-        authEndpoint_.ipv4NetworkOrder = nextIpv4;
+        authEndpoint5c_.ipv4NetworkOrder = nextIpv4;
     }
     ++authConnectAttemptCount28_;
 
@@ -181,7 +181,8 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d205 / CALL 0x44b090
     // anchor: launcher.exe:0x41d20a-0x41d225 / copy endpoint fields to this+0x5c
     // Just ensure port is set correctly from config
-    authEndpoint_.portNetworkOrder =
+    authEndpoint5c_.family = 2;
+    authEndpoint5c_.portNetworkOrder =
         static_cast<uint16_t>((authServerPortHostOrder_ << 8) | (authServerPortHostOrder_ >> 8));
 
     // Set connection endpoint and call EnsureConnected - anchor: launcher.exe:0x41d228-0x41d232
@@ -196,13 +197,13 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
         g_qsAuthServerDNSName ? g_qsAuthServerDNSName : "<empty>",
         static_cast<unsigned>(authConnectAttemptCount28_),
         static_cast<unsigned>(authAddressList4c_.Count()),
-        static_cast<unsigned>(authEndpoint_.ipv4NetworkOrder),
+        static_cast<unsigned>(authEndpoint5c_.ipv4NetworkOrder),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(authConnectionFlag2c_));
 
     // Call Connect via vtable+0x1c - anchor: launcher.exe:0x41d232
     // anchor: launcher.exe:0x41d232 / call dword ptr [ECX + 0x1c] = Connect(endpoint)
-    return connection->Connect(authEndpoint_);
+    return connection->Connect(authEndpoint5c_);
 }
 
 

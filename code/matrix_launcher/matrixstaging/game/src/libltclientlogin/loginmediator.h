@@ -1228,8 +1228,12 @@ public:
     uint16_t marginServerPortHostOrder_;
     bool ignoreHostsFileForMargin_;
 
-    mxo::liblttcp::LTTCPEndpointKey_0x44b070 authEndpoint_;
-    mxo::liblttcp::LTTCPEndpointKey_0x44b070 marginEndpoint_;
+    // owner `+0x5c .. +0x6b`; `0x41d170` materializes a temporary endpoint and copies all four
+    // dwords here before calling connection vtable `+0x1c` with `&owner+0x5c`.
+    mxo::liblttcp::LTTCPEndpointKey_0x44b070 authEndpoint5c_{};
+    // owner `+0x6c .. +0x7b`; `0x41e500` materializes a temporary endpoint and copies all four
+    // dwords here before calling connection vtable `+0x1c` with `&owner+0x6c`.
+    mxo::liblttcp::LTTCPEndpointKey_0x44b070 marginEndpoint6c_{};
 
     std::string authUsername_;
     std::string authPassword_;
