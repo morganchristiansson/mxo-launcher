@@ -12,6 +12,12 @@ Current high-confidence launcher.exe findings used by `matrixstaging/runtime/src
 
 Recovered field roles:
 
+- `+0x0c..+0x5b` = one inline completed-operation queue-pair storage object
+  - Ghidra datatype: `CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610`
+  - first repeated queue record: pair `+0x00` / engine `+0x0c`
+  - second repeated queue record: pair `+0x28` / engine `+0x34`
+  - important modeling note: the inner `0x28` queue shape is still treated as a repeated recovered
+    record layout, not a proven original OO class boundary
 - `+0x60` = `queueLockHelper60` (`CLTCriticalSectionHelper_0x4add70`)
 - `+0x98` = `cleanupLockHelper98` (`CLTCriticalSectionHelper_0x4add70`)
 - `+0x80` = allocated `0x24` endpoint-tree head
@@ -34,7 +40,15 @@ Recovered field roles:
 ## Worker creation / queueing
 
 - `0x431ff0` allocates a worker thread, stores it at `[connection+0x08]`, inserts it into the context tree under the `+0x98` cleanup lock, and optionally starts it.
-- `0x4364d0` is a distinct dequeue helper used by the zero-thread stop/drain path.
+- `0x436340` initializes one repeated `0x28` queue-shaped record.
+- `0x436450` grows/appends block storage for one repeated queue-shaped record.
+- `0x436610` initializes the inline queue-pair storage at base `+0x0c` by zeroing two adjacent
+  repeated records and calling `0x436340` for each.
+- `0x436670` pushes `(workItem, context)` into either the first record or the second record inside
+  that queue-pair storage.
+- `0x4364d0` is still an engine/base dequeue helper; it checks queue-thread count, takes the
+  queue lock, waits through the `+0x5c` helper, and prefers the second queue record before the
+  first.
 - `0x436820` is the enqueue boundary.
 - `0x436b10` is the main completed-operation queue consumer body.
 

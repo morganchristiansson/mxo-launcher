@@ -28,22 +28,36 @@ using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
 using CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode =
     std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
 
-// Recovered base-queue object from CLTBaseThreadPerClientTCPEngine.
-// Current high-confidence field map comes from 0x436610 -> 0x436340 and later consumer paths.
-// This matches the launcher arg5 queue storage shape at:
-// - +0x0c..+0x33
-// - +0x34..+0x5b
-struct CLTThreadPerClientTCPEngine_0x4b2768_Queue {
-    void* current0;        // +0x00
-    void* block0;          // +0x04
-    void* end0;            // +0x08
-    void* slotsCurrent;    // +0x0c
-    void* current1;        // +0x10
-    void* block1;          // +0x14
-    void* end1;            // +0x18
-    void* slotsLast;       // +0x1c
-    void* slotsBase;       // +0x20
-    uint32_t slotCapacity; // +0x24
+// Recovered repeated queue-record layout used inside the base completed-operation queue-pair
+// storage.
+// Evidence chain:
+// - launcher.exe:0x436610 zeros two consecutive 0x28 records and calls 0x436340 on each
+// - launcher.exe:0x436670 selects either the first record or the pair-relative +0x28 record
+// - launcher.exe:0x4364d0 treats base +0x0c as one queue-pair object and prefers the second
+//   embedded record before the first
+// Modeling note:
+// - this is a recovered repeating record shape, not a proven original source-level class boundary
+struct CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord {
+    void* readCursor00;        // +0x00
+    void* firstBlockBegin04;   // +0x04
+    void* firstBlockEnd08;     // +0x08
+    void* slotArrayCurrent0C;  // +0x0c
+    void* writeCursor10;       // +0x10
+    void* lastBlockBegin14;    // +0x14
+    void* lastBlockEnd18;      // +0x18
+    void* slotArrayLast1C;     // +0x1c
+    void* slotArrayBase20;     // +0x20
+    uint32_t slotCapacity24;   // +0x24
+};
+
+// Recovered queue-pair class/type boundary identified by OOAnalyzer and ctor/init helper
+// launcher.exe:0x436610.
+// This object is embedded inline at base +0x0c and spans engine/base +0x0c..+0x5b, so
+// engine-relative +0x34 is the second embedded queue record (`queue28`), not a separate top-level
+// sibling field.
+struct CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 {
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord queue00; // pair +0x00 / engine +0x0c
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord queue28; // pair +0x28 / engine +0x34
 };
 
 // Recovered queued pair shape from 0x436820 producer and 0x436d31..0x436ee7 consumer paths.
@@ -73,6 +87,10 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader {
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader) == 0x0c, "work-item header size mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, workType) == 0x04, "work-item header workType offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, statusOrPayloadDword08) == 0x08, "work-item header status/payload offset mismatch");
+
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord) == 0x28, "queue record size mismatch");
+static_assert(sizeof(CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610) == 0x50, "queue pair storage size mismatch");
+static_assert(offsetof(CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610, queue28) == 0x28, "queue pair second-record offset mismatch");
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold {
     // anchor: launcher.exe:0x435050 / vtable `0x004b3df8`
@@ -330,7 +348,7 @@ public:
     // Recovered launcher arg5 body offsets derived from the real class layout.
     static constexpr size_t OffsetField04();
     static constexpr size_t OffsetField08();
-    static constexpr size_t OffsetQueue0C();
+    static constexpr size_t OffsetQueuePair0C();
     static constexpr size_t OffsetQueue34();
     static constexpr size_t OffsetWaitHelper5C();
     static constexpr size_t OffsetQueueLockHelper60();
@@ -405,17 +423,18 @@ public:
 
 
     // anchor: launcher.exe:0x436340
-    static void Queue_Free(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue);
+    static void Queue_Free(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord);
     // anchor: launcher.exe:0x436340
-    static bool Queue_Init(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, uint32_t initialSize);
+    static bool Queue_Init(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord, uint32_t initialSize);
     // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
     // Original helper returns `void`; once the caller reaches this push path it does not receive
     // enqueue-success feedback.
-    static void Queue_PushPair(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, uint32_t value0, uint32_t value1);
+    // `queueRecord` is one of the two repeated records inside the inline queue-pair storage.
+    static void Queue_PushPair(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord, uint32_t value0, uint32_t value1);
     // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
-    static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue);
+    static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord);
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
-    static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair);
+    static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord, CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair);
 
     // UNANCHORED: scaffold bridge because the current liblttcp engine still lives beside the raw
     // launcher ABI shell.
@@ -503,8 +522,10 @@ private:
     // `[contextNode+0x14]`.
     void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread);
     // anchor: launcher.exe:0x4364d0
-    // Pop one completed-operation pair from queue34 first, else queue0C. Returns launcher-style
-    // result codes and writes a null pair on empty/non-threaded early-return cases.
+    // Pop one completed-operation pair from the inline queue-pair storage, preferring the second
+    // repeated record (pair +0x28 / engine +0x34) before the first record (pair +0x00 / engine
+    // +0x0c). Returns launcher-style result codes and writes a null pair on empty/non-threaded
+    // early-return cases.
     uint32_t TryPopCompletedOperation(
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
         bool waitForSignal);
@@ -530,8 +551,7 @@ private:
 
     uint32_t ctorFlagsField04_;
     void* queueThreadArrayField08_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue ownedQueue34_;
+    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 ownedQueuePair0C_;
     CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold ownedWaitHelper5C_;
     CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold ownedQueueLockHelper60_;
     HANDLE ownedQueueSignalEvent7C_;
@@ -548,8 +568,7 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
     void** vtable;
     uint32_t field04;
     void* field08;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue queue0C;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue queue34;
+    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 queuePair0C;
     CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold waitHelper5C;
     CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold queueLockHelper60;
     HANDLE queueSignalEvent7C;
@@ -565,8 +584,8 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror) == 0xb4, "layout mirror size mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field04) == 0x04, "field04 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field08) == 0x08, "field08 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queue0C) == 0x0c, "queue0C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queue34) == 0x34, "queue34 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C) == 0x0c, "queuePair0C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C.queue28) == 0x34, "queuePair0C.queue28 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, waitHelper5C) == 0x5c, "waitHelper5C offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueLockHelper60) == 0x60, "queueLockHelper60 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueSignalEvent7C) == 0x7c, "queueSignalEvent7C offset mismatch");

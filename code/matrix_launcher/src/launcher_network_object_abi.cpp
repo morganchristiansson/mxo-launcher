@@ -7,7 +7,7 @@
 #include <cstring>
 #include <spdlog/spdlog.h>
 
-using LauncherObjectQueue = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_Queue;
+using LauncherObjectQueuePair = mxo::liblttcp::CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610;
 using LauncherObjectListHead24 = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24;
 using LauncherObjectListHead18 = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18;
 using LauncherObjectAbiAttachment = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment;
@@ -18,12 +18,11 @@ struct LauncherObjectLockHelper {
 };
 
 struct LauncherObjectAbiShell {
-    void** vtable;               // +0x00 derived primary vtable after 0x431c30 completes
-    uint32_t field04;            // +0x04 ctor arg / queue-thread count seed from 0x4366f0
-    void* field08;               // +0x08 queue-thread pointer array (NULL on the current ctorFlags=0 path)
-    LauncherObjectQueue queue0C; // +0x0c..+0x33 base queue state from 0x436610/0x436340
-    LauncherObjectQueue queue34; // +0x34..+0x5b second base queue from 0x436610/0x436340
-    void** subVtable5C;          // +0x5c base wait/event helper vtable (`0x4b3e20` final ctor state)
+    void** vtable;                    // +0x00 derived primary vtable after 0x431c30 completes
+    uint32_t field04;                 // +0x04 ctor arg / queue-thread count seed from 0x4366f0
+    void* field08;                    // +0x08 queue-thread pointer array (NULL on the current ctorFlags=0 path)
+    LauncherObjectQueuePair queuePair0C; // +0x0c..+0x5b inline queue-pair object from 0x436610
+    void** subVtable5C;               // +0x5c base wait/event helper vtable (`0x4b3e20` final ctor state)
     LauncherObjectLockHelper helper60; // +0x60..+0x7b helper vtable + CRITICAL_SECTION
     HANDLE field7C;              // +0x7c CreateEventA(NULL,0,0,0)
     void* list80;                // +0x80 allocated 0x24 endpoint-tree sentinel head
@@ -114,11 +113,11 @@ static void LogLauncherObjectPrimaryDispatchConfigOnce() {
         sizeof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768),
         sizeof(LauncherObjectAbiShell));
     spdlog::info(
-        "launcher arg5 native-vptr compile-time layout field04=0x{:x} field08=0x{:x} queue0C=0x{:x} queue34=0x{:x} wait5C=0x{:x} lock60=0x{:x} event=0x{:x} list80=0x{:x} count84=0x{:x} list8C=0x{:x} count90=0x{:x} cleanup98=0x{:x} lockHelperSize=0x{:x}",
+        "launcher arg5 native-vptr compile-time layout field04=0x{:x} field08=0x{:x} queuePair0C=0x{:x} queuePair0C.queue28=0x{:x} wait5C=0x{:x} lock60=0x{:x} event=0x{:x} list80=0x{:x} count84=0x{:x} list8C=0x{:x} count90=0x{:x} cleanup98=0x{:x} lockHelperSize=0x{:x}",
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field04),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field08),
-        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queue0C),
-        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queue34),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C.queue28),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, waitHelper5C),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueLockHelper60),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueSignalEvent7C),
@@ -254,8 +253,8 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
 static void FreeLauncherObjectAbiShellInternals(LauncherObjectAbiShell* self) {
     if (!self) return;
     ResetLauncherObjectEngineSidecar(self);
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&self->queue0C);
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&self->queue34);
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&self->queuePair0C.queue00);
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&self->queuePair0C.queue28);
     if (self->field7C) {
         CloseHandle(self->field7C);
         self->field7C = NULL;
@@ -566,8 +565,8 @@ static bool InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(LauncherOb
         return false;
     }
 
-    if (!mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&object->queue0C, 0) ||
-        !mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&object->queue34, 0)) {
+    if (!mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&object->queuePair0C.queue00, 0) ||
+        !mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&object->queuePair0C.queue28, 0)) {
         return false;
     }
 
@@ -622,8 +621,7 @@ static void InitializeLauncherNetworkEngineAbiShellPreCtorState(LauncherObjectAb
     object->vtable = NULL;
     object->field04 = 0;
     object->field08 = NULL;
-    std::memset(&object->queue0C, 0, sizeof(object->queue0C));
-    std::memset(&object->queue34, 0, sizeof(object->queue34));
+    std::memset(&object->queuePair0C, 0, sizeof(object->queuePair0C));
     object->subVtable5C = NULL;
     object->helper60.vtable = NULL;
     object->field7C = NULL;

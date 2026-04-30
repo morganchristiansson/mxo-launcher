@@ -33,11 +33,6 @@ static spdlog::logger* LoggerForQueueLabel(const char* label) {
     return spdlog::default_logger_raw();
 }
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_QueuePair {
-    uint32_t value0;
-    uint32_t value1;
-};
-
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_ConnectionStatusWorkItemVtable[2] = {0};
 static void* g_CloseWorkItemVtable[2] = {0};
@@ -96,7 +91,7 @@ static void CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemPool_Clear();
 // transition as a simple free-and-forget step. Current source keeps that narrower behavior in a
 // side cache keyed by the queue object while the exact original in-object free-list plumbing is
 // still unrecovered.
-static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_Queue*, std::vector<uint32_t*>>
+static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord*, std::vector<uint32_t*>>
     g_QueueRecycledBlocks;
 
 // GHIDRA layout audit anchors:
@@ -889,22 +884,22 @@ CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
 
 // UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
 static void QueueRecycleBlockScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
     uint32_t* block) {
-    if (!queue || !block) {
+    if (!queueRecord || !block) {
         return;
     }
-    g_QueueRecycledBlocks[queue].push_back(block);
+    g_QueueRecycledBlocks[queueRecord].push_back(block);
 }
 
 // UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
 static uint32_t* QueueTakeRecycledBlockScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue) {
-    if (!queue) {
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
+    if (!queueRecord) {
         return nullptr;
     }
 
-    auto it = g_QueueRecycledBlocks.find(queue);
+    auto it = g_QueueRecycledBlocks.find(queueRecord);
     if (it == g_QueueRecycledBlocks.end() || it->second.empty()) {
         return nullptr;
     }
@@ -919,12 +914,12 @@ static uint32_t* QueueTakeRecycledBlockScaffold(
 
 // UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
 static void QueueFreeRecycledBlocksScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue) {
-    if (!queue) {
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
+    if (!queueRecord) {
         return;
     }
 
-    auto it = g_QueueRecycledBlocks.find(queue);
+    auto it = g_QueueRecycledBlocks.find(queueRecord);
     if (it == g_QueueRecycledBlocks.end()) {
         return;
     }
@@ -1735,15 +1730,15 @@ worker_continue:
 }
 
 // anchor: launcher.exe:0x436340
-void CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue) {
-    if (!queue) {
+void CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
+    if (!queueRecord) {
         return;
     }
 
-    if (queue->slotsBase) {
-        uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-        uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
-        uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
+    if (queueRecord->slotArrayBase20) {
+        uint32_t** slotsBase = static_cast<uint32_t**>(queueRecord->slotArrayBase20);
+        uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
+        uint32_t** slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
         if (slotsCurrent && slotsLast && slotsCurrent <= slotsLast) {
             for (uint32_t** slot = slotsCurrent; slot <= slotsLast; ++slot) {
                 if (*slot) {
@@ -1755,19 +1750,19 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(CLTThreadPerClientTCPEngin
         std::free(slotsBase);
     }
 
-    QueueFreeRecycledBlocksScaffold(queue);
-    std::memset(queue, 0, sizeof(*queue));
+    QueueFreeRecycledBlocksScaffold(queueRecord);
+    std::memset(queueRecord, 0, sizeof(*queueRecord));
 }
 
 // anchor: launcher.exe:0x436340
 bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
     uint32_t initialSize) {
-    if (!queue) {
+    if (!queueRecord) {
         return false;
     }
 
-    Queue_Free(queue);
+    Queue_Free(queueRecord);
 
     uint32_t blockCount = (initialSize >> 4) + 1;
     uint32_t slotCapacity = blockCount + 2;
@@ -1784,62 +1779,64 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(
     for (uint32_t i = 0; i < blockCount; ++i) {
         slotsBase[firstIndex + i] = static_cast<uint32_t*>(std::calloc(1, 0x80));
         if (!slotsBase[firstIndex + i]) {
-            queue->slotsBase = slotsBase;
-            queue->slotsCurrent = slotsBase + firstIndex;
-            queue->slotsLast = slotsBase + firstIndex + i;
-            Queue_Free(queue);
+            queueRecord->slotArrayBase20 = slotsBase;
+            queueRecord->slotArrayCurrent0C = slotsBase + firstIndex;
+            queueRecord->slotArrayLast1C = slotsBase + firstIndex + i;
+            Queue_Free(queueRecord);
             return false;
         }
     }
 
     uint32_t** slotsCurrent = slotsBase + firstIndex;
     uint32_t** slotsLast = slotsCurrent + blockCount - 1;
-    uint8_t* block0 = reinterpret_cast<uint8_t*>(*slotsCurrent);
-    uint8_t* block1 = reinterpret_cast<uint8_t*>(*slotsLast);
+    uint8_t* firstBlock = reinterpret_cast<uint8_t*>(*slotsCurrent);
+    uint8_t* lastBlock = reinterpret_cast<uint8_t*>(*slotsLast);
 
-    queue->slotsBase = slotsBase;
-    queue->slotCapacity = slotCapacity;
-    queue->slotsCurrent = slotsCurrent;
-    queue->slotsLast = slotsLast;
-    queue->block0 = block0;
-    queue->end0 = block0 ? (block0 + 0x80) : nullptr;
-    queue->current0 = block0;
-    queue->block1 = block1;
-    queue->end1 = block1 ? (block1 + 0x80) : nullptr;
-    queue->current1 = block1 ? (block1 + ((initialSize & 0xfu) * 8u)) : nullptr;
+    queueRecord->slotArrayBase20 = slotsBase;
+    queueRecord->slotCapacity24 = slotCapacity;
+    queueRecord->slotArrayCurrent0C = slotsCurrent;
+    queueRecord->slotArrayLast1C = slotsLast;
+    queueRecord->firstBlockBegin04 = firstBlock;
+    queueRecord->firstBlockEnd08 = firstBlock ? (firstBlock + 0x80) : nullptr;
+    queueRecord->readCursor00 = firstBlock;
+    queueRecord->lastBlockBegin14 = lastBlock;
+    queueRecord->lastBlockEnd18 = lastBlock ? (lastBlock + 0x80) : nullptr;
+    queueRecord->writeCursor10 = lastBlock ? (lastBlock + ((initialSize & 0xfu) * 8u)) : nullptr;
     return true;
 }
 
 // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
 void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
     uint32_t value0,
     uint32_t value1) {
-    if (!queue || !queue->current1) {
+    if (!queueRecord || !queueRecord->writeCursor10) {
         return;
     }
 
-    uint8_t* lastPairInBlock = queue->end1 ? (static_cast<uint8_t*>(queue->end1) - 8) : nullptr;
-    if (static_cast<void*>(queue->current1) == static_cast<void*>(lastPairInBlock)) {
-        uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-        uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
+    uint8_t* lastPairInBlock =
+        queueRecord->lastBlockEnd18 ? (static_cast<uint8_t*>(queueRecord->lastBlockEnd18) - 8) : nullptr;
+    if (static_cast<void*>(queueRecord->writeCursor10) == static_cast<void*>(lastPairInBlock)) {
+        uint32_t** slotsBase = static_cast<uint32_t**>(queueRecord->slotArrayBase20);
+        uint32_t** slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
         if (!slotsBase || !slotsLast) {
             return;
         }
 
-        const uint32_t tailFreeSlots = queue->slotCapacity - static_cast<uint32_t>(slotsLast - slotsBase);
+        const uint32_t tailFreeSlots =
+            queueRecord->slotCapacity24 - static_cast<uint32_t>(slotsLast - slotsBase);
         if (tailFreeSlots < 2u) {
-            uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
+            uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
             if (!slotsCurrent) {
                 return;
             }
             const uint32_t activeBlocks = static_cast<uint32_t>((slotsLast - slotsCurrent) + 1);
             const uint32_t neededBlocks = activeBlocks + 1u;
-            uint32_t newCapacity = queue->slotCapacity;
+            uint32_t newCapacity = queueRecord->slotCapacity24;
             uint32_t** newSlotsBase = slotsBase;
-            if (queue->slotCapacity <= (neededBlocks * 2u)) {
-                const uint32_t growthBase = (queue->slotCapacity >= 1u) ? queue->slotCapacity : 1u;
-                newCapacity = queue->slotCapacity + growthBase + 2u;
+            if (queueRecord->slotCapacity24 <= (neededBlocks * 2u)) {
+                const uint32_t growthBase = (queueRecord->slotCapacity24 >= 1u) ? queueRecord->slotCapacity24 : 1u;
+                newCapacity = queueRecord->slotCapacity24 + growthBase + 2u;
                 newSlotsBase = static_cast<uint32_t**>(std::calloc(newCapacity, sizeof(uint32_t*)));
                 if (!newSlotsBase) {
                     return;
@@ -1851,21 +1848,25 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
             std::memmove(newSlotsCurrent, slotsCurrent, activeBlocks * sizeof(uint32_t*));
             if (newSlotsBase != slotsBase) {
                 std::free(slotsBase);
-                queue->slotsBase = newSlotsBase;
-                queue->slotCapacity = newCapacity;
+                queueRecord->slotArrayBase20 = newSlotsBase;
+                queueRecord->slotCapacity24 = newCapacity;
             }
 
-            queue->slotsCurrent = newSlotsCurrent;
-            queue->block0 = *newSlotsCurrent;
-            queue->end0 = queue->block0 ? (static_cast<uint8_t*>(queue->block0) + 0x80) : nullptr;
+            queueRecord->slotArrayCurrent0C = newSlotsCurrent;
+            queueRecord->firstBlockBegin04 = *newSlotsCurrent;
+            queueRecord->firstBlockEnd08 = queueRecord->firstBlockBegin04
+                ? (static_cast<uint8_t*>(queueRecord->firstBlockBegin04) + 0x80)
+                : nullptr;
             uint32_t** newSlotsLast = newSlotsCurrent + activeBlocks - 1;
-            queue->slotsLast = newSlotsLast;
-            queue->block1 = *newSlotsLast;
-            queue->end1 = queue->block1 ? (static_cast<uint8_t*>(queue->block1) + 0x80) : nullptr;
+            queueRecord->slotArrayLast1C = newSlotsLast;
+            queueRecord->lastBlockBegin14 = *newSlotsLast;
+            queueRecord->lastBlockEnd18 = queueRecord->lastBlockBegin14
+                ? (static_cast<uint8_t*>(queueRecord->lastBlockBegin14) + 0x80)
+                : nullptr;
             slotsLast = newSlotsLast;
         }
 
-        uint32_t* newBlock = QueueTakeRecycledBlockScaffold(queue);
+        uint32_t* newBlock = QueueTakeRecycledBlockScaffold(queueRecord);
         if (!newBlock) {
             newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
             if (!newBlock) {
@@ -1876,48 +1877,49 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
         }
 
         slotsLast[1] = newBlock;
-        uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
-        current1[0] = value0;
-        current1[1] = value1;
-        queue->slotsLast = slotsLast + 1;
-        queue->block1 = newBlock;
-        queue->end1 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
-        queue->current1 = newBlock;
+        uint32_t* writeCursor = static_cast<uint32_t*>(queueRecord->writeCursor10);
+        writeCursor[0] = value0;
+        writeCursor[1] = value1;
+        queueRecord->slotArrayLast1C = slotsLast + 1;
+        queueRecord->lastBlockBegin14 = newBlock;
+        queueRecord->lastBlockEnd18 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
+        queueRecord->writeCursor10 = newBlock;
         return;
     }
 
-    uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
-    current1[0] = value0;
-    current1[1] = value1;
-    queue->current1 = current1 + 2;
+    uint32_t* writeCursor = static_cast<uint32_t*>(queueRecord->writeCursor10);
+    writeCursor[0] = value0;
+    writeCursor[1] = value1;
+    queueRecord->writeCursor10 = writeCursor + 2;
 }
 
 // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
-bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue) {
-    return !queue || !queue->current0 || (queue->current1 == queue->current0);
+bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
+    return !queueRecord || !queueRecord->readCursor00 || (queueRecord->writeCursor10 == queueRecord->readCursor00);
 }
 
 // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
 bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
     CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair) {
-    if (!queue || !outPair || Queue_IsEmpty(queue)) {
+    if (!queueRecord || !outPair || Queue_IsEmpty(queueRecord)) {
         return false;
     }
 
-    uint32_t* current0 = static_cast<uint32_t*>(queue->current0);
-    outPair->value0 = current0[0];
-    outPair->value1 = current0[1];
+    uint32_t* readCursor = static_cast<uint32_t*>(queueRecord->readCursor00);
+    outPair->value0 = readCursor[0];
+    outPair->value1 = readCursor[1];
 
-    uint8_t* lastPairInBlock = queue->end0 ? (static_cast<uint8_t*>(queue->end0) - 8) : nullptr;
-    if (static_cast<void*>(queue->current0) == static_cast<void*>(lastPairInBlock)) {
-        uint32_t* oldBlock = static_cast<uint32_t*>(queue->block0);
-        uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
-        uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
+    uint8_t* lastPairInBlock =
+        queueRecord->firstBlockEnd08 ? (static_cast<uint8_t*>(queueRecord->firstBlockEnd08) - 8) : nullptr;
+    if (static_cast<void*>(queueRecord->readCursor00) == static_cast<void*>(lastPairInBlock)) {
+        uint32_t* oldBlock = static_cast<uint32_t*>(queueRecord->firstBlockBegin04);
+        uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
+        uint32_t** slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
         if (!slotsCurrent || slotsCurrent >= slotsLast) {
             // No later block is active; the queue just becomes empty within the current block.
             // The recovered free-list behavior matters on the cross-block path below, not here.
-            queue->current0 = current0 + 2;
+            queueRecord->readCursor00 = readCursor + 2;
             return true;
         }
 
@@ -1927,18 +1929,18 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
             //   dequeue cursor leaves a full `0x80` block
             // - current source now mirrors that more closely by caching the exhausted head block for
             //   later `Queue_PushPair` growth reuse instead of freeing it immediately
-            QueueRecycleBlockScaffold(queue, oldBlock);
+            QueueRecycleBlockScaffold(queueRecord, oldBlock);
         }
         ++slotsCurrent;
-        queue->slotsCurrent = slotsCurrent;
+        queueRecord->slotArrayCurrent0C = slotsCurrent;
         uint32_t* newBlock = *slotsCurrent;
-        queue->block0 = newBlock;
-        queue->end0 = newBlock ? (static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80) : nullptr;
-        queue->current0 = newBlock;
+        queueRecord->firstBlockBegin04 = newBlock;
+        queueRecord->firstBlockEnd08 = newBlock ? (static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80) : nullptr;
+        queueRecord->readCursor00 = newBlock;
         return true;
     }
 
-    queue->current0 = current0 + 2;
+    queueRecord->readCursor00 = readCursor + 2;
     return true;
 }
 
@@ -2018,8 +2020,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::InitializeContextTreeHead18(
 CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
     : ctorFlagsField04_(0),
       queueThreadArrayField08_(nullptr),
-      ownedQueue0C_(),
-      ownedQueue34_(),
+      ownedQueuePair0C_(),
       ownedWaitHelper5C_{nullptr},
       ownedQueueLockHelper60_(),
       ownedQueueSignalEvent7C_(NULL),
@@ -2045,8 +2046,8 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
     //   source backings keyed by `this`, not as pretend hidden object fields
     ownedQueueLockHelper60_.vtable = nullptr;
     ownedCleanupLockHelper98_.vtable = nullptr;
-    Queue_Init(&ownedQueue0C_, 0);
-    Queue_Init(&ownedQueue34_, 0);
+    Queue_Init(&ownedQueuePair0C_.queue00, 0);
+    Queue_Init(&ownedQueuePair0C_.queue28, 0);
     ownedQueueSignalEvent7C_ = CreateEventA(NULL, FALSE, FALSE, NULL);
     InitializeLockHelperScaffold(&ownedQueueLockHelper60_);
     InitializeLockHelperScaffold(&ownedCleanupLockHelper98_);
@@ -2097,8 +2098,8 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
         contextBacking->entries.clear();
     }
 
-    Queue_Free(&ownedQueue0C_);
-    Queue_Free(&ownedQueue34_);
+    Queue_Free(&ownedQueuePair0C_.queue00);
+    Queue_Free(&ownedQueuePair0C_.queue28);
     DeleteLockHelperScaffold(&ownedQueueLockHelper60_);
     DeleteLockHelperScaffold(&ownedCleanupLockHelper98_);
     if (ownedQueueSignalEvent7C_) {
@@ -2886,8 +2887,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C = shell ? &shell->queue0C : &ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 = shell ? &shell->queue34 : &ownedQueue34_;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
+        shell ? &shell->queuePair0C.queue00 : &ownedQueuePair0C_.queue00;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
+        shell ? &shell->queuePair0C.queue28 : &ownedQueuePair0C_.queue28;
     HANDLE activeQueueSignalEvent = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
     CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
     if (queueLock) {
@@ -2914,7 +2917,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         }
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* selectedQueue = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
     if (!Queue_IsEmpty(activeQueue34)) {
         selectedQueue = activeQueue34;
     } else if (!Queue_IsEmpty(activeQueue0C)) {
@@ -2952,9 +2955,11 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     // - no push-success result is surfaced back to callers; caller-side ownership/lifetime does not
     //   branch on queue-growth success/failure once this path is entered
     CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C = shell ? &shell->queue0C : &ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 = shell ? &shell->queue34 : &ownedQueue34_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
+        shell ? &shell->queuePair0C.queue00 : &ownedQueuePair0C_.queue00;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
+        shell ? &shell->queuePair0C.queue28 : &ownedQueuePair0C_.queue28;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
     if (!targetQueue) {
         return false;
     }
@@ -3025,9 +3030,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the attached arg5 lock
+    // - that attached lock covers one inline queue-pair object at engine +0x0c, whose second
+    //   repeated record lives at pair +0x28 / engine +0x34
     CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C = shell ? &shell->queue0C : &ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 = shell ? &shell->queue34 : &ownedQueue34_;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
+        shell ? &shell->queuePair0C.queue00 : &ownedQueuePair0C_.queue00;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
+        shell ? &shell->queuePair0C.queue28 : &ownedQueuePair0C_.queue28;
     HANDLE activeQueueSignalEvent = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
     CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
     while (true) {
@@ -3035,7 +3044,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             EnterCriticalSection(queueLock);
         }
 
-        CLTThreadPerClientTCPEngine_0x4b2768_Queue* selectedQueue = nullptr;
+        CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
         if (!Queue_IsEmpty(activeQueue34)) {
             selectedQueue = activeQueue34;
         } else if (!Queue_IsEmpty(activeQueue0C)) {
