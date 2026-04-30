@@ -2006,68 +2006,30 @@ static void QueueWorkItem_Release(void* workItem) {
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best consumer anchor is context->+0x10(workItem) in 0x436d31..0x436ee7.
-// Active source may dequeue either the direct connection object or the explicit queue-dispatch ABI
-// adapter used when raw client.dll consumers are still on the path.
+// Current queue paths now carry the direct connection object as the queued context identity.
 static void QueuedConnection_OnOperationCompleted(
-    void* queuedContext,
+    void* /*queuedContext*/,
     CBaseConnection* queuedConnection,
     void* workItem) {
     if (queuedConnection) {
         (void)queuedConnection->OnOperationCompleted(workItem);
-        return;
     }
-
-    if (!queuedContext) {
-        return;
-    }
-
-    void** vtable = *reinterpret_cast<void***>(queuedContext);
-    if (!vtable || !vtable[4]) {
-        return;
-    }
-
-    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
-    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-    (void)fn(queuedContext, workItem);
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
 // Current best consumer anchor is the `(char)context[1]` test in 0x436d31..0x436ee7`.
 static bool QueuedConnection_ShouldAutoReleaseAfterType1(
-    void* queuedContext,
+    void* /*queuedContext*/,
     const CBaseConnection* queuedConnection) {
-    if (CBaseConnection_QueueContextScaffold* queueContext =
-            static_cast<CBaseConnection_QueueContextScaffold*>(queuedContext);
-        queueContext != nullptr &&
-        CBaseConnection_FromQueueContextScaffold(queuedContext) != nullptr) {
-        return queueContext->autoReleaseFlag != 0u;
-    }
     return queuedConnection != nullptr && queuedConnection->AutoReleaseFlag04() != 0u;
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
-// Adapter contexts still expose a source-owned release bridge at slot `+0x04`; direct connection
-// objects keep the recovered base `+0x04` flag modeled but do not yet have a recovered release
-// target on an active path.
+// Direct queued connection contexts still do not have an evidenced type-1 release target on an
+// active path; keep the modeled auto-release flag but do not synthesize a release body here.
 static void QueuedConnection_ReleaseAfterType1(
-    void* queuedContext,
+    void* /*queuedContext*/,
     CBaseConnection* queuedConnection) {
-    if (CBaseConnection_QueueContextScaffold* queueContext =
-            static_cast<CBaseConnection_QueueContextScaffold*>(queuedContext);
-        queueContext != nullptr &&
-        CBaseConnection_FromQueueContextScaffold(queuedContext) != nullptr) {
-        void** vtable = *reinterpret_cast<void***>(queueContext);
-        if (!vtable || !vtable[1]) {
-            return;
-        }
-
-        typedef uint32_t (__thiscall *ReleaseFn)(void*);
-        ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-        (void)fn(queueContext);
-        return;
-    }
-
     if (!queuedConnection || queuedConnection->AutoReleaseFlag04() == 0u) {
         return;
     }

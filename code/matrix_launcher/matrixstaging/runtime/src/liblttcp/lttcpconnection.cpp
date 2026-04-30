@@ -338,31 +338,6 @@ void CLTTCPReadOperation::SetByteCount(uint32_t byteCount) {
 namespace {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
-static void* g_BaseConnectionQueueContextVtable[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-
-// UNANCHORED: source-owned queue-dispatch ABI adapter release bridge for current non-byte-faithful
-// C++ objects.
-static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
-    CBaseConnection_QueueContextScaffold* /*self*/) {
-    return 1u;
-}
-
-// UNANCHORED: source-owned queue-dispatch ABI adapter completion bridge for raw client.dll queue
-// consumers expecting original slot `+0x10` / `vtable[4]`.
-static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffold(
-    CBaseConnection_QueueContextScaffold* self,
-    void* workItem) {
-    return (self && self->owner) ? self->owner->OnOperationCompleted(workItem) : 0u;
-}
-
-static void EnsureBaseConnectionQueueContextVtableInitialized() {
-    if (!g_BaseConnectionQueueContextVtable[1]) {
-        g_BaseConnectionQueueContextVtable[1] =
-            reinterpret_cast<void*>(BaseConnectionQueueContext_ReleaseScaffold);
-        g_BaseConnectionQueueContextVtable[4] =
-            reinterpret_cast<void*>(BaseConnectionQueueContext_OnOperationCompletedScaffold);
-    }
-}
 
 // UNANCHORED: source-owned endpoint formatting helper that mirrors the byte/port extraction shape
 // used by `CLTTCPConnection::OnReceive` terminal parser-error logging.
@@ -423,16 +398,7 @@ CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
     : autoReleaseFlag04_(0u),
       padding05_07_{0u, 0u, 0u},
       engine_(nullptr),
-      state_(initialState),
-      queueContextScaffold_() {
-    EnsureBaseConnectionQueueContextVtableInitialized();
-    queueContextScaffold_.vtable = g_BaseConnectionQueueContextVtable;
-    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag04_;
-    queueContextScaffold_.padding05[0] = 0u;
-    queueContextScaffold_.padding05[1] = 0u;
-    queueContextScaffold_.padding05[2] = 0u;
-    queueContextScaffold_.owner = this;
-}
+      state_(initialState) {}
 
 // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
 void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
@@ -454,21 +420,14 @@ void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
-// UNANCHORED: source-owned helper that recognizes the current queue-dispatch ABI adapter object
-// and returns its owning `CBaseConnection` when present.
+// UNANCHORED: direct queue-context identity helper for the current queue consumer paths.
 CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext) {
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
-    if (!queueContext || queueContext->vtable != g_BaseConnectionQueueContextVtable) {
-        return nullptr;
-    }
-    return queueContext->owner;
+    return static_cast<CBaseConnection*>(maybeQueueContext);
 }
 
-// UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
+// UNANCHORED: direct queue-context cleanup-key normalization for the current queue consumer paths.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext) {
-    CBaseConnection* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
-    return owner ? static_cast<void*>(owner) : maybeQueueContext;
+    return maybeQueueContext;
 }
 
 // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.
