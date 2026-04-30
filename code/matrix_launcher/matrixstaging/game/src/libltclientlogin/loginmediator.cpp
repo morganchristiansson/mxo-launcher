@@ -2096,17 +2096,18 @@ void CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold(std::string_view 
 // anchor: launcher.exe:0x41af70
 // Original is a thin thunk:
 //   - loads margin connection from this+0x1c
-//   - jumps to connection->vtable[+0x24] (CMessageConnection_SendPacket)
-// which then chains to vtable[+0x28] (ForwardEnvelopeToSendPacket -> SendPacketMessageRef)
-// Current source preserves envelope-based send bridge for packet-builder integration.
+//   - tail-jumps to connection->vtable[+0x24] with the caller's stack-local
+//     Packet_0x4af2a4-family object still on the stack
+// That downstream wrapper reads packetBuilder+0x08 and forwards the retained outer
+// message-ref object into `0x448cf0`.
 uint32_t CLTLoginMediator::SendCurrentMarginPacket(
-    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope) {
+    mxo::liblttcp::Packet_0x4af2a4& packetBuilder) {
     mxo::liblttcp::CMessageConnection_0x4b7928* const connection = marginConnection_;
     if (!connection) {
         return 0u;
     }
 
-    return connection->ForwardPacketBuilderEnvelopeToSendPacket(envelope);
+    return connection->ForwardPacketBuilderToSendPacket(packetBuilder);
 }
 
 // anchor: launcher.exe:0x41f270

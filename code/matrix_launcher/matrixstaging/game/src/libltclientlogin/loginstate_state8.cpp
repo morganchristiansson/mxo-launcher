@@ -248,11 +248,8 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
         }
     }
 
-    // anchor: launcher.exe:0x439840 = envelope field access pattern
-    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
-    envelope.payloadBase04 = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
-    envelope.messageRef08 = packetBuilder.messageRef08;
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
+    // anchor: launcher.exe state8 send thunk - pass the stack-local packet builder itself
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
     g_CurrentLoginMediator->PostEvent(0x09u);
 
     const unsigned nonZeroSnapshotBlockCount =

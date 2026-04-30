@@ -104,11 +104,8 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
             currentSlotRecord ? currentSlotRecord->characterIdHigh20 : 0u;
     }
 
-    // Build envelope for send
-    ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
-    envelope.payloadBase04 = payload;
-    envelope.messageRef08 = packetBuilder.messageRef08;
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
+    // anchor: launcher.exe state7 send thunk - pass the stack-local packet builder itself
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
     g_CurrentLoginMediator->PostEvent(0x07u);
 
     const uint16_t totalBytes = packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c

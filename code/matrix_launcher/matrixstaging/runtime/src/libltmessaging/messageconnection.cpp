@@ -1061,15 +1061,16 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplyRec
 }
 
 // anchor: launcher.exe:0x41cf30
-uint32_t CMessageConnection_0x4b7928::ForwardPacketBuilderEnvelopeToSendPacket(
-    CMessageConnectionPacketBuilderEnvelope& envelope) {
-    if (!envelope.messageRef08) {
+uint32_t CMessageConnection_0x4b7928::ForwardPacketBuilderToSendPacket(
+    Packet_0x4af2a4& packetBuilder) {
+    if (!packetBuilder.messageRef08) {
         return 0u;
     }
-    spdlog::debug("ForwardPacketBuilderEnvelopeToSendPacket: messageRef08={} payloadBytes={}",
-        fmt::ptr(envelope.messageRef08),
-        envelope.messageRef08->PayloadByteCount());
-    SendPacketMessageRef(*envelope.messageRef08);
+    spdlog::debug("ForwardPacketBuilderToSendPacket: packetBuilder={} messageRef08={} payloadBytes={}",
+        fmt::ptr(&packetBuilder),
+        fmt::ptr(packetBuilder.messageRef08),
+        packetBuilder.messageRef08->PayloadByteCount());
+    SendPacketMessageRef(*packetBuilder.messageRef08);
     return 0u; // Original function returns void, but wrapper maintains uint32_t signature
 }
 

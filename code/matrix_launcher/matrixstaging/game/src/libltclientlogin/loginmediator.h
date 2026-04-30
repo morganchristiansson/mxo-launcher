@@ -977,17 +977,13 @@ public:
     // `+0x24`.
     // Newer Ghidra tightening now makes that two-step downstream bridge more concrete:
     // - `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
-    // - that wrapper forwards envelope `+0x08` (the retained outer message-ref object) into
-    //   `+0x28` = inherited `CMessageConnection_0x4b7928::SendPacket` / `0x448cf0`
+    // - that wrapper forwards packet-builder `+0x08` (the retained outer message-ref object)
+    //   into `+0x28` = inherited `CMessageConnection_0x4b7928::SendPacket` / `0x448cf0`
     // - `0x448cf0` consumes that message-ref object, not bare payload bytes
-    // Current source helper is therefore intentionally narrower/scaffold-only:
-    // - local builder front matter now stays raw-first (`+0x04` payload base, `+0x08` message-ref)
-    // - `0x448cf0` consumption now happens on that retained message-ref object rather than a
-    //   shared_ptr-owned convenience shell
-    // - helper-side packet-agenda replacement/discard and the larger builder-local metadata tails
-    //   beyond that front matter still remain incomplete
+    // - caller passes the real stack-local `Packet_0x4af2a4`-family object, not a synthetic
+    //   source-only envelope wrapper
     uint32_t SendCurrentMarginPacket(
-        mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope);
+        mxo::liblttcp::Packet_0x4af2a4& packetBuilder);
 
     // anchor: launcher.exe:0x41e500
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`

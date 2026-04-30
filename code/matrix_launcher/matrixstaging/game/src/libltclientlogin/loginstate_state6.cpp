@@ -215,11 +215,8 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     payloadBase[0x22] = g_CurrentLoginMediator->GetUnknownByte05();
   }
 
-  // Build envelope for send
-  ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
-  envelope.payloadBase04 = payloadBase;
-  envelope.messageRef08 = packetBuilder.messageRef08;
-  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
+  // anchor: launcher.exe:0x43b9df..0x43b9ec - pass the stack-local packet builder itself
+  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
   g_CurrentLoginMediator->PostEvent(0x11u);
   // Log version values for diagnostics (dereferenced from pointers)
   const uint32_t loggedLauncherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
@@ -346,11 +343,8 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
   packetBuilder.ResetAndInitialize();
   packetBuilder.SetChallengeResponseFields(goHereAddr, sessionSecret);
 
-  // Build envelope for send
-  ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope{};
-  envelope.payloadBase04 = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
-  envelope.messageRef08 = packetBuilder.messageRef08;
-  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(envelope);
+  // anchor: launcher.exe:0x440a0b..0x440a18 - pass the stack-local packet builder itself
+  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
 
   spdlog::info(
       "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage sent opcode-0x08 challenge response goHereAddr=0x{:08x} sessionSecret=0x{:08x} sendResult=0x{:08x}",

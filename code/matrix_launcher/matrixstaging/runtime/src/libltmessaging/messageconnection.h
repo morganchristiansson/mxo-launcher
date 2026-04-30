@@ -355,19 +355,7 @@ enum class CMessageConnectionPacketNameFamily : uint8_t {
     kMargin = 2,
 };
 
-struct CMessageConnectionPacketBuilderEnvelope {
-    // Recovered raw local packet-builder envelope front matter initialized by `0x439840` and
-    // forwarded by `0x41af70 -> 0x41cf30`.
-    // Current best material fields from `0x439840` / `0x41cf30`:
-    // - `+0x00` = local helper vtable / derived builder vtable slot
-    // - `+0x04` = payload base cached as `messageRef+0x0c -> inner+0x0c`
-    // - `+0x08` = retained outer message-ref object consumed by `0x448cf0`
-    void** vtable00 = nullptr;
-    uint8_t* payloadBase04 = nullptr;
-    CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;
-};
-
-static_assert(offsetof(CMessageConnectionPacketBuilderEnvelope, messageRef08) == 0x08, "packet-builder envelope message-ref offset mismatch");
+class Packet_0x4af2a4;
 
 struct CMessageConnectionPacketBuilderReservationScaffold {
     // Recovered repeated reservation sidecar used by the local packet-builder helpers after
@@ -395,11 +383,22 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
     // - `+0x0c` = helper-local byte/flag cleared by the init/reset helpers
     // - `+0x10` = packet payload base pointer used by the fixed-field writers and reservation
     //   helpers as the offset base
-    CMessageConnectionPacketBuilderEnvelope envelope00{};
+    // Recovered raw local packet-builder front matter initialized by `0x439840` and used by
+    // fixed-payload builders before `0x41af70 -> 0x41cf30` forwards the retained message-ref.
+    // Layout mirrors the real `Packet_0x4af2a4` front matter without requiring a synthetic
+    // source-only envelope wrapper type:
+    // - `+0x00` = local helper vtable / derived builder vtable slot
+    // - `+0x04` = payload base cached as `messageRef+0x0c -> inner+0x0c`
+    // - `+0x08` = retained outer message-ref object consumed by `0x448cf0`
+    void** vtable00 = nullptr;
+    uint8_t* payloadBase04 = nullptr;
+    CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;
     uint8_t builderFlag0c = 0u;
     uint8_t padding0d_0f[3] = {0u, 0u, 0u};
     uint8_t* packetPayload10 = nullptr;
 };
+
+static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, messageRef08) == 0x08, "packet-builder scaffold message-ref offset mismatch");
 
 // anchor: launcher.exe:0x004af2a4 / vtable
 // anchor: launcher.exe:0x439840 / ctor
@@ -1245,10 +1244,10 @@ public:
 
     // anchor: launcher.exe:0x41cf30
     // Wrapper immediately beneath mediator send helper `0x41af70`.
-    // Original body extracts envelope `+0x08` and forwards that retained message-ref object into
-    // vtable `+0x28` / `0x448cf0`.
-    uint32_t ForwardPacketBuilderEnvelopeToSendPacket(
-        CMessageConnectionPacketBuilderEnvelope& envelope);
+    // Original body extracts packetBuilder `+0x08` and forwards that retained message-ref object
+    // into vtable `+0x28` / `0x448cf0`.
+    uint32_t ForwardPacketBuilderToSendPacket(
+        Packet_0x4af2a4& packetBuilder);
 
     // anchor: launcher.exe:0x448cf0
     // Narrow source-owned mirror of the message-ref-based send path.
