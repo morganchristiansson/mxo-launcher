@@ -39,27 +39,29 @@ void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginStat
     }
 
     const uint8_t payload[] = {CLTLoginMediator::kAuthRawCodeGetWorldListRequest};
-    mxo::auth::FramedPacket packet;
+    std::vector<uint8_t> packetBytes;
+    size_t packetHeaderByteCount = 0u;
     if (!mxo::auth::BuildVariableLengthPacket(
             payload,
             sizeof(payload),
             mxo::auth::kFrameModeAuto,
-            &packet)) {
+            &packetBytes,
+            &packetHeaderByteCount)) {
         spdlog::info("DIAGNOSTIC: CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue failed to build AS_GetWorldListRequest");
         return;
     }
 
     const uint32_t sendResult = connection->SendPacket(
-        packet.bytes.data(),
-        static_cast<uint32_t>(packet.bytes.size()),
+        packetBytes.data(),
+        static_cast<uint32_t>(packetBytes.size()),
         nullptr);
     g_CurrentLoginMediator->PostEvent(0x1bu);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue built raw-0x35 packet headerLen={} payloadLen={} byteCount={} currentState={} -> sendResult=0x{:08x} then posts event=0x1b",
-        packet.headerBytes.size(),
-        packet.payloadBytes.size(),
-        packet.bytes.size(),
+        packetHeaderByteCount,
+        sizeof(payload),
+        packetBytes.size(),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(sendResult));
     return;

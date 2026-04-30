@@ -23,75 +23,6 @@
 
 namespace mxo::auth {
 
-bool BuildGetPublicKeyRequestPacket(
-    uint32_t launcherVersion,
-    uint32_t currentPublicKeyId,
-    FrameMode frameMode,
-    FramedPacket* outPacket) {
-    using namespace internal;
-
-    std::vector<uint8_t> payload;
-    payload.reserve(9u);
-    payload.push_back(0x06u);
-    AppendU32LE(&payload, launcherVersion);
-    AppendU32LE(&payload, currentPublicKeyId);
-    return BuildVariableLengthPacket(payload.data(), payload.size(), frameMode, outPacket);
-}
-
-bool BuildAuthRequestBlobPlaintext(
-    const std::string& username,
-    const AuthBlobLayout& layout,
-    std::vector<uint8_t>* outPlaintext,
-    std::vector<uint8_t>* outTwofishKey,
-    uint16_t* outUsernameLengthField) {
-    using namespace internal;
-
-    if (!outPlaintext || !outTwofishKey || !outUsernameLengthField || username.empty()) {
-        return false;
-    }
-
-    std::vector<uint8_t> effectiveTwofishKey = layout.twofishKey;
-    if (effectiveTwofishKey.empty()) {
-        effectiveTwofishKey.resize(16u);
-        CryptoPP::AutoSeededRandomPool rng;
-        rng.GenerateBlock(effectiveTwofishKey.data(), effectiveTwofishKey.size());
-    }
-    if (effectiveTwofishKey.size() != 16u) {
-        return false;
-    }
-
-    std::vector<uint8_t> usernameBytes(username.begin(), username.end());
-    if (layout.includeUsernameNullTerminator) {
-        usernameBytes.push_back(0u);
-    }
-
-    const int lengthField =
-        static_cast<int>(usernameBytes.size()) + layout.usernameLengthAdjust;
-    if (lengthField < 0 || lengthField > 0xffff) {
-        return false;
-    }
-
-    outPlaintext->clear();
-    outPlaintext->reserve(1u + 4u + 2u + 16u + 4u + 2u + usernameBytes.size());
-    outPlaintext->push_back(layout.leadingByte);
-    AppendU32LE(outPlaintext, layout.rsaMethod);
-    AppendU16LE(outPlaintext, layout.someShort);
-    outPlaintext->insert(
-        outPlaintext->end(),
-        effectiveTwofishKey.begin(),
-        effectiveTwofishKey.end());
-    AppendU32LE(outPlaintext, layout.embeddedTime);
-    AppendU16LE(outPlaintext, static_cast<uint16_t>(lengthField));
-    outPlaintext->insert(
-        outPlaintext->end(),
-        usernameBytes.begin(),
-        usernameBytes.end());
-
-    *outTwofishKey = effectiveTwofishKey;
-    *outUsernameLengthField = static_cast<uint16_t>(lengthField);
-    return true;
-}
-
 // Transitional low-level margin CERT/MS helper note:
 // - wire/crypto shape here is intentionally shared runtime code
 // - evidence source is open server/proxy code, especially:
@@ -104,12 +35,11 @@ bool EncryptMarginPayloadPacket(
     const uint8_t* payloadBytes,
     size_t payloadSize,
     const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket) {
+    std::vector<uint8_t>* outEncryptedPayloadBytes) {
     using namespace internal;
 
-    if (!payloadBytes || payloadSize == 0u || !outPacket || twofishKeyBytes.size() != 16u ||
-        payloadSize > 0xffffu) {
+    if (!payloadBytes || payloadSize == 0u || !outEncryptedPayloadBytes ||
+        twofishKeyBytes.size() != 16u || payloadSize > 0xffffu) {
         return false;
     }
 
@@ -154,11 +84,17 @@ bool EncryptMarginPayloadPacket(
         return false;
     }
 
-    std::vector<uint8_t> encryptedPayload;
-    encryptedPayload.reserve(sizeof(ivBytes) + ciphertextBytes.size());
-    encryptedPayload.insert(encryptedPayload.end(), ivBytes, ivBytes + sizeof(ivBytes));
-    encryptedPayload.insert(encryptedPayload.end(), ciphertextBytes.begin(), ciphertextBytes.end());
-    return BuildVariableLengthPacket(encryptedPayload.data(), encryptedPayload.size(), frameMode, outPacket);
+    outEncryptedPayloadBytes->clear();
+    outEncryptedPayloadBytes->reserve(sizeof(ivBytes) + ciphertextBytes.size());
+    outEncryptedPayloadBytes->insert(
+        outEncryptedPayloadBytes->end(),
+        ivBytes,
+        ivBytes + sizeof(ivBytes));
+    outEncryptedPayloadBytes->insert(
+        outEncryptedPayloadBytes->end(),
+        ciphertextBytes.begin(),
+        ciphertextBytes.end());
+    return true;
 }
 
 bool DecryptMarginPayloadPacket(

@@ -1700,7 +1700,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     return kAuthBootstrap680InboundUnhandled;
                 }
 
-                mxo::auth::AuthChallengeResponseLayout layout;
                 std::vector<uint8_t> decryptedChallengeBytes;
                 std::vector<uint8_t> processedChallengeMd5Bytes;
                 std::vector<uint8_t> plaintextBytes;
@@ -1746,16 +1745,25 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     challengeMd5.Final(processedChallengeMd5Bytes.data());
                 }
 
+                // anchor: launcher.exe:0x44831c..0x448467
+                // Ghidra confirms the raw 0x0a path constructs a real
+                // `Packet_AsAuthChallengeResponse_0x4b6cf4` inline and then calls its small field
+                // appenders directly:
+                // - `0x444040` appends password string
+                // - `0x444140` appends secondary/station string
+                // - `0x4441a0(0x20)` writes the fixed little-endian word 0x0020
+                // - `0x443660(0x20 - (payloadLen & 0x0f))` appends zero padding
+                // So the old source-owned `AuthChallengeResponseLayout` knob bag was an infidel.
+                static constexpr uint8_t kAuthChallengeResponseLeadingByte = 0x00;
+                static constexpr uint16_t kAuthChallengeResponseUnknown1 = 23;
+                static constexpr uint8_t kAuthChallengeResponsePaddingByte = 0x00;
+
                 std::vector<uint8_t> passwordBytes(password, password + std::strlen(password));
-                if (layout.includePasswordNullTerminator) {
-                    passwordBytes.push_back(0u);
-                }
+                passwordBytes.push_back(0u);
                 std::vector<uint8_t> soePasswordBytes(
                     soePassword,
                     soePassword + std::strlen(soePassword));
-                if (layout.includeSoePasswordNullTerminator) {
-                    soePasswordBytes.push_back(0u);
-                }
+                soePasswordBytes.push_back(0u);
                 if (passwordBytes.size() > 0xffffu || soePasswordBytes.size() > 0xffffu) {
                     spdlog::error("launcher-owned auth rejected oversized raw0x0a password field");
                     return kAuthBootstrap680InboundUnhandled;
@@ -1763,12 +1771,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
                 const uint16_t passwordLengthField = static_cast<uint16_t>(passwordBytes.size());
                 const uint16_t soePasswordLengthField = static_cast<uint16_t>(soePasswordBytes.size());
-                const uint16_t unknown2 = layout.usePasswordLengthForUnknown2
-                    ? passwordLengthField
-                    : layout.unknown2;
-                const uint16_t unknown3 = layout.useSoePasswordLengthForUnknown3
-                    ? soePasswordLengthField
-                    : layout.unknown3;
 
                 const size_t plaintextSizeWithoutPadding =
                     1u +
@@ -1781,14 +1783,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
 
                 plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
-                plaintextBytes.push_back(layout.plaintextLeadingByte);
+                plaintextBytes.push_back(kAuthChallengeResponseLeadingByte);
                 plaintextBytes.insert(
                     plaintextBytes.end(),
                     processedChallengeMd5Bytes.begin(),
                     processedChallengeMd5Bytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, layout.unknown1);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, unknown2);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, unknown3);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, kAuthChallengeResponseUnknown1);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
                 mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
                 plaintextBytes.insert(
                     plaintextBytes.end(),
@@ -1803,7 +1805,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextBytes.insert(
                     plaintextBytes.end(),
                     paddingLengthField,
-                    layout.paddingByte);
+                    kAuthChallengeResponsePaddingByte);
 
                 if ((plaintextBytes.size() % 16u) != 0u) {
                     spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
@@ -2143,12 +2145,14 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
         getPublicKeyRequestPayload + Packet_AsGetPublicKeyRequest_0x4b6c74::kCurrentPublicKeyIdOffset) =
         currentPublicKeyId9C;
 
-    mxo::auth::FramedPacket packet;
+    std::vector<uint8_t> packetBytes;
+    size_t packetHeaderByteCount = 0u;
     if (!mxo::auth::BuildVariableLengthPacket(
             getPublicKeyRequestPayload,
             Packet_AsGetPublicKeyRequest_0x4b6c74::kFixedByteCount,
             mxo::auth::kFrameModeAuto,
-            &packet)) {
+            &packetBytes,
+            &packetHeaderByteCount)) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth failed to frame Packet_AsGetPublicKeyRequest_0x4b6c74");
         return;
     }
@@ -2160,19 +2164,19 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
     }
 
     auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(sendTarget50);
-    const uint8_t rawCode = packet.payloadBytes.empty() ? 0u : packet.payloadBytes[0];
+    const uint8_t rawCode = getPublicKeyRequestPayload[0];
     const uint32_t sendResult = sendTarget->SendPacket(
-        packet.bytes.data(),
-        static_cast<uint32_t>(packet.bytes.size()),
+        packetBytes.data(),
+        static_cast<uint32_t>(packetBytes.size()),
         nullptr);
     spdlog::info(
         "DIAGNOSTIC: launcher-owned auth send via 0x447eb0 child+0x50->vtable+0x24 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} ensuredLazyPubkeyDatValidatorA4={} childLazyPubkeyDatValidatorA4={} child={} helperOwner={} -> sendResult=0x{:08x}",
         CLTLoginMediator::kMessageAsGetPublicKeyRequest,
         rawCode,
         mxo::auth::AuthOpcodeName(rawCode),
-        packet.headerBytes.size(),
-        packet.payloadBytes.size(),
-        packet.bytes.size(),
+        packetHeaderByteCount,
+        Packet_AsGetPublicKeyRequest_0x4b6c74::kFixedByteCount,
+        packetBytes.size(),
         fmt::ptr(sendTarget50),
         ensuredLazyPubkeyDatValidatorA4 ? 1u : 0u,
         fmt::ptr(lazyPubkeyDatValidatorA4),

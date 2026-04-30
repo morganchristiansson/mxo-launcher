@@ -590,21 +590,20 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     }
 
     if (shouldEncrypt) {
-        mxo::auth::FramedPacket encryptedPacket;
+        std::vector<uint8_t> encryptedPayloadBytes;
         if (!mxo::auth::EncryptMarginPayloadPacket(
                 payloadBytes,
                 payloadByteCount,
                 CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
-                mxo::auth::kFrameModeAuto,
-                &encryptedPacket)) {
+                &encryptedPayloadBytes)) {
             spdlog::debug("TryTransform: EncryptMarginPayloadPacket failed");
             return false;
         }
 
-        spdlog::debug("TryTransform: encrypted output size={}", encryptedPacket.payloadBytes.size());
+        spdlog::debug("TryTransform: encrypted output size={}", encryptedPayloadBytes.size());
         return outputBuffer->SetPayloadBytes(
-            encryptedPacket.payloadBytes.data(),
-            encryptedPacket.payloadBytes.size());
+            encryptedPayloadBytes.data(),
+            encryptedPayloadBytes.size());
     } else {
         // Send unencrypted - copy payload directly
         spdlog::debug("TryTransform: sending unencrypted, output size={}", payloadByteCount);

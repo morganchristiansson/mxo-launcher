@@ -61,52 +61,6 @@ inline void AppendU32LE(std::vector<uint8_t>* outBytes, uint32_t value) {
     outBytes->push_back(static_cast<uint8_t>((value >> 24u) & 0xffu));
 }
 
-inline bool NormalizeFixed16(
-    const std::vector<uint8_t>& source,
-    std::vector<uint8_t>* outBytes) {
-    if (!outBytes) {
-        return false;
-    }
-    if (!source.empty() && source.size() != 16u) {
-        return false;
-    }
-
-    outBytes->assign(16u, 0u);
-    if (!source.empty()) {
-        std::memcpy(outBytes->data(), source.data(), 16u);
-    }
-    return true;
-}
-
-inline bool BuildDefaultAuthHeaderBytes(
-    const AuthRequestLayout& requestLayout,
-    std::vector<uint8_t>* outHeaderBytes,
-    std::vector<uint8_t>* outKeyConfigBytes,
-    std::vector<uint8_t>* outUiConfigBytes) {
-    if (!outHeaderBytes || !outKeyConfigBytes || !outUiConfigBytes) {
-        return false;
-    }
-
-    if (!NormalizeFixed16(requestLayout.keyConfigMd5, outKeyConfigBytes) ||
-        !NormalizeFixed16(requestLayout.uiConfigMd5, outUiConfigBytes)) {
-        return false;
-    }
-
-    outHeaderBytes->clear();
-    outHeaderBytes->reserve(35u);
-    outHeaderBytes->push_back(requestLayout.loginType);
-    AppendU16LE(outHeaderBytes, requestLayout.reservedWord);
-    outHeaderBytes->insert(
-        outHeaderBytes->end(),
-        outKeyConfigBytes->begin(),
-        outKeyConfigBytes->end());
-    outHeaderBytes->insert(
-        outHeaderBytes->end(),
-        outUiConfigBytes->begin(),
-        outUiConfigBytes->end());
-    return outHeaderBytes->size() == 35u;
-}
-
 inline uint32_t CurrentUnixTimeU32() {
     return static_cast<uint32_t>(std::time(NULL));
 }

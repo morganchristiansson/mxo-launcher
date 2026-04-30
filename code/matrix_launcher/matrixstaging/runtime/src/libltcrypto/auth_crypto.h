@@ -1,9 +1,7 @@
 #pragma once
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <vector>
 
 namespace mxo {
@@ -39,71 +37,6 @@ enum FrameMode {
     kFrameModeForceTwoByte = 2,
 };
 
-struct FramedPacket {
-    std::vector<uint8_t> headerBytes;
-    std::vector<uint8_t> payloadBytes;
-    std::vector<uint8_t> bytes;
-};
-
-struct AuthBlobLayout {
-    uint8_t leadingByte;
-    uint32_t rsaMethod;
-    uint16_t someShort;
-    uint32_t embeddedTime;
-    std::vector<uint8_t> twofishKey;
-    bool includeUsernameNullTerminator;
-    int usernameLengthAdjust;
-
-    AuthBlobLayout()
-        : leadingByte(0x00),
-          rsaMethod(4),
-          someShort(0x001b),
-          embeddedTime(0),
-          includeUsernameNullTerminator(true),
-          usernameLengthAdjust(0) {}
-};
-
-struct AuthRequestLayout {
-    uint32_t publicKeyId;
-    uint8_t loginType;
-    uint16_t reservedWord;
-    std::vector<uint8_t> keyConfigMd5;
-    std::vector<uint8_t> uiConfigMd5;
-    std::vector<uint8_t> fixedHeaderBytes;
-    std::vector<uint8_t> rsaModulusBytes;
-    std::vector<uint8_t> rsaExponentBytes;
-
-    AuthRequestLayout()
-        : publicKeyId(0),
-          loginType(1),
-          reservedWord(0) {}
-};
-
-struct AuthChallengeResponseLayout {
-    uint16_t packetSomeShort;
-    uint8_t plaintextLeadingByte;
-    uint16_t unknown1;
-    uint16_t unknown2;
-    uint16_t unknown3;
-    bool usePasswordLengthForUnknown2;
-    bool useSoePasswordLengthForUnknown3;
-    bool includePasswordNullTerminator;
-    bool includeSoePasswordNullTerminator;
-    uint8_t paddingByte;
-
-    AuthChallengeResponseLayout()
-        : packetSomeShort(0x001b),
-          plaintextLeadingByte(0x00),
-          unknown1(23),
-          unknown2(0),
-          unknown3(0),
-          usePasswordLengthForUnknown2(true),
-          useSoePasswordLengthForUnknown3(true),
-          includePasswordNullTerminator(true),
-          includeSoePasswordNullTerminator(true),
-          paddingByte(0x00) {}
-};
-
 // String/diagnostic helper anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
@@ -122,7 +55,8 @@ bool BuildVariableLengthPacket(
     const uint8_t* payload,
     size_t payloadSize,
     FrameMode mode,
-    FramedPacket* outPacket);
+    std::vector<uint8_t>* outPacketBytes,
+    size_t* outHeaderByteCount = nullptr);
 
 // Transitional low-level margin CERT/MS bootstrap helpers.
 // These stay in the shared crypto layer because they model reusable wire/crypto behavior backed by
@@ -132,33 +66,6 @@ bool BuildVariableLengthPacket(
 // They are not a claim that final launcher-owned state progression/source ownership should live
 // here permanently.
 
-struct MarginConnectReply {
-    bool valid;
-    std::vector<uint8_t> headerBytes;
-    std::vector<uint8_t> payloadBytes;
-    std::vector<uint8_t> bytes;
-    std::vector<uint8_t> encryptedPayloadBytes;
-    uint32_t status0;
-    uint32_t status1;
-    uint32_t sessionId;
-    uint16_t field0d;
-    uint16_t field0f;
-    uint16_t field11;
-    uint16_t field13;
-    uint16_t field15;
-
-    MarginConnectReply()
-        : valid(false),
-          status0(0),
-          status1(0),
-          sessionId(0),
-          field0d(0),
-          field0f(0),
-          field11(0),
-          field13(0),
-          field15(0) {}
-};
-
 // Generic encrypted margin payload wrapper used by MS bootstrap packets and later margin traffic.
 // Wire shape follows the open-server `EncryptedPacket` helper: random IV + Twofish-CBC ciphertext
 // over `[crc32][u16 length][u32 timestamp][payload]`.
@@ -166,8 +73,7 @@ bool EncryptMarginPayloadPacket(
     const uint8_t* payloadBytes,
     size_t payloadSize,
     const std::vector<uint8_t>& twofishKeyBytes,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
+    std::vector<uint8_t>* outEncryptedPayloadBytes);
 
 bool DecryptMarginPayloadPacket(
     const uint8_t* encryptedPayloadBytes,
