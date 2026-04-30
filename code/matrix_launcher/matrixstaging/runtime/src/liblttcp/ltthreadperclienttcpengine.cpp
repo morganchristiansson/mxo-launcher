@@ -2157,25 +2157,6 @@ static CompletedOperationDispatchTarget ResolveCompletedOperationDispatchTarget(
     return target;
 }
 
-// UNANCHORED internal helper isolating the replacement-only same-worker close self-dispatch seam.
-static bool HandleSameWorkerThreadCloseSelfDispatchScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768* engine,
-    void* queuedContext,
-    CBaseConnection* queuedBaseConnection,
-    void* workItem,
-    bool shouldAutoReleaseContext) {
-    if (queuedContext) {
-        QueuedConnection_OnOperationCompleted(queuedContext, queuedBaseConnection, workItem);
-    }
-    if (shouldAutoReleaseContext) {
-        QueuedConnection_ReleaseAfterType1(queuedContext, queuedBaseConnection);
-    }
-    QueueWorkItem_Release(workItem);
-    if (queuedContext) {
-        engine->CleanupConnection(queuedContext);
-    }
-    return true;
-}
 
 // Keep the implementation intentionally conservative.
 // These methods currently provide original-name structure and evidence-backed state
@@ -3340,35 +3321,17 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const CompletedOperationDispatchTarget dispatchTarget =
             ResolveCompletedOperationDispatchTarget(this, context);
         CBaseConnection* queuedBaseConnection = dispatchTarget.baseConnection;
-        CLTTCPConnection* queuedConnection = dispatchTarget.tcpConnection;
         const bool shouldAutoReleaseContext =
             isType1 && QueuedConnection_ShouldAutoReleaseAfterType1(context, queuedBaseConnection);
-        const bool detectedSameWorkerThreadCloseSelfDispatch =
-            isType1 && queuedConnection != nullptr && queuedConnection->WorkerThreadScaffold() != nullptr &&
-            queuedConnection->WorkerThreadScaffold()->IsCurrentThread();
-        const bool sameWorkerThreadCloseSelfDispatch =
-            isType1 && (preferType1CallbackBeforeCleanup || detectedSameWorkerThreadCloseSelfDispatch);
 
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} preferType1CallbackBeforeCleanup={} detectedSameWorkerThreadCloseSelfDispatch={} sameWorkerThreadCloseSelfDispatch={}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} preferType1CallbackBeforeCleanup={}",
             (selectedQueue == ActiveQueue34Scaffold()) ? "queue34" : "queue0C",
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),
             shouldAutoReleaseContext ? 1u : 0u,
-            preferType1CallbackBeforeCleanup ? 1u : 0u,
-            detectedSameWorkerThreadCloseSelfDispatch ? 1u : 0u,
-            sameWorkerThreadCloseSelfDispatch ? 1u : 0u);
-
-        if (sameWorkerThreadCloseSelfDispatch) {
-            (void)HandleSameWorkerThreadCloseSelfDispatchScaffold(
-                this,
-                context,
-                queuedBaseConnection,
-                workItem,
-                shouldAutoReleaseContext);
-            return;
-        }
+            preferType1CallbackBeforeCleanup ? 1u : 0u);
 
         if (context && isType1) {
             CleanupConnection(context);
