@@ -871,16 +871,6 @@ CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
     return self;
 }
 
-// UNANCHORED internal helper used by the current thread-object scaffolds.
-static void CloseSocketHandle(uint32_t* socketHandle) {
-    if (!socketHandle || *socketHandle == kInvalidSocketHandle) {
-        return;
-    }
-
-    closesocket(static_cast<SOCKET>(*socketHandle));
-    *socketHandle = kInvalidSocketHandle;
-}
-
 // UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
 static void QueueRecycleBlockScaffold(
     CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue,
@@ -1305,7 +1295,10 @@ CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread::CLTThreadPerClientTCPEngine_0
 
 // anchor: launcher.exe:0x431b30 deleting wrapper / +0x40 wakeup helper teardown
 CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread::~CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread() {
-    CloseSocketHandle(&wakeupSocketHandle_);
+    if (wakeupSocketHandle_ != kInvalidSocketHandle) {
+        closesocket(static_cast<SOCKET>(wakeupSocketHandle_));
+        wakeupSocketHandle_ = kInvalidSocketHandle;
+    }
 }
 
 // UNANCHORED: scaffold accessor for recovered child +0x38 owner/context field
@@ -1320,7 +1313,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread::WakeupSocketHandle()
 
 // UNANCHORED: source-owned bridge for the original external closesocket([payload+0x3c]) seam.
 void CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread::CloseListenSocketScaffold() {
-    CloseSocketHandle(&listenSocketHandle_);
+    if (listenSocketHandle_ != kInvalidSocketHandle) {
+        closesocket(static_cast<SOCKET>(listenSocketHandle_));
+        listenSocketHandle_ = kInvalidSocketHandle;
+    }
 }
 
 // anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
@@ -1346,7 +1342,10 @@ CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::CLTThreadPerClientTCPEngine_0
 
 // anchor: launcher.exe:0x431be0 deleting wrapper / +0x40 wakeup helper teardown
 CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::~CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread() {
-    CloseSocketHandle(&wakeupSocketHandle_);
+    if (wakeupSocketHandle_ != kInvalidSocketHandle) {
+        closesocket(static_cast<SOCKET>(wakeupSocketHandle_));
+        wakeupSocketHandle_ = kInvalidSocketHandle;
+    }
 }
 
 // UNANCHORED: scaffold accessor for recovered child +0x38 context/connection key field
@@ -1928,10 +1927,8 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
     return true;
 }
 
-// UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best anchor for the type read itself is launcher helper 0x4816f0,
-// which returns [workItem+0x04]. We model that as a documented header view rather than
-// open-coded pointer arithmetic.
+// anchor: launcher.exe:0x4816f0
+// Helper reads `[workItem+0x04]`.
 static uint32_t QueueWorkItem_GetType(const void* workItem) {
     if (!workItem) {
         return 0;
@@ -1939,122 +1936,6 @@ static uint32_t QueueWorkItem_GetType(const void* workItem) {
     const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader* header =
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     return header->workType;
-}
-
-// UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best consumer anchor is the trailing work-item release in 0x436d31..0x436ee7.
-static void QueueWorkItem_Release(void* workItem) {
-    if (!workItem) {
-        return;
-    }
-
-    void** vtable = *reinterpret_cast<void***>(workItem);
-    if (!vtable || !vtable[1]) {
-        return;
-    }
-
-    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-    (void)fn(workItem);
-}
-
-// UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best consumer anchor is context->+0x10(workItem) in 0x436d31..0x436ee7.
-// Active source may dequeue either the direct connection object or the explicit queue-dispatch ABI
-// adapter used when raw client.dll consumers are still on the path.
-static void QueuedConnection_OnOperationCompleted(
-    void* queuedContext,
-    CBaseConnection* queuedConnection,
-    void* workItem) {
-    if (queuedConnection) {
-        (void)queuedConnection->OnOperationCompleted(workItem);
-        return;
-    }
-
-    if (!queuedContext) {
-        return;
-    }
-
-    void** vtable = *reinterpret_cast<void***>(queuedContext);
-    if (!vtable || !vtable[4]) {
-        return;
-    }
-
-    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
-    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-    (void)fn(queuedContext, workItem);
-}
-
-// UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best consumer anchor is the `(char)context[1]` test in 0x436d31..0x436ee7`.
-static bool QueuedConnection_ShouldAutoReleaseAfterType1(
-    void* queuedContext,
-    const CBaseConnection* queuedConnection) {
-    if (CBaseConnection_QueueContextScaffold* queueContext =
-            static_cast<CBaseConnection_QueueContextScaffold*>(queuedContext);
-        queueContext != nullptr &&
-        CBaseConnection_FromQueueContextScaffold(queuedContext) != nullptr) {
-        return queueContext->autoReleaseFlag != 0u;
-    }
-    return queuedConnection != nullptr && queuedConnection->AutoReleaseFlag04() != 0u;
-}
-
-// UNANCHORED internal helper for the current source-side consumer scaffold.
-// Adapter contexts still expose a source-owned release bridge at slot `+0x04`; direct connection
-// objects keep the recovered base `+0x04` flag modeled but do not yet have a recovered release
-// target on an active path.
-static void QueuedConnection_ReleaseAfterType1(
-    void* queuedContext,
-    CBaseConnection* queuedConnection) {
-    if (CBaseConnection_QueueContextScaffold* queueContext =
-            static_cast<CBaseConnection_QueueContextScaffold*>(queuedContext);
-        queueContext != nullptr &&
-        CBaseConnection_FromQueueContextScaffold(queuedContext) != nullptr) {
-        void** vtable = *reinterpret_cast<void***>(queueContext);
-        if (!vtable || !vtable[1]) {
-            return;
-        }
-
-        typedef uint32_t (__thiscall *ReleaseFn)(void*);
-        ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-        (void)fn(queueContext);
-        return;
-    }
-
-    if (!queuedConnection || queuedConnection->AutoReleaseFlag04() == 0u) {
-        return;
-    }
-
-    spdlog::warn(
-        "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
-        fmt::ptr(queuedConnection));
-}
-
-struct CompletedOperationDispatchTarget {
-    CBaseConnection* baseConnection = nullptr;
-    CLTTCPConnection* tcpConnection = nullptr;
-};
-
-// UNANCHORED internal helper for the current source-side consumer scaffold.
-static CompletedOperationDispatchTarget ResolveCompletedOperationDispatchTarget(
-    CLTThreadPerClientTCPEngine_0x4b2768* engine,
-    void* queuedContext) {
-    CompletedOperationDispatchTarget target = {};
-    if (!queuedContext) {
-        return target;
-    }
-
-    if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(queuedContext)) {
-        target.baseConnection = completionTarget;
-        target.tcpConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
-        return target;
-    }
-
-    if (CMessageConnection_0x4b7928* directConnection = engine->FindMessageConnection(queuedContext)) {
-        target.baseConnection = directConnection;
-        target.tcpConnection = dynamic_cast<CLTTCPConnection*>(directConnection);
-    }
-    return target;
 }
 
 
@@ -2279,13 +2160,19 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
             ownerContext);
     if (!acceptThread) {
         uint32_t socketHandleToClose = listenSocketHandle;
-        CloseSocketHandle(&socketHandleToClose);
+        if (socketHandleToClose != kInvalidSocketHandle) {
+            closesocket(static_cast<SOCKET>(socketHandleToClose));
+            socketHandleToClose = kInvalidSocketHandle;
+        }
         (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
         return 1u;
     }
     if (!EndpointTreeAttachPayload(this, node, std::move(acceptThread))) {
         uint32_t socketHandleToClose = listenSocketHandle;
-        CloseSocketHandle(&socketHandleToClose);
+        if (socketHandleToClose != kInvalidSocketHandle) {
+            closesocket(static_cast<SOCKET>(socketHandleToClose));
+            socketHandleToClose = kInvalidSocketHandle;
+        }
         (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
         return 1u;
     }
@@ -2339,7 +2226,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostO
         /*startThread=*/false);
     if (!worker) {
         uint32_t socketHandleToClose = socketHandle;
-        CloseSocketHandle(&socketHandleToClose);
+        if (socketHandleToClose != kInvalidSocketHandle) {
+            closesocket(static_cast<SOCKET>(socketHandleToClose));
+            socketHandleToClose = kInvalidSocketHandle;
+        }
         connection->SetSocketHandle(kInvalidSocketHandle);
         return 1u;
     }
@@ -2486,7 +2376,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             reinterpret_cast<const sockaddr*>(&localBindAddress),
             sizeof(localBindAddress)) == SOCKET_ERROR) {
         const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
-        CloseSocketHandle(&socketHandle);
+        if (socketHandle != kInvalidSocketHandle) {
+            closesocket(static_cast<SOCKET>(socketHandle));
+            socketHandle = kInvalidSocketHandle;
+        }
         connection->SetSocketHandle(socketHandle);
         spdlog::info(
             "CLTThreadPerClientTCPEngine_0x4b2768::Connect bind failed connection={} port={} ip=0x{:08x} wsaError={} ({})",
@@ -2519,7 +2412,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             sizeof(remoteSocketAddress)) == SOCKET_ERROR) {
         const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
         if (wsaError != WSAEWOULDBLOCK) {
-            CloseSocketHandle(&socketHandle);
+            if (socketHandle != kInvalidSocketHandle) {
+                closesocket(static_cast<SOCKET>(socketHandle));
+                socketHandle = kInvalidSocketHandle;
+            }
             connection->SetSocketHandle(socketHandle);
             spdlog::info(
                 "CLTThreadPerClientTCPEngine_0x4b2768::Connect connect failed connection={} port={} ip=0x{:08x} wsaError={} ({})",
@@ -2560,7 +2456,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     if (!workerThread) {
         // UNANCHORED bounded source-side guard: current `0x431ff0` mirror can still fail or
         // deduplicate, while launcher.exe `0x4328a0` uses the returned worker directly.
-        CloseSocketHandle(&socketHandle);
+        if (socketHandle != kInvalidSocketHandle) {
+            closesocket(static_cast<SOCKET>(socketHandle));
+            socketHandle = kInvalidSocketHandle;
+        }
         connection->SetSocketHandle(socketHandle);
         spdlog::info(
             "CLTThreadPerClientTCPEngine_0x4b2768::Connect worker creation failed connection={} port={} ip=0x{:08x}",
@@ -3251,11 +3150,26 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
 
-        const CompletedOperationDispatchTarget dispatchTarget =
-            ResolveCompletedOperationDispatchTarget(this, context);
-        CBaseConnection* queuedBaseConnection = dispatchTarget.baseConnection;
+        CBaseConnection* queuedBaseConnection = nullptr;
+        if (context) {
+            if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
+                queuedBaseConnection = completionTarget;
+            } else if (CMessageConnection_0x4b7928* directConnection = FindMessageConnection(context)) {
+                queuedBaseConnection = directConnection;
+            }
+        }
         const bool shouldAutoReleaseContext =
-            isType1 && QueuedConnection_ShouldAutoReleaseAfterType1(context, queuedBaseConnection);
+            isType1 && ((CBaseConnection_QueueContextScaffold*)context != nullptr) &&
+            ((CBaseConnection_QueueContextScaffold*)context != nullptr) &&
+            ([&]() {
+                if (CBaseConnection_QueueContextScaffold* queueContext =
+                        static_cast<CBaseConnection_QueueContextScaffold*>(context);
+                    queueContext != nullptr &&
+                    CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
+                    return queueContext->autoReleaseFlag != 0u;
+                }
+                return queuedBaseConnection != nullptr && queuedBaseConnection->AutoReleaseFlag04() != 0u;
+            })();
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} preferType1CallbackBeforeCleanup={}",
@@ -3271,13 +3185,41 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         }
 
         if (context) {
-            QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
+            if (queuedBaseConnection) {
+                (void)queuedBaseConnection->OnOperationCompleted(workItem);
+            } else {
+                void** vtable = *reinterpret_cast<void***>(context);
+                if (vtable && vtable[4]) {
+                    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
+                    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
+                    (void)fn(context, workItem);
+                }
+            }
         }
 
         if (shouldAutoReleaseContext) {
-            QueuedConnection_ReleaseAfterType1(context, queuedBaseConnection);
+            if (CBaseConnection_QueueContextScaffold* queueContext =
+                    static_cast<CBaseConnection_QueueContextScaffold*>(context);
+                queueContext != nullptr &&
+                CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
+                void** vtable = *reinterpret_cast<void***>(queueContext);
+                if (vtable && vtable[1]) {
+                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+                    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+                    (void)fn(queueContext);
+                }
+            } else if (queuedBaseConnection && queuedBaseConnection->AutoReleaseFlag04() != 0u) {
+                spdlog::warn(
+                    "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
+                    fmt::ptr(queuedBaseConnection));
+            }
         }
-        QueueWorkItem_Release(workItem);
+        void** workItemVtable = *reinterpret_cast<void***>(workItem);
+        if (workItemVtable && workItemVtable[1]) {
+            typedef uint32_t (__thiscall *ReleaseFn)(void*);
+            ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
+            (void)fn(workItem);
+        }
     }
 }
 
@@ -3293,19 +3235,51 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
-                const CompletedOperationDispatchTarget dispatchTarget =
-                    ResolveCompletedOperationDispatchTarget(this, context);
+                CBaseConnection* queuedBaseConnection = nullptr;
+                if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
+                    queuedBaseConnection = completionTarget;
+                } else if (CMessageConnection_0x4b7928* directConnection = FindMessageConnection(context)) {
+                    queuedBaseConnection = directConnection;
+                }
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }
-                if (dispatchTarget.baseConnection != nullptr) {
-                    QueuedConnection_OnOperationCompleted(context, dispatchTarget.baseConnection, workItem);
-                    if (workType == kWorkTypeClose &&
-                        QueuedConnection_ShouldAutoReleaseAfterType1(context, dispatchTarget.baseConnection)) {
-                        QueuedConnection_ReleaseAfterType1(context, dispatchTarget.baseConnection);
+                if (queuedBaseConnection != nullptr) {
+                    (void)queuedBaseConnection->OnOperationCompleted(workItem);
+                    const bool shouldAutoReleaseContext =
+                        workType == kWorkTypeClose && ([&]() {
+                            if (CBaseConnection_QueueContextScaffold* queueContext =
+                                    static_cast<CBaseConnection_QueueContextScaffold*>(context);
+                                queueContext != nullptr &&
+                                CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
+                                return queueContext->autoReleaseFlag != 0u;
+                            }
+                            return queuedBaseConnection->AutoReleaseFlag04() != 0u;
+                        })();
+                    if (shouldAutoReleaseContext) {
+                        if (CBaseConnection_QueueContextScaffold* queueContext =
+                                static_cast<CBaseConnection_QueueContextScaffold*>(context);
+                            queueContext != nullptr &&
+                            CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
+                            void** vtable = *reinterpret_cast<void***>(queueContext);
+                            if (vtable && vtable[1]) {
+                                typedef uint32_t (__thiscall *ReleaseFn)(void*);
+                                ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+                                (void)fn(queueContext);
+                            }
+                        } else {
+                            spdlog::warn(
+                                "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
+                                fmt::ptr(queuedBaseConnection));
+                        }
                     }
                 }
-                QueueWorkItem_Release(workItem);
+                void** workItemVtable = *reinterpret_cast<void***>(workItem);
+                if (workItemVtable && workItemVtable[1]) {
+                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+                    ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
+                    (void)fn(workItem);
+                }
             }
         }
         return;
