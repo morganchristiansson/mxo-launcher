@@ -436,6 +436,13 @@ public:
 // Margin opcode 0x0c (0x4d) = MS_CreateCharacterRequest (used by state11)
 class Packet_MsCreateCharacterRequest_0x4b53c8 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+    Packet_MsCreateCharacterRequest_0x4b53c8() = default;
+
+    // anchor: launcher.exe:0x43a330
+    Packet_MsCreateCharacterRequest_0x4b53c8(
+        ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
+        char resolveFieldsNow);
+
     // anchor: launcher.exe:0x43a470
     void ResetAndInitialize() {
         if (!messageRef08) {
@@ -467,6 +474,20 @@ public:
         ClearReservation(background24_);
         ClearReservation(gameSessionId2c_);
     }
+
+    // anchor: launcher.exe:0x43a2d0 / shared vtable family parse refresh used by state10
+    void InitializePayloadSize() override;
+
+    // anchor: launcher.exe:0x43a2d0
+    void ResolveFields(char resolveFieldsNow);
+
+    bool valid = false;
+    uint32_t status = 0;
+    uint32_t characterIdLow = 0;
+    uint32_t characterIdHigh = 0;
+    uint16_t optionalTextOffset01 = 0;
+    const char* optionalText = nullptr;
+    uint16_t optionalTextLength = 0;
 
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold realFirstName14_{};
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold realLastName1c_{};

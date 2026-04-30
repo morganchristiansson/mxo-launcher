@@ -623,52 +623,6 @@ inline uint32_t ReadU32LE(const uint8_t* p) {
            (static_cast<uint32_t>(p[3]) << 24);
 }
 
-// anchor: launcher.exe:0x4b53c8
-class State10ClaimCharacterNameReplyParseObject_0x4b53c8 : public mxo::liblttcp::Packet_0x4af2a4 {
-public:
-    // anchor: launcher.exe:0x43a330
-    State10ClaimCharacterNameReplyParseObject_0x4b53c8(
-        mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
-        char resolveFieldsNow);
-
-    ~State10ClaimCharacterNameReplyParseObject_0x4b53c8() override = default;
-
-    // anchor: launcher.exe:0x43a2d0
-    void InitializePayloadSize() override;
-
-    // anchor: launcher.exe:0x43a2d0
-    void ResolveFields(char resolveFieldsNow);
-
-    bool valid = false;
-    uint32_t status = 0;
-    uint32_t characterIdLow = 0;
-    uint32_t characterIdHigh = 0;
-    uint16_t optionalTextOffset01 = 0;
-    const char* optionalText = nullptr;
-    uint16_t optionalTextLength = 0;
-
-private:
-    uint8_t* messageBase04() const {
-        return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(payloadPtr04));
-    }
-
-    void setMessageBase04(uint8_t* messageBase) {
-        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(messageBase));
-    }
-
-    uint8_t* currentMessage10() const {
-        return static_cast<uint8_t*>(payloadAlias10);
-    }
-
-    void setCurrentMessage10(uint8_t* currentMessage) {
-        payloadAlias10 = currentMessage;
-    }
-
-    void setOptionalText14(const char* text) {
-        debugString14 = text;
-    }
-};
-
 // anchor: launcher.exe:0x4b542c
 class Packet_MsLoadCharacterReply_0x4b542c : public mxo::liblttcp::Packet_0x4af2a4 {
 public:

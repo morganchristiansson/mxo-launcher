@@ -203,10 +203,10 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot9_IsNetworkDriven() const {
     return 0;
 }
 
-// Implementation of State10ClaimCharacterNameReplyParseObject_0x4b53c8
+// Implementation of Packet_MsCreateCharacterRequest_0x4b53c8 shared parse/builder family
 
 // anchor: launcher.exe:0x43a330
-State10ClaimCharacterNameReplyParseObject_0x4b53c8::State10ClaimCharacterNameReplyParseObject_0x4b53c8(
+Packet_MsCreateCharacterRequest_0x4b53c8::Packet_MsCreateCharacterRequest_0x4b53c8(
     mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingMessageRef,
     char resolveFieldsNow) {
     messageRef08 = incomingMessageRef;
@@ -215,81 +215,88 @@ State10ClaimCharacterNameReplyParseObject_0x4b53c8::State10ClaimCharacterNameRep
     }
 
     if (incomingMessageRef != nullptr && incomingMessageRef->headerless10 == 0) {
-        setMessageBase04(incomingMessageRef->messageStorage0c
-            ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
-            : nullptr);
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+            incomingMessageRef->messageStorage0c
+                ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
+                : nullptr));
     } else if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c != nullptr) {
         uint8_t* const payloadBase = incomingMessageRef->messageStorage0c->payloadBytes0c.data();
         const uint8_t encodedHeaderByte = payloadBase[0x01u];
         const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
         const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
-        setMessageBase04(payloadBase + lookupHigh + lookupLow + 0x12u);
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+            payloadBase + lookupHigh + lookupLow + 0x12u));
         incomingMessageRef->headerless10 = 1;
     } else {
-        setMessageBase04(nullptr);
+        payloadPtr04 = 0u;
     }
 
     createRefParam0c = static_cast<uint8_t>(resolveFieldsNow != 0);
     ResolveFields(resolveFieldsNow);
     if (resolveFieldsNow == '\0') {
-        if (currentMessage10() == nullptr) {
+        if (payloadAlias10 == nullptr) {
             valid = false;
             status = 0u;
             characterIdLow = 0u;
             characterIdHigh = 0u;
             optionalTextOffset01 = 0u;
-            setOptionalText14(nullptr);
+            debugString14 = nullptr;
             payloadSize18 = 0u;
             return;
         }
-        currentMessage10()[0x00] = 0x0bu;
-        *reinterpret_cast<uint16_t*>(currentMessage10() + 0x01u) = 0u;
-        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x03u) = 0u;
-        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x07u) = 0u;
-        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x0bu) = 0u;
+        uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+        currentMessage[0x00] = 0x0bu;
+        *reinterpret_cast<uint16_t*>(currentMessage + 0x01u) = 0u;
+        *reinterpret_cast<uint32_t*>(currentMessage + 0x03u) = 0u;
+        *reinterpret_cast<uint32_t*>(currentMessage + 0x07u) = 0u;
+        *reinterpret_cast<uint32_t*>(currentMessage + 0x0bu) = 0u;
     }
 
-    valid = currentMessage10() != nullptr;
+    valid = payloadAlias10 != nullptr;
     if (!valid) {
         return;
     }
 
-    if (currentMessage10()[0] != 0x0bu) {
+    uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+    if (currentMessage[0] != 0x0bu) {
         valid = false;
         return;
     }
 
-    optionalTextOffset01 = ReadU16LE(currentMessage10() + 0x01u);
-    status = ReadU32LE(currentMessage10() + 0x03u);
-    characterIdLow = ReadU32LE(currentMessage10() + 0x07u);
-    characterIdHigh = ReadU32LE(currentMessage10() + 0x0bu);
+    optionalTextOffset01 = ReadU16LE(currentMessage + 0x01u);
+    status = ReadU32LE(currentMessage + 0x03u);
+    characterIdLow = ReadU32LE(currentMessage + 0x07u);
+    characterIdHigh = ReadU32LE(currentMessage + 0x0bu);
     optionalText = reinterpret_cast<const char*>(debugString14);
     optionalTextLength = payloadSize18;
 }
 
 // anchor: launcher.exe:0x43a2d0
-void State10ClaimCharacterNameReplyParseObject_0x4b53c8::InitializePayloadSize() {
+void Packet_MsCreateCharacterRequest_0x4b53c8::InitializePayloadSize() {
     ResolveFields(static_cast<char>(createRefParam0c));
 }
 
 // anchor: launcher.exe:0x43a2d0
-void State10ClaimCharacterNameReplyParseObject_0x4b53c8::ResolveFields(char resolveFieldsNow) {
-    setCurrentMessage10(messageBase04());
+void Packet_MsCreateCharacterRequest_0x4b53c8::ResolveFields(char resolveFieldsNow) {
+    payloadAlias10 = reinterpret_cast<void*>(static_cast<uintptr_t>(payloadPtr04));
     if (resolveFieldsNow == '\0') {
         if (messageRef08 != nullptr) {
             messageRef08->GrowPayloadByteCount(0x0fu);
             if (messageRef08->messageStorage0c != nullptr) {
-                setMessageBase04(messageRef08->messageStorage0c->payloadBytes0c.data());
-                setCurrentMessage10(messageBase04());
+                payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+                    messageRef08->messageStorage0c->payloadBytes0c.data()));
+                payloadAlias10 = reinterpret_cast<void*>(static_cast<uintptr_t>(payloadPtr04));
             }
         }
         return;
     }
 
-    if (currentMessage10() != nullptr && ReadU16LE(currentMessage10() + 0x01u) != 0u) {
-        optionalTextLength = ReadU16LE(currentMessage10() + ReadU16LE(currentMessage10() + 0x01u));
-        uint8_t* const optionalTextBytes = currentMessage10() + ReadU16LE(currentMessage10() + 0x01u) + 2u;
-        setOptionalText14(reinterpret_cast<const char*>(optionalTextBytes));
+    uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+    if (currentMessage != nullptr && ReadU16LE(currentMessage + 0x01u) != 0u) {
+        const uint16_t optionalTextOffset = ReadU16LE(currentMessage + 0x01u);
+        optionalTextLength = ReadU16LE(currentMessage + optionalTextOffset);
+        uint8_t* const optionalTextBytes = currentMessage + optionalTextOffset + 2u;
+        debugString14 = reinterpret_cast<const char*>(optionalTextBytes);
         payloadSize18 = optionalTextLength;
         if (optionalTextLength != 0u) {
             optionalTextBytes[optionalTextLength - 1u] = 0;
@@ -299,7 +306,7 @@ void State10ClaimCharacterNameReplyParseObject_0x4b53c8::ResolveFields(char reso
 
     optionalTextLength = 0u;
     payloadSize18 = 0u;
-    setOptionalText14(nullptr);
+    debugString14 = nullptr;
 }
 
 // Implementation of Packet_MsLoadCharacterReply_0x4b542c

@@ -165,7 +165,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // parsing raw payload bytes through an ad-hoc scaffold. Ghidra currently types the object as
     // `Packet_MsCreateCharacter_0x4b53c8 *` at `0x43a330`, but source keeps a distinct class name
     // because the same vtable family is already used by the state11 create-character request builder.
-    State10ClaimCharacterNameReplyParseObject_0x4b53c8 parsed(messageRef, 1);
+    Packet_MsCreateCharacterRequest_0x4b53c8 parsed(messageRef, 1);
     if (!parsed.valid) {
         const uint16_t payloadByteCount = messageRef->PayloadByteCount();
         spdlog::warn(
