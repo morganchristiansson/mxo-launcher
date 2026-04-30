@@ -322,7 +322,7 @@ public:
     // Static-RE now shows this region is just ordinary `CLTLoginMediator` storage, with the
     // canonical state8 persistence object living directly at owner `+0xf1c`.
 
-    class CLTLoginMediatorSelectionRouteState {
+    class CLTLoginMediatorSelectionRouteState_0x41dba0 {
     public:
         struct PersistedSelectionContext64c {
             // owner `+0x64c .. +0x6fb` inside `CLTLoginMediatorSelectionRouteState_0x41dba0`
@@ -341,7 +341,7 @@ public:
         };
 
         // anchor: launcher.exe:0x41dba0 / embedded owner subobject ctor
-        CLTLoginMediatorSelectionRouteState();
+        CLTLoginMediatorSelectionRouteState_0x41dba0();
 
         // anchor: launcher.exe:0x41d270 / embedded owner subobject reset
         void ResetSelectionRouteState();
@@ -867,7 +867,7 @@ public:
     // - original keeps this as one embedded helper spanning count + `+0x688` slot table + `+0x818`
     //   route strings + current-slot byte `+0xcc8` + snapshot body `+0xcd0..+0xd7f`
     // - replacement now models that ownership island as the nested
-    //   `CLTLoginMediatorSelectionRouteState` class and keeps the anchored method boundaries there
+    //   `CLTLoginMediatorSelectionRouteState_0x41dba0` class and keeps the anchored method boundaries there
 
     // =============================================================================
     // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
@@ -1136,7 +1136,7 @@ public:
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
     // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).
-  CLTLoginMediatorSelectionRouteState selectionRouteState684_{};
+  CLTLoginMediatorSelectionRouteState_0x41dba0 selectionRouteState684_{};
     // Canonical owner `+0xf1c` object returned by the original `+0xf4/+0xbc/+0xc0/+0xc4`
     // getter family.
     CLTLoginMediatorCharacterPersistenceData_0x41d900 state8PersistenceDataF1c{}; // anchor: launcher.exe owner `+0xf1c .. +0x146b`

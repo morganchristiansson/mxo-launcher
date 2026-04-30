@@ -49,7 +49,8 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
     const Packet_AsAuthReply_0x4b5328* currentSlotRecord =
         g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
-    const char* sourceBlock94String60Begin = g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
+    const char* sourceBlock94String60Begin =
+        StringBeginOrNull(g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60);
 
     // anchor: launcher.exe:0x43a9a0 = Packet_MsDeleteCharacterRequest_0x4b53f0::ResetAndInitialize
     Packet_MsDeleteCharacterRequest_0x4b53f0 packetBuilder;

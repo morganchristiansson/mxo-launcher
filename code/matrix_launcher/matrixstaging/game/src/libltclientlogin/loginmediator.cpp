@@ -139,7 +139,7 @@ static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
 }  // namespace
 
 // anchor: launcher.exe:0x41dba0 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0 ctor
-CLTLoginMediator::CLTLoginMediatorSelectionRouteState::CLTLoginMediatorSelectionRouteState() {
+CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::CLTLoginMediatorSelectionRouteState_0x41dba0() {
     slotRecordCount00_ = 0;
     for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
         routeHostStrings194_[i].clear();
@@ -153,7 +153,7 @@ CLTLoginMediator::CLTLoginMediatorSelectionRouteState::CLTLoginMediatorSelection
 }
 
 // anchor: launcher.exe:0x41d270 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState
-void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::ResetSelectionRouteState() {
+void CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState() {
     const size_t activeCount = std::min(static_cast<size_t>(slotRecordCount00_), slotRecordTable04_.size());
     for (size_t i = 0; i < activeCount; ++i) {
         slotRecordTable04_[i] = {};
@@ -165,7 +165,7 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::ResetSelectionRouteS
 }
 
 // anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
-void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRouteState() {
+void CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState() {
     ResetSelectionRouteState();
     for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
         StringReleaseStorage(routeHostStrings194_[i]);
@@ -445,16 +445,11 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const SubmitLoginRequestInput_0x4
 
     ownerAuthBootstrapSource94_.CopyFromSubmitLoginRequestInput(input);
 
-    // Fidelity: session token at +0xf4 within owner+0x94 block
-    ownerAuthBootstrapSource94_.sessionToken60.begin = input.submitSessionTokenString.begin;
-    ownerAuthBootstrapSource94_.sessionToken60.current = input.submitSessionTokenString.current;
-    ownerAuthBootstrapSource94_.sessionToken60.capacity = input.submitSessionTokenString.capacity;
-
     spdlog::info(
         "CLTLoginMediator::ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} currentState={} stateCode={} launchPadGateState16State18AltPath={} helper65cPresent={} submitOwnership=owner",
         ownerAuthBootstrapSource94_.username00[0] ? ownerAuthBootstrapSource94_.username00.data() : "<empty>",
         ownerAuthBootstrapSource94_.password20[0] ? ownerAuthBootstrapSource94_.password20.data() : "<empty>",
-        static_cast<unsigned>(ownerAuthBootstrapSource94_.sessionToken60.current - ownerAuthBootstrapSource94_.sessionToken60.begin),
+        static_cast<unsigned>(ownerAuthBootstrapSource94_.sessionToken60.size()),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(stateCode),
         0u,
@@ -482,9 +477,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const SubmitLoginRequestInput_0x4
         // This is the exact favored happy path and keeps submit ownership on the mediator/owner,
         // not on state0.
         // Fidelity: clear session token in owner+0x94 block (as per static-RE 0x41ecd0)
-        ownerAuthBootstrapSource94_.sessionToken60.begin = nullptr;
-        ownerAuthBootstrapSource94_.sessionToken60.current = nullptr;
-        ownerAuthBootstrapSource94_.sessionToken60.capacity = nullptr;
+        ownerAuthBootstrapSource94_.sessionToken60.clear();
         spdlog::info(
             "ROUTE CHECKPOINT: early-auth state0 -> state2 via owner ProcessLoginRequest (favored g_LaunchPadGateState16State18==0 happy path) upstreamState={} clearedOwnerF4=1",
             upstreamState ? upstreamState->DebugName() : "<null>");
@@ -542,11 +535,8 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const SubmitLoginRequestInput_0x4
     }
 
     if (launchPadClient65c_ != nullptr) {
-        const char* helperString = launchPadClient65c_->authConnection18.c_str();
         // Fidelity: refresh session token in owner+0x94 block
-        ownerAuthBootstrapSource94_.sessionToken60.begin = helperString;
-        ownerAuthBootstrapSource94_.sessionToken60.current = helperString + launchPadClient65c_->authConnection18.size();
-        ownerAuthBootstrapSource94_.sessionToken60.capacity = ownerAuthBootstrapSource94_.sessionToken60.current;
+        ownerAuthBootstrapSource94_.sessionToken60 = launchPadClient65c_->authConnection18;
         spdlog::info(
             "CLTLoginMediator::ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch refreshed owner+0xf4 from helper65c string18='{}'",
             launchPadClient65c_->authConnection18.empty() ? "<empty>" : launchPadClient65c_->authConnection18.c_str());
@@ -2136,7 +2126,7 @@ void CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     // our layout is occupied by authConnection_ pointer (CMessageConnection_0x4b7928*). Need Ghidra
     // to confirm if original +0x18 is actually the string or something else.
     // For now, use the best source-side mirror of the data that should be at +0x18.
-    const char* sessionString = ownerAuthBootstrapSource94_.sessionToken60.begin;
+    const char* sessionString = StringBeginOrNull(ownerAuthBootstrapSource94_.sessionToken60);
     if (sessionString == nullptr || sessionString[0] == '\0') {
         // Try fallback: empty string if no session token
         gameSessionId664_.clear();
@@ -2167,8 +2157,8 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
     // - keep this separate from the active state2 -> owner+0x680 bootstrap-child handoff
 
     // Fidelity: read session token from owner+0x94 block
-    if (ownerAuthBootstrapSource94_.sessionToken60.begin != nullptr && ownerAuthBootstrapSource94_.sessionToken60.begin[0] != '\0') {
-        gameSessionId664_ = ownerAuthBootstrapSource94_.sessionToken60.begin;
+    if (!ownerAuthBootstrapSource94_.sessionToken60.empty()) {
+        gameSessionId664_ = ownerAuthBootstrapSource94_.sessionToken60;
     } else {
         gameSessionId664_.clear();
     }
