@@ -237,17 +237,7 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
     void* priorList8C = owner->list8C;
 
     LauncherObjectAbiAttachment attachment = {};
-    attachment.field04CtorFlags = &owner->field04;
-    attachment.field08QueueThreadArray = &owner->field08;
-    attachment.queue0C = &owner->queue0C;
-    attachment.queue34 = &owner->queue34;
-    attachment.queueLock = &owner->helper60.crit;
-    attachment.queueSignalEvent = owner->field7C;
-    attachment.cleanupLock = &owner->helper98.crit;
-    attachment.list80EndpointTreeHead = &owner->list80;
-    attachment.field84EndpointCount = &owner->field84;
-    attachment.list8CContextTreeHead = &owner->list8C;
-    attachment.field90ContextCount = &owner->field90;
+    attachment.launcherObjectShell = owner;
     engine->AttachLauncherAbiSurfaceScaffold(attachment);
 
     if (priorList80 && priorList80 != owner->list80) {

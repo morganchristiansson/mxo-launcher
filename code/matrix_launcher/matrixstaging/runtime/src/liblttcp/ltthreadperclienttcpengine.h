@@ -131,21 +131,11 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18 {
     unsigned char keyAndPayload[0x8];
 };
 
-// Launcher-visible shell attachment map used by the current wrapper boundary.
-// This intentionally keeps the raw arg5 shell outside liblttcp while letting the target class own
-// more of the constructor/runtime-visible state that the shell mirrors.
+// Launcher-visible shell attachment used by the current wrapper boundary.
+// The live launcher arg5 shell has the same recovered 0xb4 layout as the sidecar mirror object,
+// so the bridge only needs the attached shell base address rather than per-field mirror pointers.
 struct CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment {
-    uint32_t* field04CtorFlags = nullptr;
-    void** field08QueueThreadArray = nullptr;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue0C = nullptr;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue34 = nullptr;
-    void* queueLock = nullptr;
-    void* queueSignalEvent = nullptr;
-    void* cleanupLock = nullptr;
-    void** list80EndpointTreeHead = nullptr;
-    uint32_t* field84EndpointCount = nullptr;
-    void** list8CContextTreeHead = nullptr;
-    uint32_t* field90ContextCount = nullptr;
+    void* launcherObjectShell = nullptr;
 };
 
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold) == 0x04, "wait helper size mismatch");

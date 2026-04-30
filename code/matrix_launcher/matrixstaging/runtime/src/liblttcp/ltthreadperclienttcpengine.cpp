@@ -169,6 +169,15 @@ static CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& EnsureEngineL
     return g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment;
 }
 
+static CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* ActiveLauncherObjectShellMirror(
+    const CLTThreadPerClientTCPEngine_0x4b2768* self) {
+    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(self);
+    return (attachment && attachment->launcherObjectShell)
+        ? static_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(attachment->launcherObjectShell)
+        : nullptr;
+}
+
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
     const CLTThreadPerClientTCPEngine_0x4b2768* self) {
     if (!self) {
@@ -2758,29 +2767,14 @@ void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (!attachment) {
-        return;
-    }
-
-    if (attachment->field04CtorFlags) {
-        *attachment->field04CtorFlags = 0u;
-    }
-    if (attachment->field08QueueThreadArray) {
-        *attachment->field08QueueThreadArray = nullptr;
-    }
-    if (attachment->list80EndpointTreeHead) {
-        *attachment->list80EndpointTreeHead = nullptr;
-    }
-    if (attachment->field84EndpointCount) {
-        *attachment->field84EndpointCount = 0u;
-    }
-    if (attachment->list8CContextTreeHead) {
-        *attachment->list8CContextTreeHead = nullptr;
-    }
-    if (attachment->field90ContextCount) {
-        *attachment->field90ContextCount = 0u;
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    if (shell) {
+        shell->field04 = 0u;
+        shell->field08 = nullptr;
+        shell->endpointTreeHead80 = nullptr;
+        shell->endpointCount84 = 0u;
+        shell->contextTreeHead8C = nullptr;
+        shell->contextCount90 = 0u;
     }
 
     if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
@@ -2805,50 +2799,31 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
     if (ownedContextTreeHead8C_ && ownedContextCount90_ == 0u) {
         InitializeContextTreeHead18(ownedContextTreeHead8C_);
     }
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (!attachment) {
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    if (!shell) {
         return;
     }
 
-    if (attachment->field04CtorFlags) {
-        *attachment->field04CtorFlags = ctorFlagsField04_;
-    }
-    if (attachment->field08QueueThreadArray) {
-        *attachment->field08QueueThreadArray = queueThreadArrayField08_;
-    }
-    if (attachment->list80EndpointTreeHead) {
-        *attachment->list80EndpointTreeHead = ownedEndpointTreeHead80_;
-    }
-    if (attachment->field84EndpointCount) {
-        *attachment->field84EndpointCount = ownedEndpointCount84_;
-    }
-    if (attachment->list8CContextTreeHead) {
-        *attachment->list8CContextTreeHead = ownedContextTreeHead8C_;
-    }
-    if (attachment->field90ContextCount) {
-        *attachment->field90ContextCount = ownedContextCount90_;
-    }
+    shell->field04 = ctorFlagsField04_;
+    shell->field08 = queueThreadArrayField08_;
+    shell->endpointTreeHead80 = ownedEndpointTreeHead80_;
+    shell->endpointCount84 = ownedEndpointCount84_;
+    shell->contextTreeHead8C = ownedContextTreeHead8C_;
+    shell->contextCount90 = ownedContextCount90_;
 }
 
 // anchor: launcher.exe:0x435f90
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SignalQueueEventHelper() {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    HANDLE eventHandle = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
-        ? attachment->queueSignalEvent
-        : ownedQueueSignalEvent7C_);
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    HANDLE eventHandle = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
     return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
 }
 
 // anchor: launcher.exe:0x435fa0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMilliseconds) {
     (void)LeaveQueueLockHelper();
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    HANDLE eventHandle = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
-        ? attachment->queueSignalEvent
-        : ownedQueueSignalEvent7C_);
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    HANDLE eventHandle = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
     const DWORD waitResult = eventHandle
         ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reasonMilliseconds))
         : WAIT_FAILED;
@@ -2866,48 +2841,32 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMi
 // Shared helper-body evidence: launcher.exe:0x4147b0 / 0x4147c0.
 // These are source-side wrappers over the recovered lock-helper storage.
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
-            (attachment && attachment->queueLock)
-                ? attachment->queueLock
-                : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit))) {
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    if (CRITICAL_SECTION* crit = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit) {
         EnterCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
-            (attachment && attachment->queueLock)
-                ? attachment->queueLock
-                : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit))) {
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    if (CRITICAL_SECTION* crit = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit) {
         LeaveCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
-            (attachment && attachment->cleanupLock)
-                ? attachment->cleanupLock
-                : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit))) {
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    if (CRITICAL_SECTION* crit = shell ? &shell->cleanupLockHelper98.crit : &ownedCleanupLockHelper98_.crit) {
         EnterCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(
-            (attachment && attachment->cleanupLock)
-                ? attachment->cleanupLock
-                : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit))) {
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    if (CRITICAL_SECTION* crit = shell ? &shell->cleanupLockHelper98.crit : &ownedCleanupLockHelper98_.crit) {
         LeaveCriticalSection(crit);
     }
     return 0u;
@@ -2926,19 +2885,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         return 0x7000006u;
     }
 
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C =
-        (attachment && attachment->queue0C) ? attachment->queue0C : &ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 =
-        (attachment && attachment->queue34) ? attachment->queue34 : &ownedQueue34_;
-    HANDLE activeQueueSignalEvent = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
-        ? attachment->queueSignalEvent
-        : ownedQueueSignalEvent7C_);
-    CRITICAL_SECTION* queueLock = CriticalSectionFromOpaqueStorage(
-        (attachment && attachment->queueLock)
-            ? attachment->queueLock
-            : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit));
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C = shell ? &shell->queue0C : &ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 = shell ? &shell->queue34 : &ownedQueue34_;
+    HANDLE activeQueueSignalEvent = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
+    CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
     if (queueLock) {
         EnterCriticalSection(queueLock);
     }
@@ -3000,21 +2951,15 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     //   -> signal helper `+0x5c` only on pre-push empty -> non-empty transition
     // - no push-success result is surfaced back to callers; caller-side ownership/lifetime does not
     //   branch on queue-growth success/failure once this path is entered
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C =
-        (attachment && attachment->queue0C) ? attachment->queue0C : &ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 =
-        (attachment && attachment->queue34) ? attachment->queue34 : &ownedQueue34_;
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C = shell ? &shell->queue0C : &ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 = shell ? &shell->queue34 : &ownedQueue34_;
     CLTThreadPerClientTCPEngine_0x4b2768_Queue* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
     if (!targetQueue) {
         return false;
     }
 
-    CRITICAL_SECTION* queueLock = CriticalSectionFromOpaqueStorage(
-        (attachment && attachment->queueLock)
-            ? attachment->queueLock
-            : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit));
+    CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
     if (queueLock && !queueLockAlreadyHeld) {
         EnterCriticalSection(queueLock);
     }
@@ -3080,19 +3025,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the attached arg5 lock
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C =
-        (attachment && attachment->queue0C) ? attachment->queue0C : &ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 =
-        (attachment && attachment->queue34) ? attachment->queue34 : &ownedQueue34_;
-    HANDLE activeQueueSignalEvent = static_cast<HANDLE>((attachment && attachment->queueSignalEvent)
-        ? attachment->queueSignalEvent
-        : ownedQueueSignalEvent7C_);
-    CRITICAL_SECTION* queueLock = CriticalSectionFromOpaqueStorage(
-        (attachment && attachment->queueLock)
-            ? attachment->queueLock
-            : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit));
+    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue0C = shell ? &shell->queue0C : &ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* activeQueue34 = shell ? &shell->queue34 : &ownedQueue34_;
+    HANDLE activeQueueSignalEvent = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
+    CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
     while (true) {
         if (queueLock) {
             EnterCriticalSection(queueLock);
