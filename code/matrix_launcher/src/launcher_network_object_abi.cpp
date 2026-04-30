@@ -22,9 +22,11 @@ struct LauncherObjectAbiShell {
     uint32_t field04;                 // +0x04 ctor arg / queue-thread count seed from 0x4366f0
     void* field08;                    // +0x08 queue-thread pointer array (NULL on the current ctorFlags=0 path)
     LauncherObjectQueuePair queuePair0C; // +0x0c..+0x5b inline queue-pair object from 0x436610
-                                          // wrapper keeps the original byte shape for raw client
-                                          // consumers, but live queue mechanics stay on the bound
-                                          // native engine object's inline storage
+                                          // ABI-wrapper ownership note: this subobject is not
+                                          // just decorative layout padding. Raw client.dll code
+                                          // may touch these bytes/subobjects directly, so the
+                                          // wrapper-owned shell remains the authoritative queue
+                                          // storage surface whenever a shell is attached.
     void** subVtable5C;               // +0x5c base wait/event helper vtable (`0x4b3e20` final ctor state)
     LauncherObjectLockHelper helper60; // +0x60..+0x7b helper vtable + CRITICAL_SECTION
     HANDLE field7C;              // +0x7c CreateEventA(NULL,0,0,0)
@@ -574,8 +576,9 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
 
     // Tree-family pruning step:
     // - the shell no longer pre-allocates fake +0x80/+0x8c tree heads
-    // - once attached, those bytes are published from the real engine object for raw direct field
-    //   readers via AttachLauncherAbiSurfaceScaffold/SyncAttachedLauncherObjectStateScaffold
+    // - unlike queuePair0C, these later tree/count bytes are only published from the real engine
+    //   for raw direct field readers via AttachLauncherAbiSurfaceScaffold/
+    //   SyncAttachedLauncherObjectStateScaffold
     object->list80 = NULL;
     object->field84 = 0;
     object->list8C = NULL;

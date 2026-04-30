@@ -179,14 +179,31 @@ static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorag
         return nullptr;
     }
 
-    // Fidelity correction:
-    // - `0x436610/0x436820/0x4364d0/0x436b10` operate on the engine object's inline `+0x0c..+0x5b`
-    //   queue-pair storage
-    // - the launcher ABI shell exists only so client.dll can keep using original MSVC `this`
-    //   identities and helper subobject entrypoints
-    // - queue bytes should therefore stay authoritative on the native engine object, not bounce
-    //   through a copied shell mirror
+    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(self)) {
+        return &shell->queuePair0C;
+    }
+
     return &reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(self)->queuePair0C;
+}
+
+static void MoveQueueRecycledBlocksScaffold(
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* fromQueueRecord,
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* toQueueRecord) {
+    if (!fromQueueRecord || !toQueueRecord || fromQueueRecord == toQueueRecord) {
+        return;
+    }
+
+    auto fromIt = g_QueueRecycledBlocks.find(fromQueueRecord);
+    if (fromIt == g_QueueRecycledBlocks.end()) {
+        return;
+    }
+
+    std::vector<uint32_t*>& targetBlocks = g_QueueRecycledBlocks[toQueueRecord];
+    targetBlocks.insert(
+        targetBlocks.end(),
+        fromIt->second.begin(),
+        fromIt->second.end());
+    g_QueueRecycledBlocks.erase(fromIt);
 }
 
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -2779,6 +2796,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
+    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(this)) {
+        shell->queuePair0C = ownedQueuePair0C_;
+        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue00, &shell->queuePair0C.queue00);
+        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue28, &shell->queuePair0C.queue28);
+    }
     SyncAttachedLauncherObjectStateScaffold();
 }
 
@@ -2786,6 +2808,10 @@ void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
     CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(this);
     if (shell) {
+        ownedQueuePair0C_ = shell->queuePair0C;
+        MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue00, &ownedQueuePair0C_.queue00);
+        MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue28, &ownedQueuePair0C_.queue28);
+        std::memset(&shell->queuePair0C, 0, sizeof(shell->queuePair0C));
         shell->field04 = 0u;
         shell->field08 = nullptr;
         shell->queueSignalEvent7C = nullptr;
@@ -3043,9 +3069,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the real engine queue lock
-    // - wrapper-owned arg5 shells no longer shadow queue storage; helper/primary ABI thunks call
-    //   back into the native engine object, whose inline `+0x0c..+0x5b` bytes remain the single
-    //   authoritative queue-pair state
+    // - when an arg5 shell is attached, queue bytes at `+0x0c..+0x5b` remain authoritative for
+    //   raw client.dll queue access, so producers/consumers operate on that attached shell storage
+    //   while helper behavior still forwards into the native engine object
     CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* activeQueuePair =
         ActiveQueuePairStorageScaffold(this);
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
