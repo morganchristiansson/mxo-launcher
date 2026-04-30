@@ -2680,9 +2680,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SendBuffer(
             return 1u;
         }
 
-        // Source-only fallback for unexpected detached-worker paths; active RE-backed slot `8`
-        // users are expected to have `[connection+0x08]` populated by `0x431ff0` already.
-        return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
+        // RE-backed slot `8` users are expected to have `[connection+0x08]` populated by
+        // `0x431ff0`; without a worker thread there is no original detached raw-send fallback.
+        return 0u;
     }
 
     const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;

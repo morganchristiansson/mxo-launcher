@@ -470,11 +470,6 @@ public:
     bool TryPopQueuedSendBufferWithEndpoint(CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem);
     bool SendQueueEmptyFlag() const;
 
-    // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
-    uint32_t CloseSocketTransportScaffold(bool graceful);
-    // UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
-    uint32_t SendRawSocketBufferScaffold(const void* buffer, uint32_t byteCount, void* completionContext);
-
     // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
     // Current best original read:
     // - argument order after engine `this` is `(workItem, connection, useQueue34)`

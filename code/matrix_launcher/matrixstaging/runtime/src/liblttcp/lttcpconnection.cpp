@@ -659,14 +659,8 @@ uint32_t CBaseConnection::Close(bool graceful) {
         return 0u;
     }
 
-    if (engine_) {
-        // `0x449ca0` forwards the base connection object itself into engine vtable slot `+0x1c`.
-        return engine_->Close(this, graceful);
-    }
-
-    // Source-owned null-engine fallback kept only because the current C++ layout still permits
-    // detached connection objects while the wider base-field reconstruction remains incomplete.
-    return static_cast<CLTTCPConnection*>(this)->CloseSocketTransportScaffold(graceful);
+    // `0x449ca0` forwards the base connection object itself into engine vtable slot `+0x1c`.
+    return engine_ ? engine_->Close(this, graceful) : 0u;
 }
 
 // anchor: launcher.exe:0x449cd0
@@ -687,11 +681,9 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
         return 0u;
     }
 
-    return engine_
-        // `0x449d20` forwards `(buffer, byteCount, this, completionContext)` into engine slot
-        // `+0x20`; the current C++ interface now uses that recovered argument order directly.
-        ? engine_->SendBuffer(buffer, byteCount, this, completionContext)
-        : SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
+    // `0x449d20` forwards `(buffer, byteCount, this, completionContext)` into engine slot
+    // `+0x20`; the current C++ interface now uses that recovered argument order directly.
+    return engine_ ? engine_->SendBuffer(buffer, byteCount, this, completionContext) : 0u;
 }
 
 // anchor: launcher.exe:0x449fd0
@@ -767,93 +759,6 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
     if (readOperationFragment) {
         readOperationFragment->Release();
     }
-}
-
-// UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
-uint32_t CLTTCPConnection::CloseSocketTransportScaffold(bool /*graceful*/) {
-    if (state_ != LTTCPEngineConnectionState::kConnectActive &&
-        state_ != LTTCPEngineConnectionState::kUdpMonitorActive) {
-        return 0u;
-    }
-
-    state_ = LTTCPEngineConnectionState::kClosing;
-    if (socketHandle_ != kInvalidSocketHandle) {
-        const SOCKET socket = static_cast<SOCKET>(socketHandle_);
-        const int shutdownResult = shutdown(socket, SD_BOTH);
-        if (shutdownResult == SOCKET_ERROR) {
-            const int wsaError = WSAGetLastError();
-            if (wsaError != WSAENOTCONN) {
-                spdlog::debug(
-                    "CLTTCPConnection::CloseSocketTransportScaffold shutdown failed socket=0x{:08x} wsaError={}",
-                    socketHandle_,
-                    wsaError);
-            }
-        }
-        const int closeResult = closesocket(socket);
-        if (closeResult == SOCKET_ERROR) {
-            spdlog::debug(
-                "CLTTCPConnection::CloseSocketTransportScaffold closesocket failed socket=0x{:08x} wsaError={}",
-                socketHandle_,
-                WSAGetLastError());
-        }
-    }
-    socketHandle_ = kInvalidSocketHandle;
-    return 1u;
-}
-
-// UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
-uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
-    const void* buffer,
-    uint32_t byteCount,
-    void* /*completionContext*/) {
-    if (!buffer || byteCount == 0u) {
-        return 0u;
-    }
-
-    if (state_ != LTTCPEngineConnectionState::kConnectActive &&
-        state_ != LTTCPEngineConnectionState::kUdpMonitorActive) {
-        spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because state={} socket=0x{:08x} byteCount={}",
-            static_cast<uint32_t>(state_),
-            socketHandle_,
-            byteCount);
-        return 0u;
-    }
-
-    if (socketHandle_ == kInvalidSocketHandle) {
-        spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because socket is invalid state={} byteCount={}",
-            static_cast<uint32_t>(state_),
-            byteCount);
-        return 0u;
-    }
-
-    const int sent = send(
-        static_cast<SOCKET>(socketHandle_),
-        static_cast<const char*>(buffer),
-        static_cast<int>(byteCount),
-        0);
-    if (sent == SOCKET_ERROR) {
-        const int wsaError = WSAGetLastError();
-        spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold send failed socket=0x{:08x} byteCount={} wsaError={}",
-            socketHandle_,
-            byteCount,
-            wsaError);
-        if (wsaError != WSAEWOULDBLOCK) {
-            (void)CloseSocketTransportScaffold(/*graceful=*/false);
-        }
-        return 0u;
-    }
-    if (sent != static_cast<int>(byteCount)) {
-        spdlog::debug(
-            "CLTTCPConnection::SendRawSocketBufferScaffold short send socket=0x{:08x} requested={} sent={}",
-            socketHandle_,
-            byteCount,
-            sent);
-        return 0u;
-    }
-    return 1u;
 }
 
 // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
