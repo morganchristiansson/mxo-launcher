@@ -869,11 +869,10 @@ static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorS
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantWorldName(variantIndex);
 }
 
-// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator_0x4af2b8 sibling slot +0xe4
-// anchor: launcher.exe:0x40e480 matched row path also consults the same +0xe4 status reader
+// anchor: launcher.exe:0x41b2a0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe4
-// Naming tightened from the old "variant state" guess: this slot is the active selection-entry /
-// slot-record status reader on the auth-valid path, while still preserving wrapper fallback behavior.
+// Direct slot-record status reader used by the page-7 row builder / resolver; the packed row high
+// word may be sign-extended here, but the original body naturally returns 7 for out-of-range input.
 static uint32_t __thiscall Mediator_GetSlotRecordStatusBySelectionIndex(MinimalLoginMediatorStub* self, int32_t selectionIndex) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetSlotRecordStatusBySelectionIndex(selectionIndex);

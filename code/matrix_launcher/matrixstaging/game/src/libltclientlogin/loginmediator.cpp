@@ -1236,44 +1236,26 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
     return worldName;
 }
 
-// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator_0x4af2b8 sibling slot +0xe4
-// anchor: launcher.exe:0x40e480 matched row path also consults the same +0xe4 status reader
+// anchor: launcher.exe:0x41b2a0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe4
-// Naming tightened from the old "variant state" guess: on the auth-valid path this is the
-// active selection-entry / slot-record status reader, backed directly by owner slot records.
+// Direct owner-side slot-record status reader reused by the page-7 row builder / resolver. The
+// launcher passes the packed-row high word here; any negative / out-of-range index naturally falls
+// through to the same default status 7 as the original body.
 uint8_t CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const {
-    const bool stateAllowsRecoveredSelectionRouteRead =
-        currentState_ != nullptr && currentState_->GetStateId() > 2u;
-
-    uint32_t state = 3u;
-    const char* source = "arg6-selection-fallback";
-    if (stateAllowsRecoveredSelectionRouteRead) {
-        if (selectionIndex >= 0 && selectionIndex <= 0xff) {
-            state = GetSlotRecordStatusByIndex(static_cast<uint8_t>(selectionIndex));
-            source = "owner+0x688.status+0x0b";
-        } else {
-            source = "owner+0x688.<out-of-range>";
-        }
-    } else if (selectionIndex >= 0) {
-        const uint32_t unsignedVariantIndex = static_cast<uint32_t>(selectionIndex);
-        if (unsignedVariantIndex < this->SelectionVariantUpperBoundExclusive() &&
-            this->VariantIndexMatchesSelection(unsignedVariantIndex)) {
-            state = this->SelectedVariantState();
-            source = "arg6-selected-active-entry-state";
-        } else {
-            source = "arg6-selection-fallback.<not-selected>";
-        }
-    } else {
-        source = "negative-index";
+    if (!currentState_) {
+        return 7u;
     }
-    spdlog::info(
-        "CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(+0xe4 selectionIndex={}) -> {} [source={} configuredVariant=0x{:02x} configuredState={}]",
-        selectionIndex,
-        state,
-        source,
-        this->SelectedVariantIndexHigh8(),
-        this->SelectedVariantState());
-    return state;
+    const uint32_t stateId = currentState_->GetStateId();
+    if (stateId <= 2u) {
+        return 7u;
+    }
+    const uint32_t unsignedSelectionIndex = static_cast<uint32_t>(selectionIndex);
+    if (unsignedSelectionIndex >= 100u) {
+        return 7u;
+    }
+    const Packet_AsAuthReply_0x4b5328* record =
+        const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(unsignedSelectionIndex);
+    return record ? record->packetType1a : 7u;
 }
 
 // anchor: launcher.exe:0x41ec00 +0xe8

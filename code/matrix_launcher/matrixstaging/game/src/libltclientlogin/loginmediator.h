@@ -566,7 +566,7 @@ public:
     // string reader reused by the launcher page-`7` world-list path
     const char* GetVariantWorldName(uint32_t variantIndex) override;
     // +0xe4
-    // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 and page-7 row builder at 0x40e480
+    // anchor: launcher.exe:0x41b2a0
     uint8_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const override;
     // +0x164
     bool RequestAuthConnectionCloseWaitEvent1() override;
@@ -729,11 +729,6 @@ public:
     //   descriptor/profile bridges still reached from launcher/client scaffolding
     // Source-owned arg6 bootstrap fallback helpers.
     // These are replacement-side helpers, not recovered launcher.exe vtable slots.
-    uint32_t SelectionVariantUpperBoundExclusive() const;
-    uint32_t SelectedVariantIndexHigh8() const;
-    uint32_t SelectedVariantState() const;
-    const char* MappedSelectionName() const;
-    bool VariantIndexMatchesSelection(uint32_t variantIndex) const;
     uint32_t ExpectedSelectionDescriptorScratchRequest() const;
     bool SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
 
