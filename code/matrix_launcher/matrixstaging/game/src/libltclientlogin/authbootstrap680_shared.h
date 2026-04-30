@@ -19,12 +19,6 @@ namespace mxo::ltlogin {
 
 struct AuthBootstrap680RsaPublicKeyPairOwnedState;
 
-// Transitional compatibility alias while surrounding runtime/messageconnection headers still refer
-// to the recovered child string fields by their older mirror name. Semantically these are now
-// modeled directly as std::string.
-using AuthBootstrap680SmallStringMirror = std::string;
-
-
 class __attribute__((packed)) AuthBootstrapReplyCopyShadowF4_0x44add0 {
 public:
     std::array<uint8_t, 0x80> authSignature00{};

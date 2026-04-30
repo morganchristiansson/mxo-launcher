@@ -1068,9 +1068,9 @@ public:
     // Auth-bootstrap receiver-backed field family migrated from the earlier auth child base.
     // These fields are consumed by the non-virtual helper methods rooted at `0x4474f0`, `0x447eb0`,
     // `0x447f50`, `0x448050`, and `0x448140`.
-    mxo::ltlogin::AuthBootstrap680SmallStringMirror string04;
-    mxo::ltlogin::AuthBootstrap680SmallStringMirror string10;
-    mxo::ltlogin::AuthBootstrap680SmallStringMirror string1C;
+    std::string string04;
+    std::string string10;
+    std::string string1C;
     uint32_t loginType28 = 0;
     uint32_t launcherVersion2C = 0;
     std::array<uint8_t, 16> block30{};
