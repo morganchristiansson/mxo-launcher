@@ -61,20 +61,29 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
             return 1u;
         }
 
+        const CLTLoginState* const cachedUpstreamBeforeTransition = cachedUpstreamOrArg_0x4;
         const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
         if (nextHelperStateId != 13u) {
-            // anchor: launcher.exe:0x439473 - direct owner+0x24 reset before helper/state3 switch
+            // anchor: launcher.exe:0x4392d0 / 0x439473
+            // - clear cached upstream at `this+4`
+            // - write owner `+0x104 = -1`
+            // - direct owner `+0x24 = 0`
+            // - switch helper/state to `3`
+            cachedUpstreamOrArg_0x4 = nullptr;
+            g_CurrentLoginMediator->marginRouteState_.currentWorldId = -1;
             g_CurrentLoginMediator->marginBeginCount24_ = 0u;
             (void)g_CurrentLoginMediator->SetCurrentState(3u);
         }
         g_CurrentLoginMediator->PostError(6u);
         spdlog::info(
-            "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate non-zero status=0x{:08x} ({}) retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
+            "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate non-zero status=0x{:08x} ({}) retry exhausted cachedUpstream={} upstreamPhaseCode={} currentState={} cachedUpstreamNow={} owner+0x104={} -> PostError(0x06)",
             static_cast<unsigned>(status),
             std::system_category().message(status),
-            fmt::ptr(cachedUpstreamOrArg_0x4),
+            fmt::ptr(cachedUpstreamBeforeTransition),
             static_cast<unsigned>(nextHelperStateId),
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
+            fmt::ptr(cachedUpstreamOrArg_0x4),
+            g_CurrentLoginMediator->marginRouteState_.currentWorldId);
         return 1u;
     }
 
