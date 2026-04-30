@@ -718,11 +718,10 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
 
 // anchor: launcher.exe:0x41f3c0 / vtable +0x60
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
-    // Original body ignores caller state and returns the child small-string begin pointer at
-    // owner+0x680+0xf8; it assumes owner+0x680 is already initialized.
-    const char* passwordSeed = authBootstrapChild680_->stringF8.empty()
-        ? nullptr
-        : authBootstrapChild680_->stringF8.c_str();
+    // Exact tiny body: load owner `+0x680`, then return child `+0xf8` begin pointer.
+    // Keep the chained token for wrapper-signature compatibility only; the original body does not
+    // read it.
+    const char* passwordSeed = authBootstrapChild680_->stringF8.c_str();
     spdlog::info(
         "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),

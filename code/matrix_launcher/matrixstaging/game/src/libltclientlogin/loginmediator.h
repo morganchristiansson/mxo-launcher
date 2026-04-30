@@ -461,10 +461,13 @@ public:
     // +0x54
     bool HasBootstrapRaw08AuxHandle54() const override;
     // +0x58
+    // anchor: launcher.exe:0x41f390 / exact tiny body returns child byte `+0x104` in AL
     uint8_t GetCrashReporterPromptForSecurId58() const override;
     // +0x5c
+    // anchor: launcher.exe:0x41f3a0 / tiny getter returns child `+0xf4+0x85` or pooled empty string
     const char* GetCrashReporterUsername5c(const void* chainedValueToken) override;
     // +0x60
+    // anchor: launcher.exe:0x41f3c0 / exact tiny body returns child `+0xf8` begin pointer
     const char* GetCrashReporterPassword60(const void* chainedValueToken) override;
     // +0x64
     // anchor: launcher.exe:0x41f2b0 / exact tiny body returns owner+0x680+0x110
