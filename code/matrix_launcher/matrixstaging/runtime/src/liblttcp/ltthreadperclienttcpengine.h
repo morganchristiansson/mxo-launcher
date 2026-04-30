@@ -15,10 +15,6 @@
 #include "ilttcpengine.h"
 #include "lttcpconnection.h"
 
-namespace mxo::ltlogin {
-class CLTLoginMediator;
-}
-
 namespace mxo::liblttcp {
 
 class CMessageConnection_0x4b7928;
