@@ -207,8 +207,6 @@ void CLTLoginMediator::InitializeObserverTree674() {
     headerBase->_M_left = headerBase;
     headerBase->_M_right = headerBase;
 
-    latestObserver170_ = nullptr;
-    latestObserver174_ = nullptr;
 }
 
 // anchor: launcher.exe:0x419570 / 0x41d370

@@ -1513,12 +1513,10 @@ void AuthBootstrap680Child_0x441290::PrepareAndDispatch(
         fmt::ptr(static_cast<AuthBootstrap680ChildBase_0x4b7134*>(this)));
 
     if (sendAuthRequestBranch) {
-        mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
         child.SendAuthRequest();
         return;
     }
 
-    mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
     child.SendGetPublicKeyRequest();
 }
 

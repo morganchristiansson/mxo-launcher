@@ -1118,14 +1118,6 @@ public:
     void* ownerCallback84_ = nullptr;          // owner `+0x84`; bounded active-scope writes now read as init-zero at `0x41ee60`, startup-triple store at `0x41f1d0`, then submit-side reads
     void* ownerObject88_ = nullptr;            // owner `+0x88`; natural-original object88 cross-checks as client `INetMgr.Default` wrapper and no later bounded active-scope launcher write is isolated yet beyond `0x41f1d0`
     void* startupDistrObjExecutive8c_ = nullptr; // owner `+0x8c`; current best match is the client startup triple's ILTDistrObjExecutive-like third object
-    // +0x124 wrapper-facing startup triple capture state (owner-side mirror remains explicit in
-    // `SetState9CallbackObjectTriple84_88_8c`).
-    void* provideStartupTripleNetShell_ = nullptr;         // +0x124 netShell
-    void* provideStartupTripleNetMgr_ = nullptr;           // +0x124 netMgr
-    void* provideStartupTripleDistrObjExecutive_ = nullptr; // +0x124 distrObjExecutive
-    uint32_t provideStartupTripleCount_ = 0u;              // +0x124 call count
-    const void* createCharacterInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
-    uint32_t createCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     // launcher.exe:0x41f0a0 / owner vtable +0x38: returns pointer to this block at +0x94
     // anchor: launcher.exe:0x41eb80 copies from submit input into this block
@@ -1147,14 +1139,10 @@ public:
     // owner byte `+0xf14`; shared send gate used by the active state8 path and later state10.
     uint8_t state10SendGateFlagF14 = 0;
 
-    // Legacy decomposed mirrors around owner `+0xf1c` still kept while neighboring source is
-    // migrated onto the canonical mediator-owned `state8PersistenceDataF1c` object.
+    // Remaining direct owner-side storage adjacent to the canonical `+0xf1c` persistence object.
+    // Keep only fields that are still represented directly in source instead of the packed
+    // `CLTLoginMediatorCharacterPersistenceData_0x41d900` blob.
     char characterNameBufferF1c[32] = {0};
-    uint32_t characterReplyFieldF3c = 0;
-    uint32_t characterReplyFieldF40 = 0;
-    uint32_t characterReplyFieldF44 = 0x1000;
-    std::array<uint32_t, 8> characterFlagsF48{};
-    std::array<uint32_t, 8> secondaryCharacterDataF68{};
     std::array<uint32_t, 10> characterRecordPointersF88{};
     std::array<char, 0x20> section0StringF8c{};
     std::array<char, 0x20> section0StringFac{};
@@ -1202,8 +1190,6 @@ public:
     uint32_t state8Section11Dword145c = 0;
     std::string state8Section11String1460;
     std::array<uint8_t, 8> replyParseBuffer{};
-    uint32_t replySectionData13cc = 0;
-    uint32_t replySectionData13d0 = 0;
     uint8_t section0Flag13f6 = 0;
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18
     // launcher.exe:0x4f78b8 owner-side world-list packet pointer table (`+0xd84`).
@@ -1220,8 +1206,6 @@ public:
     // original `0x41cfb0 / 0x41d090` traversals are std::_Tree-like in-order walks over this data.
     LoginObserverTree674 observerTree674_{};
     LoginObserverTreeNode674 observerTreeHeader674_{};
-    void* latestObserver170_ = nullptr;         // most recent register call observer
-    void* latestObserver174_ = nullptr;         // most recent unregister call observer
 
     uint16_t authServerPortHostOrder_;
 
@@ -1241,9 +1225,6 @@ public:
     std::vector<uint8_t> authKeyConfigMd5_;
     std::vector<uint8_t> authUiConfigMd5_;
 
-    const char* expectedAuthRequestName_;
-    const char* expectedMarginRequestName_;
-
 
     // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x4c`.
     // Recovered original in-object layout:
@@ -1261,24 +1242,6 @@ public:
     // and consumes the recovered owner tables (`+0xd84/+0x688/+0x818`) directly.
     // Keep only the narrower configured arg6 selection scratch that is still used by the
     // wrapper-facing descriptor/profile bridges.
-    struct SelectionSeedConfig {
-        uint32_t worldUpperBoundExclusive_ = 1;
-        uint32_t variantUpperBoundExclusive_ = 1;
-        uint32_t selectedWorldIndexLow24_ = 0;
-        // Current tighter page-`7` read: this high byte is the selected row's high-word active
-        // entry index. On the auth-valid launcher selection path that is currently better modeled
-        // as the slot-record / character-entry index rather than a free-standing world variant id.
-        uint32_t selectedVariantIndexHigh8_ = 0;
-        uint32_t selectedVariantState_ = 0;
-        uint32_t mappedSelectionId_ = 0;
-        std::string mappedSelectionName_ = "standalone";
-        std::string mappedVariantName_ = "standalone";
-        std::string profileName_ = "resurrections";
-        std::string authName_ = "resurrections";
-        std::string authPassword_;
-    };
-
-    SelectionSeedConfig selectionSeed_;
     uint32_t arg6VariantWorldNameQueryCountE0_ = 0u; // wrapper-facing arg6 `+0xe0` query count
 };
 

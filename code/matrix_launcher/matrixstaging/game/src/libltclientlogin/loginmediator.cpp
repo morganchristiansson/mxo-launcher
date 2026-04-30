@@ -193,9 +193,7 @@ CLTLoginMediator::CLTLoginMediator()
       authPassword_(),
       authLauncherVersion_(76005),
       authKeyConfigMd5_(),
-      authUiConfigMd5_(),
-      expectedAuthRequestName_(nullptr),
-      expectedMarginRequestName_(nullptr) {
+      authUiConfigMd5_() {
     InitializeObserverTree674();
 }
 
@@ -1569,22 +1567,16 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
 // - this keeps future INetMgr.Default / CUDPDriver::JoinSession work scoped to the active
 //   late-login surface instead of forcing rereads of broader mediator/auth files
 
-// wrapper-facing slot +0x124 startup triple capture; owner-side mirror remains explicit below.
+// wrapper-facing slot +0x124 startup triple capture; exact owner-side effect stays the direct
+// `0x41f1d0` write to owner `+0x84/+0x88/+0x8c`.
 void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) {
-    provideStartupTripleNetShell_ = netShell;
-    provideStartupTripleNetMgr_ = netMgr;
-    provideStartupTripleDistrObjExecutive_ = distrObjExecutive;
-    ++provideStartupTripleCount_;
-
-    // Keep the wrapper-facing capture and the owner-side submit mirror unified on the mediator.
     SetState9CallbackObjectTriple84_88_8c(netShell, netMgr, distrObjExecutive);
 
     spdlog::info(
-        "CLTLoginMediator::ProvideStartupTriple(+0x124 wrapper-facing netShell={} netMgr={} distrObjExecutive={} [count={}] ownerMirror=+0x84/+0x88/+0x8c)",
-        fmt::ptr(provideStartupTripleNetShell_),
-        fmt::ptr(provideStartupTripleNetMgr_),
-        fmt::ptr(provideStartupTripleDistrObjExecutive_),
-        provideStartupTripleCount_);
+        "CLTLoginMediator::ProvideStartupTriple(+0x124 wrapper-facing netShell={} netMgr={} distrObjExecutive={} ownerMirror=+0x84/+0x88/+0x8c)",
+        fmt::ptr(netShell),
+        fmt::ptr(netMgr),
+        fmt::ptr(distrObjExecutive));
 }
 
 // anchor: launcher.exe:0x41f310 slot +0x130
@@ -1736,8 +1728,6 @@ bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
         return false;
     }
 
-    latestObserver170_ = observer;
-
     const bool inserted = InsertObserverNode674(observer);
     const bool returnValue = !inserted;
     if (!inserted) {
@@ -1773,8 +1763,6 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     if (!observer) {
         return false;
     }
-
-    latestObserver174_ = observer;
 
     LoginObserverTreeNode674* lowerBound = nullptr;
     LoginObserverTreeNode674* upperBound = nullptr;
@@ -1984,14 +1972,10 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
     const void* input120,
     void* returnAddress,
     bool applyOwnerSemantics) {
-    createCharacterInput120_ = input120;
-    ++createCharacterInputCount120_;
-
     if (!input120) {
         spdlog::info(
-            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120) input=<null> caller={} [count={}] applyOwnerSemantics={}",
+            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120) input=<null> caller={} applyOwnerSemantics={}",
             fmt::ptr(returnAddress),
-            createCharacterInputCount120_,
             applyOwnerSemantics ? 1u : 0u);
         return 1u;
     }
@@ -2000,10 +1984,9 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
     if (!applyOwnerSemantics) {
         MirrorCreateCharacterInput120SourceBlock(input);
         spdlog::info(
-            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 mirror-only input={} caller={} [count={}] field12c=0x{:08x} name='{}')",
+            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 mirror-only input={} caller={} field12c=0x{:08x} name='{}')",
             fmt::ptr(input120),
             fmt::ptr(returnAddress),
-            createCharacterInputCount120_,
             static_cast<unsigned>(createCharacterData108.selectedWorldField24),
             createCharacterData108.characterName00[0]
                 ? createCharacterData108.characterName00.data()
@@ -2012,10 +1995,9 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
     }
 
     spdlog::debug(
-        "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 owner-dispatch input={} caller={} [count={}])",
+        "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 owner-dispatch input={} caller={})",
         fmt::ptr(input120),
-        fmt::ptr(returnAddress),
-        createCharacterInputCount120_);
+        fmt::ptr(returnAddress));
     return ProcessCreateCharacterInput120(input);
 }
 

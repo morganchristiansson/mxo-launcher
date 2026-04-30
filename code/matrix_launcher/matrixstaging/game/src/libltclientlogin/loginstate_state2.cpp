@@ -202,9 +202,11 @@ void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginS
     auto* child = g_CurrentLoginMediator->authBootstrapChild680_.get();
     // Direct field access: owner+0x18 (authConnection_) instead of accessor
     void* sendTarget = g_CurrentLoginMediator->authConnection_;
-    // Direct offset access: owner+0x94 + 0x60 = ownerAuthBootstrapSource94_.sessionToken60.begin
-    const char* sessionToken = *reinterpret_cast<const char**>(
-        reinterpret_cast<uint8_t*>(&g_CurrentLoginMediator->ownerAuthBootstrapSource94_) + 0x60);
+    // owner+0x94 + 0x60 is the old-MSVC2003 `std::string` member inside
+    // `OwnerAuthBootstrapSource94_0x41eb80`; use its `c_str()` surface instead of a fake raw
+    // three-pointer view here.
+    const char* sessionToken =
+        StringBeginOrNull(g_CurrentLoginMediator->ownerAuthBootstrapSource94_.sessionToken60);
 
     spdlog::info(
         "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap-child dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
@@ -543,7 +545,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
         // The binary's switch at 0x43f300 only has cases 2, 4, 5, 6, and default. Child result
         // value 3 falls into default, which does SetCurrentState(0) + PostError(4) — the same
         // behavior as the former explicit case below. Removed the explicit case to match the
-        // binary; source-only additions (expectedMarginRequestName_=nullptr, LogParsedAuthReply)
+        // binary; source-only logging/additional scaffolding removed here for fidelity
         // that were on this case are dropped since the binary doesn't distinguish it.
 
         case kAuthBootstrap680InboundGetPublicKeyReplyError:

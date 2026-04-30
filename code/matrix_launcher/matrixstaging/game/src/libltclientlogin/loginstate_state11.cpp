@@ -319,18 +319,18 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
         // current static-RE shows this work as part of the original slot6 body.
         ownerState.state8PersistenceDataF1c = {};
         std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
-        ownerState.characterReplyFieldF3c = 0u;
-        ownerState.characterReplyFieldF40 = 0u;
-        ownerState.characterReplyFieldF44 = 0x1000u;
-        std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
-        std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
+        ownerState.state8PersistenceDataF1c.replyField20 = 0u;
+        ownerState.state8PersistenceDataF1c.selectedWorldField24 = 0u;
+        ownerState.state8PersistenceDataF1c.field28_1000 = 0x1000u;
+        std::fill(ownerState.state8PersistenceDataF1c.header2c.begin(), ownerState.state8PersistenceDataF1c.header2c.end(), 0u);
+        std::fill(ownerState.state8PersistenceDataF1c.secondary4c.begin(), ownerState.state8PersistenceDataF1c.secondary4c.end(), 0u);
         std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
         std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
         std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
         std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
         std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
-        ownerState.replySectionData13cc = 0u;
-        ownerState.replySectionData13d0 = 0u;
+        ownerState.state8PersistenceDataF1c.replySectionData4b0 = 0u;
+        ownerState.state8PersistenceDataF1c.replySectionData4b4 = 0u;
         ResetOwnedSectionBytes(
             ownerState.state8Section0OverflowBuffer13f0,
             ownerState.state8Section0OverflowLength13f4,
@@ -349,8 +349,6 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
         ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
 
         // anchor: launcher.exe:0x440320 first-fragment seed
-        ownerState.characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
-        ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
         ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
         ownerState.state8PersistenceDataF1c.selectedWorldField24 =
             ownerState.createCharacterData108.selectedWorldField24;
@@ -363,10 +361,6 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             ownerState.createCharacterData108.characterName00.begin(),
             ownerState.createCharacterData108.characterName00.end(),
             ownerState.state8PersistenceDataF1c.characterName00.begin());
-        std::copy_n(
-            ownerState.createCharacterData108.header2c.begin(),
-            ownerState.characterFlagsF48.size(),
-            ownerState.characterFlagsF48.begin());
         std::copy_n(
             ownerState.createCharacterData108.header2c.begin(),
             ownerState.state8PersistenceDataF1c.header2c.size(),
@@ -388,8 +382,8 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
         case 0u:
             if (loadCharacterReplyEnvelope.sectionData && loadCharacterReplyEnvelope.sectionByteCount >= 0x44cu) {
                 ownerState.characterRecordPointersF88[0] = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x00u);
-                ownerState.replySectionData13cc = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x444u);
-                ownerState.replySectionData13d0 = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x448u);
+                ownerState.state8PersistenceDataF1c.replySectionData4b0 = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x444u);
+                ownerState.state8PersistenceDataF1c.replySectionData4b4 = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x448u);
                 persistence.bodyWord6c = 0x1000u;
                 std::fill(persistence.realFirstName70.begin(), persistence.realFirstName70.end(), '\0');
                 std::fill(persistence.realLastName90.begin(), persistence.realLastName90.end(), '\0');
