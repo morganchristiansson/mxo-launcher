@@ -6,21 +6,6 @@
 namespace mxo::ltlogin {
 namespace {
 
-// anchor: launcher.exe:0x4043b0 = recovered basic_string concat helper
-// Conservative recovered helper shape shared across multiple callsites:
-// - append the full range of lhs then rhs into a temporary string-family object
-// - materialize the output as a fresh `std::string`
-static std::string* BasicString_0x403f90_ConcatInto(
-    std::string& out,
-    const std::string& lhs,
-    const std::string& rhs) {
-    std::string local_20;
-    StringAppendRange(local_20, lhs.c_str(), lhs.c_str() + lhs.size());
-    StringAppendRange(local_20, rhs.c_str(), rhs.c_str() + rhs.size());
-    StringResetAndAssignCString(out, local_20.c_str());
-    return &out;
-}
-
 }  // namespace
 
 uint8_t CLTLoginMediator::CurrentCharacterRouteIndexCc8Scaffold() const {
@@ -127,11 +112,9 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         // `0x403f20 = recovered basic_string reset/assign helper`. Current static evidence only
         // shows a read and the pointed-at bytes are zero, so model the second concatenation input
         // as empty until a real initializer/write is recovered.
-        std::string rebuiltAddressListInput;
-        (void)BasicString_0x403f90_ConcatInto(
-            rebuiltAddressListInput,
-            routeDescriptor30_,
-            std::string{});
+        // anchor: launcher.exe:0x4043b0 = recovered basic_string concat helper
+        // Current source equivalent of the launcher concat helper.
+        std::string rebuiltAddressListInput = routeDescriptor30_ + std::string{};
 
         if (const char* const rebuiltBegin = StringBeginOrNull(rebuiltAddressListInput);
             rebuiltBegin != nullptr) {
