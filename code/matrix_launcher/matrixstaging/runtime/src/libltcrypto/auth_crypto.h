@@ -79,26 +79,6 @@ struct AuthRequestLayout {
           reservedWord(0) {}
 };
 
-struct AuthRequestBuildResult {
-    uint16_t usernameLengthField;
-    bool includedUsernameNullTerminator;
-    bool usedFixedHeaderOverride;
-    bool usedProvidedPublicKey;
-    FramedPacket packet;
-    std::vector<uint8_t> authHeaderBytes;
-    std::vector<uint8_t> keyConfigMd5Bytes;
-    std::vector<uint8_t> uiConfigMd5Bytes;
-    std::vector<uint8_t> blobPlaintextBytes;
-    std::vector<uint8_t> blobCiphertextBytes;
-    std::vector<uint8_t> twofishKeyBytes;
-
-    AuthRequestBuildResult()
-        : usernameLengthField(0),
-          includedUsernameNullTerminator(true),
-          usedFixedHeaderOverride(false),
-          usedProvidedPublicKey(false) {}
-};
-
 struct AuthChallengeResponseLayout {
     uint16_t packetSomeShort;
     uint8_t plaintextLeadingByte;
@@ -124,75 +104,6 @@ struct AuthChallengeResponseLayout {
           paddingByte(0x00) {}
 };
 
-struct MxoString {
-    uint16_t length;
-    std::string text;
-    std::vector<uint8_t> rawBytes;
-
-    MxoString() : length(0) {}
-};
-
-struct AuthCharacterEntry {
-    uint8_t unknownByte;
-    uint16_t handleStringOffset;
-    uint64_t characterId;
-    uint8_t status;
-    uint16_t worldId;
-    MxoString handle;
-
-    AuthCharacterEntry()
-        : unknownByte(0),
-          handleStringOffset(0),
-          characterId(0),
-          status(0),
-          worldId(0) {}
-};
-
-struct AuthWorldEntry {
-    uint8_t unknownByte;
-    uint16_t worldId;
-    std::string worldName;
-    uint8_t status;
-    uint8_t type;
-    uint32_t clientVersion;
-    uint16_t unknown4;
-    uint8_t load;
-
-    AuthWorldEntry()
-        : unknownByte(0),
-          worldId(0),
-          status(0),
-          type(0),
-          clientVersion(0),
-          unknown4(0),
-          load(0) {}
-};
-
-struct AuthSignedData {
-    bool valid;
-    uint8_t unknownByte;
-    uint32_t userId1;
-    std::string userName;
-    uint16_t unknownShort;
-    uint32_t padding1;
-    uint32_t expiryTime;
-    std::vector<uint8_t> padding2;
-    uint16_t publicExponent;
-    std::vector<uint8_t> modulusBytes;
-    uint32_t timeCreated;
-    std::vector<uint8_t> rawBytes;
-
-    AuthSignedData()
-        : valid(false),
-          unknownByte(0),
-          userId1(0),
-          unknownShort(0),
-          padding1(0),
-          expiryTime(0),
-          publicExponent(0),
-          timeCreated(0) {}
-};
-
 // String/diagnostic helper anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
@@ -213,82 +124,6 @@ bool BuildVariableLengthPacket(
     FrameMode mode,
     FramedPacket* outPacket);
 
-bool ParseVariableLengthPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    FramedPacket* outPacket);
-
-// Raw 0x06 / AS_GetPublicKeyRequest anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`
-// - strongest current original send-builder anchor:
-//   - launcher.exe:0x447eb0
-// - upstream branch/dispatcher anchor:
-//   - launcher.exe:0x448050
-bool BuildGetPublicKeyRequestPacket(
-    uint32_t launcherVersion,
-    uint32_t currentPublicKeyId,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
-
-// Raw 0x07 / AS_GetPublicKeyReply parse anchors:
-// - current strongest child-side consumer/owner-handling anchor:
-//   - launcher.exe:0x4484d3 inside
-//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
-// - local packet parse accessor used there:
-//   - launcher.exe:0x443910 = Packet_AsGetPublicKeyReply_0x4b6ca4::InitFromIncomingMessage
-// - later auth-reply/state-family consumers still decode the body through their own anchored paths:
-//   - launcher.exe:0x41bc20
-//   - launcher.exe:0x4401a0
-// Raw 0x08 / AS_AuthRequest build anchors:
-// - source file anchor:
-//   `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`
-// - strongest current original send-builder anchor:
-//   - launcher.exe:0x4474f0
-// - branch/dispatch anchor selecting raw 0x06 vs 0x08 path:
-//   - launcher.exe:0x448050
-// - later material/current-key continuation anchor:
-//   - launcher.exe:0x429b0
-bool BuildAuthRequestBlobPlaintext(
-    const std::string& username,
-    const AuthBlobLayout& layout,
-    std::vector<uint8_t>* outPlaintext,
-    std::vector<uint8_t>* outTwofishKey,
-    uint16_t* outUsernameLengthField);
-
-bool EncryptAuthRequestBlob(
-    const std::vector<uint8_t>& plaintext,
-    std::vector<uint8_t>* outCiphertext);
-
-// Raw 0x09 / AS_AuthChallenge parse anchors:
-// - current strongest child-side consumer/owner-handling anchor:
-//   - launcher.exe:0x44831c..0x448467 inline inside
-//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
-// - local packet parse accessor used there:
-//   - launcher.exe:0x443d90 = Packet_AsAuthChallenge_0x4b6ce0 init path
-
-// Raw 0x0a / AS_AuthChallengeResponse build anchors:
-// - concrete owner-side inline continuation lives in:
-//   - launcher.exe:0x44831c..0x448467 inside
-//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
-// - later challenge/material continuation anchor:
-//   - launcher.exe:0x429b0
-//
-// Important fidelity note:
-// - the current static-RE does NOT justify a standalone public launcher-style helper boundary for
-//   raw 0x0a packet building
-// - keep the orchestration/material assembly in the anchored owner path unless a real shared
-//   original function boundary is recovered later
-
-// Raw 0x0b / AS_AuthReply parse anchors:
-// - current strongest child-side consumer/owner-handling anchor:
-//   - launcher.exe:0x448140 inline inside
-//     AuthBootstrap680Child_0x441290::HandleInboundAuthMessage
-// - launcher-faithful copied parse object builder used there:
-//   - launcher.exe:0x444390 / 0x4449c0 / 0x443470
-// - later owner-side handler:
-//   - launcher.exe:0x4401a0
-
 // Transitional low-level margin CERT/MS bootstrap helpers.
 // These stay in the shared crypto layer because they model reusable wire/crypto behavior backed by
 // open server/proxy evidence:
@@ -296,18 +131,6 @@ bool EncryptAuthRequestBlob(
 // - `../../../work/mxoemu/Proxy/Logging.cpp`
 // They are not a claim that final launcher-owned state progression/source ownership should live
 // here permanently.
-struct MarginConnectChallenge {
-    bool valid;
-    std::vector<uint8_t> payloadBytes;
-    std::array<uint8_t, 16> seedBytes;
-    uint32_t chunkByteCount;
-
-    MarginConnectChallenge()
-        : valid(false),
-          payloadBytes(),
-          seedBytes{},
-          chunkByteCount(0) {}
-};
 
 struct MarginConnectReply {
     bool valid;
@@ -335,18 +158,6 @@ struct MarginConnectReply {
           field13(0),
           field15(0) {}
 };
-
-// Encrypted raw 0x09 / MS_ConnectReply parse helpers.
-bool ParseMarginMsConnectReplyPayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    MarginConnectReply* outReply);
-
-// Transitional compatibility alias for earlier call sites.
-bool ParseMarginConnectReplyPayload(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    MarginConnectReply* outReply);
 
 // Generic encrypted margin payload wrapper used by MS bootstrap packets and later margin traffic.
 // Wire shape follows the open-server `EncryptedPacket` helper: random IV + Twofish-CBC ciphertext
