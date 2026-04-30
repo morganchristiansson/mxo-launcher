@@ -1246,7 +1246,7 @@ public:
     // Wrapper immediately beneath mediator send helper `0x41af70`.
     // Original body extracts packetBuilder `+0x08` and forwards that retained message-ref object
     // into vtable `+0x28` / `0x448cf0`.
-    uint32_t ForwardPacketBuilderToSendPacket(
+    void ForwardPacketBuilderToSendPacket(
         Packet_0x4af2a4& packetBuilder);
 
     // anchor: launcher.exe:0x448cf0

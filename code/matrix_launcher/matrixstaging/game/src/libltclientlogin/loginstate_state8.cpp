@@ -249,7 +249,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     }
 
     // anchor: launcher.exe state8 send thunk - pass the stack-local packet builder itself
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
+    g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
     g_CurrentLoginMediator->PostEvent(0x09u);
 
     const unsigned nonZeroSnapshotBlockCount =
@@ -267,7 +267,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
     // gameSessionId already declared above in SetGameSessionId block
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' then posts event=9",
         0xbbu,
         packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
             ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u,
@@ -276,8 +276,7 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
         nonZeroSnapshotBlockCount,
         g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
         g_CurrentLoginMediator->selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
-        gameSessionId ? gameSessionId : "<empty>",
-        sendResult);
+        gameSessionId ? gameSessionId : "<empty>");
     return;
 }
 

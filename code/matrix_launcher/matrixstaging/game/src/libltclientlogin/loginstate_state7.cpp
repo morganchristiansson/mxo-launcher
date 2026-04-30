@@ -105,21 +105,20 @@ void CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue(CLTLoginState* upstrea
     }
 
     // anchor: launcher.exe state7 send thunk - pass the stack-local packet builder itself
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
+    g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
     g_CurrentLoginMediator->PostEvent(0x07u);
 
     const uint16_t totalBytes = packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
         ? packetBuilder.messageRef08->messageStorage0c->PayloadByteCount() : 0u;
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
+        "DIAGNOSTIC: CLTLoginState_State7_0x4b50b4::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' then posts event=0x07",
         State7Packet0x0dFixedPayload::kFixedByteCount,
         totalBytes,
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
         currentSlotRecord ? currentSlotRecord->characterIdLow1c : 0u,
         currentSlotRecord ? currentSlotRecord->characterIdHigh20 : 0u,
-        currentSlotRecord && currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
-        sendResult);
+        currentSlotRecord && currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>");
     return;
 }
 

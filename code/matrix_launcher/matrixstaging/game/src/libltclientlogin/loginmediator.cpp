@@ -2100,14 +2100,14 @@ void CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold(std::string_view 
 //     Packet_0x4af2a4-family object still on the stack
 // That downstream wrapper reads packetBuilder+0x08 and forwards the retained outer
 // message-ref object into `0x448cf0`.
-uint32_t CLTLoginMediator::SendCurrentMarginPacket(
+void CLTLoginMediator::SendCurrentMarginPacket(
     mxo::liblttcp::Packet_0x4af2a4& packetBuilder) {
     mxo::liblttcp::CMessageConnection_0x4b7928* const connection = marginConnection_;
     if (!connection) {
-        return 0u;
+        return;
     }
 
-    return connection->ForwardPacketBuilderToSendPacket(packetBuilder);
+    connection->ForwardPacketBuilderToSendPacket(packetBuilder);
 }
 
 // anchor: launcher.exe:0x41f270

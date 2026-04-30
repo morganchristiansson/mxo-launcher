@@ -982,7 +982,7 @@ public:
     // - `0x448cf0` consumes that message-ref object, not bare payload bytes
     // - caller passes the real stack-local `Packet_0x4af2a4`-family object, not a synthetic
     //   source-only envelope wrapper
-    uint32_t SendCurrentMarginPacket(
+    void SendCurrentMarginPacket(
         mxo::liblttcp::Packet_0x4af2a4& packetBuilder);
 
     // anchor: launcher.exe:0x41e500

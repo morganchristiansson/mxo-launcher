@@ -216,7 +216,7 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
   }
 
   // anchor: launcher.exe:0x43b9df..0x43b9ec - pass the stack-local packet builder itself
-  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
+  g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
   g_CurrentLoginMediator->PostEvent(0x11u);
   // Log version values for diagnostics (dereferenced from pointers)
   const uint32_t loggedLauncherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
@@ -227,7 +227,7 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode()
     : 0u);
   spdlog::info(
-    "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
+    "CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} currentState={} then posts event=0x11",
     0x23u,
     static_cast<unsigned>(loggedLauncherVersion),
     static_cast<unsigned>(loggedClientVersion),
@@ -236,7 +236,6 @@ void CLTLoginState_State6_0x4b508c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     static_cast<unsigned>(loggedGobGuid[2]),
     static_cast<unsigned>(loggedGobGuid[3]),
     static_cast<unsigned>(loggedHelperPhase),
-    static_cast<unsigned>(sendResult),
     g_CurrentLoginMediator->currentState_
     ? g_CurrentLoginMediator->currentState_->DebugName()
     : "<null>");
@@ -344,12 +343,11 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
   packetBuilder.SetChallengeResponseFields(goHereAddr, sessionSecret);
 
   // anchor: launcher.exe:0x440a0b..0x440a18 - pass the stack-local packet builder itself
-  const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
+  g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
 
   spdlog::info(
-      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage sent opcode-0x08 challenge response goHereAddr=0x{:08x} sessionSecret=0x{:08x} sendResult=0x{:08x}",
-      static_cast<unsigned>(goHereAddr), static_cast<unsigned>(sessionSecret),
-      static_cast<unsigned>(sendResult));
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage sent opcode-0x08 challenge response goHereAddr=0x{:08x} sessionSecret=0x{:08x}",
+      static_cast<unsigned>(goHereAddr), static_cast<unsigned>(sessionSecret));
 
   // anchor: launcher.exe:0x440a18..0x440a30 - no state transition after sending 0x08
   // In original, state transition happens AFTER receiving the ConnectReply (0x09), not after sending 0x08.

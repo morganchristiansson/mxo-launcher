@@ -97,7 +97,7 @@ void CLTLoginState_State10_0x4b512c::Slot3_BeginOrContinue(CLTLoginState* upstre
     }
 
     // anchor: launcher.exe state10 send thunk - pass the stack-local packet builder itself
-    (void)g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
+    g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
     g_CurrentLoginMediator->PostEvent(0x13u);
 
     const uint16_t totalBytes = packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c

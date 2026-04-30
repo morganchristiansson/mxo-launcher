@@ -240,11 +240,11 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
     }
 
     // anchor: launcher.exe state11 send thunk - pass the stack-local packet builder itself
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
+    g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
     g_CurrentLoginMediator->PostEvent(0x15u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
+        "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' then posts event=0x15",
         State11Packet0x4dFixedPayload::kPayloadTag0c,
         State11Packet0x4dFixedPayload::kFixedByteCount,
         packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c
@@ -258,8 +258,7 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
         std::string(g_CurrentLoginMediator->createCharacterData108.realFirstName70.data()),
         std::string(g_CurrentLoginMediator->createCharacterData108.realLastName90.data()),
         std::string(g_CurrentLoginMediator->createCharacterData108.backgroundB0.data()),
-        g_CurrentLoginMediator->GetGameSessionId() ? g_CurrentLoginMediator->GetGameSessionId() : "<empty>",
-        sendResult);
+        g_CurrentLoginMediator->GetGameSessionId() ? g_CurrentLoginMediator->GetGameSessionId() : "<empty>");
     spdlog::info(
         "CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={}",
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
