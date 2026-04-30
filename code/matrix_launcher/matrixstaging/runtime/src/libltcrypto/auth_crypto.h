@@ -66,20 +66,6 @@ bool BuildVariableLengthPacket(
 // They are not a claim that final launcher-owned state progression/source ownership should live
 // here permanently.
 
-// Generic encrypted margin payload wrapper used by MS bootstrap packets and later margin traffic.
-// Wire shape follows the open-server `EncryptedPacket` helper: random IV + Twofish-CBC ciphertext
-// over `[crc32][u16 length][u32 timestamp][payload]`.
-bool EncryptMarginPayloadPacket(
-    const uint8_t* payloadBytes,
-    size_t payloadSize,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    std::vector<uint8_t>* outEncryptedPayloadBytes);
-
-bool DecryptMarginPayloadPacket(
-    const uint8_t* encryptedPayloadBytes,
-    size_t encryptedPayloadSize,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    std::vector<uint8_t>* outPayloadBytes);
 
 }  // namespace auth
 }  // namespace mxo

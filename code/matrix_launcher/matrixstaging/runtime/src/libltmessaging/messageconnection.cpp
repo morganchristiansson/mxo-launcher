@@ -3,7 +3,6 @@
 
 #include "../../../game/src/libltclientlogin/loginmediator.h"
 #include "../libltbase/ltresult.h"
-#include "../libltcrypto/auth_crypto.h"
 #include "../libltcrypto/auth_internal.h"
 #include "variablelengthprefixedtcpstreamparser.h"
 #include "spdlog/spdlog.h"
@@ -56,6 +55,132 @@ static void** CMessageConnection_0x4b7928_CompletionHelperVtable() {
     // anchor: launcher.exe vtable `0x004b3e20`
     static void* vtable[1] = {nullptr};
     return vtable;
+}
+
+// anchor: launcher.exe:0x44c750
+static bool CPacketEncryptor_EncryptPayloadScaffold(
+    const uint8_t* payloadBytes,
+    size_t payloadByteCount,
+    const std::array<uint8_t, 16>& seedBytes,
+    std::vector<uint8_t>* outEncryptedPayloadBytes) {
+    using namespace mxo::auth::internal;
+
+    if (!payloadBytes || payloadByteCount == 0u || !outEncryptedPayloadBytes ||
+        payloadByteCount > 0xffffu) {
+        return false;
+    }
+
+    const uint16_t payloadLength = static_cast<uint16_t>(payloadByteCount);
+    const uint32_t timestamp = CurrentUnixTimeU32();
+
+    std::vector<uint8_t> checksumInputBytes;
+    checksumInputBytes.reserve(2u + 4u + payloadByteCount);
+    AppendU16LE(&checksumInputBytes, payloadLength);
+    AppendU32LE(&checksumInputBytes, timestamp);
+    checksumInputBytes.insert(
+        checksumInputBytes.end(),
+        payloadBytes,
+        payloadBytes + payloadByteCount);
+
+    uint8_t crcBytes[4] = {0};
+    CryptoPP::CRC32 crc;
+    crc.Update(checksumInputBytes.data(), checksumInputBytes.size());
+    crc.Final(crcBytes);
+
+    std::vector<uint8_t> plaintextBytes;
+    plaintextBytes.reserve(sizeof(crcBytes) + checksumInputBytes.size());
+    plaintextBytes.insert(plaintextBytes.end(), crcBytes, crcBytes + sizeof(crcBytes));
+    plaintextBytes.insert(
+        plaintextBytes.end(),
+        checksumInputBytes.begin(),
+        checksumInputBytes.end());
+
+    uint8_t ivBytes[16] = {0};
+    std::vector<uint8_t> ciphertextBytes;
+    try {
+        CryptoPP::AutoSeededRandomPool rng;
+        rng.GenerateBlock(ivBytes, sizeof(ivBytes));
+
+        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
+        feedbackTransform.SetKeyWithIV(seedBytes.data(), seedBytes.size(), ivBytes);
+
+        std::string ciphertext;
+        CryptoPP::StringSource source(
+            plaintextBytes.data(),
+            plaintextBytes.size(),
+            true,
+            new CryptoPP::StreamTransformationFilter(
+                feedbackTransform,
+                new CryptoPP::StringSink(ciphertext)));
+        ciphertextBytes.assign(ciphertext.begin(), ciphertext.end());
+    } catch (const CryptoPP::Exception&) {
+        return false;
+    }
+
+    outEncryptedPayloadBytes->clear();
+    outEncryptedPayloadBytes->reserve(sizeof(ivBytes) + ciphertextBytes.size());
+    outEncryptedPayloadBytes->insert(outEncryptedPayloadBytes->end(), ivBytes, ivBytes + sizeof(ivBytes));
+    outEncryptedPayloadBytes->insert(
+        outEncryptedPayloadBytes->end(),
+        ciphertextBytes.begin(),
+        ciphertextBytes.end());
+    return true;
+}
+
+// anchor: launcher.exe:0x44bca0
+static bool CPacketDecryptor_DecryptPayloadScaffold(
+    const uint8_t* encryptedPayloadBytes,
+    size_t encryptedPayloadByteCount,
+    const std::array<uint8_t, 16>& seedBytes,
+    std::vector<uint8_t>* outPayloadBytes) {
+    using namespace mxo::auth::internal;
+
+    if (!encryptedPayloadBytes || !outPayloadBytes || encryptedPayloadByteCount <= 16u) {
+        return false;
+    }
+
+    std::vector<uint8_t> plaintextBytes;
+    try {
+        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption feedbackTransform;
+        feedbackTransform.SetKeyWithIV(seedBytes.data(), seedBytes.size(), encryptedPayloadBytes);
+
+        std::string plaintext;
+        CryptoPP::StringSource source(
+            encryptedPayloadBytes + 16u,
+            encryptedPayloadByteCount - 16u,
+            true,
+            new CryptoPP::StreamTransformationFilter(
+                feedbackTransform,
+                new CryptoPP::StringSink(plaintext)));
+        plaintextBytes.assign(plaintext.begin(), plaintext.end());
+    } catch (const CryptoPP::Exception&) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    if (plaintextBytes.size() < 10u) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    const uint16_t payloadLength = ReadU16LE(plaintextBytes.data() + 4u);
+    const size_t expectedPlaintextByteCount = 4u + 2u + 4u + payloadLength;
+    if (plaintextBytes.size() != expectedPlaintextByteCount) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    uint8_t expectedCrcBytes[4] = {0};
+    CryptoPP::CRC32 crc;
+    crc.Update(plaintextBytes.data() + 4u, plaintextBytes.size() - 4u);
+    crc.Final(expectedCrcBytes);
+    if (std::memcmp(expectedCrcBytes, plaintextBytes.data(), sizeof(expectedCrcBytes)) != 0) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    outPayloadBytes->assign(plaintextBytes.begin() + 10u, plaintextBytes.end());
+    return true;
 }
 
 }  // namespace
@@ -523,10 +648,10 @@ bool CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::TryTransform(
     }
 
     std::vector<uint8_t> decryptedPayloadBytes;
-    if (!mxo::auth::DecryptMarginPayloadPacket(
+    if (!CPacketDecryptor_DecryptPayloadScaffold(
             encryptedPayloadBytes,
             encryptedPayloadByteCount,
-            CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
+            associatedSeedBytes,
             &decryptedPayloadBytes)) {
         return false;
     }
@@ -575,40 +700,24 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
 
     spdlog::debug("TryTransform: input payload[0]={:02x} count={}", payloadBytes[0], payloadByteCount);
 
-    // FIDELITY: Check for CERT packet format [opcode][3][data] which should NOT be encrypted
-    // Server expects CERT packets (opcodes 1-5) with second field = 3 to be sent unencrypted
-    // This matches launcher.exe behavior where certain critical packets bypass stream encryption
-    bool shouldEncrypt = true;
-    if (payloadByteCount >= 3 &&
-        payloadBytes[0] >= 0x01 && payloadBytes[0] <= 0x05) {  // CERT opcodes 1-5
-        const uint16_t secondField = *reinterpret_cast<const uint16_t*>(payloadBytes + 1);
-        if (secondField == 3) {
-            shouldEncrypt = false;
-            spdlog::debug("TryTransform: skipping encryption for CERT packet with unencrypted flag (opcode={:02x}, field=3)",
-                payloadBytes[0]);
-        }
+    // anchor: launcher.exe:0x44d390
+    // Static-RE decompile shows the write helper always builds a sink, snapshots the owner
+    // endpoint key, and unconditionally calls `CPacketEncryptor_EncryptPacket(1, payload, len)`.
+    // The old CERT bypass heuristic was source-owned and has been removed.
+    std::vector<uint8_t> encryptedPayloadBytes;
+    if (!CPacketEncryptor_EncryptPayloadScaffold(
+            payloadBytes,
+            payloadByteCount,
+            associatedSeedBytes,
+            &encryptedPayloadBytes)) {
+        spdlog::debug("TryTransform: CPacketEncryptor_EncryptPayloadScaffold failed");
+        return false;
     }
 
-    if (shouldEncrypt) {
-        std::vector<uint8_t> encryptedPayloadBytes;
-        if (!mxo::auth::EncryptMarginPayloadPacket(
-                payloadBytes,
-                payloadByteCount,
-                CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
-                &encryptedPayloadBytes)) {
-            spdlog::debug("TryTransform: EncryptMarginPayloadPacket failed");
-            return false;
-        }
-
-        spdlog::debug("TryTransform: encrypted output size={}", encryptedPayloadBytes.size());
-        return outputBuffer->SetPayloadBytes(
-            encryptedPayloadBytes.data(),
-            encryptedPayloadBytes.size());
-    } else {
-        // Send unencrypted - copy payload directly
-        spdlog::debug("TryTransform: sending unencrypted, output size={}", payloadByteCount);
-        return outputBuffer->SetPayloadBytes(payloadBytes, payloadByteCount);
-    }
+    spdlog::debug("TryTransform: encrypted output size={}", encryptedPayloadBytes.size());
+    return outputBuffer->SetPayloadBytes(
+        encryptedPayloadBytes.data(),
+        encryptedPayloadBytes.size());
 }
 
 // anchor: launcher.exe:0x44bb60 / helper-family vtable `0x004b81c8 +0x04`

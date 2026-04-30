@@ -53,14 +53,28 @@ No live call sites remained. They only fed helper code that was not part of the 
 
 No live call sites remained. Active margin/bootstrap receive code already uses packet/view classes and direct byte vectors rather than a synthetic umbrella reply struct.
 
+## Follow-up: remaining margin encrypt/decrypt wrappers
+
+Static-RE on the last two public helpers showed their only live launcher.exe call sites are not in the auth bootstrap layer at all, but in the message-connection stream-encryption module:
+
+- write path `launcher.exe:0x44d390`
+  - decompile shows the helper always constructs a sink and unconditionally calls `CPacketEncryptor_EncryptPacket(1, payload, len)`
+  - there is no separate CERT bypass branch in the recovered launcher body
+- read path `launcher.exe:0x44d500`
+  - decompile shows the helper loops read transforms and calls `CPacketDecryptor_DecryptPacket(..., &endpointKey.familyPortDword)`
+  - packet validation/CRC/timestamp semantics belong to the packet decryptor path, not a generic public auth helper
+- packet crypto inner helpers:
+  - `launcher.exe:0x44c750` = `CPacketEncryptor_EncryptPacket`
+  - `launcher.exe:0x44bca0` = `CPacketDecryptor_DecryptPacket`
+
+So the old public `EncryptMarginPayloadPacket(...)` / `DecryptMarginPayloadPacket(...)` wrappers were another source-owned layer. They were removed from `auth_crypto.h`, and the narrow surviving payload encrypt/decrypt scaffolds now live next to their only validated callers in `matrixstaging/runtime/src/libltmessaging/messageconnection.cpp`.
+
 ## Result
 
-All struct definitions were deleted from `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`.
+All source-owned structs were deleted from `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`, and the remaining packet encrypt/decrypt wrappers were also removed from the public auth header.
 
-The public API now keeps only the lower-fidelity pieces that still correspond to active behavior:
+The public API now keeps only the pieces that still correspond to active validated behavior:
 
 - framing enum
 - `BuildVariableLengthPacket(...)` returning framed bytes + header length
-- `EncryptMarginPayloadPacket(...)` returning encrypted payload bytes
-- `DecryptMarginPayloadPacket(...)`
 - `AuthOpcodeName(...)`
