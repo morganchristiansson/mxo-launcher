@@ -461,9 +461,6 @@ static uint32_t __thiscall LauncherObject_Slot10_443810(
 static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self);
 // UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
 static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self);
-// anchor: launcher.exe:0x4147b0
-// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
-static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self);
 
 // anchor: launcher.exe:0x431670
 // vtable: launcher.exe:0x004b2768 slot +0x2c
@@ -490,48 +487,8 @@ static CRITICAL_SECTION* LauncherObjectCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
 
-// UNANCHORED: helper-to-owner backpointer used by the current arg5 embedded helper surfaces.
-static LauncherObjectAbiShell* LauncherObjectShellFromHelper(void* helperSelf, size_t helperOffset) {
-    return helperSelf
-        ? reinterpret_cast<LauncherObjectAbiShell*>(static_cast<unsigned char*>(helperSelf) - helperOffset)
-        : NULL;
-}
-
-static LauncherObjectAbiShell* LauncherObjectShellFromLockHelper(void* helperSelf, size_t* outHelperOffset) {
-    if (!helperSelf) {
-        return NULL;
-    }
-
-    LauncherObjectAbiShell* owner60 = LauncherObjectShellFromHelper(helperSelf, 0x60);
-    if (owner60 && (&owner60->helper60 == helperSelf)) {
-        if (outHelperOffset) {
-            *outHelperOffset = 0x60;
-        }
-        return owner60;
-    }
-
-    LauncherObjectAbiShell* owner98 = LauncherObjectShellFromHelper(helperSelf, 0x98);
-    if (owner98 && (&owner98->helper98 == helperSelf)) {
-        if (outHelperOffset) {
-            *outHelperOffset = 0x98;
-        }
-        return owner98;
-    }
-
-    return NULL;
-}
-
 // UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
 static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
-    size_t helperOffset = 0;
-    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromLockHelper(self, &helperOffset)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            return (helperOffset == 0x98)
-                ? engine->EnterCleanupLockHelper()
-                : engine->EnterQueueLockHelper();
-        }
-    }
-
     if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
         EnterCriticalSection(crit);
     }
@@ -540,15 +497,6 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
 
 // UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
 static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
-    size_t helperOffset = 0;
-    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromLockHelper(self, &helperOffset)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            return (helperOffset == 0x98)
-                ? engine->LeaveCleanupLockHelper()
-                : engine->LeaveQueueLockHelper();
-        }
-    }
-
     if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
         LeaveCriticalSection(crit);
     }
@@ -558,12 +506,6 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
 // anchor: launcher.exe:0x435f90
 // vtable: launcher.exe:arg5+0x5c helper slot +0x00
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
-    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x5c)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            return engine->SignalQueueEventHelper();
-        }
-    }
-
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
 }
@@ -571,12 +513,6 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
 // anchor: launcher.exe:0x435fa0
 // vtable: launcher.exe:arg5+0x5c helper slot +0x04
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
-    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x5c)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            return engine->WaitQueueEventHelper(reason);
-        }
-    }
-
     void* helper60 = self ? static_cast<unsigned char*>(self) + 4 : NULL;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     if (helper60) {
@@ -586,34 +522,17 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
     const DWORD waitResult = eventHandle ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reason)) : WAIT_FAILED;
     if (waitResult == WAIT_OBJECT_0) {
         if (helper60) {
-            LauncherObject_Subobject60_Slot0(helper60);
+            LauncherObject_LockHelper_Slot0(helper60);
         }
         return 0u;
     }
     if (waitResult == WAIT_TIMEOUT) {
         if (helper60) {
-            LauncherObject_Subobject60_Slot0(helper60);
+            LauncherObject_LockHelper_Slot0(helper60);
         }
         return 3u;
     }
     return 1u;
-}
-
-// anchor family: launcher.exe:0x4147b0
-// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
-// Faithfulness note:
-// - the original helper body itself is just the `EnterCriticalSection` wrapper from `0x4147b0`
-// - the old launcher-side no-worker receive pump layered on top of this slot was source-only
-//   infidelity and has been removed
-static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
-    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            return engine->EnterQueueLockHelper();
-        }
-    }
-
-    LauncherObject_LockHelper_Slot0(self);
-    return 0u;
 }
 
 
@@ -658,8 +577,8 @@ static void** LauncherObjectSubVtable5C() {
 // UNANCHORED: compile-time launcher arg5 helper table for the final `+0x60` ctor state.
 static void** LauncherObjectSubVtable60() {
     static void* const kSubVtable60[2] = {
-        (void*)LauncherObject_Subobject60_Slot0, // 0x4147b0
-        (void*)LauncherObject_LockHelper_Slot1,  // 0x4147c0
+        (void*)LauncherObject_LockHelper_Slot0, // 0x4147b0
+        (void*)LauncherObject_LockHelper_Slot1, // 0x4147c0
     };
     return const_cast<void**>(kSubVtable60);
 }
