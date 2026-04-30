@@ -1574,40 +1574,67 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             if (connectStatusQueued) {
                 return;
             }
-            const bool queued = engine->EnqueueDirectConnectionStatusWorkItemScaffold(
-                connection,
-                CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus,
-                workPayload,
+            CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* statusWorkItem =
+                CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
+                    CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
+                    workPayload);
+            if (!statusWorkItem) {
+                spdlog::warn(
+                    "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread direct queue connect status alloc failed connection={} ownerContext={} payload=0x{:08x}",
+                    fmt::ptr(connection),
+                    fmt::ptr(connection->OwnerContext()),
+                    static_cast<unsigned>(workPayload));
+                return;
+            }
+            const bool queued = engine->EnqueueCompletedOperationScaffold(
+                &statusWorkItem->header,
+                connection->QueueContextScaffold(),
+                /*useQueue34=*/false,
                 connectStatusLabel,
                 /*queueLockAlreadyHeld=*/false);
             if (!queued) {
+                std::free(statusWorkItem);
                 spdlog::warn(
                     "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread direct queue connect status failed connection={} ownerContext={} payload=0x{:08x}",
                     fmt::ptr(connection),
                     fmt::ptr(connection->OwnerContext()),
                     static_cast<unsigned>(workPayload));
+                return;
             }
-            connectStatusQueued = queued;
+            connectStatusQueued = true;
         };
 
     const auto queueClose = [&]() {
         if (closeQueued) {
             return;
         }
-        const bool queued = engine->EnqueueDirectConnectionStatusWorkItemScaffold(
-            connection,
-            CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose,
-            0u,
+        CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* closeWorkItem =
+            CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
+                CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate());
+        if (!closeWorkItem) {
+            spdlog::warn(
+                "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread direct queue close alloc failed connection={} ownerContext={} state={}",
+                fmt::ptr(connection),
+                fmt::ptr(connection->OwnerContext()),
+                static_cast<unsigned>(connection->State()));
+            return;
+        }
+        const bool queued = engine->EnqueueCompletedOperationScaffold(
+            &closeWorkItem->header,
+            connection->QueueContextScaffold(),
+            /*useQueue34=*/false,
             closeStatusLabel,
             /*queueLockAlreadyHeld=*/false);
         if (!queued) {
+            std::free(closeWorkItem);
             spdlog::warn(
                 "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread direct queue close failed connection={} ownerContext={} state={}",
                 fmt::ptr(connection),
                 fmt::ptr(connection->OwnerContext()),
                 static_cast<unsigned>(connection->State()));
+            return;
         }
-        closeQueued = queued;
+        closeQueued = true;
     };
 
     const auto closeAndInvalidateSocket = [&]() {
@@ -3213,82 +3240,6 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         fmt::ptr(context),
         queuePairWasEmpty ? 1u : 0u,
         queueLockAlreadyHeld ? 1u : 0u);
-    return true;
-}
-
-bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueDirectConnectionStatusWorkItemScaffold(
-    CLTTCPConnection* connection,
-    uint32_t workType,
-    uint32_t workPayload,
-    const char* label,
-    bool queueLockAlreadyHeld) {
-    if (!connection) {
-        return false;
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader* workItem = nullptr;
-    if (workType == kWorkTypeConnectionStatus) {
-        CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* statusWorkItem =
-            CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
-                CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
-                workPayload);
-        if (!statusWorkItem) {
-            LoggerForQueueLabel(label)->info(
-                "CLTThreadPerClientTCPEngine_0x4b2768::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
-                label ? label : "<null>");
-            return false;
-        }
-        workItem = &statusWorkItem->header;
-    } else if (workType == kWorkTypeClose) {
-        CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* closeWorkItem =
-            CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
-                CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate());
-        if (!closeWorkItem) {
-            LoggerForQueueLabel(label)->info(
-                "CLTThreadPerClientTCPEngine_0x4b2768::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
-                label ? label : "<null>");
-            return false;
-        }
-        workItem = &closeWorkItem->header;
-    } else {
-        LoggerForQueueLabel(label)->warn(
-            "CLTThreadPerClientTCPEngine_0x4b2768::EnqueueDirectConnectionStatusWorkItemScaffold unsupported workType=0x{:08x} ({}) connection={} label='{}'",
-            workType,
-            EngineWorkTypeName(workType),
-            fmt::ptr(connection),
-            label ? label : "<null>");
-        return false;
-    }
-
-    void* queuedContext = connection ? connection->QueueContextScaffold() : nullptr;
-    const bool queued = EnqueueCompletedOperationScaffold(
-        workItem,
-        queuedContext,
-        /*useQueue34=*/false,
-        label,
-        queueLockAlreadyHeld);
-    if (!queued) {
-        std::free(workItem);
-        return false;
-    }
-
-    LoggerForQueueLabel(label)->info(
-        "CLTThreadPerClientTCPEngine_0x4b2768 direct queued work label='{}' workItem={} context={} type=0x{:08x} ({}) payload=0x{:08x}",
-        label ? label : "<null>",
-        fmt::ptr(workItem),
-        fmt::ptr(queuedContext),
-        workType,
-        EngineWorkTypeName(workType),
-        workPayload);
-
-    // Queue-timing rollback for late runtime stability:
-    // - original producer paths only enqueue here and let the normal queue consumer family
-    //   (`0x436fc0 -> 0x436b10` queue thread or client arg5 helper `+0x60`) drain later
-    // - the earlier source-owned immediate drain let worker/connect threads re-enter margin/auth
-    //   completion logic synchronously, which is a stronger replacement-only timing change than the
-    //   now-restored direct-`context=this` producer shape
-    // - keep type-1/type-2 completion ordering on the real queue-consumer path instead of
-    //   short-circuiting it on the producer thread
     return true;
 }
 

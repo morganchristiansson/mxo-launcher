@@ -547,12 +547,6 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    bool EnqueueDirectConnectionStatusWorkItemScaffold(
-        CLTTCPConnection* connection,
-        uint32_t workType,
-        uint32_t workPayload,
-        const char* label,
-        bool queueLockAlreadyHeld);
     // UNANCHORED: launcher-visible mirror refresh for the recovered +0x80/+0x8c sentinel heads and
     // count dwords.
     void RefreshOwnedLauncherMirrorStateScaffold();
