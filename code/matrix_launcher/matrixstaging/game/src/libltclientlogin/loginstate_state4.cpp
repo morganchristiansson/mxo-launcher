@@ -130,7 +130,8 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
             // - read owner byte `+0xcc8`
             // - call owner vtable `+0xe0(slot, 0)`
             // - forward the returned route-host text into `0x41e500`
-            const uint8_t routeSlot = g_CurrentLoginMediator->CurrentCharacterRouteIndexCc8Scaffold();
+            const uint8_t routeSlot =
+                g_CurrentLoginMediator->selectionRouteState684_.currentSlotOrSelectionIndex644_;
             g_CurrentLoginMediator->BeginMarginConnection(
                 g_CurrentLoginMediator->GetVariantWorldName(routeSlot),
                 0u);
