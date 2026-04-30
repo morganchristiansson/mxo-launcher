@@ -1258,11 +1258,7 @@ bool CLTThread::Resume() {
     {
         std::lock_guard<std::mutex> lock(stateMutex_);
         threadHandle = threadHandle_;
-        if (threadHandle == 0) {
-            return false;
-        }
-
-        isCurrentThread = (threadId_ != 0 && threadId_ == GetCurrentThreadId());
+        isCurrentThread = IsCurrentThread();
         if (isCurrentThread) {
             ++suspendDepth_;
         }
@@ -1272,8 +1268,7 @@ bool CLTThread::Resume() {
         return false;
     }
 
-    const DWORD resumeResult = ResumeThread(reinterpret_cast<HANDLE>(threadHandle));
-    return resumeResult != 0xffffffffu;
+    return ResumeThread(reinterpret_cast<HANDLE>(threadHandle)) != 0xffffffffu;
 }
 
 // anchor: launcher.exe:0x452660
@@ -1346,21 +1341,19 @@ uint32_t CLTThread::Wait() {
 // anchor: launcher.exe:0x452620
 void CLTThread::Suspend() {
     uintptr_t threadHandle = 0;
-    int suspendDepth = 0;
+    int previousSuspendDepth = 0;
     {
         std::lock_guard<std::mutex> lock(stateMutex_);
         threadHandle = threadHandle_;
-        suspendDepth = suspendDepth_;
-        if (suspendDepth_ > 0) {
+        previousSuspendDepth = suspendDepth_;
+        if (previousSuspendDepth > 0) {
             --suspendDepth_;
         }
     }
 
-    if (threadHandle == 0 || suspendDepth > 0) {
-        return;
+    if (previousSuspendDepth <= 0) {
+        (void)SuspendThread(reinterpret_cast<HANDLE>(threadHandle));
     }
-
-    (void)SuspendThread(reinterpret_cast<HANDLE>(threadHandle));
 }
 
 // anchor: launcher.exe:0x431a40
