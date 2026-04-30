@@ -413,15 +413,6 @@ public:
     // Narrow source-owned mirror of the worker-thread receive delivery shape:
     // - each recv iteration allocates a `CLTTCPReadOperation`-family fragment
     // - recv lands directly into fragment `+0x0c`
-    // - take one worker-owned outer ref immediately after allocation/setup
-    // - set fragment byte count
-    // - take one more delivery-temp ref just before `OnReceive(readOperationFragment)`
-    // - release only that delivery-temp ref after the callback returns
-    // This helper still models one successful recv/OnReceive iteration per call.
-    // Current source may re-enter it repeatedly from the launcher bridge within one arg5 helper
-    // poll, but the original `0x42fe50` same-poll recv-drain loop is still not reconstructed here
-    // inside `CLTTCPConnection` itself.
-    int PollReceiveAndDeliverReadOperationFragmentsScaffold();
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
     // Inherited shared `CBaseConnection::Close(bool)` body; this table does not add a distinct

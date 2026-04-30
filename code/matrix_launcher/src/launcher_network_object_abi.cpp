@@ -603,23 +603,16 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
 // vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
 // Faithfulness note:
 // - the original helper body itself is just the `EnterCriticalSection` wrapper from `0x4147b0`
-// - the extra launcher-side no-worker pump remains a current shell-owned side effect layered on
-//   top of that pure enter-helper body for the arg5 `+0x60` slot-0 path only
+// - the old launcher-side no-worker receive pump layered on top of this slot was source-only
+//   infidelity and has been removed
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            const uint32_t result = engine->EnterQueueLockHelper();
-            engine->PumpLauncherConnectionsFromArg5HelperScaffold();
-            return result;
+            return engine->EnterQueueLockHelper();
         }
     }
 
     LauncherObject_LockHelper_Slot0(self);
-    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(owner)) {
-            engine->PumpLauncherConnectionsFromArg5HelperScaffold();
-        }
-    }
     return 0u;
 }
 
@@ -832,9 +825,7 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
 // UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
 void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking) {
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = ResolveLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(launcherObjectPtr))) {
-        engine->PumpLauncherConnectionsFromArg5HelperScaffold();
         engine->RunCompletedOperationQueue(nonBlocking);
-        engine->PumpLauncherConnectionsFromArg5HelperScaffold();
     }
 }
 

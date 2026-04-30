@@ -469,7 +469,6 @@ public:
         CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
         CLTTCPConnection* connection,
         const char* label = nullptr);
-    void PumpLauncherConnectionsFromArg5HelperScaffold();
 
     // anchor: launcher.exe:0x436b10
     // Current bounded source mirror:
@@ -532,18 +531,6 @@ private:
         uint32_t workPayload,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: narrow nonblocking receive pump used only by the current arg5 helper fallback.
-    // Current source-owned pacing split:
-    // - `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` stays the narrow
-    //   one-fragment recv->fragment->OnReceive seam
-    // - active worker-thread paths no longer go through a mediator-owned bridge context here
-    // - any remaining arg5-helper polling is therefore connection-centric and only used when a
-    //   direct auth/margin connection exists without an attached worker thread
-    void PumpLauncherConnectionContextScaffold(
-        CMessageConnection_0x4b7928* connection,
-        mxo::ltlogin::CLTLoginMediator* mediator,
-        bool isMarginConnection,
-        const char* receiveLabel);
     // UNANCHORED: launcher-visible mirror refresh for the recovered +0x80/+0x8c sentinel heads and
     // count dwords.
     void RefreshOwnedLauncherMirrorStateScaffold();
