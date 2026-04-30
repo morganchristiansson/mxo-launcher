@@ -1,5 +1,6 @@
 #include "ltthreadperclienttcpengine.h"
 
+#include "../../../../src/launcher_network_object_abi.h"
 #include "../libltmessaging/messageconnection.h"
 #include "../libltnet/sys/pc/pcsocket.h"
 #include <spdlog/spdlog.h>
@@ -2796,10 +2797,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
-    if (CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(this)) {
-        shell->queuePair0C = ownedQueuePair0C_;
-        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue00, &shell->queuePair0C.queue00);
-        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue28, &shell->queuePair0C.queue28);
+    if (void* shell = attachment.launcherObjectShell) {
+        LauncherNetworkEngineAttachQueueSurface(shell, &ownedQueuePair0C_);
+        CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shellMirror =
+            static_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(shell);
+        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue00, &shellMirror->queuePair0C.queue00);
+        MoveQueueRecycledBlocksScaffold(&ownedQueuePair0C_.queue28, &shellMirror->queuePair0C.queue28);
     }
     SyncAttachedLauncherObjectStateScaffold();
 }
@@ -2808,17 +2811,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
     CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = AttachedLauncherObjectShell(this);
     if (shell) {
-        ownedQueuePair0C_ = shell->queuePair0C;
+        LauncherNetworkEngineDetachQueueSurface(shell, &ownedQueuePair0C_);
         MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue00, &ownedQueuePair0C_.queue00);
         MoveQueueRecycledBlocksScaffold(&shell->queuePair0C.queue28, &ownedQueuePair0C_.queue28);
         std::memset(&shell->queuePair0C, 0, sizeof(shell->queuePair0C));
-        shell->field04 = 0u;
-        shell->field08 = nullptr;
-        shell->queueSignalEvent7C = nullptr;
-        shell->endpointTreeHead80 = nullptr;
-        shell->endpointCount84 = 0u;
-        shell->contextTreeHead8C = nullptr;
-        shell->contextCount90 = 0u;
+        LauncherNetworkEngineClearPublishedShellState(shell);
     }
 
     if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
@@ -2855,13 +2852,15 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
     //   from the raw arg5 shell bytes between virtual calls
     // - queue mechanics now stay native on the engine object and helper/primary wrappers forward
     //   behavior directly instead of treating the shell copy as authoritative storage
-    shell->field04 = ctorFlagsField04_;
-    shell->field08 = queueThreadArrayField08_;
-    shell->queueSignalEvent7C = ownedQueueSignalEvent7C_;
-    shell->endpointTreeHead80 = ownedEndpointTreeHead80_;
-    shell->endpointCount84 = ownedEndpointCount84_;
-    shell->contextTreeHead8C = ownedContextTreeHead8C_;
-    shell->contextCount90 = ownedContextCount90_;
+    LauncherNetworkEnginePublishShellState(
+        shell,
+        ctorFlagsField04_,
+        queueThreadArrayField08_,
+        ownedQueueSignalEvent7C_,
+        ownedEndpointTreeHead80_,
+        ownedEndpointCount84_,
+        ownedContextTreeHead8C_,
+        ownedContextCount90_);
 }
 
 // anchor: launcher.exe:0x435f90

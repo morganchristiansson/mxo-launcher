@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace mxo::liblttcp {
 class CLTThreadPerClientTCPEngine_0x4b2768;
 }
@@ -22,4 +24,21 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
 
 // UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
 void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking);
+
+// UNANCHORED: launcher-owned raw arg5 queue-surface transfer helpers.
+// These keep shell-specific byte-copy policy on the ABI-wrapper side rather than in liblttcp.
+void LauncherNetworkEngineAttachQueueSurface(void* launcherObjectPtr, const void* engineQueuePairStorage);
+void LauncherNetworkEngineDetachQueueSurface(void* launcherObjectPtr, void* engineQueuePairStorage);
+
+// UNANCHORED: launcher-owned raw arg5 direct-read field publication helpers.
+void LauncherNetworkEnginePublishShellState(
+    void* launcherObjectPtr,
+    uint32_t field04,
+    void* field08,
+    void* queueSignalEvent7C,
+    void* endpointTreeHead80,
+    uint32_t endpointCount84,
+    void* contextTreeHead8C,
+    uint32_t contextCount90);
+void LauncherNetworkEngineClearPublishedShellState(void* launcherObjectPtr);
 

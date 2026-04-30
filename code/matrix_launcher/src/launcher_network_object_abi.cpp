@@ -677,6 +677,62 @@ void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking
         ->RunCompletedOperationQueue(nonBlocking);
 }
 
+void LauncherNetworkEngineAttachQueueSurface(void* launcherObjectPtr, const void* engineQueuePairStorage) {
+    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
+    if (!object || !engineQueuePairStorage) {
+        return;
+    }
+
+    object->queuePair0C = *static_cast<const LauncherObjectQueuePair*>(engineQueuePairStorage);
+}
+
+void LauncherNetworkEngineDetachQueueSurface(void* launcherObjectPtr, void* engineQueuePairStorage) {
+    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
+    if (!object || !engineQueuePairStorage) {
+        return;
+    }
+
+    *static_cast<LauncherObjectQueuePair*>(engineQueuePairStorage) = object->queuePair0C;
+}
+
+void LauncherNetworkEnginePublishShellState(
+    void* launcherObjectPtr,
+    uint32_t field04,
+    void* field08,
+    void* queueSignalEvent7C,
+    void* endpointTreeHead80,
+    uint32_t endpointCount84,
+    void* contextTreeHead8C,
+    uint32_t contextCount90) {
+    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
+    if (!object) {
+        return;
+    }
+
+    object->field04 = field04;
+    object->field08 = field08;
+    object->field7C = static_cast<HANDLE>(queueSignalEvent7C);
+    object->list80 = endpointTreeHead80;
+    object->field84 = endpointCount84;
+    object->list8C = contextTreeHead8C;
+    object->field90 = contextCount90;
+}
+
+void LauncherNetworkEngineClearPublishedShellState(void* launcherObjectPtr) {
+    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
+    if (!object) {
+        return;
+    }
+
+    object->field04 = 0u;
+    object->field08 = NULL;
+    object->field7C = NULL;
+    object->list80 = NULL;
+    object->field84 = 0u;
+    object->list8C = NULL;
+    object->field90 = 0u;
+}
+
 // UNANCHORED: public replacement-launcher entrypoint for the original 0x40a380 allocation + ctor
 // step only. Keep the later store-to-`0x4d6304` and arg6 wrapper `+0x08` call in
 // `CLauncher::InitializeThreadPerClientTCPEngine()` so the anchored launcher method owns that
