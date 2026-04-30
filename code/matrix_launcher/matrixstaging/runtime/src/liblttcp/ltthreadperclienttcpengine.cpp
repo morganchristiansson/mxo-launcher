@@ -311,11 +311,13 @@ static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry* FindEngineEndp
     return (it != backing->entries.end()) ? it->second.get() : nullptr;
 }
 
-// anchor family: launcher.exe:0x4318f0 / 0x431240
+// Source-owned endpoint-tree insertion adapter.
+// Evidence addresses: launcher.exe:0x4318f0 / 0x431240 / 0x431ce0 / 0x431200.
 // Static-RE note:
-// - launcher.exe inserts an endpoint node first, with `[node+0x20]` still null
-// - later `0x431ce0` fills that payload slot with the direct `AcceptThread` object pointer on the
-//   success path, or erases the node again on bind/listen failure via `0x431200`
+// - launcher.exe already gets the red/black mechanics from SGI STL tree helpers
+// - this wrapper only bridges recovered head/node layout plus source-owned payload backing
+// - original flow inserts an endpoint node first with `[node+0x20] == nullptr`, then later fills
+//   that slot with the direct `AcceptThread*`, or erases the node again on bind/listen failure
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeInsertUniqueNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
@@ -430,12 +432,13 @@ static CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry* FindEngineConte
     return (it != backing->entries.end()) ? it->second.get() : nullptr;
 }
 
-// anchor family: launcher.exe:0x4196b0 / 0x420ba0
+// Source-owned context-tree insertion adapter.
+// Evidence addresses: launcher.exe:0x4196b0 / 0x420ba0 / 0x431ff0.
 // Static-RE note:
-// - launcher.exe inserts a context-keyed node whose payload at `[node+0x14]` is the direct
-//   `WorkerThread` object pointer
-// - helper `0x431ff0` allocates that payload first, then inserts `(connection, workerThread)` into
-//   the `+0x8c` tree under helper `+0x98` lock
+// - launcher.exe already gets the red/black mechanics from SGI STL tree helpers
+// - this wrapper only bridges recovered head/node layout plus source-owned payload backing
+// - original flow inserts a context-keyed node whose `[node+0x14]` payload is the direct
+//   `WorkerThread*` object pointer
 static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeInsertUniqueNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
@@ -523,10 +526,11 @@ static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> Contex
     return std::move(entry->payload);
 }
 
-// anchor family: launcher.exe:0x4154d0
+// Source-owned endpoint-tree erase adapter.
+// Evidence address: launcher.exe:0x4154d0.
 // Static-RE note:
-// - `_Rb_tree_rebalance_for_erase` handles the shared unlink/rebalance mechanics already
-// - this retained wrapper only bridges recovered head/node layout and source-owned backing cleanup
+// - `_Rb_tree_rebalance_for_erase` already handles the shared unlink/rebalance mechanics
+// - this wrapper only bridges recovered head/node layout and source-owned backing cleanup
 static bool EndpointTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
@@ -537,10 +541,11 @@ static bool EndpointTreeEraseNode(
         node);
 }
 
-// anchor family: launcher.exe:0x4154d0
+// Source-owned context-tree erase adapter.
+// Evidence address: launcher.exe:0x4154d0.
 // Static-RE note:
-// - `_Rb_tree_rebalance_for_erase` handles the shared unlink/rebalance mechanics already
-// - this retained wrapper only bridges recovered head/node layout and source-owned backing cleanup
+// - `_Rb_tree_rebalance_for_erase` already handles the shared unlink/rebalance mechanics
+// - this wrapper only bridges recovered head/node layout and source-owned backing cleanup
 static bool ContextTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
@@ -2193,7 +2198,7 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
     // Original base ctor 0x4366f0 allocates queue-thread children only when the effective
     // ctor flag/count at +0x04 is non-zero. The current scaffold still enters through a
     // zero-count binder path, so keep the recovered child family in source but default it empty.
-    RebuildQueueThreadsForCtorCount(/*queueThreadCount=*/0);
+    CreateQueueThreadsForCtorCount(/*queueThreadCount=*/0);
 }
 
 // anchor: launcher.exe:0x40b389..0x40b404 teardown releases arg5 through vtable slot 0
@@ -2201,7 +2206,7 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
 // NOTE: starter C++ destructor only models local sidecar cleanup, not the full original dtor body.
 CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
     DetachLauncherAbiSurfaceScaffold();
-    RebuildQueueThreadsForCtorCount(/*queueThreadCount=*/0);
+    StopQueueThreads();
 
     if (CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking =
             FindEngineEndpointPayloadBacking(this)) {
@@ -2997,7 +3002,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMi
     return 1u;
 }
 
-// anchor family: launcher.exe:0x4147b0
+// Shared helper-body evidence: launcher.exe:0x4147b0 / 0x4147c0.
+// These are source-side wrappers over the recovered lock-helper storage.
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
@@ -3006,7 +3012,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
     return 0u;
 }
 
-// anchor family: launcher.exe:0x4147c0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
@@ -3015,7 +3020,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
     return 0u;
 }
 
-// anchor family: launcher.exe:0x4147b0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
@@ -3024,7 +3028,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
     return 0u;
 }
 
-// anchor family: launcher.exe:0x4147c0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
@@ -3326,20 +3329,24 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     }
 }
 
-// anchor family: launcher.exe:0x4366f0 / 0x436920
-// Current source helper owns the real `+0x04/+0x08` queue-thread array/count fields directly.
-void CLTThreadPerClientTCPEngine_0x4b2768::RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount) {
+// anchor: launcher.exe:0x436920
+void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
     CLTThreadPerClientTCPEngine_0x4b2768_QueueThread** queueThreadArray =
         static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(queueThreadArrayField08_);
     const uint32_t existingQueueThreadCount = ctorFlagsField04_;
-    if (existingQueueThreadCount != 0u) {
-        (void)EnqueueCompletedOperationScaffold(
-            nullptr,
-            nullptr,
-            /*useQueue34=*/false,
-            "RebuildQueueThreadsForCtorCountShutdown",
-            /*queueLockAlreadyHeld=*/false);
+    if (existingQueueThreadCount == 0u) {
+        while (!Queue_IsEmpty(ActiveQueue0CScaffold()) || !Queue_IsEmpty(ActiveQueue34Scaffold())) {
+            RunCompletedOperationQueue(/*nonBlocking=*/true);
+        }
+        return;
     }
+
+    (void)EnqueueCompletedOperationScaffold(
+        nullptr,
+        nullptr,
+        /*useQueue34=*/false,
+        "StopQueueThreadsShutdown",
+        /*queueLockAlreadyHeld=*/false);
     for (uint32_t i = 0; i < existingQueueThreadCount; ++i) {
         CLTThreadPerClientTCPEngine_0x4b2768_QueueThread* thread = queueThreadArray ? queueThreadArray[i] : nullptr;
         if (!thread) {
@@ -3354,14 +3361,24 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RebuildQueueThreadsForCtorCount(uint3
 
     queueThreadArrayField08_ = nullptr;
     ctorFlagsField04_ = 0u;
+    SyncAttachedLauncherObjectStateScaffold();
+}
+
+// Source-owned extraction of the queue-thread allocation/start tail embedded in ctor 0x4366f0.
+void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32_t queueThreadCount) {
     if (queueThreadCount == 0u) {
+        queueThreadArrayField08_ = nullptr;
+        ctorFlagsField04_ = 0u;
         SyncAttachedLauncherObjectStateScaffold();
         return;
     }
 
-    queueThreadArray = static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(
-        std::calloc(queueThreadCount, sizeof(CLTThreadPerClientTCPEngine_0x4b2768_QueueThread*)));
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueThread** queueThreadArray =
+        static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(
+            std::calloc(queueThreadCount, sizeof(CLTThreadPerClientTCPEngine_0x4b2768_QueueThread*)));
     if (!queueThreadArray) {
+        queueThreadArrayField08_ = nullptr;
+        ctorFlagsField04_ = 0u;
         SyncAttachedLauncherObjectStateScaffold();
         return;
     }

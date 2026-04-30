@@ -459,13 +459,12 @@ public:
     uint32_t SignalQueueEventHelper();
     // anchor: launcher.exe:0x435fa0
     uint32_t WaitQueueEventHelper(int reasonMilliseconds);
-    // anchor family: launcher.exe:0x4147b0
+    // Shared helper-body evidence: launcher.exe:0x4147b0 / 0x4147c0.
+    // These are source-side lock-entry/exit wrappers over the recovered helper storage, not a
+    // claim that all four methods inline to one original body.
     uint32_t EnterQueueLockHelper();
-    // anchor family: launcher.exe:0x4147c0
     uint32_t LeaveQueueLockHelper();
-    // anchor family: launcher.exe:0x4147b0
     uint32_t EnterCleanupLockHelper();
-    // anchor family: launcher.exe:0x4147c0
     uint32_t LeaveCleanupLockHelper();
 
     // UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
@@ -488,10 +487,13 @@ public:
     //   immediate-return scaffold
     void RunCompletedOperationQueue(bool nonBlocking, bool preferType1CallbackBeforeCleanup = false);
 
-    // anchor family: launcher.exe:0x4366f0 / 0x436920
-    // Current source helper owns the real `+0x04/+0x08` queue-thread array/count fields directly
-    // and mirrors the constructor/stop-thread family without pretending to be one exact body.
-    void RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount);
+    // anchor: launcher.exe:0x436920
+    // Drains pending queue work when no queue threads exist; otherwise enqueues the shutdown
+    // sentinel, waits for each queue thread to terminate, releases the array, and clears +0x04/+0x08.
+    void StopQueueThreads();
+    // Source-owned extraction of the queue-thread allocation/start tail embedded in ctor 0x4366f0.
+    // Kept separate so we do not pretend ctor-time startup and stop-thread teardown are one body.
+    void CreateQueueThreadsForCtorCount(uint32_t queueThreadCount);
 
     // Source-owned connection resolver. Current faithful preference order is:
     // - direct connection object / direct owner-context identities
