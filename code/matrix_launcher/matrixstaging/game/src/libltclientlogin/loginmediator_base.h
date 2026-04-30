@@ -299,13 +299,10 @@ public:
         std::copy_n(input.submitKeyConfigMd5Block40.begin(), 0x10, keyConfigMd540.begin());
         // Copy uiConfigMd5 block (16 bytes)
         std::copy_n(input.submitUiConfigMd5Block50.begin(), 0x10, uiConfigMd550.begin());
-        // `0x41eb80` uses the old-MSVC2003 `std::string::assign(begin, end)` path for the
-        // embedded `+0x60` string member.
-        if (input.submitSessionTokenString.begin == nullptr ||
-            input.submitSessionTokenString.current == nullptr ||
-            input.submitSessionTokenString.current < input.submitSessionTokenString.begin) {
-            sessionToken60.clear();
-        } else {
+        // `0x41eb80` guards only against self-assignment of the embedded `+0x60` string object,
+        // then follows the old-MSVC2003 `std::string::assign(begin, end)` path.
+        if (reinterpret_cast<const void*>(&input.submitSessionTokenString) !=
+            reinterpret_cast<const void*>(&sessionToken60)) {
             sessionToken60.assign(
                 input.submitSessionTokenString.begin,
                 input.submitSessionTokenString.current);
