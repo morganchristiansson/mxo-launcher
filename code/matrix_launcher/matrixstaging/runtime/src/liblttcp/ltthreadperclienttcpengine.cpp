@@ -2,7 +2,6 @@
 
 #include "../libltmessaging/messageconnection.h"
 #include "../libltnet/sys/pc/pcsocket.h"
-#include "../../../game/src/libltclientlogin/loginmediator.h"
 #include <spdlog/spdlog.h>
 
 #include <bits/stl_tree.h>
@@ -1140,7 +1139,7 @@ int CLTThread::Stop(bool waitAfterTerminate) {
     }
 
     if (IsCurrentThread()) {
-        ExitThread(0);
+        return 0;
     }
 
     // anchor: launcher.exe:0x452685
@@ -2706,7 +2705,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> workerPayload;
 
-    if (CMessageConnection_0x4b7928* connection = FindMessageConnection(cleanupContextKey)) {
+    if (CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(cleanupContextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
         connection->SetSocketHandle(kInvalidSocketHandle);
         connection->SetWorkerThreadScaffold(nullptr);
@@ -3154,8 +3153,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         if (context) {
             if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
                 queuedBaseConnection = completionTarget;
-            } else if (CMessageConnection_0x4b7928* directConnection = FindMessageConnection(context)) {
-                queuedBaseConnection = directConnection;
+            } else {
+                queuedBaseConnection = static_cast<CMessageConnection_0x4b7928*>(context);
             }
         }
         const bool shouldAutoReleaseContext =
@@ -3238,8 +3237,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
                 CBaseConnection* queuedBaseConnection = nullptr;
                 if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
                     queuedBaseConnection = completionTarget;
-                } else if (CMessageConnection_0x4b7928* directConnection = FindMessageConnection(context)) {
-                    queuedBaseConnection = directConnection;
+                } else {
+                    queuedBaseConnection = static_cast<CMessageConnection_0x4b7928*>(context);
                 }
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
@@ -3336,47 +3335,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32
     ctorFlagsField04_ = queueThreadCount;
     SyncAttachedLauncherObjectStateScaffold();
 }
-
-// UNANCHORED starter helper.
-// Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
-CMessageConnection_0x4b7928* CLTThreadPerClientTCPEngine_0x4b2768::FindMessageConnection(void* contextKey) {
-    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
-    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
-    auto matchesConnectionKey =
-        [contextKey, resolvedContextKey, queueContextOwner](CMessageConnection_0x4b7928* connection) -> bool {
-        if (!connection) {
-            return false;
-        }
-
-        return connection == contextKey ||
-            connection == resolvedContextKey ||
-            connection == queueContextOwner ||
-            connection->OwnerContext() == contextKey ||
-            connection->OwnerContext() == resolvedContextKey;
-    };
-
-    if (CMessageConnection_0x4b7928* queuedConnection =
-            dynamic_cast<CMessageConnection_0x4b7928*>(queueContextOwner);
-        queuedConnection && matchesConnectionKey(queuedConnection)) {
-        return queuedConnection;
-    }
-
-    if (CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking =
-            FindEngineContextPayloadBacking(this)) {
-        for (const auto& it : contextBacking->entries) {
-            const CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* worker = it.second->payload.get();
-            CMessageConnection_0x4b7928* connection = worker
-                ? static_cast<CMessageConnection_0x4b7928*>(worker->ContextKey())
-                : nullptr;
-            if (matchesConnectionKey(connection)) {
-                return connection;
-            }
-        }
-    }
-
-    return nullptr;
-}
-
 
 // UNANCHORED starter helper.
 // No direct launcher.exe helper body is assigned yet; this just mirrors the recovered key shape.

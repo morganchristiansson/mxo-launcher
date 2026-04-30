@@ -491,12 +491,6 @@ public:
     // Kept separate so we do not pretend ctor-time startup and stop-thread teardown are one body.
     void CreateQueueThreadsForCtorCount(uint32_t queueThreadCount);
 
-    // Source-owned connection resolver. Current faithful preference order is:
-    // - direct connection object / direct owner-context identities
-    // - active worker/context-tree payloads keyed by the direct connection object
-    // - no generic synthetic fallback allocation
-    CMessageConnection_0x4b7928* FindMessageConnection(void* contextKey);
-
     friend class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
 
 private:
