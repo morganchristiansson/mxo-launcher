@@ -10,60 +10,6 @@
 namespace mxo::ltlogin {
 namespace {
 
-static uint16_t ReadU16LE(const uint8_t* p) {
-    return static_cast<uint16_t>(p[0]) |
-           (static_cast<uint16_t>(p[1]) << 8);
-}
-
-static uint32_t ReadU32LE(const uint8_t* p) {
-    return static_cast<uint32_t>(p[0]) |
-           (static_cast<uint32_t>(p[1]) << 8) |
-           (static_cast<uint32_t>(p[2]) << 16) |
-           (static_cast<uint32_t>(p[3]) << 24);
-}
-
-struct ParsedState10ClaimCharacterNameReplyScaffold {
-    bool valid = false;
-    uint32_t status = 0;
-    uint32_t characterIdLow1c = 0;
-    uint32_t characterIdHigh20 = 0;
-    uint16_t optionalTextOffset01 = 0;
-    const char* optionalText = nullptr;
-    uint16_t optionalTextLength = 0;
-};
-
-static ParsedState10ClaimCharacterNameReplyScaffold ParseState10ClaimCharacterNameReplyScaffold(
-    const uint8_t* bytes,
-    uint16_t byteCount) {
-    ParsedState10ClaimCharacterNameReplyScaffold out = {};
-    if (byteCount < 0x0fu || bytes[0] != 0x0bu) {
-        return out;
-    }
-
-    out.valid = true;
-    out.optionalTextOffset01 = ReadU16LE(bytes + 1u);
-    out.status = ReadU32LE(bytes + 3u);
-    out.characterIdLow1c = ReadU32LE(bytes + 7u);
-    out.characterIdHigh20 = ReadU32LE(bytes + 0x0bu);
-
-    if (out.optionalTextOffset01 != 0u) {
-        const size_t stringLengthFieldOffset = static_cast<size_t>(out.optionalTextOffset01);
-        if (stringLengthFieldOffset + 2u <= byteCount) {
-            out.optionalTextLength = ReadU16LE(bytes + stringLengthFieldOffset);
-            const size_t stringBytesOffset = stringLengthFieldOffset + 2u;
-            const size_t availableTextBytes = byteCount - stringBytesOffset;
-            if (out.optionalTextLength > availableTextBytes) {
-                out.optionalTextLength = static_cast<uint16_t>(availableTextBytes);
-            }
-            if (out.optionalTextLength != 0u) {
-                out.optionalText = reinterpret_cast<const char*>(bytes + stringBytesOffset);
-            }
-        }
-    }
-
-    return out;
-}
-
 }  // namespace
 
 // anchor: launcher.exe vtable 0x4b512c
@@ -215,22 +161,13 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // extracted payload bytes. The parse object has a virtual destructor cleaned up at
     // 0x4402e7-0x4402f0: TEST ECX,ECX; JZ skip; MOV EDX,[ECX]; CALL [EDX+8].
     //
-    // Current approach: extract payload bytes + use a POD scaffold parser. This produces
-    // the same field values (offsets +3=status, +7=charIdLow, +0xb=charIdHigh match) but
-    // doesn't mirror the original's parse-object lifetime or virtual dispatch.
-    // FIDELITY: Use PayloadBase() which returns payloadBytesPtr0c + 0xc to match original
-    const uint8_t* payloadBytes = messageRef->messageStorage0c->PayloadBase();
-    const uint16_t payloadByteCount = messageRef->PayloadByteCount();
-
-    // Inline recovery of MS_ClaimCharacterNameReply parsing and slot record allocation:
-    // - parse inline name/status/character IDs from message-ref payload
-    // - set owner+0x80 = parsed status
-    // - if status < 1: allocate/init new slot record at +0x688[currentCount],
-    //   copy descriptor inline name into +0x818[currentCount], set owner+0xcc8=currentCount,
-    //   increment +0x684, fill slot record with character ID/name/worldId fields
-    const ParsedState10ClaimCharacterNameReplyScaffold parsed =
-        ParseState10ClaimCharacterNameReplyScaffold(payloadBytes, payloadByteCount);
+    // Faithful source-owned replacement: model the same stack parse object family instead of
+    // parsing raw payload bytes through an ad-hoc scaffold. Ghidra currently types the object as
+    // `Packet_MsCreateCharacter_0x4b53c8 *` at `0x43a330`, but source keeps a distinct class name
+    // because the same vtable family is already used by the state11 create-character request builder.
+    State10ClaimCharacterNameReplyParseObject_0x4b53c8 parsed(messageRef, 1);
     if (!parsed.valid) {
+        const uint16_t payloadByteCount = messageRef->PayloadByteCount();
         spdlog::warn(
             "DIAGNOSTIC: state10 raw-0x0b claim-name reply parse rejected payload bytes={} (expected >= 0x0f-byte MS_ClaimCharacterNameReply layout)",
             static_cast<unsigned>(payloadByteCount));
@@ -318,8 +255,8 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // anchor: launcher.exe:0x440288-0x4402ab
     // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
     // [EDI+0x10]+0xb = 0 (status), [EDI+0x10]+0xc = worldId (word from descriptor)
-    appendedSlotRecord.characterIdLow1c = parsed.characterIdLow1c;
-    appendedSlotRecord.characterIdHigh20 = parsed.characterIdHigh20;
+    appendedSlotRecord.characterIdLow1c = parsed.characterIdLow;
+    appendedSlotRecord.characterIdHigh20 = parsed.characterIdHigh;
     appendedSlotRecord.packetType1a = 0u;
     appendedSlotRecord.worldId24 = selectedWorldDescriptor.worldId01;
 
