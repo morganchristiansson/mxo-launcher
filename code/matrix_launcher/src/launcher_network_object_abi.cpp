@@ -146,6 +146,34 @@ static void** LauncherObjectSelectedPrimaryVtable() {
 #endif
 }
 
+static void** LauncherObjectSubVtable5C();
+static void** LauncherObjectSubVtable60();
+static void** LauncherObjectSubVtable98();
+
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherObjectNativeEngineFromVisiblePtr(void* visiblePtr) {
+    return static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(visiblePtr);
+}
+
+static void* LauncherObjectVisiblePtrFromNativeEngine(
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine) {
+    return engine;
+}
+
+static void InstallNativeEngineArg5HelperVtables(
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine) {
+    if (!engine) {
+        return;
+    }
+
+    auto* nativeLayout =
+        reinterpret_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(engine);
+    nativeLayout->waitHelper5C.vtable = LauncherObjectSubVtable5C();
+    nativeLayout->queueLockHelper60.vtable = LauncherObjectSubVtable60();
+    nativeLayout->cleanupLockHelper98.vtable = LauncherObjectSubVtable98();
+}
+#endif
+
 // UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
 static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& LauncherObjectEngineBinding();
 // UNANCHORED: registered arg5 sidecar resolver using the single current launcher binding.
@@ -205,12 +233,16 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* ResolveLauncherObjec
     LauncherObjectAbiShell* owner) {
     if (!owner) return NULL;
 
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    return LauncherObjectNativeEngineFromVisiblePtr(owner);
+#else
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& binding = LauncherObjectEngineBinding();
     if (binding.Owner() != owner || !binding.Engine()) {
         return NULL;
     }
 
     return binding.Engine();
+#endif
 }
 
 // UNANCHORED: launcher startup bind helper for the single current arg5 object.
@@ -222,6 +254,9 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
         return NULL;
     }
 
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    return LauncherObjectNativeEngineFromVisiblePtr(owner);
+#else
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& binding = LauncherObjectEngineBinding();
     if (binding.Owner() != owner) {
         if (!binding.Bind(owner)) {
@@ -242,6 +277,7 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
     engine->AttachLauncherAbiSurfaceScaffold(attachment);
 
     return engine;
+#endif
 }
 
 // UNANCHORED: replacement arg5 internal teardown helper.
@@ -740,11 +776,22 @@ void LauncherNetworkEngineClearPublishedShellState(void* launcherObjectPtr) {
 void* LauncherCreateNetworkEngineAbiShell() {
     LogLauncherObjectPrimaryDispatchConfigOnce();
 
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    auto* engine = new mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768();
+    if (!engine) {
+        return NULL;
+    }
+    InstallNativeEngineArg5HelperVtables(engine);
+    void* visibleObject = LauncherObjectVisiblePtrFromNativeEngine(engine);
+    LauncherLogNetworkEngineAbiShellDispatchState(visibleObject, "post-create-native-engine");
+    return visibleObject;
+#else
     LauncherObjectAbiShell* object = CreateLauncherNetworkEngineAbiShellLike40A380();
     if (object) {
         LauncherLogNetworkEngineAbiShellDispatchState(object, "post-create");
     }
     return object;
+#endif
 }
 
 // UNANCHORED: public replacement-launcher entrypoint that releases the arg5 ABI shell.
@@ -757,10 +804,12 @@ void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediat
     LauncherLogNetworkEngineAbiShellDispatchState(object, "pre-release");
 
     if (LauncherObjectPrimaryDispatchModeForBuild() == LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr) {
+        auto* engine = LauncherObjectNativeEngineFromVisiblePtr(object);
         spdlog::info(
-            "launcher arg5 native-vptr mode using manual shell release for {} instead of object->vtable[0]",
+            "launcher arg5 native-vptr mode deleting native engine storage {} via visible object {}",
+            fmt::ptr(engine),
             fmt::ptr(object));
-        LauncherObject_Release(object, 1u);
+        delete engine;
     } else {
         typedef int (__thiscall *ReleaseFn)(LauncherObjectAbiShell*, uint32_t);
         ReleaseFn release = object->vtable ? reinterpret_cast<ReleaseFn>(object->vtable[0]) : nullptr;
