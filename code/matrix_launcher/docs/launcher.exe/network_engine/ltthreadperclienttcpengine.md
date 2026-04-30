@@ -25,12 +25,6 @@ Recovered field roles:
   - endpoint node payload `[node+0x20]` = `AcceptThread*`
   - context node payload `[node+0x14]` = `WorkerThread*`
 
-## Wrapper boundary simplification
-
-- Current source no longer mirrors the launcher arg5 shell through an engine-owned attachment map.
-- The launcher-facing ABI shell remains a thin wrapper object in `src/launcher_network_object_abi.cpp`, while the bound `CLTThreadPerClientTCPEngine_0x4b2768` sidecar now always uses its own recovered queue/event/lock/tree state directly.
-- This matches the current codebase reality better because launcher startup still binds a single arg5 shell to a single engine sidecar through `CLTThreadPerClientTCPEngine_0x4b2768Binding`.
-
 ## Worker creation / queueing
 
 - `0x431ff0` allocates a worker thread, stores it at `[connection+0x08]`, inserts it into the context tree under the `+0x98` cleanup lock, and optionally starts it.

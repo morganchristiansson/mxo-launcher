@@ -10,6 +10,7 @@
 using LauncherObjectQueue = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_Queue;
 using LauncherObjectListHead24 = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24;
 using LauncherObjectListHead18 = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18;
+using LauncherObjectAbiAttachment = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment;
 
 struct LauncherObjectLockHelper {
     void** vtable;          // +0x00
@@ -180,6 +181,10 @@ static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
         return;
     }
 
+    if (binding.Engine()) {
+        binding.Engine()->DetachLauncherAbiSurfaceScaffold();
+    }
+
     // Current fidelity correction from the latest queue/worker/context RE pass:
     // - original engine evidence stays connection-centric (`0x431ff0`, `0x4316a0`, `0x436820`,
     //   `0x436b10`, `0x449d40`)
@@ -226,6 +231,30 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine = binding.Engine();
     if (!engine) {
         return NULL;
+    }
+
+    void* priorList80 = owner->list80;
+    void* priorList8C = owner->list8C;
+
+    LauncherObjectAbiAttachment attachment = {};
+    attachment.field04CtorFlags = &owner->field04;
+    attachment.field08QueueThreadArray = &owner->field08;
+    attachment.queue0C = &owner->queue0C;
+    attachment.queue34 = &owner->queue34;
+    attachment.queueLock = &owner->helper60.crit;
+    attachment.queueSignalEvent = owner->field7C;
+    attachment.cleanupLock = &owner->helper98.crit;
+    attachment.list80EndpointTreeHead = &owner->list80;
+    attachment.field84EndpointCount = &owner->field84;
+    attachment.list8CContextTreeHead = &owner->list8C;
+    attachment.field90ContextCount = &owner->field90;
+    engine->AttachLauncherAbiSurfaceScaffold(attachment);
+
+    if (priorList80 && priorList80 != owner->list80) {
+        std::free(priorList80);
+    }
+    if (priorList8C && priorList8C != owner->list8C) {
+        std::free(priorList8C);
     }
 
     return engine;
