@@ -253,16 +253,9 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
 static void FreeLauncherObjectAbiShellInternals(LauncherObjectAbiShell* self) {
     if (!self) return;
     ResetLauncherObjectEngineSidecar(self);
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&self->queuePair0C.queue00);
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&self->queuePair0C.queue28);
-    if (self->field7C) {
-        CloseHandle(self->field7C);
-        self->field7C = NULL;
-    }
-    if (self->helper60.vtable) {
-        DeleteCriticalSection(&self->helper60.crit);
-        self->helper60.vtable = NULL;
-    }
+    std::memset(&self->queuePair0C, 0, sizeof(self->queuePair0C));
+    self->field7C = NULL;
+    self->helper60.vtable = NULL;
     if (self->helper98.vtable) {
         DeleteCriticalSection(&self->helper98.crit);
         self->helper98.vtable = NULL;
@@ -410,10 +403,14 @@ static uint32_t __thiscall LauncherObject_Slot10_443810(
     return ResolveLauncherObjectEngineSidecar(self)->Slot10_443810(arg1);
 }
 
-// UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
-static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self);
-// UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
-static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self);
+// UNANCHORED: queue-lock helper wrappers for arg5 +0x60 now forward into the real engine-owned
+// storage rather than using shell-local critical-section state.
+static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot0(void* self);
+static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot1(void* self);
+// UNANCHORED: cleanup-lock helper wrappers for arg5 +0x98 still use the shell-local helper family
+// pending a later collapse of that storage.
+static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot0(void* self);
+static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot1(void* self);
 
 // anchor: launcher.exe:0x431670
 // vtable: launcher.exe:0x004b2768 slot +0x2c
@@ -438,16 +435,38 @@ static CRITICAL_SECTION* LauncherObjectCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
 
-// UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
-static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
+static LauncherObjectAbiShell* LauncherObjectFromSubobject(void* self, size_t offset) {
+    return self ? reinterpret_cast<LauncherObjectAbiShell*>(static_cast<unsigned char*>(self) - offset) : NULL;
+}
+
+// UNANCHORED: queue-lock helper enter for arg5 +0x60.
+static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot0(void* self) {
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
+            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x60))) {
+        return engine->EnterQueueLockHelper();
+    }
+    return 1u;
+}
+
+// UNANCHORED: queue-lock helper leave for arg5 +0x60.
+static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot1(void* self) {
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
+            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x60))) {
+        return engine->LeaveQueueLockHelper();
+    }
+    return 1u;
+}
+
+// UNANCHORED: cleanup-lock helper enter for arg5 +0x98.
+static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot0(void* self) {
     if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
         EnterCriticalSection(crit);
     }
     return 0u;
 }
 
-// UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
-static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
+// UNANCHORED: cleanup-lock helper leave for arg5 +0x98.
+static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot1(void* self) {
     if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
         LeaveCriticalSection(crit);
     }
@@ -457,31 +476,19 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
 // anchor: launcher.exe:0x435f90
 // vtable: launcher.exe:arg5+0x5c helper slot +0x00
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
-    HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
-    return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
+            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x5c))) {
+        return engine->SignalQueueEventHelper();
+    }
+    return 1u;
 }
 
 // anchor: launcher.exe:0x435fa0
 // vtable: launcher.exe:arg5+0x5c helper slot +0x04
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
-    void* helper60 = self ? static_cast<unsigned char*>(self) + 4 : NULL;
-    HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
-    if (helper60) {
-        LauncherObject_LockHelper_Slot1(helper60);
-    }
-
-    const DWORD waitResult = eventHandle ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reason)) : WAIT_FAILED;
-    if (waitResult == WAIT_OBJECT_0) {
-        if (helper60) {
-            LauncherObject_LockHelper_Slot0(helper60);
-        }
-        return 0u;
-    }
-    if (waitResult == WAIT_TIMEOUT) {
-        if (helper60) {
-            LauncherObject_LockHelper_Slot0(helper60);
-        }
-        return 3u;
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
+            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x5c))) {
+        return engine->WaitQueueEventHelper(reason);
     }
     return 1u;
 }
@@ -528,8 +535,8 @@ static void** LauncherObjectSubVtable5C() {
 // UNANCHORED: compile-time launcher arg5 helper table for the final `+0x60` ctor state.
 static void** LauncherObjectSubVtable60() {
     static void* const kSubVtable60[2] = {
-        (void*)LauncherObject_LockHelper_Slot0, // 0x4147b0
-        (void*)LauncherObject_LockHelper_Slot1, // 0x4147c0
+        (void*)LauncherObject_QueueLockHelper_Slot0, // 0x4147b0 wrapper -> engine queue lock
+        (void*)LauncherObject_QueueLockHelper_Slot1, // 0x4147c0 wrapper -> engine queue lock
     };
     return const_cast<void**>(kSubVtable60);
 }
@@ -537,8 +544,8 @@ static void** LauncherObjectSubVtable60() {
 // UNANCHORED: compile-time launcher arg5 helper table for the final `+0x98` ctor state.
 static void** LauncherObjectSubVtable98() {
     static void* const kSubVtable98[2] = {
-        (void*)LauncherObject_LockHelper_Slot0, // 0x4147b0
-        (void*)LauncherObject_LockHelper_Slot1, // 0x4147c0
+        (void*)LauncherObject_CleanupLockHelper_Slot0, // 0x4147b0 shell-local cleanup lock
+        (void*)LauncherObject_CleanupLockHelper_Slot1, // 0x4147c0 shell-local cleanup lock
     };
     return const_cast<void**>(kSubVtable98);
 }
@@ -558,18 +565,7 @@ static bool InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(LauncherOb
     object->field08 = NULL;
     object->subVtable5C = LauncherObjectSubVtable5C();
     object->helper60.vtable = LauncherObjectSubVtable60();
-    InitializeCriticalSection(&object->helper60.crit);
-    object->field7C = CreateEventA(NULL, FALSE, FALSE, NULL);
-    if (!object->field7C) {
-        spdlog::warn("launcher arg5 ABI shell failed to create +0x7c event ({})", (unsigned long)GetLastError());
-        return false;
-    }
-
-    if (!mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&object->queuePair0C.queue00, 0) ||
-        !mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&object->queuePair0C.queue28, 0)) {
-        return false;
-    }
-
+    object->field7C = NULL;
     return true;
 }
 
@@ -624,6 +620,7 @@ static void InitializeLauncherNetworkEngineAbiShellPreCtorState(LauncherObjectAb
     std::memset(&object->queuePair0C, 0, sizeof(object->queuePair0C));
     object->subVtable5C = NULL;
     object->helper60.vtable = NULL;
+    std::memset(&object->helper60.crit, 0, sizeof(object->helper60.crit));
     object->field7C = NULL;
     object->list80 = NULL;
     object->field84 = 0;

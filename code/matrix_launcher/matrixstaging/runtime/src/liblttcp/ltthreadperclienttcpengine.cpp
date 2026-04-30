@@ -2815,18 +2815,14 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
 
 // anchor: launcher.exe:0x435f90
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SignalQueueEventHelper() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    HANDLE eventHandle = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
-    return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
+    return (ownedQueueSignalEvent7C_ && SetEvent(ownedQueueSignalEvent7C_)) ? 0u : 1u;
 }
 
 // anchor: launcher.exe:0x435fa0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMilliseconds) {
     (void)LeaveQueueLockHelper();
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    HANDLE eventHandle = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
-    const DWORD waitResult = eventHandle
-        ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reasonMilliseconds))
+    const DWORD waitResult = ownedQueueSignalEvent7C_
+        ? WaitForSingleObject(ownedQueueSignalEvent7C_, static_cast<DWORD>(reasonMilliseconds))
         : WAIT_FAILED;
     if (waitResult == WAIT_OBJECT_0) {
         (void)EnterQueueLockHelper();
@@ -2840,20 +2836,16 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMi
 }
 
 // Shared helper-body evidence: launcher.exe:0x4147b0 / 0x4147c0.
-// These are source-side wrappers over the recovered lock-helper storage.
+// Queue-family collapse note:
+// - arg5 +0x60 remains as ABI helper surface only
+// - live queue-lock state now stays on the real engine object's recovered helper storage
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    if (CRITICAL_SECTION* crit = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit) {
-        EnterCriticalSection(crit);
-    }
+    EnterCriticalSection(&ownedQueueLockHelper60_.crit);
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    if (CRITICAL_SECTION* crit = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit) {
-        LeaveCriticalSection(crit);
-    }
+    LeaveCriticalSection(&ownedQueueLockHelper60_.crit);
     return 0u;
 }
 
@@ -2886,13 +2878,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         return 0x7000006u;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
-        shell ? &shell->queuePair0C.queue00 : &ownedQueuePair0C_.queue00;
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
-        shell ? &shell->queuePair0C.queue28 : &ownedQueuePair0C_.queue28;
-    HANDLE activeQueueSignalEvent = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
-    CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C = &ownedQueuePair0C_.queue00;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 = &ownedQueuePair0C_.queue28;
+    HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
+    CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
     if (queueLock) {
         EnterCriticalSection(queueLock);
     }
@@ -2954,17 +2943,14 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     //   -> signal helper `+0x5c` only on pre-push empty -> non-empty transition
     // - no push-success result is surfaced back to callers; caller-side ownership/lifetime does not
     //   branch on queue-growth success/failure once this path is entered
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
-        shell ? &shell->queuePair0C.queue00 : &ownedQueuePair0C_.queue00;
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
-        shell ? &shell->queuePair0C.queue28 : &ownedQueuePair0C_.queue28;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C = &ownedQueuePair0C_.queue00;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 = &ownedQueuePair0C_.queue28;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
     if (!targetQueue) {
         return false;
     }
 
-    CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
+    CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
     if (queueLock && !queueLockAlreadyHeld) {
         EnterCriticalSection(queueLock);
     }
@@ -3029,16 +3015,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - callback runs before the later release tail
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
-    // - queue selection/pop happens under the attached arg5 lock
-    // - that attached lock covers one inline queue-pair object at engine +0x0c, whose second
-    //   repeated record lives at pair +0x28 / engine +0x34
-    CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror* shell = ActiveLauncherObjectShellMirror(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
-        shell ? &shell->queuePair0C.queue00 : &ownedQueuePair0C_.queue00;
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
-        shell ? &shell->queuePair0C.queue28 : &ownedQueuePair0C_.queue28;
-    HANDLE activeQueueSignalEvent = shell ? shell->queueSignalEvent7C : ownedQueueSignalEvent7C_;
-    CRITICAL_SECTION* queueLock = shell ? &shell->queueLockHelper60.crit : &ownedQueueLockHelper60_.crit;
+    // - queue selection/pop happens under the real engine queue lock
+    // - arg5 +0x5c/+0x60 remain ABI helper entry surfaces only; live queue state stays on the
+    //   recovered engine-owned queue-pair object at +0x0c
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C = &ownedQueuePair0C_.queue00;
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 = &ownedQueuePair0C_.queue28;
+    HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
+    CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
     while (true) {
         if (queueLock) {
             EnterCriticalSection(queueLock);
