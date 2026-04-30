@@ -3,11 +3,13 @@
 #include <winsock2.h>
 #include <windows.h>
 
+#include <bits/stl_tree.h>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ilttcpengine.h"
@@ -21,6 +23,14 @@ namespace mxo::liblttcp {
 
 class CMessageConnection_0x4b7928;
 class CLTThreadPerClientTCPEngine_0x4b2768;
+class CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread;
+class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
+struct LTTCPEndpointKey_0x44b070;
+
+using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
+    std::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
+using CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode =
+    std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
 
 // Recovered base-queue object from CLTBaseThreadPerClientTCPEngine.
 // Current high-confidence field map comes from 0x436610 -> 0x436340 and later consumer paths.
@@ -495,7 +505,9 @@ private:
     // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
     static LTTCPEndpointKey_0x44b070 MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
     // anchor: launcher.exe:0x42fdb0 search shape over the endpoint-keyed `+0x80` tree family.
-    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey_0x44b070& key);
+    // Faithfulness note: unlike the older source helper, the original returns the matching tree
+    // node or the tree-head sentinel, not the `AcceptThread*` payload.
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTree_Find(const LTTCPEndpointKey_0x44b070& key);
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindWorker(void* contextKey);
     // Source-owned shared engine-slot connection resolver.

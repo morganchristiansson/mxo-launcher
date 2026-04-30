@@ -2368,9 +2368,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Slot4_42F7C0(void* arg1) {
 // vtable: launcher.exe:0x004b2768 slot +0x14
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) {
     const LTTCPEndpointKey_0x44b070 key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
-        EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
-    if (!node || !(node)->_M_valptr()->second) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node = EndpointTree_Find(key);
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* endpointTreeSentinel =
+        reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(ownedEndpointTreeHead80_);
+    if (node == endpointTreeSentinel || !(node)->_M_valptr()->second) {
         if (outOwnerContext) {
             *outOwnerContext = nullptr;
         }
@@ -3427,10 +3428,11 @@ LTTCPEndpointKey_0x44b070 CLTThreadPerClientTCPEngine_0x4b2768::MakeEndpointKey(
 }
 
 // anchor: launcher.exe:0x42fdb0
-CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* CLTThreadPerClientTCPEngine_0x4b2768::FindMonitoredPort(const LTTCPEndpointKey_0x44b070& key) {
+CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* CLTThreadPerClientTCPEngine_0x4b2768::EndpointTree_Find(const LTTCPEndpointKey_0x44b070& key) {
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
         EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
-    return node ? node->_M_valptr()->second : nullptr;
+    return node ? node
+                : reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(ownedEndpointTreeHead80_);
 }
 
 // anchor: launcher.exe:0x42fe10
