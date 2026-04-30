@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <array>
+#include <cstring>
 #include <vector>
 
 namespace mxo {
@@ -43,6 +44,27 @@ public:
     ~Packet_AsAuthReply_0x4b5328() override = default;
     void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
+
+    // anchor: launcher.exe:0x43aa80
+    void SetCharacterName(const char* characterName) {
+        if (characterName == nullptr || payloadSize18 != 0u) {
+            return;
+        }
+
+        size_t characterNameLength = 0u;
+        const char* scan = characterName;
+        while (*scan++) {
+            ++characterNameLength;
+        }
+
+        const uint16_t reservedByteCount =
+            ReserveLengthPrefixedTail(static_cast<uint16_t>(characterNameLength + 1u));
+        if (reservedByteCount != 0u && debugString14 != nullptr) {
+            char* const reservedWritePointer = const_cast<char*>(debugString14);
+            strncpy(reservedWritePointer, characterName, reservedByteCount - 1u);
+            reservedWritePointer[reservedByteCount - 1u] = '\0';
+        }
+    }
 };
 
 static_assert(sizeof(Packet_AsAuthReply_0x4b5328) == sizeof(mxo::liblttcp::Packet_0x4af2a4),

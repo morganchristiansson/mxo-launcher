@@ -5,7 +5,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cstring>
 #include <string>
 
 namespace mxo::ltlogin {
@@ -242,27 +241,12 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 
     // anchor: launcher.exe:0x440274-0x440283
-    // Original: PUSH &mediator->createCharacterData108; MOV ECX,pNewSlotRecord;
-    // CALL 0x43aa80 (SetCharacterName). Reuse the slot record's inherited
-    // Packet_0x4af2a4 reserve/write fields directly instead of the old debugString alias shortcut.
+    // Original: PUSH &mediator->createCharacterData108; MOV ECX,pNewSlotRecord; CALL 0x43aa80.
+    // Static-RE ownership now points that helper at Packet_AsAuthReply_0x4b5328.
     Packet_AsAuthReply_0x4b5328& appendedSlotRecord =
         g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
-    const char* appendedCharacterName =
-        g_CurrentLoginMediator->createCharacterData108.characterName00.data();
-    if (appendedCharacterName != nullptr && appendedSlotRecord.payloadSize18 == 0u) {
-        size_t characterNameLength = 0u;
-        const char* scan = appendedCharacterName;
-        while (*scan++) {
-            ++characterNameLength;
-        }
-        const uint16_t reservedByteCount = appendedSlotRecord.ReserveLengthPrefixedTail(
-            static_cast<uint16_t>(characterNameLength + 1u));
-        if (reservedByteCount != 0u && appendedSlotRecord.debugString14 != nullptr) {
-            char* const reservedWritePointer = const_cast<char*>(appendedSlotRecord.debugString14);
-            strncpy(reservedWritePointer, appendedCharacterName, reservedByteCount - 1u);
-            reservedWritePointer[reservedByteCount - 1u] = '\0';
-        }
-    }
+    appendedSlotRecord.SetCharacterName(
+        g_CurrentLoginMediator->createCharacterData108.characterName00.data());
 
     // anchor: launcher.exe:0x440288-0x4402ab
     // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
