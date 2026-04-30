@@ -2815,9 +2815,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
         shell->field04 = 0u;
         shell->field08 = nullptr;
         shell->endpointTreeHead80 = nullptr;
-        shell->endpointCount84 = 0u;
         shell->contextTreeHead8C = nullptr;
-        shell->contextCount90 = 0u;
     }
 
     if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
@@ -2850,9 +2848,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::SyncAttachedLauncherObjectStateScaffo
     shell->field04 = ctorFlagsField04_;
     shell->field08 = queueThreadArrayField08_;
     shell->endpointTreeHead80 = ownedEndpointTreeHead80_;
-    shell->endpointCount84 = ownedEndpointCount84_;
     shell->contextTreeHead8C = ownedContextTreeHead8C_;
-    shell->contextCount90 = ownedContextCount90_;
 }
 
 // anchor: launcher.exe:0x435f90

@@ -43,7 +43,8 @@ Recovered field roles:
   - helper entry surfaces at `+0x5c/+0x60` can stay as ABI wrappers that forward into engine-owned event/lock behavior
   - the engine sidecar therefore has to operate on the attached shell queue-pair storage, not on a separately-mutated copied mirror
   - current cleanup-lock pruning pass routes arg5 `+0x98` helper calls into the engine-owned cleanup lock while still leaving the shell-local embedded `CRITICAL_SECTION` initialized as inert ABI backing until we prove no raw byte/probe dependence remains
-  - current tree-family pruning pass removes shell-side fake pre-allocation of `+0x80` / `+0x8c` tree heads; after attach those fields are populated only from the real engine object's authoritative tree storage
+  - current tree-family pruning pass removes shell-side fake pre-allocation of `+0x80` / `+0x8c` tree heads; after attach those pointer fields are populated only from the real engine object's authoritative tree storage
+  - the shell no longer mirrors `+0x84` / `+0x90` live tree counts from the engine sidecar; those dwords stay as inert ABI padding unless proven client-visible
 
 ## Worker creation / queueing
 
