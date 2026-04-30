@@ -294,8 +294,8 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     //
     // Note: original has no slotRecordValid04_ write — just the pointer store at 0x440228.
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
-    g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[appendedSlotIndex].Assign(
-        selectedWorldDescriptor.inlineNamePlus03);
+    g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[appendedSlotIndex] =
+        selectedWorldDescriptor.inlineNamePlus03;
     g_CurrentLoginMediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 

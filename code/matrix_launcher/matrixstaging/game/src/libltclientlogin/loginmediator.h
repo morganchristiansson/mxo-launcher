@@ -430,14 +430,14 @@ public:
         // Source-owned mirrors of the original embedded helper layout:
         // - `+0x00`  = active slot-record count
         // - `+0x04`  = slot-record pointer table (mirrored here as value objects plus validity bits)
-        // - `+0x194` = route-string helper array (`BasicString_0x403f90`, recovered from the
-        //              `std::basic_string<char>`-like `0x403f90` family)
+        // - `+0x194` = route-host `std::string` array, matching the recovered old-MSVC2003
+        //              `std::basic_string<char>` family at `0x403f90`
         // - `+0x644` = current slot / selection byte
         // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
         uint8_t slotRecordCount00_ = 0;
         std::array<Packet_AsAuthReply_0x4b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
         std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
-        std::array<BasicString_0x403f90, kRecoveredWorldSlotCapacity> routeHostStrings194_{};
+        std::array<std::string, kRecoveredWorldSlotCapacity> routeHostStrings194_{};
         uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
         PersistedSelectionContext64c persistedSelectionContext64c_{};
     };
@@ -1245,7 +1245,8 @@ public:
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
-    BasicString_0x403f90 routeDescriptor30_{};
+    RouteDescriptor30SmallStringLikeSketch routeDescriptor30Sketch_{};
+    std::string routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
     // - entries are 12-byte owned string-triples copied by `0x41f640`

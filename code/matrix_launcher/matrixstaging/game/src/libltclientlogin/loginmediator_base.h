@@ -152,80 +152,54 @@ struct RouteDescriptor30SmallStringLikeSketch {
     const char* capacity = nullptr;
 };
 
-// Source-owned mirror of the recovered launcher string helper family.
-//
-// Ghidra evidence currently points at a `std::basic_string<char>`-like helper with the concrete
-// recovered 12-byte `begin/current/capacity` view rooted at `0x403f90`. Keep this wrapper distinct
-// from raw `std::string` so anchored helper boundaries still map cleanly back to launcher.exe.
-class BasicString_0x403f90 : public RouteDescriptor30SmallStringLikeSketch {
-public:
-    // anchor: launcher.exe:0x403f20
-    BasicString_0x403f90() { SyncFromOwned(); }
+// Ghidra evidence currently points at the `0x403f90` family being old-MSVC2003
+// `std::basic_string<char>` / `std::string`. Source therefore uses direct `std::string`
+// storage and only keeps tiny helper shims for the recovered method boundaries and the
+// wrapper-facing `begin/current/capacity` sketch.
+inline void SyncStringSketch(RouteDescriptor30SmallStringLikeSketch& sketch, const std::string& value) {
+    sketch.begin = value.c_str();
+    sketch.current = sketch.begin + value.size();
+    sketch.capacity = sketch.current;
+}
 
+inline const char* StringBeginOrNull(const std::string& value) {
+    return value.empty() ? nullptr : value.c_str();
+}
+
+inline void StringResetAndAssignCString(std::string& value, const char* text) {
     // anchor: launcher.exe:0x403f20 = recovered basic_string reset/assign helper
-    void* ResetAndAssignCString(const char* text) {
-        owned_ = text ? text : "";
-        SyncFromOwned();
-        return this;
-    }
+    value = text ? text : "";
+}
 
+inline void StringAppendRange(std::string& value, const char* sourceBegin, const char* sourceEnd) {
     // anchor: launcher.exe:0x403dc0 = recovered append-range helper (Ghidra old name: meth_0x403dc0)
-    BasicString_0x403f90* AppendRange(const char* sourceBegin, const char* sourceEnd) {
-        if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
-            return this;
-        }
-        owned_.append(sourceBegin, sourceEnd);
-        SyncFromOwned();
-        return this;
+    if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
+        return;
     }
+    value.append(sourceBegin, sourceEnd);
+}
 
+inline void StringAssignFromRange(std::string& value, const char* sourceBegin, const char* sourceEnd) {
     // anchor: launcher.exe:0x407dd0 = recovered basic_string assign-from-range helper
-    BasicString_0x403f90* AssignFromRange(const char* sourceBegin, const char* sourceEnd) {
-        if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
-            Clear();
-            return this;
-        }
-        owned_.assign(sourceBegin, sourceEnd);
-        SyncFromOwned();
-        return this;
+    if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
+        value.clear();
+        return;
     }
+    value.assign(sourceBegin, sourceEnd);
+}
 
-    void Assign(const char* value) {
-        ResetAndAssignCString(value);
-    }
+inline void StringReleaseStorage(std::string& value) {
+    value.clear();
+    value.shrink_to_fit();
+}
 
-    void Assign(const std::string& value) {
-        owned_ = value;
-        SyncFromOwned();
-    }
-
-    int CompareNoCase(const char* other) const;
-
-    void Clear() {
-        owned_.clear();
-        SyncFromOwned();
-    }
-
-    void ReleaseStorage() {
-        owned_.clear();
-        owned_.shrink_to_fit();
-        SyncFromOwned();
-    }
-
-    const char* BeginOrNull() const {
-        return (begin != nullptr && begin != current) ? begin : nullptr;
-    }
-
-private:
-    void SyncFromOwned() {
-        begin = owned_.c_str();
-        current = begin + owned_.size();
-        capacity = current;
-    }
-
-    // Source-owned backing store; the exposed pointer triple above mirrors the launcher helper view.
-    std::string owned_;
-};
+inline int StringCompareNoCase(const std::string& value, const char* other) {
+#if defined(_WIN32)
+    return _stricmp(value.c_str(), other ? other : "");
+#else
+    return strcasecmp(value.c_str(), other ? other : "");
+#endif
+}
 
 struct LateEntryList1470EntrySketch {
     // anchor: launcher.exe:0x41af50 / owner vtable `+0x118`

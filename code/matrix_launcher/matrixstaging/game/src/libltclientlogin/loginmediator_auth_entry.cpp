@@ -94,7 +94,7 @@ std::string CLTLoginMediator::ResolvedMarginHostName() const {
     if (!marginRouteState_.exactMarginHostName.empty()) {
         return marginRouteState_.exactMarginHostName;
     }
-    if (const char* const routeDescriptorBegin = routeDescriptor30_.BeginOrNull();
+    if (const char* const routeDescriptorBegin = StringBeginOrNull(routeDescriptor30_);
         routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
         return std::string(routeDescriptorBegin) + g_marginServerDNSName;
     }

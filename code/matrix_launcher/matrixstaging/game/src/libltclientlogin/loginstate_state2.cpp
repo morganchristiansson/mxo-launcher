@@ -463,8 +463,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                                 g_CurrentLoginMediator->worldListPacketsD84_[static_cast<size_t>(
                                     matchedWorldIndex)];
                             if (matchedWorldPacket != nullptr) {
-                                g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[i]
-                                    .Assign(matchedWorldPacket->inlineNamePlus03);
+                                g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[i] =
+                                    matchedWorldPacket->inlineNamePlus03;
                             }
                         }
                     }

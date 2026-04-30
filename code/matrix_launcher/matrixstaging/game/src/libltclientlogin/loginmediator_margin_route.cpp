@@ -9,16 +9,15 @@ namespace {
 // anchor: launcher.exe:0x4043b0 = recovered basic_string concat helper
 // Conservative recovered helper shape shared across multiple callsites:
 // - append the full range of lhs then rhs into a temporary string-family object
-// - materialize the output as a fresh `BasicString_0x403f90`
-static BasicString_0x403f90* BasicString_0x403f90_ConcatInto(
-    BasicString_0x403f90& out,
-    const BasicString_0x403f90& lhs,
-    const BasicString_0x403f90& rhs) {
-    BasicString_0x403f90 local_20;
-    local_20.Clear();
-    local_20.AppendRange(lhs.begin, lhs.current);
-    local_20.AppendRange(rhs.begin, rhs.current);
-    out.ResetAndAssignCString(local_20.begin);
+// - materialize the output as a fresh `std::string`
+static std::string* BasicString_0x403f90_ConcatInto(
+    std::string& out,
+    const std::string& lhs,
+    const std::string& rhs) {
+    std::string local_20;
+    StringAppendRange(local_20, lhs.c_str(), lhs.c_str() + lhs.size());
+    StringAppendRange(local_20, rhs.c_str(), rhs.c_str() + rhs.size());
+    StringResetAndAssignCString(out, local_20.c_str());
     return &out;
 }
 
@@ -53,7 +52,7 @@ const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const
     // `+0x30/+0x3c/+0x6c` on the existing-character path:
     // when the per-slot route table is not populated yet, reuse the owner `+0x30`
     // route-descriptor string directly.
-    return routeDescriptor30_.BeginOrNull();
+    return StringBeginOrNull(routeDescriptor30_);
 }
 
 const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const {
@@ -116,25 +115,25 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         // - when different, assign `[arg1, terminator)` into owner `+0x30`
         // - build a temporary concatenated string through the `0x403f20 / 0x4043b0` helper family
         const char* const newRouteDescriptor = routeHostText ? routeHostText : "";
-        if (_stricmp(routeDescriptor30_.begin ? routeDescriptor30_.begin : "", newRouteDescriptor) != 0) {
+        if (_stricmp(routeDescriptor30_.c_str(), newRouteDescriptor) != 0) {
             const char* sourceEnd = newRouteDescriptor;
             while (*sourceEnd != '\0') {
                 ++sourceEnd;
             }
-            routeDescriptor30_.AssignFromRange(newRouteDescriptor, sourceEnd);
+            StringAssignFromRange(routeDescriptor30_, newRouteDescriptor, sourceEnd);
         }
 
         // Original reads global pointer slot `DAT_004d6814` and passes it as arg2 to
         // `0x403f20 = recovered basic_string reset/assign helper`. Current static evidence only
         // shows a read and the pointed-at bytes are zero, so model the second concatenation input
         // as empty until a real initializer/write is recovered.
-        BasicString_0x403f90 rebuiltAddressListInput;
+        std::string rebuiltAddressListInput;
         (void)BasicString_0x403f90_ConcatInto(
             rebuiltAddressListInput,
             routeDescriptor30_,
-            BasicString_0x403f90{});
+            std::string{});
 
-        if (const char* const rebuiltBegin = rebuiltAddressListInput.BeginOrNull();
+        if (const char* const rebuiltBegin = StringBeginOrNull(rebuiltAddressListInput);
             rebuiltBegin != nullptr) {
             marginHost = rebuiltBegin;
         }
@@ -168,7 +167,7 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         marginEndpoint_.portNetworkOrder =
             static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
         marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
-    } else if (const char* const routeDescriptorBegin = routeDescriptor30_.BeginOrNull();
+    } else if (const char* const routeDescriptorBegin = StringBeginOrNull(routeDescriptor30_);
                routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
         marginHost = std::string(routeDescriptorBegin) + g_marginServerDNSName;
     }
@@ -236,8 +235,8 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
     if (slotIndex >= 100u) {
         return nullptr;
     }
-    const BasicString_0x403f90& slot = selectionRouteState684_.routeHostStrings194_[slotIndex];
-    return slot.BeginOrNull();
+    const std::string& slot = selectionRouteState684_.routeHostStrings194_[slotIndex];
+    return StringBeginOrNull(slot);
 }
 
 // anchor: launcher.exe:0x41b2a0
