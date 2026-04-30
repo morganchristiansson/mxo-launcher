@@ -599,33 +599,6 @@ public:
     // that word, so keep that discrepancy explicit instead of inventing one.
     uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) override;
 
-    struct ActiveCharacterStateViewScaffold {
-        const char* characterName = nullptr;
-        uint32_t characterIdLow = 0;
-        uint32_t characterIdHigh = 0;
-        const char* realFirstName = nullptr;
-        const char* realLastName = nullptr;
-        const char* background = nullptr;
-    };
-
-    // Narrow wrapper-facing bridge on top of the launcher global current-mediator pointer
-    // (`0x4f78b8 = g_CurrentLoginMediator`). Keep callers on this hook instead of reaching into a
-    // TU-local global directly.
-    ActiveCharacterStateViewScaffold DescribeOwnCharacterStateScaffold() const;
-
-    // anchor: launcher.exe:0x41b450
-    // Recovered helper-state switcher:
-    // - not just a raw assignment
-    // - calls old helper vtable `+0x0c` with the new helper object
-    // - installs the new helper from the dispatch table
-    // - then calls new helper vtable `+0x08` with the old helper object
-    // Direct vtable reads now tighten that to:
-    // - old helper `+0x0c` -> slot 4
-    // - new helper `+0x08` -> slot 3 / BeginOrContinue
-    // Active post-state9 consequence: the state9 -> state12 pair maps both of those to tiny stubs,
-    // so the immediate continuation stays the later explicit PostEvent/listener work.
-
-
     // Anchored launcher.exe logging/event side effects at `0x41cfb0` / `0x41d090`.
     // Current implementation keeps lightweight event/error history together with the recovered
     // observer registration bridge for arg6/`ILTLoginMediator_0x4af2b8.Default` slots `+0x170/+0x174`.
