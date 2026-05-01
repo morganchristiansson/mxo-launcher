@@ -2874,16 +2874,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
-    CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
-    if (queueLock) {
-        EnterCriticalSection(queueLock);
-    }
+    (void)EnterQueueLockHelper();
 
     while (waitForSignal && Queue_IsEmpty(activeQueue0C) && Queue_IsEmpty(activeQueue34)) {
-        if (queueLock) {
-            LeaveCriticalSection(queueLock);
-        }
         if (!activeQueueSignalEvent) {
+            (void)LeaveQueueLockHelper();
             outPair->value0 = 0u;
             outPair->value1 = 0u;
             return 0x700000au;
@@ -2893,9 +2888,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
             outPair->value0 = 0u;
             outPair->value1 = 0u;
             return 0x700000au;
-        }
-        if (queueLock) {
-            EnterCriticalSection(queueLock);
         }
     }
 
@@ -2907,18 +2899,14 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     }
 
     if (!selectedQueue) {
-        if (queueLock) {
-            LeaveCriticalSection(queueLock);
-        }
+        (void)LeaveQueueLockHelper();
         outPair->value0 = 0u;
         outPair->value1 = 0u;
         return 0x700000au;
     }
 
     const bool popped = Queue_TryPopPair(selectedQueue, outPair);
-    if (queueLock) {
-        LeaveCriticalSection(queueLock);
-    }
+    (void)LeaveQueueLockHelper();
     return popped ? 0u : 0x700000au;
 }
 
@@ -3023,11 +3011,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
-    CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
     while (true) {
-        if (queueLock) {
-            EnterCriticalSection(queueLock);
-        }
+        (void)EnterQueueLockHelper();
 
         CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
         if (!Queue_IsEmpty(activeQueue34)) {
@@ -3037,14 +3022,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         }
 
         if (!selectedQueue) {
-            if (queueLock) {
-                LeaveCriticalSection(queueLock);
-            }
             if (nonBlocking) {
+                (void)LeaveQueueLockHelper();
                 return;
             }
 
             if (!activeQueueSignalEvent) {
+                (void)LeaveQueueLockHelper();
                 return;
             }
 
@@ -3057,9 +3041,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair pair = {};
         const bool popped = Queue_TryPopPair(selectedQueue, &pair);
-        if (queueLock) {
-            LeaveCriticalSection(queueLock);
-        }
+        (void)LeaveQueueLockHelper();
         if (!popped) {
             return;
         }

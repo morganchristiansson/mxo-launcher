@@ -785,12 +785,18 @@ Current best read:
   - `+0x8c` / `+0x90`
 - practical source consequence:
   - old queue attach/detach copy helpers were pruned
-  - on the current native-object build, detached-shell field publication is skipped, but the
-    helper still refreshes engine-owned endpoint/context count mirrors and empty-head
-    normalization so runtime state stays closer to the original insert/remove helpers
+  - detached-shell field publication helpers/syncers were then removed from liblttcp entirely;
+    current source now updates only engine-owned count/head state at the concrete mutation sites
   - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only for fallback
     detached-shell builds unless a future compiler-port proves direct cross-module subobject access
     can no longer remain native
+  - newer queue-fidelity correction from `0x4364d0/0x436b10`:
+    - `+0x5c` wait helper already performs the leave-lock / wait / reacquire sequence itself
+    - current source was previously double-releasing the queue lock before calling that helper on
+      blocking dequeue paths
+    - source now enters/leaves through the recovered queue-lock helper family directly and lets the
+      wait helper own the blocking unlock/relock transition, matching launcher/client control flow
+      more closely
 
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 
