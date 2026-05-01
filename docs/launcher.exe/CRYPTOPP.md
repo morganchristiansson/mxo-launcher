@@ -233,58 +233,53 @@ Practical family picture:
 - `0x004b672c` = `CryptoPP::InvertibleRSAFunction` (`RSA::PrivateKey`)
 - the later `0x004b6778` margin/auth wrapper sits on top of that RSA private-key core
 
-### 2.5.3 `0x447020` verifier constructor / class family used by auth pubkey validation
+### 2.5.3 Auth pubkey validator family
 
-**Confidence: HIGH for verifier-family identification; MEDIUM-HIGH for exact MI subobject labels**
+Once source uses the concrete Crypto++ leaf types directly, the useful documentation here is the
+address-to-class / address-to-method mapping rather than the noisy ctor-state OOAnalyzer labels.
 
-The ugly constructor at `0x447020` is best explained as the launcher constructing an old Crypto++
-RSA signature verifier from a reply public key.
+#### `0x004b7580` = `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
 
-Current best identification:
+| Address | Mapped name |
+|---|---|
+| `0x447020` | construct-from-reply-public-key |
+| `0x447260` | lazy fallback-key verifier builder |
+| `0x468f80` | verify embedded auth reply public key against `pubkey.dat` signer |
+| `0x44aec0` | verify auth reply copy shadow with verifier |
 
-- leaf family: `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
-- Crypto++ alias in modern headers:
-  - `rsa.h`: `Weak::RSASSA_PKCS1v15_MD5_Verifier`
-  - typedef/class alias of `RSASS<PKCS1v15, Weak1::MD5>::Verifier`
-- template family underneath:
-  - `PK_FinalTemplate<TF_VerifierImpl<...>>`
+#### `0x004b6fe8` = `CryptoPP::TF_VerifierImpl<RSASS<PKCS1v15, Weak1::MD5>...>` ctor-state base
 
-Why this mapping is strong:
+| Address | Mapped name |
+|---|---|
+| `0x4458c0` | verifier-impl base constructor before final leaf install |
 
-1. `0x447260` lazy fallback path allocates a `0x54`-byte object, constructs:
-   - exponent `0x11`
-   - modulus from the embedded fallback `pubkey.dat` modulus
-   - then calls `0x447020`
-2. `0x447020` deep-copies two `CryptoPP::Integer` objects into the destination object:
-   - `this + 0x14` = modulus
-   - `this + 0x28` = public exponent
-3. `0x468f80` later consumes the resulting object through verifier-family virtual dispatch:
-   - call through `param_4->vtable + 0x2c`
-   - signed message length `0x81`
-   - signature length `0x100`
-4. modern Crypto++ reference tree still exposes the exact family name in `third_party/cryptopp890/rsa.h`
+#### `0x004b6e40` = `CryptoPP::TF_VerifierBase` ctor-state base
 
-Observed constructor-state vtable writes in `0x447020`:
+| Address | Mapped name |
+|---|---|
+| `0x444cc0` | verifier-base constructor |
+| `0x445a10` | verifier-base destructor |
 
-| Address | Role | Best current reading |
-|---|---|---|
-| `0x4b73c8` | early primary vfptr | intermediate ctor-state verifier slice / base-construction state |
-| `0x4b7450` | later primary vfptr | second intermediate ctor-state verifier slice before final leaf install |
-| `0x4b7580` | final primary vfptr | final leaf verifier object (`Weak::RSASSA_PKCS1v15_MD5_Verifier` family) |
-| `0x4b7440` | secondary subobject vfptr at `this+0x08` | embedded Crypto++ key / trapdoor-function verifier-side MI slice |
-| `0x4b73c0` | secondary subobject vfptr at `this+0x4c` | secondary adjustor/algorithm slice used during verifier construction |
-| `0x4b741c` | adjustor thunk written through side table | intermediate thunk target during ctor-state installation |
-| `0x4b7558` | adjustor thunk written through side table | final leaf thunk target after `0x4b7580` install |
-| `0x4b6c44` | temporary vbptr-ish side write at `this+0x50` | construction-state side table / MI plumbing, not semantic launcher data |
-| `0x4b6c68` | temporary side write at `this+0x4c` | early ctor-state side vtable before final `0x4b73c0` install |
+#### `0x004b7440` = verifier-family secondary `CryptoPP::PK_Verifier` interface slice
 
-This is the same general old-MSVC/Crypto++ multiple-inheritance pattern already seen in the OAEP
-RSA encryptor/decryptor families elsewhere in the launcher.
+| Address | Mapped name |
+|---|---|
+| `0x445960` | adjustor thunk into verifier interface method |
+| `0x445970` | adjustor thunk into verifier interface method |
+| `0x445980` | adjustor thunk into verifier interface method |
+| `0x445990` | adjustor thunk into verifier interface method |
+| `0x4459a0` | adjustor thunk into verifier interface method |
+| `0x4459b0` | adjustor thunk into verifier interface method |
 
-Practical mapping used by auth-bootstrap:
+#### `0x004b6c44`
 
-- child `+0xa4` = lazy fallback verifier used to validate the embedded auth public key from raw `0x07`
-- child `+0xac` = verifier rebuilt from the reply public key and later used by auth-reply validation
+Not a standalone semantic Crypto++ leaf. Treat it as old-MSVC multiple-inheritance construction
+plumbing used by the verifier family ctors/dtors rather than as a recoverable public class name.
+
+Practical auth-bootstrap mapping used in source:
+
+- child `+0xa4` = `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` fallback validator for raw `0x07`
+- child `+0xac` = `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` rebuilt from the reply public key
 
 ### 2.5.4 FileSink family used by auth pubkey.dat recording
 

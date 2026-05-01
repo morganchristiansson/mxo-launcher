@@ -220,16 +220,17 @@ static bool BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
     return true;
 }
 
-static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
-    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>* outValidator,
+// anchor: launcher.exe:0x447020 / final leaf vtable 0x004b7580
+static bool BuildWeakRsassaPkcs1v15Md5VerifierFromReplyPublicKey(
+    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>* outVerifier,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger) {
-    if (!outValidator || !ownedState) {
+    if (!outVerifier || !ownedState) {
         return false;
     }
 
-    outValidator->reset();
+    outVerifier->reset();
     if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
             &ownedState->publicKey,
             ownedState,
@@ -240,9 +241,9 @@ static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
     }
 
     try {
-        *outValidator = std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(ownedState->publicKey);
+        *outVerifier = std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(ownedState->publicKey);
     } catch (const CryptoPP::Exception&) {
-        outValidator->reset();
+        outVerifier->reset();
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
         return false;
     }
@@ -251,7 +252,7 @@ static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
 
 namespace {
 
-struct AuthBootstrap680ReplyAuthDataValidatorView {
+struct WeakRsassaPkcs1v15Md5VerifierView {
     const void* object = nullptr;
     const AuthBootstrap680RsaPublicKeyPairOwnedState* publicKeyPair0c = nullptr;
 };
@@ -1163,7 +1164,7 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
         kAuthBootstrap680PubkeyDatFallbackModulus.data(),
         kAuthBootstrap680PubkeyDatFallbackModulus.size());
     static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
-    if (!BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+    if (!BuildWeakRsassaPkcs1v15Md5VerifierFromReplyPublicKey(
             &child.lazyPubkeyDatValidatorA4Owned_,
             &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
             kFallbackModulus,
@@ -1187,7 +1188,7 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
-    const AuthBootstrap680ReplyAuthDataValidatorView& lazyPubkeyDatValidatorA4) {
+    const WeakRsassaPkcs1v15Md5VerifierView& lazyPubkeyDatValidatorA4) {
     if (lazyPubkeyDatValidatorA4.object == nullptr ||
         lazyPubkeyDatValidatorA4.publicKeyPair0c == nullptr) {
         return false;
@@ -2454,7 +2455,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
             return 0x19000004u;
         }
 
-        const AuthBootstrap680ReplyAuthDataValidatorView lazyPubkeyDatValidatorA4View{
+        const WeakRsassaPkcs1v15Md5VerifierView lazyPubkeyDatValidatorA4View{
             lazyPubkeyDatValidatorA4,
             &lazyPubkeyDatValidatorA4PublicKeyPair0c_};
         if (!AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
@@ -2484,7 +2485,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
         raw08PublicKeyWorkerA8 = nullptr;
     }
 
-    if (BuildAuthBootstrap680ReplyAuthDataValidatorAC(
+    if (BuildWeakRsassaPkcs1v15Md5VerifierFromReplyPublicKey(
             &replyAuthDataValidatorACOwned_,
             &replyAuthDataValidatorACPublicKeyPair0c_,
             modulusInteger,
