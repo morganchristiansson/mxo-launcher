@@ -883,6 +883,9 @@ Recovered behavior:
   - and that hot cleanup-thread exit sequence is now kept inline inside `CleanupConnection`
     instead of routing through the broader unanchored `StopWorkerThreadScaffold` helper, so the
     anchored method remains easier to compare directly against static RE
+  - the same cleanup drift existed in the anchored derived destructor `0x431310`; source now keeps
+    the remaining context-worker teardown visible there too instead of hiding it behind the same
+    broad source-only helper
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:

@@ -2043,7 +2043,22 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
     if (CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking =
             FindEngineContextPayloadBacking(this)) {
         for (auto& it : contextBacking->entries) {
-            StopWorkerThreadScaffold(it.second->payload.get());
+            CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread = it.second->payload.get();
+            if (!workerThread) {
+                continue;
+            }
+
+            // Keep the remaining context-worker teardown visible in the anchored destructor path
+            // instead of hiding it behind the broader unanchored helper.
+            workerThread->RequestExit();
+            workerThread->SignalWakeup();
+            if (workerThread->IsRunning()) {
+                (void)workerThread->Wait();
+            }
+            if (CMessageConnection_0x4b7928* connection =
+                    static_cast<CMessageConnection_0x4b7928*>(workerThread->ContextKey())) {
+                connection->SetWorkerThreadScaffold(nullptr);
+            }
         }
         contextBacking->entries.clear();
     }
