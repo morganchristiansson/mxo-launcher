@@ -7,6 +7,9 @@
   - Work with user to improve incorrect types.
 - Implementations must be faithful to ghidra static-RE of launcher.exe
 - Respect method boundaries in static-RE. Do not inline or split methods if split does not exist in static-RE.
+  - do not extract helpers
+  - keep the anchored body whole
+  - prefer the simpler shape that is easiest to compare against Ghidra
 - Not addressing decompile output and not being faithful to static-RE leaves a debt to be paid in future sessions.
 - Anchor code to static-RE with comments like `// anchor: launcher.exe:0x123456 / vtable +0x58`
 
@@ -16,8 +19,9 @@ At end of task:
 - Run `make -j4` to build OR `make -j4 run` to build and run the game.
 
 ### Rule 3: Implementation, documentation and Ghidra should move together
-- Keep knowledge consolidated under: `../../docs/<binary>/<component>/`
+- With working launcher implementation, there is less need for documentation to describe things.
 - when an entry becomes resolved or stops steering current work, prune it instead of appending more history
+- Keep knowledge consolidated under: `../../docs/<binary>/<component>/`
 
 # Misc
 

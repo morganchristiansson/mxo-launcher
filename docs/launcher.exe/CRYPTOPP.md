@@ -233,7 +233,60 @@ Practical family picture:
 - `0x004b672c` = `CryptoPP::InvertibleRSAFunction` (`RSA::PrivateKey`)
 - the later `0x004b6778` margin/auth wrapper sits on top of that RSA private-key core
 
-### 2.5.3 FileSink family used by auth pubkey.dat recording
+### 2.5.3 `0x447020` verifier constructor / class family used by auth pubkey validation
+
+**Confidence: HIGH for verifier-family identification; MEDIUM-HIGH for exact MI subobject labels**
+
+The ugly constructor at `0x447020` is best explained as the launcher constructing an old Crypto++
+RSA signature verifier from a reply public key.
+
+Current best identification:
+
+- leaf family: `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
+- Crypto++ alias in modern headers:
+  - `rsa.h`: `Weak::RSASSA_PKCS1v15_MD5_Verifier`
+  - typedef/class alias of `RSASS<PKCS1v15, Weak1::MD5>::Verifier`
+- template family underneath:
+  - `PK_FinalTemplate<TF_VerifierImpl<...>>`
+
+Why this mapping is strong:
+
+1. `0x447260` lazy fallback path allocates a `0x54`-byte object, constructs:
+   - exponent `0x11`
+   - modulus from the embedded fallback `pubkey.dat` modulus
+   - then calls `0x447020`
+2. `0x447020` deep-copies two `CryptoPP::Integer` objects into the destination object:
+   - `this + 0x14` = modulus
+   - `this + 0x28` = public exponent
+3. `0x468f80` later consumes the resulting object through verifier-family virtual dispatch:
+   - call through `param_4->vtable + 0x2c`
+   - signed message length `0x81`
+   - signature length `0x100`
+4. modern Crypto++ reference tree still exposes the exact family name in `third_party/cryptopp890/rsa.h`
+
+Observed constructor-state vtable writes in `0x447020`:
+
+| Address | Role | Best current reading |
+|---|---|---|
+| `0x4b73c8` | early primary vfptr | intermediate ctor-state verifier slice / base-construction state |
+| `0x4b7450` | later primary vfptr | second intermediate ctor-state verifier slice before final leaf install |
+| `0x4b7580` | final primary vfptr | final leaf verifier object (`Weak::RSASSA_PKCS1v15_MD5_Verifier` family) |
+| `0x4b7440` | secondary subobject vfptr at `this+0x08` | embedded Crypto++ key / trapdoor-function verifier-side MI slice |
+| `0x4b73c0` | secondary subobject vfptr at `this+0x4c` | secondary adjustor/algorithm slice used during verifier construction |
+| `0x4b741c` | adjustor thunk written through side table | intermediate thunk target during ctor-state installation |
+| `0x4b7558` | adjustor thunk written through side table | final leaf thunk target after `0x4b7580` install |
+| `0x4b6c44` | temporary vbptr-ish side write at `this+0x50` | construction-state side table / MI plumbing, not semantic launcher data |
+| `0x4b6c68` | temporary side write at `this+0x4c` | early ctor-state side vtable before final `0x4b73c0` install |
+
+This is the same general old-MSVC/Crypto++ multiple-inheritance pattern already seen in the OAEP
+RSA encryptor/decryptor families elsewhere in the launcher.
+
+Practical mapping used by auth-bootstrap:
+
+- child `+0xa4` = lazy fallback verifier used to validate the embedded auth public key from raw `0x07`
+- child `+0xac` = verifier rebuilt from the reply public key and later used by auth-reply validation
+
+### 2.5.4 FileSink family used by auth pubkey.dat recording
 
 **Confidence: HIGH for family identification; MEDIUM for exact leaf type**
 
