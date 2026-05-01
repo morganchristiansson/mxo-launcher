@@ -115,15 +115,6 @@ static uint32_t ReadU32LE(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[3]) << 24u);
 }
 
-static void ResetAuthBootstrap680RsaPublicKey(
-    CryptoPP::RSA::PublicKey* publicKey) {
-    if (!publicKey) {
-        return;
-    }
-
-    *publicKey = CryptoPP::RSA::PublicKey();
-}
-
 namespace {
 
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
@@ -132,9 +123,7 @@ static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
  child.replyAuthDataValidatorAC = nullptr;
 
  child.raw08PublicKeyWorkerA8Owned_.reset();
- ResetAuthBootstrap680RsaPublicKey(&child.raw08PublicKeyWorkerA8PublicKey0c_);
  child.replyAuthDataValidatorACOwned_.reset();
- ResetAuthBootstrap680RsaPublicKey(&child.replyAuthDataValidatorACPublicKey0c_);
 }
 
 static void ResetAuthBootstrap680FeedbackTransforms(
@@ -559,7 +548,6 @@ AuthBootstrap680ChildBase_0x4b7134::AuthBootstrap680ChildBase_0x4b7134() {
  // +0x98: small transform nulled
 
  lazyPubkeyDatValidatorA4Owned_.reset();
- ResetAuthBootstrap680RsaPublicKey(&lazyPubkeyDatValidatorA4PublicKey0c_);
  lazyPubkeyDatValidatorA4 = nullptr; // +0xa4 = 0
 
  ResetAuthBootstrap680ReplyParseObject(*this);
@@ -782,17 +770,16 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
         kAuthBootstrap680PubkeyDatFallbackModulus.size());
     static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
     child.lazyPubkeyDatValidatorA4Owned_.reset();
-    ResetAuthBootstrap680RsaPublicKey(&child.lazyPubkeyDatValidatorA4PublicKey0c_);
     try {
-        child.lazyPubkeyDatValidatorA4PublicKey0c_.Initialize(
+        CryptoPP::RSA::PublicKey fallbackPublicKey;
+        fallbackPublicKey.Initialize(
             kFallbackModulus,
             kFallbackPublicExponent);
         child.lazyPubkeyDatValidatorA4Owned_ =
             std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
-                child.lazyPubkeyDatValidatorA4PublicKey0c_);
+                fallbackPublicKey);
     } catch (const CryptoPP::Exception&) {
         child.lazyPubkeyDatValidatorA4Owned_.reset();
-        ResetAuthBootstrap680RsaPublicKey(&child.lazyPubkeyDatValidatorA4PublicKey0c_);
         child.lazyPubkeyDatValidatorA4 = nullptr;
         return false;
     }
@@ -858,21 +845,21 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
     // - OutputFileName = "pubkey.dat"
     // - OutputBinaryMode = true
     // Then it emits the exact serialized record into that sink.
-    std::vector<uint8_t> serializedRecord;
-    serializedRecord.reserve(
-        sizeof(replyPublicKeyId09) + modulusBytes.size() + publicExponentBytes.size() + 1u + 0x100u);
-    serializedRecord.push_back(static_cast<uint8_t>(replyPublicKeyId09 & 0xffu));
-    serializedRecord.push_back(static_cast<uint8_t>((replyPublicKeyId09 >> 8u) & 0xffu));
-    serializedRecord.push_back(static_cast<uint8_t>((replyPublicKeyId09 >> 16u) & 0xffu));
-    serializedRecord.push_back(static_cast<uint8_t>((replyPublicKeyId09 >> 24u) & 0xffu));
-    serializedRecord.insert(serializedRecord.end(), modulusBytes.begin(), modulusBytes.end());
-    serializedRecord.insert(serializedRecord.end(), publicExponentBytes.begin(), publicExponentBytes.end());
-    serializedRecord.push_back(0u);
-    serializedRecord.insert(serializedRecord.end(), signatureBytes, signatureBytes + 0x100u);
+    const std::array<uint8_t, 4u> replyPublicKeyIdBytes = {
+        static_cast<uint8_t>(replyPublicKeyId09 & 0xffu),
+        static_cast<uint8_t>((replyPublicKeyId09 >> 8u) & 0xffu),
+        static_cast<uint8_t>((replyPublicKeyId09 >> 16u) & 0xffu),
+        static_cast<uint8_t>((replyPublicKeyId09 >> 24u) & 0xffu),
+    };
+    static constexpr uint8_t kPublicKeyRecordPaddingByte = 0u;
 
     try {
         CryptoPP::FileSink outputSink("pubkey.dat", true);
-        outputSink.Put(serializedRecord.data(), serializedRecord.size());
+        outputSink.Put(replyPublicKeyIdBytes.data(), replyPublicKeyIdBytes.size());
+        outputSink.Put(modulusBytes.data(), modulusBytes.size());
+        outputSink.Put(publicExponentBytes.data(), publicExponentBytes.size());
+        outputSink.Put(&kPublicKeyRecordPaddingByte, 1u);
+        outputSink.Put(signatureBytes, 0x100u);
         outputSink.MessageEnd();
         return 1u;
     } catch (const CryptoPP::Exception&) {
@@ -2076,34 +2063,32 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     currentPublicKeyId9C = replyPublicKeyId09;
 
     raw08PublicKeyWorkerA8Owned_.reset();
-    ResetAuthBootstrap680RsaPublicKey(&raw08PublicKeyWorkerA8PublicKey0c_);
     try {
-        raw08PublicKeyWorkerA8PublicKey0c_.Initialize(
+        CryptoPP::RSA::PublicKey replyPublicKey;
+        replyPublicKey.Initialize(
             modulusInteger,
             publicExponentInteger);
         raw08PublicKeyWorkerA8Owned_ =
             std::make_unique<CryptoPP::RSAES_OAEP_SHA_Encryptor>(
-                raw08PublicKeyWorkerA8PublicKey0c_);
+                replyPublicKey);
         raw08PublicKeyWorkerA8 = raw08PublicKeyWorkerA8Owned_.get();
     } catch (const CryptoPP::Exception&) {
         raw08PublicKeyWorkerA8Owned_.reset();
-        ResetAuthBootstrap680RsaPublicKey(&raw08PublicKeyWorkerA8PublicKey0c_);
         raw08PublicKeyWorkerA8 = nullptr;
     }
 
     replyAuthDataValidatorACOwned_.reset();
-    ResetAuthBootstrap680RsaPublicKey(&replyAuthDataValidatorACPublicKey0c_);
     try {
-        replyAuthDataValidatorACPublicKey0c_.Initialize(
+        CryptoPP::RSA::PublicKey replyPublicKey;
+        replyPublicKey.Initialize(
             modulusInteger,
             publicExponentInteger);
         replyAuthDataValidatorACOwned_ =
             std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
-                replyAuthDataValidatorACPublicKey0c_);
+                replyPublicKey);
         replyAuthDataValidatorAC = replyAuthDataValidatorACOwned_.get();
     } catch (const CryptoPP::Exception&) {
         replyAuthDataValidatorACOwned_.reset();
-        ResetAuthBootstrap680RsaPublicKey(&replyAuthDataValidatorACPublicKey0c_);
         replyAuthDataValidatorAC = nullptr;
     }
 

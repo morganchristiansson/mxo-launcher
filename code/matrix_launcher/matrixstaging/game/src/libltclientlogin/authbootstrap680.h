@@ -127,11 +127,8 @@ public:
  // Keep this tail explicit so we do not need a separate per-child side map.
  AuthBootstrap680Field54HelperOwnedState field54HelperOwnedState_{};
  std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> lazyPubkeyDatValidatorA4Owned_{};
- CryptoPP::RSA::PublicKey lazyPubkeyDatValidatorA4PublicKey0c_{};
  std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor> raw08PublicKeyWorkerA8Owned_{};
- CryptoPP::RSA::PublicKey raw08PublicKeyWorkerA8PublicKey0c_{};
  std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier> replyAuthDataValidatorACOwned_{};
- CryptoPP::RSA::PublicKey replyAuthDataValidatorACPublicKey0c_{};
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption> feedbackTransformLarge94Owned_{};
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> feedbackTransformSmall98Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
