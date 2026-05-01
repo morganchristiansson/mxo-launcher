@@ -82,92 +82,21 @@ same tiny root vtable even when they are not launcher-specific helper classes.
 
 ---
 
-### 2.2 Decryptor hierarchy overview
+### 2.2 Decryptor family
 
-**Confidence: HIGH for family identification; MEDIUM-HIGH for exact MI layering**
+| VTable / Function | Crypto++ class / method |
+|---|---|
+| `0x004b69b4` | `CryptoPP::RSAES_OAEP_SHA_Decryptor` |
+| `0x442b70` | ctor-state decryptor constructor |
+| `0x442e20` | intermediate ctor-state decryptor constructor |
+| `0x443220` | complete-object decryptor constructor |
+| `0x465d70` | load embedded `CryptoPP::InvertibleRSAFunction` / `RSA::PrivateKey` material |
+| `0x468130` | decrypt / trapdoor inverse path |
+| `0x464b80` | query max unpadded plaintext length |
+| `0x467640` | OAEP/SHA1 pad helper |
+| `0x467780` | OAEP/SHA1 unpad helper |
 
-The auth-bootstrap decryptor path is best understood as an MSVC multiple-inheritance realization of:
-
-- `CryptoPP::RSAES<OAEP<SHA1>>::Decryptor`
-- containing / exposing an embedded `CryptoPP::InvertibleRSAFunction`
-- with multiple adjustor/vbptr subobjects produced by old MSVC codegen
-
-Important constructors / states:
-
-| Address | Best current interpretation |
-|---------|-----------------------------|
-| `0x442b70` | `CryptoPP::RSAES_OAEP_SHA_Decryptor`-compatible constructor state |
-| `0x442e20` | intermediate MI construction state for the same decryptor family |
-| `0x443220` | launcher-visible complete-object constructor used by `0x443340` |
-| `0x465d70` | key-material import / CRT derivation into embedded RSA private-key member |
-
-The important correction vs older notes is that `0x443220` is **not** a simple launcher-local ctor.
-It is the complete-object ctor that finishes the MI object and then calls `0x465d70` to load the RSA
-key components.
-
----
-
-### 2.3 `0x443220` complete-object ctor
-
-**Confidence: HIGH**
-
-Function: `CMarginConnectionBootstrapPrepStateA0_ctor` in current Ghidra output.
-
-Observed sequence:
-1. If `param_4 != 0`, seed temporary vbptr / secondary-vftable state
-2. Call intermediate constructor at `0x442e20`
-3. Rewrite vfptr / adjustor-vtable slots for the final complete-object state
-4. Call `0x465d70` with `(param_1, param_2, param_3)`
-5. Return `this`
-
-The 4th argument is therefore **construction-state plumbing** rather than semantic launcher data.
-That is why the source-side unused `param_4` warning is real but the parameter still belongs in the
-signature for fidelity.
-
----
-
-### 2.4 Decryptor leaf — `0x4b69b4` = `CryptoPP::RSAES_OAEP_SHA_Decryptor`-compatible
-
-**Confidence: HIGH**
-
-VTable: `0x4b69b4` (16 entries, 64 bytes). Constructor: `0x442b70`.
-
-This class family is strongly identified as **old Crypto++ `RSAES<OAEP<SHA1>>::Decryptor`**.
-
-**Key evidence:**
-
-1. **`PerformRSADecryption` (`0x468130`)**
-   - imports ciphertext into a Crypto++ integer
-   - uses RNG/blinding context
-   - invokes trapdoor inverse / RSA private op
-   - exports result bytes
-   - hands them to OAEP unpadding-style postprocessing
-
-   This is exactly the shape expected from Crypto++ `TF_DecryptorBase::Decrypt`-style code.
-
-2. **`MaxUnpaddedLength` (`0x464b80`)**
-   - returns `k - 0x29` when `k > 0x29`
-   - `0x29 == 2*20 + 1`
-   - that is the OAEP overhead for **SHA-1**
-
-3. **`OAEP_Pad` (`0x467640`)** and **`OAEP_Unpad` (`0x467780`)**
-   - both use `0x14` byte hash lengths
-   - both instantiate SHA1 hash context machinery
-   - both run MGF1 masking / unmasking steps
-   - behavior matches Crypto++ OAEP code very closely
-
-4. **Key member semantics at `0x465d70`**
-   - imports `n`, `e`, `d`
-   - derives / stores `p`, `q`, `dp`, `dq`, `u`
-   - this matches `CryptoPP::InvertibleRSAFunction`
-
-5. **Encryptor counterpart already exists in source**
-   - launcher source already uses `CryptoPP::RSAES_OAEP_SHA_Encryptor` in the bootstrap
-     encryptor path, making the matching decryptor identification especially compelling
-
----
-
-### 2.5 Encryptor counterpart — `0x4b75e4`
+### 2.3 Encryptor counterpart — `0x4b75e4`
 
 | VTable / Function | Crypto++ class / method |
 |---|---|
@@ -182,56 +111,15 @@ This class family is strongly identified as **old Crypto++ `RSAES<OAEP<SHA1>>::D
 | `0x4471f0` | adjustor thunk to leaf dtor (`this -= 0x50`) |
 | `0x446d80` | adjustor thunk to ctor-state dtor (`this -= 0x50`) |
 
-### 2.5.1 Exact public-key base class under the `0x4b659c` / `0x4b6680` family
+### 2.3.1 Public/private RSA key core
 
-**Confidence: HIGH**
-
-The recovered ctor at `0x4420f0` now appears to be the exact Crypto++ public-key base class
-`CryptoPP::RSAFunction` rather than a launcher-local RSA helper.
-
-Key evidence:
-
-- `0x4420f0` constructs **two** `CryptoPP_Int_0x4ba50c` objects at:
-  - `this+0x08` → modulus `n`
-  - `this+0x1c` → public exponent `e`
-- the ctor installs the final vtable `0x004b6680`
-- the surrounding layout is a classic RSA public-key family with MI/thunk scaffolding
-- `0x42250` then builds the larger derived family by adding the private-key bigint slices, which
-  matches `CryptoPP::InvertibleRSAFunction`
-- in modern Crypto++ source terms, the public-key alias is `CryptoPP::RSA::PublicKey`, but the
-  exact underlying class is `CryptoPP::RSAFunction`
-
-So the launcher-recovered `AuthBootstrap680RsaPublicKeyPairSubobject0cSketch` was only a temporary
-layout mirror. The source has since been pruned to use **direct `CryptoPP::RSA::PublicKey`** for
-that family, and the Crypto++ class it corresponds to is `RSAFunction`.
-
-### 2.5.2 Derived private-key family under `0x4b672c`
-
-**Confidence: HIGH**
-
-The constructor at `0x442250` extends the RSA public-key base into the private-key family and
-matches **`CryptoPP::InvertibleRSAFunction`**.
-
-Key evidence:
-
-- `0x442250` first runs the `0x4b659c` public-key ctor path, then installs additional vtables and
-  helper slices on top of it
-- the constructor emits six more `CryptoPP_Int_0x4ba50c` initializations at:
-  - `field_0x3c`
-  - `field_0x50`
-  - `field_0x64`
-  - `field_0x78`
-  - `field_0x8c`
-  - `field_0xa0`
-- those extra bigint members line up with the private RSA components stored by
-  `CryptoPP::InvertibleRSAFunction` / `RSA::PrivateKey`
-- the vtable family at `0x004b672c` is therefore the derived private-key RSA branch, not a new
-  unrelated launcher-local crypto type
-
-Practical family picture:
-- `0x004b659c / 0x004b6680` = `CryptoPP::RSAFunction` (`RSA::PublicKey`)
-- `0x004b672c` = `CryptoPP::InvertibleRSAFunction` (`RSA::PrivateKey`)
-- the later `0x004b6778` margin/auth wrapper sits on top of that RSA private-key core
+| VTable / Function | Crypto++ class / method |
+|---|---|
+| `0x004b659c / 0x004b6680` | `CryptoPP::RSAFunction` (`CryptoPP::RSA::PublicKey`) |
+| `0x4420f0` | construct public-key core from modulus/exponent |
+| `0x004b672c` | `CryptoPP::InvertibleRSAFunction` (`CryptoPP::RSA::PrivateKey`) |
+| `0x442250` | construct private-key core |
+| `0x004b6778` | launcher margin/auth wrapper over RSA private-key core |
 
 ### 2.5.3 Auth pubkey validator family
 
