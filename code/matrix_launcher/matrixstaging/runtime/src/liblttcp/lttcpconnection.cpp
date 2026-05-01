@@ -471,6 +471,36 @@ void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueCont
     return owner ? static_cast<void*>(owner) : maybeQueueContext;
 }
 
+// UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
+uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem) {
+    CBaseConnection* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
+    if (owner) {
+        return owner->OnOperationCompleted(workItem);
+    }
+    if (!maybeQueueContext) {
+        return 0u;
+    }
+
+    CBaseConnection* directConnection = static_cast<CBaseConnection*>(maybeQueueContext);
+    return directConnection->OnOperationCompleted(workItem);
+}
+
+// UNANCHORED: source-owned ABI-dispatch wrapper for queued object slot-`+0x04` release calls.
+uint32_t QueuedObject_InvokeReleaseSlotScaffold(void* object) {
+    if (!object) {
+        return 0u;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(object);
+    if (!vtable || !vtable[1]) {
+        return 0u;
+    }
+
+    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+    return fn(object);
+}
+
 // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.
 void CLTTCPConnection::SetSocketHandle(uint32_t socketHandle) {
     socketHandle_ = socketHandle;

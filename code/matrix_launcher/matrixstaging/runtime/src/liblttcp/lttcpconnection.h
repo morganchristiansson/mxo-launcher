@@ -291,6 +291,12 @@ CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContex
 // The active replacement still needs the explicit adapter object whenever queued contexts may cross
 // into raw client.dll queue consumers compiled against the original MSVC object ABI.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
+// UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
+// Current source accepts either the queue-context adapter object or a direct CBaseConnection-family
+// object pointer on this path.
+uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem);
+// UNANCHORED: source-owned ABI-dispatch wrapper for queued object slot-`+0x04` release calls.
+uint32_t QueuedObject_InvokeReleaseSlotScaffold(void* object);
 
 // Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
 // mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`

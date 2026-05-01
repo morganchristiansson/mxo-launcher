@@ -2981,38 +2981,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         }
 
         if (context) {
-            if (queuedBaseConnection) {
-                (void)queuedBaseConnection->OnOperationCompleted(workItem);
-            } else {
-                void** vtable = *reinterpret_cast<void***>(context);
-                if (vtable && vtable[4]) {
-                    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
-                    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-                    (void)fn(context, workItem);
-                }
-            }
+            (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
         }
 
         if (shouldAutoReleaseContext) {
-            if (queuedBaseConnection) {
-                void** vtable = *reinterpret_cast<void***>(context);
-                if (vtable && vtable[1]) {
-                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-                    (void)fn(context);
-                }
-            } else {
-                spdlog::warn(
-                    "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
-                    fmt::ptr(context));
-            }
+            (void)QueuedObject_InvokeReleaseSlotScaffold(context);
         }
-        void** workItemVtable = *reinterpret_cast<void***>(workItem);
-        if (workItemVtable && workItemVtable[1]) {
-            typedef uint32_t (__thiscall *ReleaseFn)(void*);
-            ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
-            (void)fn(workItem);
-        }
+        (void)QueuedObject_InvokeReleaseSlotScaffold(workItem);
     }
 }
 
@@ -3036,40 +3011,15 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
                     CleanupConnection(context);
                 }
                 if (context) {
-                    if (queuedBaseConnection) {
-                        (void)queuedBaseConnection->OnOperationCompleted(workItem);
-                    } else {
-                        void** vtable = *reinterpret_cast<void***>(context);
-                        if (vtable && vtable[4]) {
-                            typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
-                            OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-                            (void)fn(context, workItem);
-                        }
-                    }
+                    (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
                 }
                 const bool shouldAutoReleaseContext =
                     workType == kWorkTypeClose && context != nullptr &&
                     (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
                 if (shouldAutoReleaseContext) {
-                    if (queuedBaseConnection) {
-                        void** vtable = *reinterpret_cast<void***>(context);
-                        if (vtable && vtable[1]) {
-                            typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                            ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-                            (void)fn(context);
-                        }
-                    } else {
-                        spdlog::warn(
-                            "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
-                            fmt::ptr(context));
-                    }
+                    (void)QueuedObject_InvokeReleaseSlotScaffold(context);
                 }
-                void** workItemVtable = *reinterpret_cast<void***>(workItem);
-                if (workItemVtable && workItemVtable[1]) {
-                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
-                    (void)fn(workItem);
-                }
+                (void)QueuedObject_InvokeReleaseSlotScaffold(workItem);
             }
         }
         return;
