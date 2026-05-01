@@ -572,38 +572,12 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
 namespace {
 
 // anchor: launcher.exe:0x468ea0
-// Static RE now closes the outer formula tightly even though the inner worker stack is still
-// bounded in source: `0x468ea0` computes
-//   ciphertextBlockBytes * ceil(plaintextByteCount / plaintextChunkBytes)
-// where:
-// - ciphertext block bytes come from worker vtable `+0x24 -> 0x41f090 -> this+0x0c -> modulus`
-// - plaintext chunk bytes come from the helper family behind outer `this+4/+8`
-//   (`0x468f00` re-queries that chunk bound each loop)
-//
-// Disassembly also proves `0x468f00` pushes four stack args into worker vtable `+0x1c`, and
-// `0x468280` returns with `ret 0x10`; the decompiler undercounts that unless checked against the
-// assembly. Source therefore now mirrors the outer formula more literally:
-// - ciphertext block bytes are derived from the RSA modulus bit count like the launcher path
-// - plaintext chunk bytes remain a bounded OAEP-backed stand-in for the still-unclosed helper
-//   family behind outer `this+4/+8`
-static size_t QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(
-    const CryptoPP::RSA::PublicKey& publicKey) {
-    const size_t modulusBitCount = static_cast<size_t>(publicKey.GetModulus().BitCount());
-    if (modulusBitCount == 0u) {
-        return 0u;
-    }
-
-    return ((modulusBitCount - 1u) + 7u) >> 3u;
-}
-
 static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     size_t plaintextByteCount) {
-    const CryptoPP::RSA::PublicKey& publicKey = ownedState.publicKey;
-    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
+    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
     const size_t maxPlaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
-    const size_t ciphertextChunkByteCount =
-        QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey);
+    const size_t ciphertextChunkByteCount = encryptor.FixedCiphertextLength();
     if (maxPlaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
         return 0u;
     }
@@ -617,8 +591,8 @@ static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthSc
 
 static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerCiphertextChunkByteCountScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) {
-    return static_cast<uint32_t>(
-        QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(ownedState.publicKey));
+    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
+    return static_cast<uint32_t>(encryptor.FixedCiphertextLength());
 }
 
 static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerPlaintextChunkByteCountScaffold(
@@ -638,57 +612,14 @@ static bool EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
     }
 
     try {
-        const CryptoPP::RSA::PublicKey& publicKey = ownedState.publicKey;
         CryptoPP::AutoSeededRandomPool rng;
-        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
-        const size_t ciphertextChunkByteCount =
-            QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey);
+        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
+        const size_t ciphertextChunkByteCount = encryptor.FixedCiphertextLength();
         if (ciphertextChunkByteCount == 0u || ciphertextByteCapacity < ciphertextChunkByteCount) {
             return false;
         }
 
-        // Preserve the raw-0x08 layering recovered from launcher.exe even though we no longer keep
-        // a dedicated `0x48` helper layout struct in source:
-        // - outer worker family here is `CryptoPP::RSAES_OAEP_SHA_Encryptor`
-        // - inner per-chunk helper is the old `PK_DefaultEncryptionFilter`
-        // - that helper owns a `ByteQueue` plaintext accumulator with `NodeSize = 0x100`
-        //
-        // anchor: launcher.exe:0x438120
-        // anchor: launcher.exe:0x438320
-        // anchor: launcher.exe:0x4382c0
-        // anchor: launcher.exe:0x454f10
-        // Mirror the message-end semantics of `CryptoPP_PK_DefaultEncryptionFilter_Put2` instead of
-        // erasing the boundary into a one-shot convenience encrypt call:
-        // 1. queue plaintext into a `ByteQueue`
-        // 2. query queued size
-        // 3. drain queued plaintext into a temporary contiguous buffer
-        // 4. feed that plaintext through a `PK_EncryptorFilter`-equivalent emission step
-        CryptoPP::ByteQueue plaintextQueue;
-        plaintextQueue.Put(plaintextBytes, plaintextByteCount);
-        const size_t queuedPlaintextByteCount = plaintextQueue.CurrentSize();
-        if (queuedPlaintextByteCount != plaintextByteCount) {
-            return false;
-        }
-
-        std::string queuedPlaintext(queuedPlaintextByteCount, '\0');
-        plaintextQueue.Get(
-            reinterpret_cast<CryptoPP::byte*>(queuedPlaintext.data()),
-            queuedPlaintextByteCount);
-
-        std::string ciphertextChunk;
-        CryptoPP::PK_EncryptorFilter encryptFilter(
-            rng,
-            encryptor,
-            new CryptoPP::StringSink(ciphertextChunk));
-        encryptFilter.Put(
-            reinterpret_cast<const CryptoPP::byte*>(queuedPlaintext.data()),
-            queuedPlaintext.size());
-        encryptFilter.MessageEnd();
-        if (ciphertextChunk.size() != ciphertextChunkByteCount) {
-            return false;
-        }
-
-        std::memcpy(ciphertextBytes, ciphertextChunk.data(), ciphertextChunk.size());
+        encryptor.Encrypt(rng, plaintextBytes, plaintextByteCount, ciphertextBytes);
         return true;
     } catch (const CryptoPP::Exception&) {
         return false;
