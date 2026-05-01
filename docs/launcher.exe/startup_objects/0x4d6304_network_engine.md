@@ -890,6 +890,9 @@ Recovered behavior:
     also pruned because current source had no RE-backed callsites using the alternate lock-held
     branch; the active enqueue path now matches the single original enter-lock -> push -> leave-lock
     shape more directly
+  - current source also now uses the exact write-cursor == read-cursor empty tests directly on the
+    two queue records in the `0x4364d0 / 0x436820 / 0x436b10` family, instead of layering extra
+    source-owned null-read-cursor semantics on top of the recovered queue state
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:

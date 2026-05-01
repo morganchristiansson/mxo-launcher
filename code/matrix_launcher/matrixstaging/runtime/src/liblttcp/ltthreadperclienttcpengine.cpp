@@ -1850,7 +1850,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
 
 // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
 bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
-    return !queueRecord || !queueRecord->readCursor00 || (queueRecord->writeCursor10 == queueRecord->readCursor00);
+    if (!queueRecord) {
+        return true;
+    }
+    // Tighten toward the original queue-family empty tests used by `0x4364d0` / `0x436820`
+    // / `0x436b10`: emptiness is determined by direct write-cursor == read-cursor comparisons,
+    // not by extra source-owned null-read-cursor branching.
+    return queueRecord->writeCursor10 == queueRecord->readCursor00;
 }
 
 // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
@@ -2812,7 +2818,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
     (void)EnterQueueLockHelper();
 
-    while (waitForSignal && Queue_IsEmpty(activeQueue0C) && Queue_IsEmpty(activeQueue34)) {
+    while (waitForSignal &&
+           activeQueue0C != nullptr && activeQueue34 != nullptr &&
+           activeQueue0C->writeCursor10 == activeQueue0C->readCursor00 &&
+           activeQueue34->writeCursor10 == activeQueue34->readCursor00) {
         if (!activeQueueSignalEvent) {
             (void)LeaveQueueLockHelper();
             outPair->value0 = 0u;
@@ -2828,9 +2837,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
-    if (!Queue_IsEmpty(activeQueue34)) {
+    if (activeQueue34 != nullptr && activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
         selectedQueue = activeQueue34;
-    } else if (!Queue_IsEmpty(activeQueue0C)) {
+    } else if (activeQueue0C != nullptr && activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
         selectedQueue = activeQueue0C;
     }
 
@@ -2873,7 +2882,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     (void)EnterQueueLockHelper();
 
     const bool queuePairWasEmpty =
-        Queue_IsEmpty(activeQueue0C) && Queue_IsEmpty(activeQueue34);
+        activeQueue0C != nullptr && activeQueue34 != nullptr &&
+        activeQueue0C->writeCursor10 == activeQueue0C->readCursor00 &&
+        activeQueue34->writeCursor10 == activeQueue34->readCursor00;
     Queue_PushPair(
         targetQueue,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
@@ -2939,9 +2950,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         (void)EnterQueueLockHelper();
 
         CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
-        if (!Queue_IsEmpty(activeQueue34)) {
+        if (activeQueue34 != nullptr && activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
             selectedQueue = activeQueue34;
-        } else if (!Queue_IsEmpty(activeQueue0C)) {
+        } else if (activeQueue0C != nullptr && activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
             selectedQueue = activeQueue0C;
         }
 
