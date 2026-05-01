@@ -1897,9 +1897,8 @@ static uint32_t QueueWorkItem_GetType(const void* workItem) {
 }
 
 
-// Keep the implementation intentionally conservative.
-// These methods currently provide original-name structure and evidence-backed state
-// shaping, but they are not yet the fully faithful runtime path used by arg5.
+// Current queue/runtime pass keeps launcher.exe as the source of truth and trims prior
+// wrapper-era interpretation where concrete RE has now settled the behavior.
 
 // anchor: launcher.exe:0x431c30
 // vtable: launcher.exe:0x004b2768
@@ -2850,9 +2849,8 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         return false;
     }
 
-    CRITICAL_SECTION* queueLock = &ownedQueueLockHelper60_.crit;
-    if (queueLock && !queueLockAlreadyHeld) {
-        EnterCriticalSection(queueLock);
+    if (!queueLockAlreadyHeld) {
+        (void)EnterQueueLockHelper();
     }
 
     const bool queuePairWasEmpty =
@@ -2862,8 +2860,8 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
 
-    if (queueLock && !queueLockAlreadyHeld) {
-        LeaveCriticalSection(queueLock);
+    if (!queueLockAlreadyHeld) {
+        (void)LeaveQueueLockHelper();
     }
 
     if (queuePairWasEmpty) {
@@ -2914,10 +2912,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
     // - callback runs before the later release tail
     // - on the type-1 path, conditional context auto-release precedes the final work-item release
     // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
-    // - queue selection/pop happens under the real engine queue lock
-    // - when an arg5 shell is attached, queue bytes at `+0x0c..+0x5b` remain authoritative for
-    //   raw client.dll queue access, so producers/consumers operate on that attached shell storage
-    //   while helper behavior still forwards into the native engine object
+    // - queue selection/pop happens under the real engine queue lock helper family at `+0x60`
     CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* activeQueuePair =
         ActiveQueuePairStorageScaffold(this);
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue0C =
