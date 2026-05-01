@@ -893,11 +893,17 @@ Recovered behavior:
   - current source also now uses the exact write-cursor == read-cursor empty tests directly on the
     two queue records in the `0x4364d0 / 0x436820 / 0x436b10` family, instead of layering extra
     source-owned null-read-cursor semantics on top of the recovered queue state
+  - the older duplicate `Queue_IsEmpty` helper anchor was then removed entirely so the queue-family
+    hot paths read those cursor comparisons inline where launcher.exe does
   - cross-block dequeue was tightened too:
     - source removed an impossible/null `slotArrayCurrent0C` recovery branch from the hot pop path
     - once the read cursor reaches `firstBlockEnd08 - 8`, source now follows the original
       `0x4363e0` shape directly: free current block, increment `slotArrayCurrent0C`, load the next
       block pointer, then reset `firstBlockBegin04/End08/readCursor00`
+  - blocking `0x436b10` wait handling was also nudged closer to the original loop shape: after the
+    `+0x5c` wait helper returns, source now immediately re-checks the raw cursor-empty conditions and
+    re-enters the loop if the queue is still empty instead of treating the wait helper return alone
+    as sufficient progress
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:

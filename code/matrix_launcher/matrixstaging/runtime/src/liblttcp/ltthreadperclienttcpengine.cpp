@@ -1848,22 +1848,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
     queueRecord->writeCursor10 = writeCursor + 2;
 }
 
-// anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
-bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
-    if (!queueRecord) {
-        return true;
-    }
-    // Tighten toward the original queue-family empty tests used by `0x4364d0` / `0x436820`
-    // / `0x436b10`: emptiness is determined by direct write-cursor == read-cursor comparisons,
-    // not by extra source-owned null-read-cursor branching.
-    return queueRecord->writeCursor10 == queueRecord->readCursor00;
-}
-
 // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
 bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
     CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair) {
-    if (!queueRecord || !outPair || Queue_IsEmpty(queueRecord)) {
+    if (!queueRecord || !outPair || queueRecord->writeCursor10 == queueRecord->readCursor00) {
         return false;
     }
 
@@ -2958,6 +2947,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
             const uint32_t waitResult = WaitQueueEventHelper(INFINITE);
             if (waitResult == 0u || waitResult == 3u) {
+                if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00 ||
+                    activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
+                    continue;
+                }
+                (void)LeaveQueueLockHelper();
                 continue;
             }
             return;

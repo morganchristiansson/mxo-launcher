@@ -424,8 +424,6 @@ public:
     // enqueue-success feedback.
     // `queueRecord` is one of the two repeated records inside the inline queue-pair storage.
     static void Queue_PushPair(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord, uint32_t value0, uint32_t value1);
-    // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
-    static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord);
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
     static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord, CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair);
 
