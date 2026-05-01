@@ -55,10 +55,13 @@ public:
 // uses direct `CryptoPP::RSASSA_PKCS1v15_MD5_Verifier` instances.
 
 // Launcher-owned wrapper around embedded Crypto++ RNG / BufferedTransformation slices.
-// Final ctor state from `launcher.exe:0x4686e0` is:
+// This is not a standalone Crypto++ leaf type by itself; static RE of `0x4686e0` and `0x468640`
+// shows a launcher wrapper object whose active subobjects are:
 // - `+0x00 = 0x004b695c` launcher wrapper vtable
-// - `+0x04 = 0x004b68a8` old `CryptoPP::RandomPool` / modern `OldRandomPool`
+// - `+0x04 = 0x004b68a8` old `CryptoPP::RandomPool` / modern `CryptoPP::OldRandomPool`
 // - `+0x08 = 0x004b41e0` `CryptoPP::BufferedTransformation`
+// The recovered `0x468640` fill helper dispatches through the `+0x04` RandomPool family rather
+// than exposing an additional distinct Crypto++ concrete class.
 struct AuthBootstrap680Field54HelperSketch {
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;

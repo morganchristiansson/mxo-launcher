@@ -115,15 +115,6 @@ static uint32_t ReadU32LE(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[3]) << 24u);
 }
 
-static void ResetAuthBootstrap680BigIntObject(
-    CryptoPP::Integer* outObject) {
-    if (!outObject) {
-        return;
-    }
-
-    *outObject = CryptoPP::Integer::Zero();
-}
-
 static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
     if (!ownedState) {
@@ -484,9 +475,9 @@ static void ResetAuthBootstrap680ReplyMaterialization(
         std::free(child.authReplyCopyShadowF4);
         child.authReplyCopyShadowF4 = nullptr;
     }
-    ResetAuthBootstrap680BigIntObject(&child.modulusBigIntB0);
-    ResetAuthBootstrap680BigIntObject(&child.publicExponentBigIntC4);
-    ResetAuthBootstrap680BigIntObject(&child.privateExponentBigIntD8);
+    child.modulusBigIntB0 = CryptoPP::Integer::Zero();
+    child.publicExponentBigIntC4 = CryptoPP::Integer::Zero();
+    child.privateExponentBigIntD8 = CryptoPP::Integer::Zero();
 }
 
 // anchor: launcher.exe:0x4472f0
@@ -1629,7 +1620,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
             const bool replyAuthDataValidatorAccepted =
                 copyShadowCandidate.VerifyWithValidator(
-                    replyAuthDataValidatorACOwned_.get(),
+                    replyAuthDataValidatorAC,
                     authServerTimeBias80);
             if (!replyAuthDataValidatorAccepted) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
@@ -1906,9 +1897,9 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     const uint16_t plaintextPayloadByteCount =
         plaintextAuthBlob.messageRef08 ? plaintextAuthBlob.messageRef08->PayloadByteCount() : 0u;
     const uint32_t plaintextChunkByteCount =
-        static_cast<uint32_t>(raw08PublicKeyWorkerA8Owned_->FixedMaxPlaintextLength());
+        static_cast<uint32_t>(raw08PublicKeyWorkerA8->FixedMaxPlaintextLength());
     const uint32_t ciphertextChunkByteCount =
-        static_cast<uint32_t>(raw08PublicKeyWorkerA8Owned_->FixedCiphertextLength());
+        static_cast<uint32_t>(raw08PublicKeyWorkerA8->FixedCiphertextLength());
     if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
         spdlog::info(
             "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
@@ -1982,7 +1973,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         }
         try {
             CryptoPP::AutoSeededRandomPool rng;
-            raw08PublicKeyWorkerA8Owned_->Encrypt(
+            raw08PublicKeyWorkerA8->Encrypt(
                 rng,
                 plaintextCursor,
                 currentChunkByteCount,
@@ -2072,7 +2063,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
                 modulusInteger,
                 publicExponentInteger,
                 signatureBytes,
-                lazyPubkeyDatValidatorA4Owned_.get())) {
+                lazyPubkeyDatValidatorA4)) {
             spdlog::warn(
                 "DIAGNOSTIC: RebuildReplyPublicKeyWorkers verify failed child={} signaturePreview='{}'",
                 fmt::ptr(this),
