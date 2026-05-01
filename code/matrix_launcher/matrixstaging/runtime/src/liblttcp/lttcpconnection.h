@@ -453,6 +453,8 @@ public:
     // parser-emitted completed packet work item as the exact `0x449d8a -> 0x436820` handoff
     // `(engine+0x10, completedPacketWorkItem, this, false)`, then branch through the original
     // endpoint-based terminal-error log split before releasing the outer fragment reference.
+    // Current source now also queues the direct connection object on this path; the separate
+    // queue-context adapter remains for raw client-facing consumers elsewhere.
     void OnReceive(CLTTCPReadOperation* readOperationFragment) override;
 
     // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.

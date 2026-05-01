@@ -730,7 +730,7 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
         if (engine) {
             engine->EnqueueCompletedOperation(
                 completedPacketWorkItem,
-                QueueContextScaffold(),
+                static_cast<CBaseConnection*>(this),
                 /*useQueue34=*/false,
                 "CLTTCPConnection::OnReceive");
         }

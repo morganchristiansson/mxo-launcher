@@ -2956,19 +2956,24 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
 
-        CBaseConnection* queuedBaseConnection = context
-            ? CBaseConnection_FromQueueContextScaffold(context)
-            : nullptr;
+        CBaseConnection* queuedBaseConnection = nullptr;
+        if (context) {
+            queuedBaseConnection = CBaseConnection_FromQueueContextScaffold(context);
+            if (!queuedBaseConnection) {
+                queuedBaseConnection = static_cast<CBaseConnection*>(context);
+            }
+        }
         const bool shouldAutoReleaseContext =
             isType1 && context != nullptr &&
             (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
 
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} directBaseConnection={} autoReleaseType1Context={}",
             (selectedQueue == activeQueue34) ? "queue34" : "queue0C",
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),
+            (context != nullptr && queuedBaseConnection == static_cast<CBaseConnection*>(context)) ? 1u : 0u,
             shouldAutoReleaseContext ? 1u : 0u);
 
         if (context && isType1) {
@@ -3024,6 +3029,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
                 CBaseConnection* queuedBaseConnection = CBaseConnection_FromQueueContextScaffold(context);
+                if (!queuedBaseConnection) {
+                    queuedBaseConnection = static_cast<CBaseConnection*>(context);
+                }
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }
