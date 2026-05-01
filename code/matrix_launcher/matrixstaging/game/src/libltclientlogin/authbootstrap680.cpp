@@ -571,60 +571,7 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
 
 namespace {
 
-// anchor: launcher.exe:0x468ea0
-static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-    size_t plaintextByteCount) {
-    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
-    const size_t maxPlaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
-    const size_t ciphertextChunkByteCount = encryptor.FixedCiphertextLength();
-    if (maxPlaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
-        return 0u;
-    }
-
-    const size_t chunkCount =
-        (plaintextByteCount + maxPlaintextChunkByteCount - 1u) / maxPlaintextChunkByteCount;
-    return static_cast<uint32_t>(chunkCount * ciphertextChunkByteCount);
-}
-
 }  // namespace
-
-static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerCiphertextChunkByteCountScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) {
-    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
-    return static_cast<uint32_t>(encryptor.FixedCiphertextLength());
-}
-
-static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerPlaintextChunkByteCountScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState) {
-    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
-    return static_cast<uint32_t>(encryptor.FixedMaxPlaintextLength());
-}
-
-static bool EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-    const uint8_t* plaintextBytes,
-    size_t plaintextByteCount,
-    uint8_t* ciphertextBytes,
-    size_t ciphertextByteCapacity) {
-    if (!plaintextBytes || plaintextByteCount == 0u || !ciphertextBytes) {
-        return false;
-    }
-
-    try {
-        CryptoPP::AutoSeededRandomPool rng;
-        CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(ownedState.publicKey);
-        const size_t ciphertextChunkByteCount = encryptor.FixedCiphertextLength();
-        if (ciphertextChunkByteCount == 0u || ciphertextByteCapacity < ciphertextChunkByteCount) {
-            return false;
-        }
-
-        encryptor.Encrypt(rng, plaintextBytes, plaintextByteCount, ciphertextBytes);
-        return true;
-    } catch (const CryptoPP::Exception&) {
-        return false;
-    }
-}
 
 namespace {
 
@@ -2050,10 +1997,19 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
 
     const uint16_t plaintextPayloadByteCount =
         plaintextAuthBlob.messageRef08 ? plaintextAuthBlob.messageRef08->PayloadByteCount() : 0u;
+    const uint32_t plaintextChunkByteCount =
+        static_cast<uint32_t>(raw08PublicKeyWorkerA8Owned_->FixedMaxPlaintextLength());
+    const uint32_t ciphertextChunkByteCount =
+        static_cast<uint32_t>(raw08PublicKeyWorkerA8Owned_->FixedCiphertextLength());
+    if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
+        spdlog::info(
+            "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
+        return;
+    }
+    const size_t chunkCount =
+        (plaintextPayloadByteCount + plaintextChunkByteCount - 1u) / plaintextChunkByteCount;
     const uint32_t raw08WorkerExpectedBlobLen =
-        QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
-            raw08PublicKeyWorkerA8PublicKeyPair0c_,
-            plaintextPayloadByteCount);
+        static_cast<uint32_t>(chunkCount * ciphertextChunkByteCount);
     if (raw08WorkerExpectedBlobLen == 0u || raw08WorkerExpectedBlobLen > 0xffffu) {
         spdlog::error(
             "launcher-owned auth rejected recovered 0x4474f0 ciphertext reservation len={}",
@@ -2103,21 +2059,6 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     }
 
     // anchor: launcher.exe:0x468f00
-    // Keep the raw08 per-chunk worker loop inline in `0x4474f0`, but route the concrete chunk
-    // sizing / encrypt work through recovered worker-shaped methods instead of driving Crypto++
-    // directly from this send helper.
-    const uint32_t plaintextChunkByteCount =
-        QueryAuthBootstrap680Raw08PublicKeyWorkerPlaintextChunkByteCountScaffold(
-            raw08PublicKeyWorkerA8PublicKeyPair0c_);
-    const uint32_t ciphertextChunkByteCount =
-        QueryAuthBootstrap680Raw08PublicKeyWorkerCiphertextChunkByteCountScaffold(
-            raw08PublicKeyWorkerA8PublicKeyPair0c_);
-    if (plaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
-        spdlog::info(
-            "DIAGNOSTIC: launcher-owned auth failed to recover 0x4474f0 raw08 chunk sizing");
-        return;
-    }
-
     uint8_t* ciphertextCursor =
         reinterpret_cast<uint8_t*>(const_cast<char*>(authRequestPacket.debugString14));
     const uint8_t* plaintextCursor = plaintextPayload;
@@ -2126,13 +2067,19 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     while (plaintextBytesRemaining != 0u) {
         const size_t currentChunkByteCount =
             std::min<size_t>(plaintextChunkByteCount, plaintextBytesRemaining);
-        if (ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen ||
-            !EncryptAuthBootstrap680Raw08PlaintextChunkScaffold(
-                raw08PublicKeyWorkerA8PublicKeyPair0c_,
+        if (ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen) {
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
+            return;
+        }
+        try {
+            CryptoPP::AutoSeededRandomPool rng;
+            raw08PublicKeyWorkerA8Owned_->Encrypt(
+                rng,
                 plaintextCursor,
                 currentChunkByteCount,
-                ciphertextCursor + ciphertextBytesWritten,
-                ciphertextChunkByteCount)) {
+                ciphertextCursor + ciphertextBytesWritten);
+        } catch (const CryptoPP::Exception&) {
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
             return;
