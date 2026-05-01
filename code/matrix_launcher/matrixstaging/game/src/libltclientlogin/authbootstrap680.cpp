@@ -251,6 +251,11 @@ static bool BuildAuthBootstrap680ReplyAuthDataValidatorAC(
 
 namespace {
 
+struct AuthBootstrap680ReplyAuthDataValidatorView {
+    const void* object = nullptr;
+    const AuthBootstrap680RsaPublicKeyPairOwnedState* publicKeyPair0c = nullptr;
+};
+
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
  AuthBootstrap680ChildBase_0x4b7134& child) {
  child.raw08PublicKeyWorkerA8 = nullptr;
@@ -1182,9 +1187,9 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
-    const void* lazyPubkeyDatValidatorA4,
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& lazyPubkeyDatValidatorA4PublicKeyPair0c) {
-    if (lazyPubkeyDatValidatorA4 == nullptr) {
+    const AuthBootstrap680ReplyAuthDataValidatorView& lazyPubkeyDatValidatorA4) {
+    if (lazyPubkeyDatValidatorA4.object == nullptr ||
+        lazyPubkeyDatValidatorA4.publicKeyPair0c == nullptr) {
         return false;
     }
 
@@ -1201,7 +1206,7 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     std::copy_n(modulusBytes.data(), modulusBytes.size(), signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = publicExponentBytes[0];
     return VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-        lazyPubkeyDatValidatorA4PublicKeyPair0c,
+        *lazyPubkeyDatValidatorA4.publicKeyPair0c,
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
         signatureBytes,
@@ -2449,12 +2454,14 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
             return 0x19000004u;
         }
 
+        const AuthBootstrap680ReplyAuthDataValidatorView lazyPubkeyDatValidatorA4View{
+            lazyPubkeyDatValidatorA4,
+            &lazyPubkeyDatValidatorA4PublicKeyPair0c_};
         if (!AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
                 modulusInteger,
                 publicExponentInteger,
                 signatureBytes,
-                lazyPubkeyDatValidatorA4,
-                lazyPubkeyDatValidatorA4PublicKeyPair0c_)) {
+                lazyPubkeyDatValidatorA4View)) {
             spdlog::warn(
                 "DIAGNOSTIC: RebuildReplyPublicKeyWorkers verify failed child={} signaturePreview='{}'",
                 fmt::ptr(this),

@@ -107,6 +107,11 @@ So the better recovered shape is:
 - no auth-bootstrap-child `this` pointer in the anchored helper itself
 - return value consumed from `AL` only; the decompiler's `uint in_EAX` artifact is just a symptom of the bool-sized return
 
+In source we still need a way to reach the recovered validator's backing public-key material, because our replacement verifier is implemented against source-owned Crypto++ state rather than by calling the original validator-family virtual directly. To keep the anchored helper at four arguments, the fourth source parameter is now a small view object that carries:
+
+- the lazy validator object pointer corresponding to original `param_4`
+- the associated source-owned public-key pair state used by the recovered verifier implementation
+
 Within that helper, the launcher calls the validator-family virtual `+0x2c` with:
 
 - signed bytes buffer length = `0x81`
