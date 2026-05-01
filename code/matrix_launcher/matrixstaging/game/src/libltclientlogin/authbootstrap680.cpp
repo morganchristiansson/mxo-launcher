@@ -24,7 +24,6 @@
 #include <cstring>
 #include <ctime>
 #include <memory>
-#include <random>
 
 #include <files.h>
 #include <integer.h>
@@ -178,7 +177,7 @@ static void ResetAuthBootstrap680Field54Helper(
     outHelper->nextBufferedOutputByte28 = 0x180u;
 }
 
-static void FillAuthBootstrap680Field54SeedBytesScaffold(
+static void GenerateAuthBootstrap680Field54SeedBytes(
     AuthBootstrap680Field54HelperSketch& helper,
     std::array<uint8_t, 16>& outSeed) {
     // anchor: launcher.exe:0x468640 / 0x468c30 / 0x468d30 / vtable 0x004b68a8
@@ -1018,7 +1017,7 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
     if (!outDigest) {
         return;
     }
-    // Uses same logic as BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold
+    // Uses the same direct MD5-over-signedData80 logic as the recovered `0x44ae40` leaf.
     CryptoPP::Weak1::MD5 md5;
     md5.Update(signedData80.data(), signedData80.size());
     md5.Final(outDigest->data());
@@ -1824,7 +1823,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         return;
     }
 
-    FillAuthBootstrap680Field54SeedBytesScaffold(feedbackSeedHelper54, feedbackSeed84);
+    GenerateAuthBootstrap680Field54SeedBytes(feedbackSeedHelper54, feedbackSeed84);
     ResetAuthBootstrap680FeedbackTransforms(*this);
 
     auto feedbackTransformLarge94 =
@@ -2143,14 +2142,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
         const uint8_t* const signatureBytes =
             reinterpret_cast<const uint8_t*>(replyPacket.characterIdLow1c);
         const size_t signatureByteCount = static_cast<size_t>(replyPacket.characterIdHigh20);
-        CryptoPP::Integer modulusInteger;
-        CryptoPP::Integer publicExponentInteger;
         if (modulusBytes == nullptr || modulusByteCount == 0u) {
             authRequestReadyA0 = 0u;
             return 1u;
         }
-        modulusInteger = CryptoPP::Integer(modulusBytes, modulusByteCount);
-        publicExponentInteger = CryptoPP::Integer(&publicExponentByte, 1u);
+        const CryptoPP::Integer modulusInteger(modulusBytes, modulusByteCount);
+        const CryptoPP::Integer publicExponentInteger(&publicExponentByte, 1u);
         if (modulusInteger.IsNegative() || publicExponentInteger.IsNegative() ||
             publicExponentInteger.IsZero()) {
             authRequestReadyA0 = 0u;
