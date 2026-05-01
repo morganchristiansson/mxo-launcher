@@ -249,20 +249,16 @@ address-to-class / address-to-method mapping rather than the noisy ctor-state OO
 
 #### `0x004b6fe8`
 
-Ctor-state base within the `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` family.
-
 | Address | Mapped name |
 |---|---|
-| `0x4458c0` | verifier-family base constructor before final leaf install |
+| `0x4458c0` | verifier-family ctor-state base constructor before final leaf install |
 
 #### `0x004b6e40`
 
-Earlier ctor-state base within the same verifier family.
-
 | Address | Mapped name |
 |---|---|
-| `0x444cc0` | verifier-family base constructor |
-| `0x445a10` | verifier-family base destructor |
+| `0x444cc0` | verifier-family earlier ctor-state base constructor |
+| `0x445a10` | verifier-family earlier ctor-state base destructor |
 
 #### `0x004b7440` = verifier-family secondary `CryptoPP::PK_Verifier` interface slice
 
@@ -293,69 +289,28 @@ Implementation note:
 
 ### 2.5.4 FileSink family used by auth pubkey.dat recording
 
-**Confidence: HIGH for family identification; MEDIUM for exact leaf type**
-
-The auth helper `0x447dd0` constructs a Crypto++ file-output sink for `pubkey.dat`.
-
-Key evidence from launcher RE:
-- constructor `0x447b50` feeds the strings `"OutputFileName"` and `"OutputBinaryMode"`
-- the resulting object is then used as a binary sink in `0x447dd0`
-- `0x447dd0` serializes reply-public-key data into that sink before `0x447f50` marks child `+0xa0` ready
-
-Key evidence from the bundled reference tree (`third_party/cryptopp890`):
-- `argnames.h` defines `Name::OutputFileName()` and `Name::OutputBinaryMode()`
-- `files.h` shows `CryptoPP::FileSink(const char*, bool)` calling:
-  `IsolatedInitialize(MakeParameters(Name::OutputFileName(), filename)(Name::OutputBinaryMode(), binary));`
-
-Current best mapping:
-
-| Address | Best mapping |
+| Address | Mapped name |
 |---|---|
-| `0x004b77f8` | Crypto++ `FileSink` family / configured output sink |
+| `0x004b77f8` | `CryptoPP::FileSink` family / configured output sink |
 | `0x447b50` | `CryptoPP::FileSink` ctor/config-init path |
 | `0x447dd0` | launcher auth helper that serializes a reply-public-key record into the sink |
 
-Implementation note:
-
-- source now uses direct `CryptoPP::FileSink("pubkey.dat", true)` rather than a handwritten
-  sink-less serialization stand-in
-
-Current `0x447dd0` record shape from static RE:
-1. write reply public-key id
-2. write modulus integer
-3. write public exponent integer
-4. append one NUL byte
-5. write a fixed `0x100`-byte blob from the signature pointer
-
-This should be treated as **launcher logic using Crypto++ sink infrastructure**, not as a bespoke launcher file class.
+Source now uses direct `CryptoPP::FileSink("pubkey.dat", true)`.
 
 ### 2.6 Source implementation status
 
-This replacement has now been done in source.
+Current source uses direct Crypto++ classes for the identified launcher crypto families:
 
-Current source direction:
+- `CryptoPP::RSAES_OAEP_SHA_Decryptor`
+- `CryptoPP::RSA::PrivateKey`
+- `CryptoPP::RSAES_OAEP_SHA_Encryptor`
+- `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
+- `CryptoPP::Integer`
+- `CryptoPP::OldRandomPool`
+- `CryptoPP::FileSink`
 
-- uses **`CryptoPP::RSAES_OAEP_SHA_Decryptor` directly** for the actual decryptor subobject
-- uses **`CryptoPP::RSA::PrivateKey` directly** for the loaded bootstrap key state
-- uses **direct `CryptoPP::RSA::PublicKey` + on-demand `CryptoPP::RSAES_OAEP_SHA_Encryptor`** for
-  the recovered raw `0x08` worker family
-- uses **direct `CryptoPP::RSA::PublicKey` + verifier-side PKCS#1 v1.5 / MD5 checks** for the
-  recovered `+0xa4/+0xac` validator family
-- uses **`CryptoPP::Integer` directly** for big-int semantics
-- uses **`CryptoPP::OldRandomPool` directly** for the recovered RNG helper family
-- keeps small launcher wrappers only for the preserved launcher entrypoints / boundaries:
-  - `0x443220`
-  - `0x437810`
-  - `0x468130`
-  - `0x465d70`
-- child-side raw `0x14` integer objects are preserved only where the launcher child layout still
-  really contains them before the margin-prep seam
-
-This is the preferred fidelity tradeoff:
-1. keep launcher.exe constructor / helper boundaries visible
-2. stop pretending identified Crypto++ classes are launcher-local bespoke classes
-3. preserve comments where old MSVC MI / adjustor-thunk behavior cannot be expressed 1:1 in modern source
-4. keep canonical docs and Ghidra naming aligned with the Crypto++ identification
+Canonical docs should therefore prefer address/vtable to Crypto++ class and method mappings over
+long evidence logs once source is using the concrete library classes directly.
 
 ### 2.6 Integer / big-int family — `0x4ba50c`
 
