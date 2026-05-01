@@ -361,7 +361,12 @@ class CBaseConnection {
   // UNANCHORED: source-owned setter for the same recovered base `+0x04` byte.
   void SetAutoReleaseFlag04(uint8_t autoReleaseFlag) {
     autoReleaseFlag04_ = autoReleaseFlag;
+    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag;
   }
+
+  // UNANCHORED: source-owned queue-dispatch ABI adapter accessor used where queued contexts may be
+  // consumed by raw client.dll code that expects original MSVC vtable slot numbering.
+  void* QueueContextScaffold() { return &queueContextScaffold_; }
 
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {
@@ -470,7 +475,9 @@ public:
     // parser-emitted completed packet work item as the exact `0x449d8a -> 0x436820` handoff
     // `(engine+0x10, completedPacketWorkItem, this, false)`, then branch through the original
     // endpoint-based terminal-error log split before releasing the outer fragment reference.
-    // Current source now mirrors that direct queued connection identity on the native queue path.
+    // Active source still routes that queued connection identity through `QueueContextScaffold()`
+    // so client.dll consumers built against the original MSVC2003 ABI continue to see the wrapper
+    // object's slot-`+0x10` / `obj[4]` completion surface instead of a native MinGW vtable.
     void OnReceive(CLTTCPReadOperation* readOperationFragment) override;
 
     // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.
