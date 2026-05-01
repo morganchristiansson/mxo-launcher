@@ -25,6 +25,10 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
 // UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
 void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking);
 
+// UNANCHORED: reports whether the current build exposes arg5 as the live native engine object
+// rather than a detached wrapper shell.
+bool LauncherNetworkEngineUsesNativeObjectStorage();
+
 // UNANCHORED: launcher-owned raw arg5 direct-read field publication helpers.
 void LauncherNetworkEnginePublishShellState(
     void* launcherObjectPtr,

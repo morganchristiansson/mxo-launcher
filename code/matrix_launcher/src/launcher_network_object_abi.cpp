@@ -148,6 +148,14 @@ static void** LauncherObjectSelectedPrimaryVtable() {
 #endif
 }
 
+bool LauncherNetworkEngineUsesNativeObjectStorage() {
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    return true;
+#else
+    return false;
+#endif
+}
+
 static void** LauncherObjectSubVtable5C();
 static void** LauncherObjectSubVtable60();
 static void** LauncherObjectSubVtable98();
@@ -723,6 +731,10 @@ void LauncherNetworkEnginePublishShellState(
     uint32_t endpointCount84,
     void* contextTreeHead8C,
     uint32_t contextCount90) {
+    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
+        return;
+    }
+
     LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
     if (!object) {
         return;
@@ -738,6 +750,10 @@ void LauncherNetworkEnginePublishShellState(
 }
 
 void LauncherNetworkEngineClearPublishedShellState(void* launcherObjectPtr) {
+    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
+        return;
+    }
+
     LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
     if (!object) {
         return;

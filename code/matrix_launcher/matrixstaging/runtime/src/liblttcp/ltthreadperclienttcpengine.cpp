@@ -2789,14 +2789,16 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
-    PublishAttachedLauncherObjectStateScaffold();
+    if (!LauncherNetworkEngineUsesNativeObjectStorage()) {
+        PublishAttachedLauncherObjectStateScaffold();
+    }
 }
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
     CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
         FindEngineLauncherAbiAttachment(this);
-    if (attachment && attachment->launcherObjectShell) {
+    if (!LauncherNetworkEngineUsesNativeObjectStorage() && attachment && attachment->launcherObjectShell) {
         LauncherNetworkEngineClearPublishedShellState(attachment->launcherObjectShell);
     }
 
@@ -2808,6 +2810,10 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
 
 // UNANCHORED: private launcher ABI-shell mirror step.
 void CLTThreadPerClientTCPEngine_0x4b2768::PublishAttachedLauncherObjectStateScaffold() {
+    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
+        return;
+    }
+
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking = FindEngineEndpointPayloadBacking(this);
     CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
     ownedEndpointCount84_ = endpointBacking

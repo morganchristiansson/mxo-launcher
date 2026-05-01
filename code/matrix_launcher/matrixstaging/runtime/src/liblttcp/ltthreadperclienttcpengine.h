@@ -541,10 +541,10 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still use
-    // this private publish step so raw arg5 shell bytes that original code may read directly stay
-    // aligned with the native engine object's field state. This is not the queue push/pop path;
-    // queue mechanics stay on the engine object's own inline `+0x0c..+0x5b` storage.
+    // UNANCHORED: fallback wrapper-table build only. When arg5 is a detached shell instead of the
+    // live native engine object, this publishes the remaining non-queue raw fields that direct
+    // shell readers may still observe between virtual calls. Native-object builds return early and
+    // should not be treated as depending on shell-field synchronization.
     void PublishAttachedLauncherObjectStateScaffold();
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);

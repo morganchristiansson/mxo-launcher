@@ -785,9 +785,11 @@ Current best read:
   - `+0x8c` / `+0x90`
 - practical source consequence:
   - old queue attach/detach copy helpers were pruned
-  - queue publication is no longer part of the shell-state sync step
-  - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only unless a future
-    compiler-port proves direct cross-module subobject access can no longer remain native
+  - on the current native-object build, the remaining shell-field publication helper is now a no-op
+    because arg5 itself is the live engine object rather than a detached shell mirror
+  - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only for fallback
+    detached-shell builds unless a future compiler-port proves direct cross-module subobject access
+    can no longer remain native
 
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 
