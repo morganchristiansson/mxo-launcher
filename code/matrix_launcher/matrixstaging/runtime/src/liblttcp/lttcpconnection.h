@@ -284,8 +284,18 @@ private:
     std::deque<CLTTCPConnection_QueuedSendBufferWithEndpoint> pendingSendQueue3c_;
 };
 
-// UNANCHORED: source-owned helper that recognizes the current queue-dispatch ABI adapter object
-// and returns its owning `CBaseConnection` when present.
+class CBaseConnection;
+struct CBaseConnection_QueueContextScaffold;
+
+// UNANCHORED: launcher-owned queued connection-context ABI wrapper initializer.
+// The active replacement still materializes a tiny MSVC2003-compatible queue callback surface for
+// client.dll consumers; ownership of that ABI lie lives in `src/launcher_network_object_abi.cpp`.
+void InitializeBaseConnectionQueueContextScaffold(
+    CBaseConnection_QueueContextScaffold* queueContext,
+    CBaseConnection* owner,
+    uint8_t autoReleaseFlag);
+// UNANCHORED: launcher-owned helper that recognizes the queued connection-context ABI adapter
+// object and returns its owning `CBaseConnection` when present.
 CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
 // The active replacement still needs the explicit adapter object whenever queued contexts may cross

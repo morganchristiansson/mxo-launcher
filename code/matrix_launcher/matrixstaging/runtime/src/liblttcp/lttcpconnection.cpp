@@ -1,4 +1,5 @@
 #include "lttcpconnection.h"
+#include "../../../../src/launcher_network_object_abi.h"
 
 #include "../libltbase/ltresult.h"
 #include "../libltmessaging/variablelengthprefixedtcpstreamparser.h"
@@ -338,31 +339,6 @@ void CLTTCPReadOperation::SetByteCount(uint32_t byteCount) {
 namespace {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
-static void* g_BaseConnectionQueueContextVtable[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-
-// UNANCHORED: source-owned queue-dispatch ABI adapter release bridge for current non-byte-faithful
-// C++ objects.
-static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
-    CBaseConnection_QueueContextScaffold* /*self*/) {
-    return 1u;
-}
-
-// UNANCHORED: source-owned queue-dispatch ABI adapter completion bridge for raw client.dll queue
-// consumers expecting original slot `+0x10` / `vtable[4]`.
-static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffold(
-    CBaseConnection_QueueContextScaffold* self,
-    void* workItem) {
-    return (self && self->owner) ? self->owner->OnOperationCompleted(workItem) : 0u;
-}
-
-static void EnsureBaseConnectionQueueContextVtableInitialized() {
-    if (!g_BaseConnectionQueueContextVtable[1]) {
-        g_BaseConnectionQueueContextVtable[1] =
-            reinterpret_cast<void*>(BaseConnectionQueueContext_ReleaseScaffold);
-        g_BaseConnectionQueueContextVtable[4] =
-            reinterpret_cast<void*>(BaseConnectionQueueContext_OnOperationCompletedScaffold);
-    }
-}
 
 // UNANCHORED: source-owned endpoint formatting helper that mirrors the byte/port extraction shape
 // used by `CLTTCPConnection::OnReceive` terminal parser-error logging.
@@ -425,13 +401,7 @@ CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
       engine_(nullptr),
       state_(initialState),
       queueContextScaffold_() {
-    EnsureBaseConnectionQueueContextVtableInitialized();
-    queueContextScaffold_.vtable = g_BaseConnectionQueueContextVtable;
-    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag04_;
-    queueContextScaffold_.padding05[0] = 0u;
-    queueContextScaffold_.padding05[1] = 0u;
-    queueContextScaffold_.padding05[2] = 0u;
-    queueContextScaffold_.owner = this;
+    InitializeBaseConnectionQueueContextScaffold(&queueContextScaffold_, this, autoReleaseFlag04_);
 }
 
 // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
@@ -452,17 +422,6 @@ void CLTTCPConnection::SetOwnerContext(void* ownerContext) {
 // UNANCHORED: source-owned owner-context accessor used by the current scaffolds.
 void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
-}
-
-// UNANCHORED: source-owned helper that recognizes the current queue-dispatch ABI adapter object
-// and returns its owning `CBaseConnection` when present.
-CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext) {
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
-    if (!queueContext || queueContext->vtable != g_BaseConnectionQueueContextVtable) {
-        return nullptr;
-    }
-    return queueContext->owner;
 }
 
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
@@ -504,12 +463,12 @@ uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
 
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
 uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext) {
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
-    if (!queueContext || queueContext->vtable != g_BaseConnectionQueueContextVtable) {
+    if (!CBaseConnection_FromQueueContextScaffold(maybeQueueContext)) {
         return 0u;
     }
 
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
     ReleaseFn fn = queueContext->vtable[1]
         ? reinterpret_cast<ReleaseFn>(queueContext->vtable[1])
