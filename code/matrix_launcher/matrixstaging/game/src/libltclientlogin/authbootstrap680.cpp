@@ -254,7 +254,6 @@ namespace {
 
 struct WeakRsassaPkcs1v15Md5VerifierView {
     const void* object = nullptr;
-    const AuthBootstrap680RsaPublicKeyPairOwnedState* publicKeyPair0c = nullptr;
 };
 
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
@@ -637,110 +636,32 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
 // anchor: launcher.exe:0x468520
 // anchor: launcher.exe:0x467ee0
 // anchor: launcher.exe:0x468f80 / 0x44aec0 / 0x4680a0 / 0x468e20
-// Static RE now closes the validator-family accumulator/orchestration split tightly enough to
-// model it with real Crypto++ semantics instead of a fake `0x84` launcher-owned worker layout:
-// - `0x4472f0` creates the temporary MD5-backed verification accumulator
-// - `0x447390` constructs the accumulator base state
-// - `0x447340` behaves like `PK_MessageAccumulatorBase::Update`
-// - `0x447380` behaves like `AccessHash()` for the embedded MD5 object
-// - `0x468520` loads the RSA-decoded signature representative bytes into accumulator-owned state
-// - `0x467ee0` / `0x467f70` finalize against the outer verifier object
-// - `0x445410` returns the 18-byte MD5 `DigestInfo` prefix at `0x004baefc`
-// - `0x468e20` builds the exact EMSA-PKCS1-v1_5 encoded block:
-//     [optional leading 0 when (modulusBitCount-1)&7 != 0]
-//     0x01 || 0xff... || 0x00 || DigestInfoPrefix || accumulatorMd5Digest
-// - `0x4680a0` compares that generated block byte-for-byte against the loaded decoded
-//   signature bytes
-//
-// Source keeps the boundary separation visible even though the temporary worker struct is gone:
-// - outer object: `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
-// - temporary object: MD5-backed `PK_MessageAccumulator` semantics
-//
-// The remaining helper below is therefore a source-local mirror of the concrete launcher chain
-// `0x468520 -> 0x447340 -> 0x467ee0 -> 0x4680a0 -> 0x468e20 -> 0x445410`, not a single recovered
-// library leaf. On the child `+0xac` path this intentionally means a second MD5 stage over the
-// caller's already-prebuilt 16-byte MD5 digest, because `0x44ae40` hashes signed-data first and
-// the temporary accumulator then hashes those 16 bytes again before the final compare.
-static bool VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
-    const uint8_t* signedBytes,
-    size_t signedByteCount,
+// The original launcher statically linked Crypto++ rather than re-implementing PKCS#1 v1.5
+// verification itself. Source should therefore route verified message/signature pairs through the
+// concrete Crypto++ verifier leaf instead of mirroring EMSA-PKCS1-v1_5 assembly in handwritten C++.
+static bool VerifyWeakRsassaPkcs1v15Md5Signature(
+    const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier& verifier,
+    const uint8_t* messageBytes,
+    size_t messageByteCount,
     const uint8_t* signatureBytes,
     size_t signatureByteCount) {
-    if (!signedBytes || signedByteCount == 0u || !signatureBytes || signatureByteCount == 0u) {
+    if (!messageBytes || messageByteCount == 0u || !signatureBytes || signatureByteCount == 0u) {
         return false;
     }
 
-    static constexpr std::array<uint8_t, 0x12u> kMd5DigestInfoPrefix = {
-        0x30u, 0x20u, 0x30u, 0x0cu, 0x06u, 0x08u, 0x2au, 0x86u, 0x48u,
-        0x86u, 0xf7u, 0x0du, 0x02u, 0x05u, 0x05u, 0x00u, 0x04u, 0x10u,
-    };
-
-    const CryptoPP::RSA::PublicKey& publicKey = ownedState.publicKey;
-    const CryptoPP::Integer& modulus = publicKey.GetModulus();
-    const size_t modulusBitCount = static_cast<size_t>(modulus.BitCount());
-    if (modulusBitCount == 0u) {
-        return false;
-    }
-
-    const size_t modulusBitCountMinusOne = modulusBitCount - 1u;
-    const size_t representativeByteCount = (modulusBitCountMinusOne + 7u) >> 3u;
-    if (representativeByteCount == 0u || signatureByteCount != representativeByteCount) {
-        return false;
-    }
-
-    std::array<uint8_t, 16> workerMd5Digest{};
-    CryptoPP::Weak1::MD5 md5;
-    md5.Update(signedBytes, signedByteCount);
-    md5.Final(workerMd5Digest.data());
-
-    const CryptoPP::Integer signatureInteger(signatureBytes, signatureByteCount);
-    if (signatureInteger >= modulus) {
-        return false;
-    }
-
-    const CryptoPP::Integer representativeInteger = publicKey.ApplyFunction(signatureInteger);
-    std::vector<uint8_t> representativeBytes(representativeByteCount, 0u);
-    representativeInteger.Encode(representativeBytes.data(), representativeBytes.size());
-
-    std::vector<uint8_t> expectedEncodedBytes(representativeByteCount, 0u);
-    uint8_t* outputCursor = expectedEncodedBytes.data();
-    if ((modulusBitCountMinusOne & 7u) != 0u) {
-        *outputCursor++ = 0x00u;
-    }
-
-    if (expectedEncodedBytes.size() <
-        static_cast<size_t>(outputCursor - expectedEncodedBytes.data()) + 1u +
-            kMd5DigestInfoPrefix.size() + workerMd5Digest.size() + 1u) {
-        return false;
-    }
-
-    *outputCursor++ = 0x01u;
-    uint8_t* const digestStart =
-        expectedEncodedBytes.data() + expectedEncodedBytes.size() - workerMd5Digest.size();
-    uint8_t* const digestInfoStart = digestStart - kMd5DigestInfoPrefix.size();
-    if (digestInfoStart <= outputCursor) {
-        return false;
-    }
-
-    std::fill(outputCursor, digestInfoStart - 1u, 0xffu);
-    *(digestInfoStart - 1u) = 0x00u;
-    std::copy(kMd5DigestInfoPrefix.begin(), kMd5DigestInfoPrefix.end(), digestInfoStart);
-    std::copy(workerMd5Digest.begin(), workerMd5Digest.end(), digestStart);
-
-    return representativeBytes == expectedEncodedBytes;
+    return verifier.VerifyMessage(messageBytes, messageByteCount, signatureBytes, signatureByteCount);
 }
 
 }  // namespace
 
 static bool VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
+    const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier& verifier,
     const uint8_t* signedBytes,
     size_t signedByteCount,
     const uint8_t* signatureBytes,
     size_t signatureByteCount) {
-    return VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
-        ownedState,
+    return VerifyWeakRsassaPkcs1v15Md5Signature(
+        verifier,
         signedBytes,
         signedByteCount,
         signatureBytes,
@@ -1189,8 +1110,7 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
     const WeakRsassaPkcs1v15Md5VerifierView& lazyPubkeyDatValidatorA4) {
-    if (lazyPubkeyDatValidatorA4.object == nullptr ||
-        lazyPubkeyDatValidatorA4.publicKeyPair0c == nullptr) {
+    if (lazyPubkeyDatValidatorA4.object == nullptr) {
         return false;
     }
 
@@ -1207,7 +1127,8 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     std::copy_n(modulusBytes.data(), modulusBytes.size(), signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = publicExponentBytes[0];
     return VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-        *lazyPubkeyDatValidatorA4.publicKeyPair0c,
+        *static_cast<const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier*>(
+            lazyPubkeyDatValidatorA4.object),
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
         signatureBytes,
@@ -1415,7 +1336,7 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
     // Call validator verify with public key pair
     return validator != nullptr &&
                    VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-                       publicKeyPair,
+                       *validator,
                        md5Digest10.data(),
                        md5Digest10.size(),
                        authSignature00.data(),
@@ -2456,8 +2377,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
         }
 
         const WeakRsassaPkcs1v15Md5VerifierView lazyPubkeyDatValidatorA4View{
-            lazyPubkeyDatValidatorA4,
-            &lazyPubkeyDatValidatorA4PublicKeyPair0c_};
+            lazyPubkeyDatValidatorA4};
         if (!AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
                 modulusInteger,
                 publicExponentInteger,

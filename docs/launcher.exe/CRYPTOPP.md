@@ -281,6 +281,12 @@ Practical auth-bootstrap mapping used in source:
 - child `+0xa4` = `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` fallback validator for raw `0x07`
 - child `+0xac` = `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier *` rebuilt from the reply public key
 
+Implementation note:
+
+- source now routes both verifier call sites through direct Crypto++ leaf usage via
+  `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier::VerifyMessage(...)`
+- we no longer keep a handwritten EMSA-PKCS1-v1_5 compare path for this launcher verifier family
+
 ### 2.5.4 FileSink family used by auth pubkey.dat recording
 
 **Confidence: HIGH for family identification; MEDIUM for exact leaf type**
