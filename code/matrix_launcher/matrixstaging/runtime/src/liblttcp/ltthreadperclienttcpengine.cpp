@@ -1873,31 +1873,22 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
 
     uint8_t* lastPairInBlock =
         queueRecord->firstBlockEnd08 ? (static_cast<uint8_t*>(queueRecord->firstBlockEnd08) - 8) : nullptr;
-    if (static_cast<void*>(queueRecord->readCursor00) == static_cast<void*>(lastPairInBlock)) {
-        uint32_t* oldBlock = static_cast<uint32_t*>(queueRecord->firstBlockBegin04);
-        uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
-        if (!slotsCurrent) {
-            queueRecord->readCursor00 = nullptr;
-            queueRecord->firstBlockBegin04 = nullptr;
-            queueRecord->firstBlockEnd08 = nullptr;
-            return true;
-        }
-
-        if (oldBlock) {
-            std::free(oldBlock);
-        }
-        ++slotsCurrent;
-        queueRecord->slotArrayCurrent0C = slotsCurrent;
-        uint32_t* newBlock = *slotsCurrent;
-        queueRecord->firstBlockBegin04 = newBlock;
-        queueRecord->firstBlockEnd08 = newBlock
-            ? (static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80)
-            : nullptr;
-        queueRecord->readCursor00 = newBlock;
+    if (static_cast<void*>(queueRecord->readCursor00) != static_cast<void*>(lastPairInBlock)) {
+        queueRecord->readCursor00 = readCursor + 2;
         return true;
     }
 
-    queueRecord->readCursor00 = readCursor + 2;
+    uint32_t* oldBlock = static_cast<uint32_t*>(queueRecord->firstBlockBegin04);
+    if (oldBlock) {
+        std::free(oldBlock);
+    }
+
+    uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C) + 1;
+    queueRecord->slotArrayCurrent0C = slotsCurrent;
+    uint32_t* newBlock = *slotsCurrent;
+    queueRecord->firstBlockBegin04 = newBlock;
+    queueRecord->firstBlockEnd08 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
+    queueRecord->readCursor00 = newBlock;
     return true;
 }
 
@@ -2819,7 +2810,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     (void)EnterQueueLockHelper();
 
     while (waitForSignal &&
-           activeQueue0C != nullptr && activeQueue34 != nullptr &&
            activeQueue0C->writeCursor10 == activeQueue0C->readCursor00 &&
            activeQueue34->writeCursor10 == activeQueue34->readCursor00) {
         if (!activeQueueSignalEvent) {
@@ -2837,9 +2827,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
-    if (activeQueue34 != nullptr && activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
+    if (activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
         selectedQueue = activeQueue34;
-    } else if (activeQueue0C != nullptr && activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
+    } else if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
         selectedQueue = activeQueue0C;
     }
 
@@ -2882,7 +2872,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     (void)EnterQueueLockHelper();
 
     const bool queuePairWasEmpty =
-        activeQueue0C != nullptr && activeQueue34 != nullptr &&
         activeQueue0C->writeCursor10 == activeQueue0C->readCursor00 &&
         activeQueue34->writeCursor10 == activeQueue34->readCursor00;
     Queue_PushPair(
@@ -2950,9 +2939,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         (void)EnterQueueLockHelper();
 
         CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
-        if (activeQueue34 != nullptr && activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
+        if (activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
             selectedQueue = activeQueue34;
-        } else if (activeQueue0C != nullptr && activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
+        } else if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
             selectedQueue = activeQueue0C;
         }
 
