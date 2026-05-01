@@ -163,33 +163,6 @@ static bool CopyAuthBootstrap680BigIntToBigEndianBytes(
     return true;
 }
 
-// anchor: launcher.exe:0x447120 / 0x447020
-static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-    const CryptoPP::Integer& modulusInteger,
-    const CryptoPP::Integer& publicExponentInteger) {
-    if (!ownedState || modulusInteger.IsNegative() || publicExponentInteger.IsNegative() ||
-        publicExponentInteger.IsZero()) {
-        return false;
-    }
-
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-
-    try {
-        ownedState->publicKey.Initialize(modulusInteger, publicExponentInteger);
-        if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &ownedState->modulusBytes) ||
-            !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &ownedState->exponentBytes)) {
-            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-            return false;
-        }
-    } catch (const CryptoPP::Exception&) {
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-        return false;
-    }
-
-    return true;
-}
-
 namespace {
 
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
@@ -546,23 +519,6 @@ static void ResetAuthBootstrap680ReplyMaterialization(
     ResetAuthBootstrap680BigIntObject(&child.privateExponentBigIntD8);
 }
 
-
-
-static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-    CryptoPP::Integer* outObject,
-    const uint8_t* bigEndianBytes,
-    size_t byteCount) {
-    if (!outObject || !bigEndianBytes || byteCount == 0u) {
-        return false;
-    }
-
-    // anchor family: launcher.exe:0x45d000 / 0x45de10 / data type `0x4ba50c`
-    // Static RE now proves the preserved child-side object family is old `CryptoPP::Integer`,
-    // so source stores the real integer directly instead of rebuilding the legacy digit array.
-    *outObject = CryptoPP::Integer(bigEndianBytes, byteCount);
-    return true;
-}
-
 // anchor: launcher.exe:0x4472f0
 // anchor: launcher.exe:0x447390
 // anchor: launcher.exe:0x447340
@@ -865,16 +821,21 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
         kAuthBootstrap680PubkeyDatFallbackModulus.size());
     static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
     child.lazyPubkeyDatValidatorA4Owned_.reset();
-    if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
-            kFallbackModulus,
-            kFallbackPublicExponent)) {
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
-        child.lazyPubkeyDatValidatorA4 = nullptr;
-        return false;
-    }
-
+    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
     try {
+        child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey.Initialize(
+            kFallbackModulus,
+            kFallbackPublicExponent);
+        if (!CopyAuthBootstrap680BigIntToBigEndianBytes(
+                kFallbackModulus,
+                &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.modulusBytes) ||
+            !CopyAuthBootstrap680BigIntToBigEndianBytes(
+                kFallbackPublicExponent,
+                &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.exponentBytes)) {
+            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
+            child.lazyPubkeyDatValidatorA4 = nullptr;
+            return false;
+        }
         child.lazyPubkeyDatValidatorA4Owned_ =
             std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
                 child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey);
@@ -1741,10 +1702,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 std::max<size_t>(1u, static_cast<size_t>(modulusInteger.MinEncodedSize()));
             std::vector<uint8_t> modulusBytes(modulusByteCount, 0u);
             modulusInteger.Encode(modulusBytes.data(), modulusBytes.size());
-            const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-                blockB0,
-                modulusBytes.data(),
-                modulusBytes.size());
+            const bool builtBlockB0 = !modulusBytes.empty();
+            if (builtBlockB0) {
+                *blockB0 = CryptoPP::Integer(modulusBytes.data(), modulusBytes.size());
+            }
 
             const size_t publicExponentByteCount =
                 std::max<size_t>(1u, static_cast<size_t>(publicExponentInteger.MinEncodedSize()));
@@ -1752,10 +1713,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             publicExponentInteger.Encode(
                 publicExponentBytes.data(),
                 publicExponentBytes.size());
-            const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-                blockC4,
-                publicExponentBytes.data(),
-                publicExponentBytes.size());
+            const bool builtBlockC4 = !publicExponentBytes.empty();
+            if (builtBlockC4) {
+                *blockC4 = CryptoPP::Integer(publicExponentBytes.data(), publicExponentBytes.size());
+            }
 
             std::vector<uint8_t> decryptedPrivateExponentBytes;
             bool decryptedPrivateExponent = false;
@@ -1796,10 +1757,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 privateExponentInteger.Encode(
                     privateExponentBytes.data(),
                     privateExponentBytes.size());
-                builtBlockD8 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-                    blockD8,
-                    privateExponentBytes.data(),
-                    privateExponentBytes.size());
+                builtBlockD8 = !privateExponentBytes.empty();
+                if (builtBlockD8) {
+                    *blockD8 = CryptoPP::Integer(privateExponentBytes.data(), privateExponentBytes.size());
+                }
             }
 
             spdlog::info(
@@ -2177,41 +2138,53 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     currentPublicKeyId9C = replyPublicKeyId09;
 
     raw08PublicKeyWorkerA8Owned_.reset();
-    if (BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &raw08PublicKeyWorkerA8PublicKeyPair0c_,
+    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
+    try {
+        raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey.Initialize(
             modulusInteger,
-            publicExponentInteger)) {
-        try {
+            publicExponentInteger);
+        if (!CopyAuthBootstrap680BigIntToBigEndianBytes(
+                modulusInteger,
+                &raw08PublicKeyWorkerA8PublicKeyPair0c_.modulusBytes) ||
+            !CopyAuthBootstrap680BigIntToBigEndianBytes(
+                publicExponentInteger,
+                &raw08PublicKeyWorkerA8PublicKeyPair0c_.exponentBytes)) {
+            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
+            raw08PublicKeyWorkerA8 = nullptr;
+        } else {
             raw08PublicKeyWorkerA8Owned_ =
                 std::make_unique<CryptoPP::RSAES_OAEP_SHA_Encryptor>(
                     raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey);
             raw08PublicKeyWorkerA8 = raw08PublicKeyWorkerA8Owned_.get();
-        } catch (const CryptoPP::Exception&) {
-            raw08PublicKeyWorkerA8Owned_.reset();
-            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
-            raw08PublicKeyWorkerA8 = nullptr;
         }
-    } else {
+    } catch (const CryptoPP::Exception&) {
+        raw08PublicKeyWorkerA8Owned_.reset();
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
         raw08PublicKeyWorkerA8 = nullptr;
     }
 
     replyAuthDataValidatorACOwned_.reset();
-    if (BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &replyAuthDataValidatorACPublicKeyPair0c_,
+    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
+    try {
+        replyAuthDataValidatorACPublicKeyPair0c_.publicKey.Initialize(
             modulusInteger,
-            publicExponentInteger)) {
-        try {
+            publicExponentInteger);
+        if (!CopyAuthBootstrap680BigIntToBigEndianBytes(
+                modulusInteger,
+                &replyAuthDataValidatorACPublicKeyPair0c_.modulusBytes) ||
+            !CopyAuthBootstrap680BigIntToBigEndianBytes(
+                publicExponentInteger,
+                &replyAuthDataValidatorACPublicKeyPair0c_.exponentBytes)) {
+            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
+            replyAuthDataValidatorAC = nullptr;
+        } else {
             replyAuthDataValidatorACOwned_ =
                 std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
                     replyAuthDataValidatorACPublicKeyPair0c_.publicKey);
             replyAuthDataValidatorAC = replyAuthDataValidatorACOwned_.get();
-        } catch (const CryptoPP::Exception&) {
-            replyAuthDataValidatorACOwned_.reset();
-            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
-            replyAuthDataValidatorAC = nullptr;
         }
-    } else {
+    } catch (const CryptoPP::Exception&) {
+        replyAuthDataValidatorACOwned_.reset();
         ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
         replyAuthDataValidatorAC = nullptr;
     }
@@ -2244,14 +2217,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
         const size_t signatureByteCount = static_cast<size_t>(replyPacket.characterIdHigh20);
         CryptoPP::Integer modulusInteger;
         CryptoPP::Integer publicExponentInteger;
-        if (!BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-                &modulusInteger,
-                modulusBytes,
-                modulusByteCount) ||
-            !BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-                &publicExponentInteger,
-                &publicExponentByte,
-                1u)) {
+        if (modulusBytes == nullptr || modulusByteCount == 0u) {
+            authRequestReadyA0 = 0u;
+            return 1u;
+        }
+        modulusInteger = CryptoPP::Integer(modulusBytes, modulusByteCount);
+        publicExponentInteger = CryptoPP::Integer(&publicExponentByte, 1u);
+        if (modulusInteger.IsNegative() || publicExponentInteger.IsNegative() ||
+            publicExponentInteger.IsZero()) {
             authRequestReadyA0 = 0u;
             return 1u;
         }
