@@ -1360,7 +1360,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             }
             engine->EnqueueCompletedOperation(
                 &statusWorkItem->header,
-                connection->QueueContextScaffold(),
+                connection,
                 /*useQueue34=*/false,
                 connectStatusLabel);
             connectStatusQueued = true;
@@ -1383,7 +1383,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
         }
         engine->EnqueueCompletedOperation(
             &closeWorkItem->header,
-            connection->QueueContextScaffold(),
+            connection,
             /*useQueue34=*/false,
             closeStatusLabel);
         closeQueued = true;
@@ -2286,7 +2286,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         return 0u;
     }
 
-    void* queuedConnectionContext = connection->QueueContextScaffold();
+    void* queuedConnectionContext = connection;
     const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
@@ -2956,12 +2956,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
 
-        (void)(context
-            ? CBaseConnection_FromQueueContextScaffold(context)
-            : nullptr);
+        CBaseConnection* queuedBaseConnection = static_cast<CBaseConnection*>(context);
         const bool shouldAutoReleaseContext =
-            isType1 && context != nullptr &&
-            (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
+            isType1 && queuedBaseConnection != nullptr && queuedBaseConnection->AutoReleaseFlag04() != 0u;
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
@@ -2975,12 +2972,14 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             CleanupConnection(context);
         }
 
-        if (context) {
-            (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
+        if (queuedBaseConnection) {
+            (void)queuedBaseConnection->OnOperationCompleted(workItem);
         }
 
         if (shouldAutoReleaseContext) {
-            (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
+            // Current pruning step: direct native queued connections do not yet expose a separate
+            // recovered release contract here. Keep the recovered auto-release flag test visible,
+            // but do not route it through the old ABI wrapper slot.
         }
         (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
     }
@@ -2998,18 +2997,20 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
-                (void)CBaseConnection_FromQueueContextScaffold(context);
+                CBaseConnection* queuedBaseConnection = static_cast<CBaseConnection*>(context);
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }
-                if (context) {
-                    (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
+                if (queuedBaseConnection) {
+                    (void)queuedBaseConnection->OnOperationCompleted(workItem);
                 }
                 const bool shouldAutoReleaseContext =
-                    workType == kWorkTypeClose && context != nullptr &&
-                    (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
+                    workType == kWorkTypeClose && queuedBaseConnection != nullptr &&
+                    queuedBaseConnection->AutoReleaseFlag04() != 0u;
                 if (shouldAutoReleaseContext) {
-                    (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
+                    // Current pruning step: direct native queued connections do not yet expose a
+                    // separate recovered release contract here. Keep the recovered auto-release
+                    // flag test visible, but do not route it through the old ABI wrapper slot.
                 }
                 (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
             }
