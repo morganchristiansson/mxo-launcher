@@ -29,15 +29,4 @@ void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking
 // rather than a detached wrapper shell.
 bool LauncherNetworkEngineUsesNativeObjectStorage();
 
-// UNANCHORED: launcher-owned raw arg5 direct-read field publication helpers.
-void LauncherNetworkEnginePublishShellState(
-    void* launcherObjectPtr,
-    uint32_t field04,
-    void* field08,
-    void* queueSignalEvent7C,
-    void* endpointTreeHead80,
-    uint32_t endpointCount84,
-    void* contextTreeHead8C,
-    uint32_t contextCount90);
-void LauncherNetworkEngineClearPublishedShellState(void* launcherObjectPtr);
 

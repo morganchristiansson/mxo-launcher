@@ -2223,7 +2223,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     if (CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload = node->_M_valptr()->second) {
         (void)payload->Start(/*startPriority=*/2);
     }
-    PublishAttachedLauncherObjectStateScaffold();
+    ownedEndpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
     return 0u;
 }
 
@@ -2279,7 +2279,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostO
 
     connection->SetState(LTTCPEngineConnectionState::kUdpMonitorActive);
     (void)worker->Start(/*startPriority=*/2);
-    PublishAttachedLauncherObjectStateScaffold();
+    ownedContextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
     return 0u;
 }
 
@@ -2336,7 +2336,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOr
     (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
     StopAcceptThreadScaffold(acceptThread.get());
     acceptThread.reset();
-    PublishAttachedLauncherObjectStateScaffold();
+    ownedEndpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
+    if (ownedEndpointTreeHead80_ && ownedEndpointCount84_ == 0u) {
+        InitializeEndpointTreeHead24(ownedEndpointTreeHead80_);
+    }
     return 0u;
 }
 
@@ -2522,7 +2525,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
         static_cast<unsigned>(connection->State()),
         fmt::ptr(connection->OwnerContext()));
-    PublishAttachedLauncherObjectStateScaffold();
+    ownedContextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
     return kResultSuccess;
 }
 
@@ -2781,7 +2784,13 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
         workerPayload.reset();
     }
 
-    PublishAttachedLauncherObjectStateScaffold();
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
+    ownedContextCount90_ = contextBacking
+        ? static_cast<uint32_t>(contextBacking->entries.size())
+        : 0u;
+    if (ownedContextTreeHead8C_ && ownedContextCount90_ == 0u) {
+        InitializeContextTreeHead18(ownedContextTreeHead8C_);
+    }
     return result;
 }
 
@@ -2789,70 +2798,14 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
-    PublishAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
 void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (!LauncherNetworkEngineUsesNativeObjectStorage() && attachment && attachment->launcherObjectShell) {
-        LauncherNetworkEngineClearPublishedShellState(attachment->launcherObjectShell);
-    }
-
     if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
         g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = nullptr;
         g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment = {};
     }
-}
-
-// UNANCHORED: private launcher ABI-shell mirror step.
-void CLTThreadPerClientTCPEngine_0x4b2768::PublishAttachedLauncherObjectStateScaffold() {
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking = FindEngineEndpointPayloadBacking(this);
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
-    ownedEndpointCount84_ = endpointBacking
-        ? static_cast<uint32_t>(endpointBacking->entries.size())
-        : 0u;
-    ownedContextCount90_ = contextBacking
-        ? static_cast<uint32_t>(contextBacking->entries.size())
-        : 0u;
-    if (ownedEndpointTreeHead80_ && ownedEndpointCount84_ == 0u) {
-        InitializeEndpointTreeHead24(ownedEndpointTreeHead80_);
-    }
-    if (ownedContextTreeHead8C_ && ownedContextCount90_ == 0u) {
-        InitializeContextTreeHead18(ownedContextTreeHead8C_);
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* attachment =
-        FindEngineLauncherAbiAttachment(this);
-    if (!attachment || !attachment->launcherObjectShell) {
-        return;
-    }
-
-    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
-        return;
-    }
-
-    // Fidelity correction:
-    // - this is not queue push/pop synchronization across the ABI boundary
-    // - it only publishes engine-owned fields that original launcher/client code may read directly
-    //   from the raw arg5 shell bytes between virtual calls
-    // - queue mechanics now stay native on the engine object's own inline `QueuePair` subobject,
-    //   and client.dll may read/write that subobject directly through the live engine instance
-    // - native-object builds still run the bookkeeping above so engine-owned counts/tree-head
-    //   normalization stay in lockstep with original insert/remove helpers even though no detached
-    //   shell-field publication is needed on that path
-    // - detached-shell builds alone still republish the non-queue raw field surface for direct
-    //   shell readers between virtual calls
-    LauncherNetworkEnginePublishShellState(
-        attachment->launcherObjectShell,
-        ctorFlagsField04_,
-        queueThreadArrayField08_,
-        ownedQueueSignalEvent7C_,
-        ownedEndpointTreeHead80_,
-        ownedEndpointCount84_,
-        ownedContextTreeHead8C_,
-        ownedContextCount90_);
 }
 
 // anchor: launcher.exe:0x435f90
@@ -3281,7 +3234,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
 
     queueThreadArrayField08_ = nullptr;
     ctorFlagsField04_ = 0u;
-    PublishAttachedLauncherObjectStateScaffold();
 }
 
 // Source-owned extraction of the queue-thread allocation/start tail embedded in ctor 0x4366f0.
@@ -3289,7 +3241,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32
     if (queueThreadCount == 0u) {
         queueThreadArrayField08_ = nullptr;
         ctorFlagsField04_ = 0u;
-        PublishAttachedLauncherObjectStateScaffold();
         return;
     }
 
@@ -3299,7 +3250,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32
     if (!queueThreadArray) {
         queueThreadArrayField08_ = nullptr;
         ctorFlagsField04_ = 0u;
-        PublishAttachedLauncherObjectStateScaffold();
         return;
     }
 
@@ -3310,7 +3260,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32
 
     queueThreadArrayField08_ = queueThreadArray;
     ctorFlagsField04_ = queueThreadCount;
-    PublishAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED starter helper.

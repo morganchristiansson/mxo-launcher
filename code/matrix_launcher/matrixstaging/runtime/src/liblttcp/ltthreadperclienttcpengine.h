@@ -541,11 +541,6 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: mixed helper kept narrow on purpose.
-    // - always refreshes engine-owned endpoint/context count mirrors and empty-head normalization
-    // - only detached-shell builds publish non-queue raw arg5 fields outward after that
-    // - native-object builds still need the bookkeeping half even though they skip shell writes
-    void PublishAttachedLauncherObjectStateScaffold();
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);

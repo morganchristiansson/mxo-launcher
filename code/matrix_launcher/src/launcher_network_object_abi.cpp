@@ -55,6 +55,10 @@ enum class LauncherObjectPrimaryDispatchMode {
 #define MXO_USE_MINGW_NATIVE_ARG5_VPTR 0
 #endif
 
+#if !MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#warning "Detached arg5 wrapper-table mode is retained only as a future compiler-port seam; client.dll directly touches QueuePair/+0x5c/+0x60 subobjects, so this mode is not launcher-faithful today."
+#endif
+
 static const char* LauncherObjectPrimaryDispatchModeName(LauncherObjectPrimaryDispatchMode mode) {
     switch (mode) {
         case LauncherObjectPrimaryDispatchMode::kWrapperTable:
@@ -622,8 +626,9 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
 
     // Tree-family pruning step:
     // - the shell no longer pre-allocates fake +0x80/+0x8c tree heads
-    // - unlike queuePair0C, these later tree/count bytes are only published from the real engine
-    //   for raw direct field readers via PublishAttachedLauncherObjectStateScaffold
+    // - detached-shell publication of these later tree/count bytes was removed from liblttcp
+    //   because current launcher-faithful runtime requires native arg5 object storage for direct
+    //   client.dll subobject access; wrapper-table mode remains only as a future compiler-port seam
     object->list80 = NULL;
     object->field84 = 0;
     object->list8C = NULL;
@@ -722,51 +727,6 @@ void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking
         ->RunCompletedOperationQueue(nonBlocking);
 }
 
-void LauncherNetworkEnginePublishShellState(
-    void* launcherObjectPtr,
-    uint32_t field04,
-    void* field08,
-    void* queueSignalEvent7C,
-    void* endpointTreeHead80,
-    uint32_t endpointCount84,
-    void* contextTreeHead8C,
-    uint32_t contextCount90) {
-    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
-        return;
-    }
-
-    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
-    if (!object) {
-        return;
-    }
-
-    object->field04 = field04;
-    object->field08 = field08;
-    object->field7C = static_cast<HANDLE>(queueSignalEvent7C);
-    object->list80 = endpointTreeHead80;
-    object->field84 = endpointCount84;
-    object->list8C = contextTreeHead8C;
-    object->field90 = contextCount90;
-}
-
-void LauncherNetworkEngineClearPublishedShellState(void* launcherObjectPtr) {
-    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
-        return;
-    }
-
-    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(launcherObjectPtr);
-    if (!object) {
-        return;
-    }
-
-    object->field04 = 0u;
-    object->field08 = NULL;
-    object->field7C = NULL;
-    object->list80 = NULL;
-    object->field84 = 0u;
-    object->list8C = NULL;
-    object->field90 = 0u;
-}
 
 // UNANCHORED: public replacement-launcher entrypoint for the original 0x40a380 allocation + ctor
 // step only. Keep the later store-to-`0x4d6304` and arg6 wrapper `+0x08` call in
