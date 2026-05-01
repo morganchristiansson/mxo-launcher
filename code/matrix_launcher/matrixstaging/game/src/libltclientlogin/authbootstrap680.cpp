@@ -136,15 +136,6 @@ static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
     ownedState->exponentBytes.clear();
 }
 
-// anchor: launcher.exe:0x4420f0
-static void ResetAuthBootstrap680RsaPublicKey(CryptoPP::RSA::PublicKey* outPublicKey) {
-    if (!outPublicKey) {
-        return;
-    }
-
-    *outPublicKey = CryptoPP::RSA::PublicKey();
-}
-
 static bool CopyAuthBootstrap680BigIntToBigEndianBytes(
     const CryptoPP::Integer& value,
     std::vector<uint8_t>* outBytes) {
@@ -1698,24 +1689,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             CryptoPP::Integer* const blockC4 = &publicExponentBigIntC4;
             CryptoPP::Integer* const blockD8 = &privateExponentBigIntD8;
 
-            const size_t modulusByteCount =
-                std::max<size_t>(1u, static_cast<size_t>(modulusInteger.MinEncodedSize()));
-            std::vector<uint8_t> modulusBytes(modulusByteCount, 0u);
-            modulusInteger.Encode(modulusBytes.data(), modulusBytes.size());
-            const bool builtBlockB0 = !modulusBytes.empty();
+            const bool builtBlockB0 = !modulusInteger.IsNegative() && !modulusInteger.IsZero();
             if (builtBlockB0) {
-                *blockB0 = CryptoPP::Integer(modulusBytes.data(), modulusBytes.size());
+                *blockB0 = modulusInteger;
             }
 
-            const size_t publicExponentByteCount =
-                std::max<size_t>(1u, static_cast<size_t>(publicExponentInteger.MinEncodedSize()));
-            std::vector<uint8_t> publicExponentBytes(publicExponentByteCount, 0u);
-            publicExponentInteger.Encode(
-                publicExponentBytes.data(),
-                publicExponentBytes.size());
-            const bool builtBlockC4 = !publicExponentBytes.empty();
+            const bool builtBlockC4 = !publicExponentInteger.IsNegative() && !publicExponentInteger.IsZero();
             if (builtBlockC4) {
-                *blockC4 = CryptoPP::Integer(publicExponentBytes.data(), publicExponentBytes.size());
+                *blockC4 = publicExponentInteger;
             }
 
             std::vector<uint8_t> decryptedPrivateExponentBytes;
@@ -1751,15 +1732,9 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 const CryptoPP::Integer privateExponentInteger(
                     decryptedPrivateExponentBytes.data(),
                     decryptedPrivateExponentBytes.size());
-                const size_t privateExponentByteCount =
-                    std::max<size_t>(1u, static_cast<size_t>(privateExponentInteger.MinEncodedSize()));
-                std::vector<uint8_t> privateExponentBytes(privateExponentByteCount, 0u);
-                privateExponentInteger.Encode(
-                    privateExponentBytes.data(),
-                    privateExponentBytes.size());
-                builtBlockD8 = !privateExponentBytes.empty();
+                builtBlockD8 = !privateExponentInteger.IsNegative() && !privateExponentInteger.IsZero();
                 if (builtBlockD8) {
-                    *blockD8 = CryptoPP::Integer(privateExponentBytes.data(), privateExponentBytes.size());
+                    *blockD8 = privateExponentInteger;
                 }
             }
 
