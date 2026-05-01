@@ -1755,84 +1755,142 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(
     return true;
 }
 
+// anchor: launcher.exe:0x4361f0
+static void Queue_RecenterOrGrowSlotArray(
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
+    uint32_t additionalBlockCount,
+    bool biasFrontExpansion) {
+    if (!queueRecord) {
+        return;
+    }
+
+    uint32_t** const slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
+    uint32_t** const slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
+    if (!slotsCurrent || !slotsLast) {
+        return;
+    }
+
+    const int activeBlockCount = static_cast<int>(slotsLast - slotsCurrent) + 1;
+    const int targetBlockCount = activeBlockCount + static_cast<int>(additionalBlockCount);
+    const uint32_t slotCapacity = queueRecord->slotCapacity24;
+    uint32_t** destination = nullptr;
+
+    if (static_cast<uint32_t>(targetBlockCount * 2) < slotCapacity) {
+        const uint32_t destinationIndex =
+            ((slotCapacity - static_cast<uint32_t>(targetBlockCount)) >> 1) +
+            (biasFrontExpansion ? additionalBlockCount : 0u);
+        destination = static_cast<uint32_t**>(queueRecord->slotArrayBase20) + destinationIndex;
+        if (destination < slotsCurrent) {
+            if ((slotsLast + 1) != slotsCurrent) {
+                std::memmove(destination, slotsCurrent, static_cast<size_t>((slotsLast + 1) - slotsCurrent) * sizeof(uint32_t*));
+            }
+        } else {
+            const size_t moveBytes = static_cast<size_t>((slotsLast + 1) - slotsCurrent) * sizeof(uint32_t*);
+            if (moveBytes != 0u) {
+                std::memmove(
+                    reinterpret_cast<uint8_t*>(destination) + (static_cast<size_t>(activeBlockCount) * sizeof(uint32_t*)) - moveBytes,
+                    slotsCurrent,
+                    moveBytes);
+            }
+        }
+    } else {
+        const uint32_t growthBase =
+            (slotCapacity < additionalBlockCount) ? additionalBlockCount : slotCapacity;
+        const uint32_t newCapacity = slotCapacity + 2u + growthBase;
+        uint32_t** const newSlotsBase =
+            static_cast<uint32_t**>(std::malloc(static_cast<size_t>(newCapacity) * sizeof(uint32_t*)));
+        if (!newSlotsBase) {
+            return;
+        }
+
+        const uint32_t destinationIndex =
+            ((newCapacity - static_cast<uint32_t>(targetBlockCount)) >> 1) +
+            (biasFrontExpansion ? additionalBlockCount : 0u);
+        destination = newSlotsBase + destinationIndex;
+        if ((slotsLast + 1) != slotsCurrent) {
+            std::memmove(destination, slotsCurrent, static_cast<size_t>((slotsLast + 1) - slotsCurrent) * sizeof(uint32_t*));
+        }
+
+        if (queueRecord->slotArrayBase20) {
+            std::free(queueRecord->slotArrayBase20);
+        }
+        queueRecord->slotArrayBase20 = newSlotsBase;
+        queueRecord->slotCapacity24 = newCapacity;
+    }
+
+    queueRecord->slotArrayCurrent0C = destination;
+    queueRecord->firstBlockBegin04 = *destination;
+    queueRecord->firstBlockEnd08 = *destination
+        ? (reinterpret_cast<uint8_t*>(*destination) + 0x80)
+        : nullptr;
+    queueRecord->slotArrayLast1C = destination + (activeBlockCount - 1);
+    queueRecord->lastBlockBegin14 = destination[activeBlockCount - 1];
+    queueRecord->lastBlockEnd18 = destination[activeBlockCount - 1]
+        ? (reinterpret_cast<uint8_t*>(destination[activeBlockCount - 1]) + 0x80)
+        : nullptr;
+}
+
+// anchor: launcher.exe:0x436450
+static void Queue_AppendBlockAndCommitTailPair(
+    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
+    const CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair& pair) {
+    if (!queueRecord) {
+        return;
+    }
+
+    uint32_t** slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
+    uint32_t** const slotsBase = static_cast<uint32_t**>(queueRecord->slotArrayBase20);
+    if (!slotsLast || !slotsBase) {
+        return;
+    }
+
+    if ((queueRecord->slotCapacity24 - static_cast<uint32_t>(slotsLast - slotsBase)) < 2u) {
+        Queue_RecenterOrGrowSlotArray(queueRecord, 1u, false);
+        slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
+        if (!slotsLast) {
+            return;
+        }
+    }
+
+    uint32_t* const newBlock = static_cast<uint32_t*>(std::malloc(0x80));
+    if (!newBlock) {
+        return;
+    }
+
+    slotsLast[1] = newBlock;
+    if (uint32_t* const writeCursor = static_cast<uint32_t*>(queueRecord->writeCursor10)) {
+        writeCursor[0] = pair.value0;
+        writeCursor[1] = pair.value1;
+    }
+
+    queueRecord->slotArrayLast1C = slotsLast + 1;
+    queueRecord->lastBlockBegin14 = newBlock;
+    queueRecord->lastBlockEnd18 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
+    queueRecord->writeCursor10 = newBlock;
+}
+
 // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
 void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
     uint32_t value0,
     uint32_t value1) {
-    if (!queueRecord || !queueRecord->writeCursor10) {
+    if (!queueRecord) {
         return;
     }
 
-    uint8_t* lastPairInBlock =
-        queueRecord->lastBlockEnd18 ? (static_cast<uint8_t*>(queueRecord->lastBlockEnd18) - 8) : nullptr;
-    if (static_cast<void*>(queueRecord->writeCursor10) == static_cast<void*>(lastPairInBlock)) {
-        uint32_t** slotsBase = static_cast<uint32_t**>(queueRecord->slotArrayBase20);
-        uint32_t** slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
-        if (!slotsBase || !slotsLast) {
-            return;
-        }
-
-        const uint32_t tailFreeSlots =
-            queueRecord->slotCapacity24 - static_cast<uint32_t>(slotsLast - slotsBase);
-        if (tailFreeSlots < 2u) {
-            uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
-            if (!slotsCurrent) {
-                return;
-            }
-            const uint32_t activeBlocks = static_cast<uint32_t>((slotsLast - slotsCurrent) + 1);
-            const uint32_t neededBlocks = activeBlocks + 1u;
-            uint32_t newCapacity = queueRecord->slotCapacity24;
-            uint32_t** newSlotsBase = slotsBase;
-            if (queueRecord->slotCapacity24 <= (neededBlocks * 2u)) {
-                const uint32_t growthBase = (queueRecord->slotCapacity24 >= 1u) ? queueRecord->slotCapacity24 : 1u;
-                newCapacity = queueRecord->slotCapacity24 + growthBase + 2u;
-                newSlotsBase = static_cast<uint32_t**>(std::calloc(newCapacity, sizeof(uint32_t*)));
-                if (!newSlotsBase) {
-                    return;
-                }
-            }
-
-            const uint32_t newIndex = (newCapacity - neededBlocks) >> 1;
-            uint32_t** newSlotsCurrent = newSlotsBase + newIndex;
-            std::memmove(newSlotsCurrent, slotsCurrent, activeBlocks * sizeof(uint32_t*));
-            if (newSlotsBase != slotsBase) {
-                std::free(slotsBase);
-                queueRecord->slotArrayBase20 = newSlotsBase;
-                queueRecord->slotCapacity24 = newCapacity;
-            }
-
-            queueRecord->slotArrayCurrent0C = newSlotsCurrent;
-            queueRecord->firstBlockBegin04 = *newSlotsCurrent;
-            queueRecord->firstBlockEnd08 = queueRecord->firstBlockBegin04
-                ? (static_cast<uint8_t*>(queueRecord->firstBlockBegin04) + 0x80)
-                : nullptr;
-            uint32_t** newSlotsLast = newSlotsCurrent + activeBlocks - 1;
-            queueRecord->slotArrayLast1C = newSlotsLast;
-            queueRecord->lastBlockBegin14 = *newSlotsLast;
-            queueRecord->lastBlockEnd18 = queueRecord->lastBlockBegin14
-                ? (static_cast<uint8_t*>(queueRecord->lastBlockBegin14) + 0x80)
-                : nullptr;
-            slotsLast = newSlotsLast;
-        }
-
-        uint32_t* newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
-        if (!newBlock) {
-            return;
-        }
-
-        slotsLast[1] = newBlock;
-        uint32_t* writeCursor = static_cast<uint32_t*>(queueRecord->writeCursor10);
-        writeCursor[0] = value0;
-        writeCursor[1] = value1;
-        queueRecord->slotArrayLast1C = slotsLast + 1;
-        queueRecord->lastBlockBegin14 = newBlock;
-        queueRecord->lastBlockEnd18 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
-        queueRecord->writeCursor10 = newBlock;
-        return;
-    }
-
+    CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair pair = {value0, value1};
     uint32_t* writeCursor = static_cast<uint32_t*>(queueRecord->writeCursor10);
+    if (!writeCursor) {
+        return;
+    }
+
+    const uint8_t* const lastPairInBlock =
+        queueRecord->lastBlockEnd18 ? (static_cast<uint8_t*>(queueRecord->lastBlockEnd18) - 8) : nullptr;
+    if (static_cast<const void*>(writeCursor) == static_cast<const void*>(lastPairInBlock)) {
+        Queue_AppendBlockAndCommitTailPair(queueRecord, pair);
+        return;
+    }
+
     writeCursor[0] = value0;
     writeCursor[1] = value1;
     queueRecord->writeCursor10 = writeCursor + 2;

@@ -790,13 +790,23 @@ Current best read:
   - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only for fallback
     detached-shell builds unless a future compiler-port proves direct cross-module subobject access
     can no longer remain native
-  - newer queue-fidelity corrections from `0x4363e0/0x4364d0/0x436820/0x436b10`:
+  - newer queue-fidelity corrections from `0x4361f0/0x4363e0/0x4364d0/0x436450/0x436670/0x436820/0x436b10`:
     - `+0x5c` wait helper already performs the leave-lock / wait / reacquire sequence itself
     - current source was previously double-releasing the queue lock before calling that helper on
       blocking dequeue paths
     - source now enters/leaves through the recovered queue-lock helper family directly in both
       enqueue and dequeue paths, and lets the wait helper own the blocking unlock/relock transition,
       matching launcher/client control flow more closely
+    - slot-array recenter/growth is now modeled through a dedicated `0x4361f0`-shaped helper:
+      - active block count = `slotArrayLast1C - slotArrayCurrent0C + 1`
+      - in-place recenter happens only when `targetBlockCount * 2 < slotCapacity24`
+      - otherwise a new pointer array is allocated with `newCapacity = oldCapacity + 2 + max(oldCapacity, additionalBlockCount)`
+      - destination centering uses the same optional front-bias term as the original helper
+    - tail growth is now modeled through a dedicated `0x436450`-shaped helper:
+      - checks for `< 2` slots remaining after the current last slot
+      - recenters/grows first when needed
+      - allocates one fresh `0x80` queue block
+      - commits the pending pair into the old tail slot before advancing `slotArrayLast1C`, `lastBlockBegin14/End18`, and `writeCursor10`
     - cross-block pop helper `0x4363e0` immediately frees the exhausted head `0x80` block and
       then unconditionally advances `slotArrayCurrent0C` to the next slot-array entry before
       resetting `firstBlockBegin04/firstBlockEnd08/readCursor00`
