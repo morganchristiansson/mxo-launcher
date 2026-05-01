@@ -1288,12 +1288,11 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundUnhandled;
             }
 
-            cachedAuthChallengeCiphertextBytesOwned_.assign(
-                challengePayloadBytes + 1u,
-                challengePayloadBytes + payloadByteCount);
+            const uint8_t* const encryptedChallengeBytes = challengePayloadBytes + 1u;
+            const size_t encryptedChallengeByteCount = payloadByteCount - 1u;
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
-                cachedAuthChallengeCiphertextBytesOwned_.size());
+                encryptedChallengeByteCount);
 
             {
                 const char* password = SmallStringMirrorDataOrEmpty(string10);
@@ -1326,25 +1325,28 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 // This raw 0x0a path is inline in the child-side inbound handler, not a separate
                 // standalone launcher.exe helper. Keep the crypto/material assembly here so future
                 // fidelity passes can compare directly against the packet-object staging below.
-                decryptedChallengeBytes.assign(
-                    cachedAuthChallengeCiphertextBytesOwned_.size(),
-                    0u);
-                if ((cachedAuthChallengeCiphertextBytesOwned_.size() % 16u) != 0u) {
+                decryptedChallengeBytes.assign(encryptedChallengeByteCount, 0u);
+                if ((encryptedChallengeByteCount % 16u) != 0u) {
                     spdlog::error("launcher-owned auth rejected misaligned AS_AuthChallenge ciphertext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
-                if (!cachedAuthChallengeCiphertextBytesOwned_.empty()) {
-                    static constexpr uint8_t kZeroIv[16] = {0};
+                if (feedbackTransformLarge94 == nullptr) {
+                    spdlog::error(
+                        "launcher-owned auth missing child+0x94 large feedback transform for AS_AuthChallenge response path");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+                if (encryptedChallengeByteCount != 0u) {
                     try {
-                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption challengeCipher;
-                        challengeCipher.SetKeyWithIV(
-                            cachedAuthRequestTwofishKeyBytesOwned_.data(),
-                            cachedAuthRequestTwofishKeyBytesOwned_.size(),
-                            kZeroIv);
-                        challengeCipher.ProcessData(
+                        // anchor: launcher.exe:0x448383 / child+0x94 vtable +0x1c
+                        // Static RE shows the challenge is decrypted through the existing
+                        // child-side large CBC Twofish object built by `0x4474f0`, not by a fresh
+                        // local cipher object. Keeping the same Crypto++ object preserves the
+                        // transform state that the later raw 0x0b private-exponent materialization
+                        // reuses.
+                        feedbackTransformLarge94->ProcessData(
                             decryptedChallengeBytes.data(),
-                            cachedAuthChallengeCiphertextBytesOwned_.data(),
-                            cachedAuthChallengeCiphertextBytesOwned_.size());
+                            encryptedChallengeBytes,
+                            encryptedChallengeByteCount);
                     } catch (const CryptoPP::Exception&) {
                         spdlog::error("launcher-owned auth failed to decrypt AS_AuthChallenge ciphertext");
                         return kAuthBootstrap680InboundUnhandled;
@@ -1654,8 +1656,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             std::vector<uint8_t> decryptedPrivateExponentBytes;
             bool decryptedPrivateExponent = false;
             if (parseObject->encryptedPrivateExponentBytes24 != nullptr &&
-                cachedAuthRequestTwofishKeyBytesOwned_.size() == 16u &&
-                cachedAuthChallengeCiphertextBytesOwned_.size() == 16u &&
+                feedbackTransformLarge94 != nullptr &&
                 (parseObject->encryptedPrivateExponentByteLength28 % 16u) == 0u) {
                 decryptedPrivateExponentBytes.assign(
                     parseObject->encryptedPrivateExponentByteLength28,
@@ -1663,12 +1664,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 decryptedPrivateExponent = true;
                 if (parseObject->encryptedPrivateExponentByteLength28 != 0u) {
                     try {
-                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption privateExponentCipher;
-                        privateExponentCipher.SetKeyWithIV(
-                            cachedAuthRequestTwofishKeyBytesOwned_.data(),
-                            cachedAuthRequestTwofishKeyBytesOwned_.size(),
-                            cachedAuthChallengeCiphertextBytesOwned_.data());
-                        privateExponentCipher.ProcessData(
+                        // anchor: launcher.exe:0x448241 / child+0x94 vtable +0x1c
+                        // The recovered raw 0x0b tail reuses the same large feedback transform
+                        // object that already consumed the raw 0x09 challenge block. That makes
+                        // this a continuation of the existing Crypto++ CBC object state, not a
+                        // fresh decryptor rebuild with a separately mirrored IV.
+                        feedbackTransformLarge94->ProcessData(
                             decryptedPrivateExponentBytes.data(),
                             parseObject->encryptedPrivateExponentBytes24,
                             parseObject->encryptedPrivateExponentByteLength28);

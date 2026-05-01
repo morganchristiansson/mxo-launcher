@@ -133,7 +133,6 @@ public:
  std::unique_ptr<CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption> feedbackTransformSmall98Owned_{};
  std::vector<uint8_t> authReplyParsePacketBodyBytesOwned_{};
  std::vector<uint8_t> cachedGetPublicKeyReplyPayloadBytesOwned_{};
- std::vector<uint8_t> cachedAuthChallengeCiphertextBytesOwned_{};
  std::vector<uint8_t> cachedAuthRequestTwofishKeyBytesOwned_{}; // source-owned mirror of the live 16-byte child `+0x84..+0x93` seed reused by raw `0x09/0x0a/0x0b` follow-on crypto
 
  // anchor: launcher.exe:0x445500
