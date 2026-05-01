@@ -295,8 +295,14 @@ void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueCont
 // Current source accepts either the queue-context adapter object or a direct CBaseConnection-family
 // object pointer on this path.
 uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem);
-// UNANCHORED: source-owned ABI-dispatch wrapper for queued object slot-`+0x04` release calls.
-uint32_t QueuedObject_InvokeReleaseSlotScaffold(void* object);
+// UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
+// release calls.
+uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object);
+// UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
+// Current source only auto-releases the explicit queue-context adapter object here; direct
+// CBaseConnection pointers are accepted for completion dispatch but are not released through their
+// native C++ vtable because that slot numbering does not match the original MSVC ABI contract.
+uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext);
 
 // Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
 // mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`

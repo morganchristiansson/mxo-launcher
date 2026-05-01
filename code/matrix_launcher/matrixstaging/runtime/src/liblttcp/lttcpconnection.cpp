@@ -485,8 +485,9 @@ uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQue
     return directConnection->OnOperationCompleted(workItem);
 }
 
-// UNANCHORED: source-owned ABI-dispatch wrapper for queued object slot-`+0x04` release calls.
-uint32_t QueuedObject_InvokeReleaseSlotScaffold(void* object) {
+// UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
+// release calls.
+uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
     if (!object) {
         return 0u;
     }
@@ -499,6 +500,21 @@ uint32_t QueuedObject_InvokeReleaseSlotScaffold(void* object) {
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
     ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
     return fn(object);
+}
+
+// UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
+uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext) {
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
+    if (!queueContext || queueContext->vtable != g_BaseConnectionQueueContextVtable) {
+        return 0u;
+    }
+
+    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+    ReleaseFn fn = queueContext->vtable[1]
+        ? reinterpret_cast<ReleaseFn>(queueContext->vtable[1])
+        : nullptr;
+    return fn ? fn(queueContext) : 0u;
 }
 
 // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.

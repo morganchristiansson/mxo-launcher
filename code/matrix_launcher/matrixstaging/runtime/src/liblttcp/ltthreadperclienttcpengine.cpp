@@ -2985,9 +2985,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         }
 
         if (shouldAutoReleaseContext) {
-            (void)QueuedObject_InvokeReleaseSlotScaffold(context);
+            (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
         }
-        (void)QueuedObject_InvokeReleaseSlotScaffold(workItem);
+        (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
     }
 }
 
@@ -3017,9 +3017,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
                     workType == kWorkTypeClose && context != nullptr &&
                     (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
                 if (shouldAutoReleaseContext) {
-                    (void)QueuedObject_InvokeReleaseSlotScaffold(context);
+                    (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
                 }
-                (void)QueuedObject_InvokeReleaseSlotScaffold(workItem);
+                (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
             }
         }
         return;
