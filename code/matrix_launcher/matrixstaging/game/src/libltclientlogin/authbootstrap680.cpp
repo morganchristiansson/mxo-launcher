@@ -15,6 +15,7 @@
 
 #include "loginmediator.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
+#include "../../../runtime/src/libltmessaging/crypto_init_helper.h"
 #include "authbootstrap680.h"
 #include "loginstate_packet_builder_scaffold.h"
 
@@ -25,6 +26,7 @@
 #include <memory>
 #include <random>
 
+#include <files.h>
 #include <integer.h>
 
 #include <spdlog/spdlog.h>
@@ -301,15 +303,13 @@ static void ResetAuthBootstrap680Field54Helper(
 static void FillAuthBootstrap680Field54SeedBytesScaffold(
     AuthBootstrap680Field54HelperSketch& helper,
     std::array<uint8_t, 16>& outSeed) {
-    // Static RE proves `0x4474f0` calls helper vtable `+0x18 / 0x468640` and copies the emitted
-    // `0x10` bytes into child `+0x84 .. +0x93`. The exact buffered generator behind
-    // `0x468640 / 0x468b60 / 0x468d30` is not yet closed tightly enough to reimplement bit-for-bit,
-    // so keep the recovered helper layout explicit while bounding the source-owned byte producer to
-    // one fresh 16-byte block here.
-    std::random_device rd;
-    for (uint8_t& byte : outSeed) {
-        byte = static_cast<uint8_t>(rd());
-    }
+    // anchor: launcher.exe:0x468640 / 0x468c30 / 0x468d30 / vtable 0x004b68a8
+    // The launcher routes this helper through the old Crypto++ RandomPool family. Now that the
+    // global helper wrapper is identified, source should use the real Crypto++ pool directly rather
+    // than a handwritten std::random_device stand-in.
+    mxo::liblttcp::EnsureCryptoContextInitialized();
+    mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().GenerateBlock(
+        outSeed.data(), outSeed.size());
 
     const uint32_t outputStart = helper.scratchPrefixByteCount1c;
     if (helper.bufferedOutputBytes14 != nullptr &&
@@ -1149,19 +1149,10 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
         return 0u;
     }
 
-    // `0x447dd0` constructs a launcher-owned output sink configured with:
+    // `0x447dd0` constructs a Crypto++ FileSink-family object configured with:
     // - OutputFileName = "pubkey.dat"
     // - OutputBinaryMode = true
-    // It then serializes the reply-public-key record into that sink by emitting:
-    // - replyPublicKeyId09 via `0x437ef0`
-    // - modulus integer object via virtual `+0x08`
-    // - public exponent integer object via virtual `+0x08`
-    // - a trailing NUL byte via `0x444640`
-    // - a fixed 0x100-byte blob from `signatureBytes` via sink virtual `+0x14`
-    //
-    // The surrounding sink/file-object family is still unresolved, so keep the boundary explicit
-    // and model just the exact serialized record shape rather than pretending this helper is a
-    // direct std::ofstream append.
+    // Then it emits the exact serialized record into that sink.
     std::vector<uint8_t> serializedRecord;
     serializedRecord.reserve(
         sizeof(replyPublicKeyId09) + modulusBytes.size() + publicExponentBytes.size() + 1u + 0x100u);
@@ -1173,7 +1164,15 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
     serializedRecord.insert(serializedRecord.end(), publicExponentBytes.begin(), publicExponentBytes.end());
     serializedRecord.push_back(0u);
     serializedRecord.insert(serializedRecord.end(), signatureBytes, signatureBytes + 0x100u);
-    return 1u;
+
+    try {
+        CryptoPP::FileSink outputSink("pubkey.dat", true);
+        outputSink.Put(serializedRecord.data(), serializedRecord.size());
+        outputSink.MessageEnd();
+        return 1u;
+    } catch (const CryptoPP::Exception&) {
+        return 0u;
+    }
 }
 
 // anchor: launcher.exe:0x445610

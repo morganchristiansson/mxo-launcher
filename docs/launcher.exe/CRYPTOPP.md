@@ -32,10 +32,10 @@ and address-oriented.
 | `0x442950` | dtor thunk |
 | `0x468050` | `CanIncorporateEntropy()` |
 | `0x468c30` | `GenerateBlock(byte*, size_t)` |
-| `0x468640` | generate into buffered output helper |
+| `0x468640` | buffered `GenerateBlock` helper feeding auth-bootstrap child `+0x84..+0x93` |
 | `0x468d30` | `GenerateByte()`-like helper |
 | `0x468cb0` | buffered-transformation pump helper |
-| `0x468dc0` | incorporate-entropy / seed helper |
+| `0x468dc0` | `IncorporateEntropy(...)` / seed helper |
 
 #### `0x004b41e0` = `CryptoPP::BufferedTransformation`
 
@@ -247,18 +247,22 @@ address-to-class / address-to-method mapping rather than the noisy ctor-state OO
 | `0x468f80` | verify embedded auth reply public key against `pubkey.dat` signer |
 | `0x44aec0` | verify auth reply copy shadow with verifier |
 
-#### `0x004b6fe8` = `CryptoPP::TF_VerifierImpl<RSASS<PKCS1v15, Weak1::MD5>...>` ctor-state base
+#### `0x004b6fe8`
+
+Ctor-state base within the `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` family.
 
 | Address | Mapped name |
 |---|---|
-| `0x4458c0` | verifier-impl base constructor before final leaf install |
+| `0x4458c0` | verifier-family base constructor before final leaf install |
 
-#### `0x004b6e40` = `CryptoPP::TF_VerifierBase` ctor-state base
+#### `0x004b6e40`
+
+Earlier ctor-state base within the same verifier family.
 
 | Address | Mapped name |
 |---|---|
-| `0x444cc0` | verifier-base constructor |
-| `0x445a10` | verifier-base destructor |
+| `0x444cc0` | verifier-family base constructor |
+| `0x445a10` | verifier-family base destructor |
 
 #### `0x004b7440` = verifier-family secondary `CryptoPP::PK_Verifier` interface slice
 
@@ -308,8 +312,13 @@ Current best mapping:
 | Address | Best mapping |
 |---|---|
 | `0x004b77f8` | Crypto++ `FileSink` family / configured output sink |
-| `0x447b50` | ctor/config-init path for that FileSink-family object |
+| `0x447b50` | `CryptoPP::FileSink` ctor/config-init path |
 | `0x447dd0` | launcher auth helper that serializes a reply-public-key record into the sink |
+
+Implementation note:
+
+- source now uses direct `CryptoPP::FileSink("pubkey.dat", true)` rather than a handwritten
+  sink-less serialization stand-in
 
 Current `0x447dd0` record shape from static RE:
 1. write reply public-key id
