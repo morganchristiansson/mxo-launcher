@@ -1173,20 +1173,18 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
 }
 
 // anchor: launcher.exe:0x468f80
+// Static-RE shape:
+// - plain __cdecl helper, not a child method
+// - caller passes exactly four stack args: modulusInteger, publicExponentInteger, signatureBytes,
+//   lazyPubkeyDatValidatorA4
+// - helper itself hard-codes the trailing validator signature length 0x100 and returns AL only
 static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
-    AuthBootstrap680ChildBase_0x4b7134& child,
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
-    size_t signatureByteCount) {
-    if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation != 0u) {
-        return true;
-    }
-
-    if (!EnsureAuthBootstrap680LazyPubkeyDatValidator(child)) {
-        spdlog::warn(
-            "DIAGNOSTIC: AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator missing lazy validator child={}",
-            fmt::ptr(&child));
+    const void* lazyPubkeyDatValidatorA4,
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& lazyPubkeyDatValidatorA4PublicKeyPair0c) {
+    if (lazyPubkeyDatValidatorA4 == nullptr) {
         return false;
     }
 
@@ -1195,38 +1193,19 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &modulusBytes) ||
         !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &publicExponentBytes) ||
         modulusBytes.size() != 0x80u || publicExponentBytes.size() != 1u ||
-        publicExponentBytes[0] == 0u || !signatureBytes || signatureByteCount == 0u) {
-        spdlog::warn(
-            "DIAGNOSTIC: AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator rejected malformed inputs child={} modulusBytes={} exponentBytes={} exponentFirst=0x{:02x} signatureBytes={} signaturePtr={}",
-            fmt::ptr(&child),
-            static_cast<unsigned>(modulusBytes.size()),
-            static_cast<unsigned>(publicExponentBytes.size()),
-            publicExponentBytes.empty() ? 0u : static_cast<unsigned>(publicExponentBytes[0]),
-            static_cast<unsigned>(signatureByteCount),
-            fmt::ptr(signatureBytes));
+        publicExponentBytes[0] == 0u || !signatureBytes) {
         return false;
     }
 
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
     std::copy_n(modulusBytes.data(), modulusBytes.size(), signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = publicExponentBytes[0];
-    const bool verifyResult = VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-        child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
+    return VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
+        lazyPubkeyDatValidatorA4PublicKeyPair0c,
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
         signatureBytes,
-        signatureByteCount);
-    if (!verifyResult) {
-        spdlog::warn(
-            "DIAGNOSTIC: AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator verify failed child={} signedLen={} signatureLen={} modulusPreview='{}' exponent=0x{:02x} signaturePreview='{}'",
-            fmt::ptr(&child),
-            static_cast<unsigned>(signedReplyPublicKeyBytes.size()),
-            static_cast<unsigned>(signatureByteCount),
-            BuildHexPreview(signedReplyPublicKeyBytes.data(), signedReplyPublicKeyBytes.size(), 16u),
-            static_cast<unsigned>(signedReplyPublicKeyBytes.back()),
-            BuildHexPreview(signatureBytes, signatureByteCount, 16u));
-    }
-    return verifyResult;
+        0x100u);
 }
 
 // anchor: launcher.exe:0x447dd0
@@ -2462,14 +2441,26 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
         return 1u;
     }
 
-    if (!EnsureAuthBootstrap680LazyPubkeyDatValidator(*this) ||
-        !AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
-            *this,
-            modulusInteger,
-            publicExponentInteger,
-            signatureBytes,
-            0x100u)) {
-        return 0x19000004u;
+    if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation == 0u) {
+        if (!EnsureAuthBootstrap680LazyPubkeyDatValidator(*this)) {
+            spdlog::warn(
+                "DIAGNOSTIC: RebuildReplyPublicKeyWorkers missing lazy validator child={}",
+                fmt::ptr(this));
+            return 0x19000004u;
+        }
+
+        if (!AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
+                modulusInteger,
+                publicExponentInteger,
+                signatureBytes,
+                lazyPubkeyDatValidatorA4,
+                lazyPubkeyDatValidatorA4PublicKeyPair0c_)) {
+            spdlog::warn(
+                "DIAGNOSTIC: RebuildReplyPublicKeyWorkers verify failed child={} signaturePreview='{}'",
+                fmt::ptr(this),
+                BuildHexPreview(signatureBytes, 0x100u, 16u));
+            return 0x19000004u;
+        }
     }
 
     ResetAuthBootstrap680ReplyPublicKeyWorkers(*this);

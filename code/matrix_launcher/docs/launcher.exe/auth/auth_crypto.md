@@ -96,9 +96,18 @@ So the best current model is:
 
 Date: 2026-05-01
 
-Static-RE of `launcher.exe:0x468f80` closes one important detail in the embedded auth-public-key verification path.
+Static-RE of `launcher.exe:0x468f80` closes two important details in the embedded auth-public-key verification path.
 
-Decompile + disassembly show the launcher calls the validator-family virtual `+0x2c` with:
+Decompile + disassembly show `0x468f80` is a plain helper, not a child-instance method. The only code xref is the auth-bootstrap child rebuild helper at `0x4477c9`, which pushes four stack args then does caller cleanup (`add esp, 0x10`).
+
+So the better recovered shape is:
+
+- plain `__cdecl` helper
+- args = `(modulusInteger, publicExponentInteger, signatureBytes, lazyPubkeyDatValidatorA4)`
+- no auth-bootstrap-child `this` pointer in the anchored helper itself
+- return value consumed from `AL` only; the decompiler's `uint in_EAX` artifact is just a symptom of the bool-sized return
+
+Within that helper, the launcher calls the validator-family virtual `+0x2c` with:
 
 - signed bytes buffer length = `0x81`
   - 128-byte modulus exported into a stack buffer
@@ -107,7 +116,12 @@ Decompile + disassembly show the launcher calls the validator-family virtual `+0
 
 So the launcher verifies the `AS_GetPublicKeyReply` embedded public key against a **256-byte signature**, not `0x80` bytes.
 
-Our recovered source had drifted here in `AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(...)` and was passing `0x80u` into `AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(...)`. That truncation causes otherwise-valid replies to fail with `0x19000004` when `skipPublicKeyValidation = false`.
+Our recovered source had drifted here in two ways:
+
+- it had smuggled the auth-bootstrap child through the anchored helper signature even though the original helper is stack-arg based
+- it was passing `0x80u` into `AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(...)`
+
+That truncation causes otherwise-valid replies to fail with `0x19000004` when `skipPublicKeyValidation = false`.
 
 Anchors:
 
