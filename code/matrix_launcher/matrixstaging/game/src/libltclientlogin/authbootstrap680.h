@@ -25,11 +25,10 @@ class Packet_AsGetPublicKeyReply_0x4b6ca4;
 class Packet_AsGetPublicKeyRequest_0x4b6c74;
 
 // Direct Crypto++ public-key material owned by the launcher-side wrappers.
-// The raw leaf sketch fields remain only as recovered layout mirrors.
+// Keep only the concrete Crypto++ key object; launcher-owned byte shaping now happens only at
+// the few packet/file/verify boundaries that really need serialized big-endian bytes.
 struct AuthBootstrap680RsaPublicKeyPairOwnedState {
     CryptoPP::RSA::PublicKey publicKey;
-    std::vector<uint8_t> modulusBytes;
-    std::vector<uint8_t> exponentBytes;
 };
 
 struct AuthBootstrap680Field54HelperOwnedState {
