@@ -25,11 +25,6 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
 // UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
 void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking);
 
-// UNANCHORED: launcher-owned raw arg5 queue-surface transfer helpers.
-// These keep shell-specific byte-copy policy on the ABI-wrapper side rather than in liblttcp.
-void LauncherNetworkEngineAttachQueueSurface(void* launcherObjectPtr, const void* engineQueuePairStorage);
-void LauncherNetworkEngineDetachQueueSurface(void* launcherObjectPtr, void* engineQueuePairStorage);
-
 // UNANCHORED: launcher-owned raw arg5 direct-read field publication helpers.
 void LauncherNetworkEnginePublishShellState(
     void* launcherObjectPtr,

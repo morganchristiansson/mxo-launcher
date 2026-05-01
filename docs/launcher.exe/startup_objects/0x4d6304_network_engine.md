@@ -766,6 +766,29 @@ Current best read:
   - slot `2` / `UDPMonitorPort` uses that helper after successful UDP socket/bind setup, then marks the connection object state with `[connection+0x34] = 2`, and starts the returned worker with priority `2`
   - slot `6` / `Connect` uses that helper after successful TCP setup/connect sequencing, then marks the connection object state with `[connection+0x34] = 1`, and starts the returned worker with priority `3`
 
+### New clarification: client.dll touches the inline QueuePair subobject directly
+
+Latest source/runtime pruning now treats the queue family differently from the surrounding raw arg5
+shell fields.
+
+Current best read:
+- client.dll can read/write the inline completed-operation `QueuePair` subobject at arg5
+  `+0x0c..+0x5b` directly
+- current MinGW/MSVC2003 bridge therefore keeps that queue storage native on the live
+  `CLTThreadPerClientTCPEngine_0x4b2768` object rather than copying it into/out of a separate
+  shell mirror
+- the arg5 ABI wrapper still republishes only the non-queue direct-read field surface that later
+  raw shell readers may observe between virtual calls:
+  - `+0x04` / `+0x08`
+  - `+0x7c`
+  - `+0x80` / `+0x84`
+  - `+0x8c` / `+0x90`
+- practical source consequence:
+  - old queue attach/detach copy helpers were pruned
+  - queue publication is no longer part of the shell-state sync step
+  - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only unless a future
+    compiler-port proves direct cross-module subobject access can no longer remain native
+
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 
 Static disassembly of `0x431840` now supports a stronger reading than only “empty-path returns `0x7000004`.”

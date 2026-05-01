@@ -295,6 +295,15 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 // - current source therefore keeps the wrapper handoff explicit here, routes it into
 //   `CLTLoginMediator::Initialize(...)`, and limits arg5 sidecar accessors to owner<->engine
 //   pairing only, without lazy mediator bind/reset
+// ABI boundary warning from the current queue-subobject pass:
+// - client.dll does not treat arg5 as a clean abstract interface object
+// - `client.dll:0x62531c10` directly reads/writes the inline completed-operation `QueuePair`
+//   subobject and also drives the embedded helper roots at `+0x5c/+0x60`
+// - because of that, a fully wrapped/separate network-engine shell is not a clean long-term model
+//   on the current MinGW/MSVC2003 bridge; the live engine object itself must remain layout-valid
+//   for those direct cross-module subobject accesses
+// - keep this arg6 registration seam thin and treat later wrapper work as call/ABI adaptation,
+//   not as permission to virtualize the whole arg5 object behind detached copied state
 // Return-shape note from launcher.exe:0x40a380:
 // - the caller turns the raw slot result into `result < 1`
 // - so this scaffold returns `0` for the non-null success case and `1` when the arg5 object

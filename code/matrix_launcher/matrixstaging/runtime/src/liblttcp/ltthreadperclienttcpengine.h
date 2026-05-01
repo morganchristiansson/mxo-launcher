@@ -545,7 +545,7 @@ private:
     // this private publish step so raw arg5 shell bytes that original code may read directly stay
     // aligned with the native engine object's field state. This is not the queue push/pop path;
     // queue mechanics stay on the engine object's own inline `+0x0c..+0x5b` storage.
-    void SyncAttachedLauncherObjectStateScaffold();
+    void PublishAttachedLauncherObjectStateScaffold();
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
