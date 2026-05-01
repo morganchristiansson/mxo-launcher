@@ -2789,9 +2789,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
     EnsureEngineLauncherAbiAttachment(this) = attachment;
-    if (!LauncherNetworkEngineUsesNativeObjectStorage()) {
-        PublishAttachedLauncherObjectStateScaffold();
-    }
+    PublishAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
@@ -2810,10 +2808,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
 
 // UNANCHORED: private launcher ABI-shell mirror step.
 void CLTThreadPerClientTCPEngine_0x4b2768::PublishAttachedLauncherObjectStateScaffold() {
-    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
-        return;
-    }
-
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking = FindEngineEndpointPayloadBacking(this);
     CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
     ownedEndpointCount84_ = endpointBacking
@@ -2835,14 +2829,21 @@ void CLTThreadPerClientTCPEngine_0x4b2768::PublishAttachedLauncherObjectStateSca
         return;
     }
 
+    if (LauncherNetworkEngineUsesNativeObjectStorage()) {
+        return;
+    }
+
     // Fidelity correction:
     // - this is not queue push/pop synchronization across the ABI boundary
     // - it only publishes engine-owned fields that original launcher/client code may read directly
     //   from the raw arg5 shell bytes between virtual calls
     // - queue mechanics now stay native on the engine object's own inline `QueuePair` subobject,
     //   and client.dll may read/write that subobject directly through the live engine instance
-    // - the launcher ABI wrapper only republishes the non-queue raw field surface that still needs
-    //   shell-visible bytes for direct readers between virtual calls
+    // - native-object builds still run the bookkeeping above so engine-owned counts/tree-head
+    //   normalization stay in lockstep with original insert/remove helpers even though no detached
+    //   shell-field publication is needed on that path
+    // - detached-shell builds alone still republish the non-queue raw field surface for direct
+    //   shell readers between virtual calls
     LauncherNetworkEnginePublishShellState(
         attachment->launcherObjectShell,
         ctorFlagsField04_,

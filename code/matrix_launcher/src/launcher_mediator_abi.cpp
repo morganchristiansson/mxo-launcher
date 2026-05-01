@@ -302,8 +302,9 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 // - because of that, a fully wrapped/separate network-engine shell is not a clean long-term model
 //   on the current MinGW/MSVC2003 bridge; the live engine object itself must remain layout-valid
 //   for those direct cross-module subobject accesses
-// - on the current native-object build, this means there is no meaningful shell-state sync step to
-//   remove: arg5 itself is the live engine object and the old publication helper becomes a no-op
+// - on the current native-object build, arg5 itself is the live engine object, so shell writes are
+//   not the goal; however, engine-owned bookkeeping around tree/count state still needs to stay
+//   faithful, so only the detached-shell publication half can be considered optional
 // - keep this arg6 registration seam thin and treat later wrapper work as call/ABI adaptation,
 //   not as permission to virtualize the whole arg5 object behind detached copied state
 // Return-shape note from launcher.exe:0x40a380:

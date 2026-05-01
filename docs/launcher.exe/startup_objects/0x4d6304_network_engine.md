@@ -785,8 +785,9 @@ Current best read:
   - `+0x8c` / `+0x90`
 - practical source consequence:
   - old queue attach/detach copy helpers were pruned
-  - on the current native-object build, the remaining shell-field publication helper is now a no-op
-    because arg5 itself is the live engine object rather than a detached shell mirror
+  - on the current native-object build, detached-shell field publication is skipped, but the
+    helper still refreshes engine-owned endpoint/context count mirrors and empty-head
+    normalization so runtime state stays closer to the original insert/remove helpers
   - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only for fallback
     detached-shell builds unless a future compiler-port proves direct cross-module subobject access
     can no longer remain native

@@ -541,10 +541,10 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: fallback wrapper-table build only. When arg5 is a detached shell instead of the
-    // live native engine object, this publishes the remaining non-queue raw fields that direct
-    // shell readers may still observe between virtual calls. Native-object builds return early and
-    // should not be treated as depending on shell-field synchronization.
+    // UNANCHORED: mixed helper kept narrow on purpose.
+    // - always refreshes engine-owned endpoint/context count mirrors and empty-head normalization
+    // - only detached-shell builds publish non-queue raw arg5 fields outward after that
+    // - native-object builds still need the bookkeeping half even though they skip shell writes
     void PublishAttachedLauncherObjectStateScaffold();
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
