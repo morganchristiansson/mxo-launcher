@@ -193,65 +193,6 @@ static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
     return true;
 }
 
-static bool BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
-    std::unique_ptr<CryptoPP::RSAES_OAEP_SHA_Encryptor>* outWorker,
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-    const CryptoPP::Integer& modulusInteger,
-    const CryptoPP::Integer& publicExponentInteger) {
-    if (!outWorker || !ownedState) {
-        return false;
-    }
-
-    outWorker->reset();
-    if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &ownedState->publicKey,
-            ownedState,
-            modulusInteger,
-            publicExponentInteger)) {
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-        return false;
-    }
-
-    try {
-        *outWorker = std::make_unique<CryptoPP::RSAES_OAEP_SHA_Encryptor>(ownedState->publicKey);
-    } catch (const CryptoPP::Exception&) {
-        outWorker->reset();
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-        return false;
-    }
-    return true;
-}
-
-// anchor: launcher.exe:0x447020 / final leaf vtable 0x004b7580
-static bool BuildWeakRsassaPkcs1v15Md5VerifierFromReplyPublicKey(
-    std::unique_ptr<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>* outVerifier,
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
-    const CryptoPP::Integer& modulusInteger,
-    const CryptoPP::Integer& publicExponentInteger) {
-    if (!outVerifier || !ownedState) {
-        return false;
-    }
-
-    outVerifier->reset();
-    if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &ownedState->publicKey,
-            ownedState,
-            modulusInteger,
-            publicExponentInteger)) {
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-        return false;
-    }
-
-    try {
-        *outVerifier = std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(ownedState->publicKey);
-    } catch (const CryptoPP::Exception&) {
-        outVerifier->reset();
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
-        return false;
-    }
-    return true;
-}
-
 namespace {
 
 struct WeakRsassaPkcs1v15Md5VerifierView {
@@ -633,40 +574,7 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
 // anchor: launcher.exe:0x447390
 // anchor: launcher.exe:0x447340
 // anchor: launcher.exe:0x447380
-// anchor: launcher.exe:0x468520
-// anchor: launcher.exe:0x467ee0
-// anchor: launcher.exe:0x468f80 / 0x44aec0 / 0x4680a0 / 0x468e20
-// The original launcher statically linked Crypto++ rather than re-implementing PKCS#1 v1.5
-// verification itself. Source should therefore route verified message/signature pairs through the
-// concrete Crypto++ verifier leaf instead of mirroring EMSA-PKCS1-v1_5 assembly in handwritten C++.
-static bool VerifyWeakRsassaPkcs1v15Md5Signature(
-    const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier& verifier,
-    const uint8_t* messageBytes,
-    size_t messageByteCount,
-    const uint8_t* signatureBytes,
-    size_t signatureByteCount) {
-    if (!messageBytes || messageByteCount == 0u || !signatureBytes || signatureByteCount == 0u) {
-        return false;
-    }
-
-    return verifier.VerifyMessage(messageBytes, messageByteCount, signatureBytes, signatureByteCount);
-}
-
 }  // namespace
-
-static bool VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-    const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier& verifier,
-    const uint8_t* signedBytes,
-    size_t signedByteCount,
-    const uint8_t* signatureBytes,
-    size_t signatureByteCount) {
-    return VerifyWeakRsassaPkcs1v15Md5Signature(
-        verifier,
-        signedBytes,
-        signedByteCount,
-        signatureBytes,
-        signatureByteCount);
-}
 
 namespace {
 
@@ -1085,12 +993,24 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
         kAuthBootstrap680PubkeyDatFallbackModulus.data(),
         kAuthBootstrap680PubkeyDatFallbackModulus.size());
     static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
-    if (!BuildWeakRsassaPkcs1v15Md5VerifierFromReplyPublicKey(
-            &child.lazyPubkeyDatValidatorA4Owned_,
+    child.lazyPubkeyDatValidatorA4Owned_.reset();
+    if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
+            &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey,
             &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
             kFallbackModulus,
             kFallbackPublicExponent)) {
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
+        child.lazyPubkeyDatValidatorA4 = nullptr;
+        return false;
+    }
+
+    try {
+        child.lazyPubkeyDatValidatorA4Owned_ =
+            std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
+                child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey);
+    } catch (const CryptoPP::Exception&) {
         child.lazyPubkeyDatValidatorA4Owned_.reset();
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
         child.lazyPubkeyDatValidatorA4 = nullptr;
         return false;
     }
@@ -1126,13 +1046,14 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
     std::copy_n(modulusBytes.data(), modulusBytes.size(), signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = publicExponentBytes[0];
-    return VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-        *static_cast<const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier*>(
-            lazyPubkeyDatValidatorA4.object),
-        signedReplyPublicKeyBytes.data(),
-        signedReplyPublicKeyBytes.size(),
-        signatureBytes,
-        0x100u);
+    const auto* verifier = static_cast<const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier*>(
+        lazyPubkeyDatValidatorA4.object);
+    return verifier != nullptr &&
+           verifier->VerifyMessage(
+               signedReplyPublicKeyBytes.data(),
+               signedReplyPublicKeyBytes.size(),
+               signatureBytes,
+               0x100u);
 }
 
 // anchor: launcher.exe:0x447dd0
@@ -1333,8 +1254,7 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
 
     // Call validator verify with public key pair
     return validator != nullptr &&
-                   VerifyAuthBootstrap680ReplyAuthDataValidatorRecoveredFinalizeScaffold(
-                       *validator,
+                   validator->VerifyMessage(
                        md5Digest10.data(),
                        md5Digest10.size(),
                        authSignature00.data(),
@@ -2391,25 +2311,45 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     ResetAuthBootstrap680ReplyPublicKeyWorkers(*this);
     currentPublicKeyId9C = replyPublicKeyId09;
 
-    if (BuildAuthBootstrap680Raw08PublicKeyWorkerA8(
-            &raw08PublicKeyWorkerA8Owned_,
+    raw08PublicKeyWorkerA8Owned_.reset();
+    if (BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
+            &raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey,
             &raw08PublicKeyWorkerA8PublicKeyPair0c_,
             modulusInteger,
             publicExponentInteger)) {
-        raw08PublicKeyWorkerA8 = raw08PublicKeyWorkerA8Owned_.get();
+        try {
+            raw08PublicKeyWorkerA8Owned_ =
+                std::make_unique<CryptoPP::RSAES_OAEP_SHA_Encryptor>(
+                    raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey);
+            raw08PublicKeyWorkerA8 = raw08PublicKeyWorkerA8Owned_.get();
+        } catch (const CryptoPP::Exception&) {
+            raw08PublicKeyWorkerA8Owned_.reset();
+            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
+            raw08PublicKeyWorkerA8 = nullptr;
+        }
     } else {
-        raw08PublicKeyWorkerA8Owned_.reset();
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
         raw08PublicKeyWorkerA8 = nullptr;
     }
 
-    if (BuildWeakRsassaPkcs1v15Md5VerifierFromReplyPublicKey(
-            &replyAuthDataValidatorACOwned_,
+    replyAuthDataValidatorACOwned_.reset();
+    if (BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
+            &replyAuthDataValidatorACPublicKeyPair0c_.publicKey,
             &replyAuthDataValidatorACPublicKeyPair0c_,
             modulusInteger,
             publicExponentInteger)) {
-        replyAuthDataValidatorAC = replyAuthDataValidatorACOwned_.get();
+        try {
+            replyAuthDataValidatorACOwned_ =
+                std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
+                    replyAuthDataValidatorACPublicKeyPair0c_.publicKey);
+            replyAuthDataValidatorAC = replyAuthDataValidatorACOwned_.get();
+        } catch (const CryptoPP::Exception&) {
+            replyAuthDataValidatorACOwned_.reset();
+            ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
+            replyAuthDataValidatorAC = nullptr;
+        }
     } else {
-        replyAuthDataValidatorACOwned_.reset();
+        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
         replyAuthDataValidatorAC = nullptr;
     }
 
