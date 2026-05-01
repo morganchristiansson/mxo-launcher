@@ -446,16 +446,14 @@ public:
     uint32_t EnterCleanupLockHelper();
     uint32_t LeaveCleanupLockHelper();
 
-    // UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
-    // Current best original read for this specific receive path:
-    // - argument order after engine `this` is `(workItem, connection, useQueue34)`
-    // - `CLTTCPConnection::OnReceive` always reaches it as `(completedPacketWorkItem, self, false)`
-    //   i.e. queue0C on the currently understood receive path
-    // - ownership of `workItem` transfers to the queue/consumer here; original `0x436820` returns
-    //   `void`, so caller-side lifetime does not depend on enqueue success/failure
-    void EnqueueCompletedOperationFromConnectionScaffold(
-        CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
-        CLTTCPConnection* connection,
+    // anchor: launcher.exe:0x436820
+    // Current source mirror preserves the original `void`-return enqueue shape and lock/order,
+    // while still allowing the active replacement to pass queue-context adapter objects where raw
+    // client.dll consumers would otherwise see an incompatible MinGW vtable layout.
+    void EnqueueCompletedOperation(
+        void* workItem,
+        void* context,
+        bool useQueue34,
         const char* label = nullptr);
 
     // anchor: launcher.exe:0x436b10
@@ -505,14 +503,6 @@ private:
     uint32_t TryPopCompletedOperation(
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
         bool waitForSignal);
-    // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape.
-    // Unlike older source scaffolds, this keeps the original `void`-return shape once the caller
-    // has already committed to queue ownership transfer.
-    void EnqueueCompletedOperationScaffold(
-        void* workItem,
-        void* context,
-        bool useQueue34,
-        const char* label);
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);

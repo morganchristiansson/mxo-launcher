@@ -474,16 +474,6 @@ public:
     // anchor: launcher.exe:0x44ab60 helper family consumed by CleanupConnection
     void ReleasePendingSendQueueContentsScaffold();
 
-    // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
-    // Current best original read:
-    // - argument order after engine `this` is `(workItem, connection, useQueue34)`
-    // - this `OnReceive` path always uses `(completedPacketWorkItem, this, false)` in launcher.exe
-    // - active source still treats that direct connection object as the queued identity, but may
-    //   project it through `QueueContextScaffold()` before it reaches raw client.dll queue
-    //   consumers so MSVC slot assumptions do not hit the MinGW object vtable directly
-    // - ownership transfers to the engine queue here; caller-side lifetime does not branch on an
-    //   enqueue success result because original `0x436820` returns `void`
-    void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem);
 
     // anchor: launcher.exe:0x41de6a - endpoint at connection +0x24
     LTTCPEndpointKey_0x44b070 remoteEndpoint_;

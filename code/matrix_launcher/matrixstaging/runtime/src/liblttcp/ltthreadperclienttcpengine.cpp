@@ -1358,7 +1358,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                     static_cast<unsigned>(workPayload));
                 return;
             }
-            engine->EnqueueCompletedOperationScaffold(
+            engine->EnqueueCompletedOperation(
                 &statusWorkItem->header,
                 connection->QueueContextScaffold(),
                 /*useQueue34=*/false,
@@ -1381,7 +1381,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                 static_cast<unsigned>(connection->State()));
             return;
         }
-        engine->EnqueueCompletedOperationScaffold(
+        engine->EnqueueCompletedOperation(
             &closeWorkItem->header,
             connection->QueueContextScaffold(),
             /*useQueue34=*/false,
@@ -2300,7 +2300,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                 kConnectRejectedNotClosedPayload);
-        (void)EnqueueCompletedOperationScaffold(
+        (void)EnqueueCompletedOperation(
             connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
             queuedConnectionContext,
             /*useQueue34=*/false,
@@ -2327,7 +2327,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                 kConnectImmediateFailurePayload);
-        (void)EnqueueCompletedOperationScaffold(
+        (void)EnqueueCompletedOperation(
             connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
             queuedConnectionContext,
             /*useQueue34=*/false,
@@ -2360,7 +2360,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                 kConnectImmediateFailurePayload);
-        (void)EnqueueCompletedOperationScaffold(
+        (void)EnqueueCompletedOperation(
             connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
             queuedConnectionContext,
             /*useQueue34=*/false,
@@ -2394,7 +2394,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* closeWorkItem =
                 CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
                     CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate());
-            (void)EnqueueCompletedOperationScaffold(
+            (void)EnqueueCompletedOperation(
                 closeWorkItem ? &closeWorkItem->header : nullptr,
                 queuedConnectionContext,
                 /*useQueue34=*/false,
@@ -2404,7 +2404,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                     CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                     kConnectImmediateFailurePayload);
-            (void)EnqueueCompletedOperationScaffold(
+            (void)EnqueueCompletedOperation(
                 connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
                 queuedConnectionContext,
                 /*useQueue34=*/false,
@@ -2834,8 +2834,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     return popped ? 0u : 0x700000au;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
+// anchor: launcher.exe:0x436820
+void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperation(
     void* workItem,
     void* context,
     bool useQueue34,
@@ -2875,34 +2875,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     }
 
     LoggerForQueueLabel(label)->info(
-        "CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} lockHeld={:08x}",
+        "CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperation label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} lockHeld={:08x}",
         label ? label : "<null>",
         useQueue34 ? "queue34" : "queue0C",
         static_cast<unsigned>(reinterpret_cast<uintptr_t>(workItem)),
         fmt::ptr(context),
         queuePairWasEmpty ? 1u : 0u,
         0u);
-}
-
-// UNANCHORED: connection-owned helper for the recovered `0x449d8a -> 0x436820` handoff.
-void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationFromConnectionScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
-    CLTTCPConnection* connection,
-    const char* label) {
-    // Current best original read for this receive path:
-    // - `CLTTCPConnection::OnReceive` always calls `0x436820(engine+0x10, workItem, self, false)`
-    // - queue selection is therefore fixed to queue0C here
-    // - current parser read does not support an intentional `Parse(...) == 0` / `workItem == NULL`
-    //   emit on this path; null work items belong to later lifecycle/shutdown producers instead
-    // - original caller does not test a success result or reclaim `workItem`; ownership is already
-    //   transferred to the queue/consumer boundary when this helper is entered
-    // - active replacement still routes the direct connection object through its queue-dispatch ABI
-    //   adapter so raw client.dll consumers do not misinterpret the MinGW virtual table layout
-    (void)EnqueueCompletedOperationScaffold(
-        workItem,
-        connection ? connection->QueueContextScaffold() : nullptr,
-        /*useQueue34=*/false,
-        label);
 }
 
 // anchor: launcher.exe:0x436b10
@@ -2966,7 +2945,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         void* workItem = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value0));
         void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
         if (!workItem) {
-            (void)EnqueueCompletedOperationScaffold(
+            (void)EnqueueCompletedOperation(
                 nullptr,
                 nullptr,
                 /*useQueue34=*/false,
@@ -3088,7 +3067,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
         return;
     }
 
-    (void)EnqueueCompletedOperationScaffold(
+    (void)EnqueueCompletedOperation(
         nullptr,
         nullptr,
         /*useQueue34=*/false,

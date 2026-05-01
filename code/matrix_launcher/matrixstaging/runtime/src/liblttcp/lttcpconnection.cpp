@@ -726,7 +726,14 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
     }
     uint32_t parseResult = parser06c_->Parse(readOperationFragment, &completedPacketWorkItem);
     while (parseResult == 0u) {
-        EnqueueCompletedPacketWorkItemScaffold(completedPacketWorkItem);
+        CLTThreadPerClientTCPEngine_0x4b2768* const engine = Engine();
+        if (engine) {
+            engine->EnqueueCompletedOperation(
+                completedPacketWorkItem,
+                QueueContextScaffold(),
+                /*useQueue34=*/false,
+                "CLTTCPConnection::OnReceive");
+        }
         completedPacketWorkItem = nullptr;
         parseResult = parser06c_->Parse(nullptr, &completedPacketWorkItem);
     }
@@ -773,26 +780,5 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
     }
 }
 
-// UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
-void CLTTCPConnection::EnqueueCompletedPacketWorkItemScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem) {
-    // Current best static read of `0x449d40` / `0x469bf0`:
-    // - the queue handoff is exactly `(engine+0x10, completedPacketWorkItem, this, false)`
-    // - launcher.exe queues the direct connection object there, but the active replacement may
-    //   project that identity through `QueueContextScaffold()` before raw client.dll consumers see
-    //   it so MSVC slot assumptions do not hit the MinGW object vtable directly
-    // - this receive path therefore always targets queue0C through `0x436820`
-    // - original caller-side lifetime does not depend on enqueue success because `0x436820`
-    //   returns `void`; once we reach this seam the completed parsed-packet work item is
-    //   queue-owned / consumer-owned rather than connection-owned
-    if (!Engine()) {
-        return;
-    }
-
-    Engine()->EnqueueCompletedOperationFromConnectionScaffold(
-        workItem,
-        static_cast<CLTTCPConnection*>(this),
-        "CLTTCPConnection::OnReceive");
-}
 
 }  // namespace mxo::liblttcp
