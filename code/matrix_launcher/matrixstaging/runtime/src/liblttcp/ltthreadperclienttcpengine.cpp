@@ -2710,7 +2710,19 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     (void)LeaveCleanupLockHelper();
 
     if (workerPayload) {
-        StopWorkerThreadScaffold(workerPayload.get());
+        // Keep the `0x4316a0` teardown shape explicit here instead of hiding the hot cleanup path
+        // behind the broader source-only `StopWorkerThreadScaffold` helper.
+        workerPayload->RequestExit();
+        workerPayload->SignalWakeup();
+        if (workerPayload->IsRunning()) {
+            (void)workerPayload->Wait();
+        }
+        if (cleanupConnection) {
+            cleanupConnection->SetWorkerThreadScaffold(nullptr);
+        } else if (CMessageConnection_0x4b7928* connection =
+                       static_cast<CMessageConnection_0x4b7928*>(workerPayload->ContextKey())) {
+            connection->SetWorkerThreadScaffold(nullptr);
+        }
         workerPayload.reset();
     }
 

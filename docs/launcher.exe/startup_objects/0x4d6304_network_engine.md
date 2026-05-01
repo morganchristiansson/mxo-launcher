@@ -880,6 +880,9 @@ Recovered behavior:
   - source previously used `CLTThread::Stop(true)` here, which can fall back to `TerminateThread`
   - current source now prefers the wakeup-driven graceful exit path (`RequestExit` + `SignalWakeup`
     + `Wait`) on this cleanup route, which is closer to the recovered intent than force-termination
+  - and that hot cleanup-thread exit sequence is now kept inline inside `CleanupConnection`
+    instead of routing through the broader unanchored `StopWorkerThreadScaffold` helper, so the
+    anchored method remains easier to compare directly against static RE
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:
