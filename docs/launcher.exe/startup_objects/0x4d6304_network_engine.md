@@ -881,6 +881,12 @@ On the non-empty dequeue branch it:
   - current best connection-layout read ties that low byte to base connection field `+0x04`, which
     `0x44a9f0` explicitly zeroes during construction
 - and only after that runs the final `workItem->+0x04()` release
+- current source now mirrors that tail more narrowly by:
+  - reading the type-1 auto-release decision from the raw low byte at `context+0x04`
+    rather than inferring it through higher-level connection/wrapper branches
+  - sharing one callback/release tail between the main queue consumer and the zero-thread
+    `StopQueueThreads` drain path so the source no longer carries two slightly different
+    source-owned interpretations of the same recovered order
 
 That ties several earlier partial observations together:
 - the queued first-dword object really is a **work/status item** rather than only arbitrary pointer noise

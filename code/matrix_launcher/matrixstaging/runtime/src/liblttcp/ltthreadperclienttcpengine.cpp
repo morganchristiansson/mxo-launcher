@@ -1954,6 +1954,58 @@ static uint32_t QueueWorkItem_GetType(const void* workItem) {
     return header->workType;
 }
 
+// anchor: launcher.exe:0x436b10 type-1 release tail reads the low byte of `context[1]`.
+static bool QueueContextAutoReleaseLowByteIsSet(const void* context) {
+    if (!context) {
+        return false;
+    }
+    return (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4)) != 0u;
+}
+
+static void DispatchQueuedContextCompletionCallback(void* context, void* workItem) {
+    if (!context) {
+        return;
+    }
+
+    if (CBaseConnection* queuedBaseConnection = CBaseConnection_FromQueueContextScaffold(context)) {
+        (void)queuedBaseConnection->OnOperationCompleted(workItem);
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(context);
+    if (vtable && vtable[4]) {
+        typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
+        OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
+        (void)fn(context, workItem);
+    }
+}
+
+static void ReleaseQueuedContextIfNeeded(void* context) {
+    if (!context) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(context);
+    if (vtable && vtable[1]) {
+        typedef uint32_t (__thiscall *ReleaseFn)(void*);
+        ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+        (void)fn(context);
+    }
+}
+
+static void ReleaseCompletedWorkItem(void* workItem) {
+    if (!workItem) {
+        return;
+    }
+
+    void** workItemVtable = *reinterpret_cast<void***>(workItem);
+    if (workItemVtable && workItemVtable[1]) {
+        typedef uint32_t (__thiscall *ReleaseFn)(void*);
+        ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
+        (void)fn(workItem);
+    }
+}
+
 
 // Current queue/runtime pass keeps launcher.exe as the source of truth and trims prior
 // wrapper-era interpretation where concrete RE has now settled the behavior.
@@ -3028,26 +3080,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
 
-        CBaseConnection* queuedBaseConnection = nullptr;
-        if (context) {
-            if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
-                queuedBaseConnection = completionTarget;
-            } else {
-                queuedBaseConnection = static_cast<CMessageConnection_0x4b7928*>(context);
-            }
-        }
+        CBaseConnection* queuedBaseConnection = context
+            ? CBaseConnection_FromQueueContextScaffold(context)
+            : nullptr;
         const bool shouldAutoReleaseContext =
-            isType1 && ((CBaseConnection_QueueContextScaffold*)context != nullptr) &&
-            ((CBaseConnection_QueueContextScaffold*)context != nullptr) &&
-            ([&]() {
-                if (CBaseConnection_QueueContextScaffold* queueContext =
-                        static_cast<CBaseConnection_QueueContextScaffold*>(context);
-                    queueContext != nullptr &&
-                    CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
-                    return queueContext->autoReleaseFlag != 0u;
-                }
-                return queuedBaseConnection != nullptr && queuedBaseConnection->AutoReleaseFlag04() != 0u;
-            })();
+            isType1 && QueueContextAutoReleaseLowByteIsSet(context);
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
@@ -3061,42 +3098,18 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             CleanupConnection(context);
         }
 
-        if (context) {
-            if (queuedBaseConnection) {
-                (void)queuedBaseConnection->OnOperationCompleted(workItem);
-            } else {
-                void** vtable = *reinterpret_cast<void***>(context);
-                if (vtable && vtable[4]) {
-                    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
-                    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-                    (void)fn(context, workItem);
-                }
-            }
-        }
+        DispatchQueuedContextCompletionCallback(context, workItem);
 
         if (shouldAutoReleaseContext) {
-            if (CBaseConnection_QueueContextScaffold* queueContext =
-                    static_cast<CBaseConnection_QueueContextScaffold*>(context);
-                queueContext != nullptr &&
-                CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
-                void** vtable = *reinterpret_cast<void***>(queueContext);
-                if (vtable && vtable[1]) {
-                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-                    (void)fn(queueContext);
-                }
-            } else if (queuedBaseConnection && queuedBaseConnection->AutoReleaseFlag04() != 0u) {
+            if (queuedBaseConnection) {
+                ReleaseQueuedContextIfNeeded(context);
+            } else {
                 spdlog::warn(
                     "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
-                    fmt::ptr(queuedBaseConnection));
+                    fmt::ptr(context));
             }
         }
-        void** workItemVtable = *reinterpret_cast<void***>(workItem);
-        if (workItemVtable && workItemVtable[1]) {
-            typedef uint32_t (__thiscall *ReleaseFn)(void*);
-            ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
-            (void)fn(workItem);
-        }
+        ReleaseCompletedWorkItem(workItem);
     }
 }
 
@@ -3112,51 +3125,23 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
-                CBaseConnection* queuedBaseConnection = nullptr;
-                if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
-                    queuedBaseConnection = completionTarget;
-                } else {
-                    queuedBaseConnection = static_cast<CMessageConnection_0x4b7928*>(context);
-                }
+                CBaseConnection* queuedBaseConnection = CBaseConnection_FromQueueContextScaffold(context);
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }
-                if (queuedBaseConnection != nullptr) {
-                    (void)queuedBaseConnection->OnOperationCompleted(workItem);
-                    const bool shouldAutoReleaseContext =
-                        workType == kWorkTypeClose && ([&]() {
-                            if (CBaseConnection_QueueContextScaffold* queueContext =
-                                    static_cast<CBaseConnection_QueueContextScaffold*>(context);
-                                queueContext != nullptr &&
-                                CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
-                                return queueContext->autoReleaseFlag != 0u;
-                            }
-                            return queuedBaseConnection->AutoReleaseFlag04() != 0u;
-                        })();
-                    if (shouldAutoReleaseContext) {
-                        if (CBaseConnection_QueueContextScaffold* queueContext =
-                                static_cast<CBaseConnection_QueueContextScaffold*>(context);
-                            queueContext != nullptr &&
-                            CBaseConnection_FromQueueContextScaffold(context) != nullptr) {
-                            void** vtable = *reinterpret_cast<void***>(queueContext);
-                            if (vtable && vtable[1]) {
-                                typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                                ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-                                (void)fn(queueContext);
-                            }
-                        } else {
-                            spdlog::warn(
-                                "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
-                                fmt::ptr(queuedBaseConnection));
-                        }
+                DispatchQueuedContextCompletionCallback(context, workItem);
+                const bool shouldAutoReleaseContext =
+                    workType == kWorkTypeClose && QueueContextAutoReleaseLowByteIsSet(context);
+                if (shouldAutoReleaseContext) {
+                    if (queuedBaseConnection) {
+                        ReleaseQueuedContextIfNeeded(context);
+                    } else {
+                        spdlog::warn(
+                            "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
+                            fmt::ptr(context));
                     }
                 }
-                void** workItemVtable = *reinterpret_cast<void***>(workItem);
-                if (workItemVtable && workItemVtable[1]) {
-                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    ReleaseFn fn = reinterpret_cast<ReleaseFn>(workItemVtable[1]);
-                    (void)fn(workItem);
-                }
+                ReleaseCompletedWorkItem(workItem);
             }
         }
         return;
