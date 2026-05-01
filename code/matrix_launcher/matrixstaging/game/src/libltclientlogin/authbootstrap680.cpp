@@ -165,21 +165,18 @@ static bool CopyAuthBootstrap680BigIntToBigEndianBytes(
 
 // anchor: launcher.exe:0x447120 / 0x447020
 static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-    CryptoPP::RSA::PublicKey* outPublicKey,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger) {
-    if (!outPublicKey || !ownedState || modulusInteger.IsNegative() ||
-        publicExponentInteger.IsNegative() || publicExponentInteger.IsZero()) {
+    if (!ownedState || modulusInteger.IsNegative() || publicExponentInteger.IsNegative() ||
+        publicExponentInteger.IsZero()) {
         return false;
     }
 
-    ResetAuthBootstrap680RsaPublicKey(outPublicKey);
     ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
 
     try {
         ownedState->publicKey.Initialize(modulusInteger, publicExponentInteger);
-        *outPublicKey = ownedState->publicKey;
         if (!CopyAuthBootstrap680BigIntToBigEndianBytes(modulusInteger, &ownedState->modulusBytes) ||
             !CopyAuthBootstrap680BigIntToBigEndianBytes(publicExponentInteger, &ownedState->exponentBytes)) {
             ResetAuthBootstrap680RsaPublicKeyPairOwnedState(ownedState);
@@ -194,10 +191,6 @@ static bool BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
 }
 
 namespace {
-
-struct WeakRsassaPkcs1v15Md5VerifierView {
-    const void* object = nullptr;
-};
 
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
  AuthBootstrap680ChildBase_0x4b7134& child) {
@@ -995,7 +988,6 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
     static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
     child.lazyPubkeyDatValidatorA4Owned_.reset();
     if (!BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey,
             &child.lazyPubkeyDatValidatorA4PublicKeyPair0c_,
             kFallbackModulus,
             kFallbackPublicExponent)) {
@@ -1029,8 +1021,8 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
-    const WeakRsassaPkcs1v15Md5VerifierView& lazyPubkeyDatValidatorA4) {
-    if (lazyPubkeyDatValidatorA4.object == nullptr) {
+    const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* lazyPubkeyDatValidatorA4) {
+    if (lazyPubkeyDatValidatorA4 == nullptr) {
         return false;
     }
 
@@ -1046,14 +1038,11 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
     std::copy_n(modulusBytes.data(), modulusBytes.size(), signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = publicExponentBytes[0];
-    const auto* verifier = static_cast<const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier*>(
-        lazyPubkeyDatValidatorA4.object);
-    return verifier != nullptr &&
-           verifier->VerifyMessage(
-               signedReplyPublicKeyBytes.data(),
-               signedReplyPublicKeyBytes.size(),
-               signatureBytes,
-               0x100u);
+    return lazyPubkeyDatValidatorA4->VerifyMessage(
+        signedReplyPublicKeyBytes.data(),
+        signedReplyPublicKeyBytes.size(),
+        signatureBytes,
+        0x100u);
 }
 
 // anchor: launcher.exe:0x447dd0
@@ -2293,13 +2282,11 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
             return 0x19000004u;
         }
 
-        const WeakRsassaPkcs1v15Md5VerifierView lazyPubkeyDatValidatorA4View{
-            lazyPubkeyDatValidatorA4};
         if (!AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
                 modulusInteger,
                 publicExponentInteger,
                 signatureBytes,
-                lazyPubkeyDatValidatorA4View)) {
+                lazyPubkeyDatValidatorA4Owned_.get())) {
             spdlog::warn(
                 "DIAGNOSTIC: RebuildReplyPublicKeyWorkers verify failed child={} signaturePreview='{}'",
                 fmt::ptr(this),
@@ -2313,7 +2300,6 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
 
     raw08PublicKeyWorkerA8Owned_.reset();
     if (BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey,
             &raw08PublicKeyWorkerA8PublicKeyPair0c_,
             modulusInteger,
             publicExponentInteger)) {
@@ -2334,7 +2320,6 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
 
     replyAuthDataValidatorACOwned_.reset();
     if (BuildAuthBootstrap680RsaPublicKeyFromReplyPublicKey(
-            &replyAuthDataValidatorACPublicKeyPair0c_.publicKey,
             &replyAuthDataValidatorACPublicKeyPair0c_,
             modulusInteger,
             publicExponentInteger)) {
