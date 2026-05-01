@@ -17,6 +17,7 @@
 #include "../../../../src/launcher_mediator_abi.h"
 #include "../../../../src/launcher_network_object_abi.h"
 #include "../../../../src/launcher_replacement_support.h"
+#include "../../../../src/server_config.h"
 #include "../libltclientlogin/loginmediator.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
@@ -48,6 +49,9 @@ char g_LastWorldName[256] = {0};
 
 extern bool DiagnosticInitializePreclientEnvironmentLike402EC0();
 extern bool IsRecoveredPreclientEnvironmentActive();
+
+void LoadServerConfigurations();
+bool SelectServerByName(const char* serverName);
 
 template <typename T>
 T ResolveProc(HMODULE module, const char* name) {
@@ -99,6 +103,25 @@ void LogLauncherPreprocessingState() {
         g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
         g_LauncherCommandLine.SwitchClone() ? 1 : 0,
         g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive() ? 1 : 0);
+}
+
+static void ConfigureRecoveredServerGlobalsEarlyFromServerConfig() {
+    LoadServerConfigurations();
+
+    const char* serverFromCommandLine = g_LauncherCommandLine.LauncherServer();
+    if (serverFromCommandLine[0] != '\0') {
+        if (SelectServerByName(serverFromCommandLine)) {
+            spdlog::info(
+                "DIAGNOSTIC: early launcher startup selected server from -server flag: '{}'",
+                serverFromCommandLine);
+        } else {
+            spdlog::warn(
+                "DIAGNOSTIC: early launcher startup could not find server '{}' in servers.cfg; keeping default selection",
+                serverFromCommandLine);
+        }
+    }
+
+    ApplySelectedServerConfigToMediator();
 }
 
 bool PreloadDependencies() {
@@ -386,6 +409,8 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         return false;
     }
 
+    ConfigureRecoveredServerGlobalsEarlyFromServerConfig();
+
     DiagnosticInitializeMediatorStub();
 
     // textmode_launcher_flow.cpp owns the replacement's loose static-RE-based selection model.
@@ -397,15 +422,13 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
     mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetValue2(
         const_cast<void*>(static_cast<const void*>(&nopatchClientVersionValue)));
 
-    // Read auth server config from mediator globals (set by ApplySelectedServerConfigToMediator)
+    // Read auth/margin config from launcher-style globals as early as possible.
     // anchor: launcher.exe:0x4f7b14 / 0x4f7a50
     const char* authServerDnsName = mxo::ltlogin::g_qsAuthServerDNSName;
     const uint16_t authServerPort = mxo::ltlogin::g_AuthServerPort;
     const bool ignoreHostsFileForAuth = (mxo::ltlogin::g_IgnoreHostsFileForAuth != 0);
-
-    // Margin config - for now use empty suffix to connect to same host as auth
-    // TODO: make this configurable per-server like auth
-    const uint16_t marginServerPort = 10000;
+    const char* marginServerDnsSuffix = mxo::ltlogin::g_marginServerDNSName;
+    const uint16_t marginServerPort = mxo::ltlogin::g_marginServerPort;
     const bool ignoreHostsFileForMargin = false;
     char marginRoutePrefix[256] = {0};
     if (bootSelectionRecord && bootSelectionRecord->routeHostPrefix && bootSelectionRecord->routeHostPrefix[0]) {
@@ -419,12 +442,13 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
     mxo::ltlogin::g_qsAuthServerDNSName = authServerDnsName ? authServerDnsName : "";
     mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
     mxo::ltlogin::g_AuthServerPort = authServerPort;
-    mxo::ltlogin::g_marginServerDNSName = "";
+    mxo::ltlogin::g_marginServerDNSName = marginServerDnsSuffix ? marginServerDnsSuffix : "";
     mxo::ltlogin::g_marginServerPort = marginServerPort;
     spdlog::info(
-        "DIAGNOSTIC: launcher startup config auth='{}' authPort={} marginRoutePrefix='{}' marginPort={} ignoreAuthHosts={} ignoreMarginHosts={}",
+        "DIAGNOSTIC: launcher startup config auth='{}' authPort={} marginSuffix='{}' marginRoutePrefix='{}' marginPort={} ignoreAuthHosts={} ignoreMarginHosts={}",
         authServerDnsName ? authServerDnsName : "<empty>",
         authServerPort,
+        marginServerDnsSuffix ? marginServerDnsSuffix : "<empty>",
         marginRoutePrefix,
         marginServerPort,
         ignoreHostsFileForAuth ? 1 : 0,

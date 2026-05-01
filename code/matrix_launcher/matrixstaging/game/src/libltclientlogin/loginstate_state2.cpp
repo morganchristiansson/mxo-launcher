@@ -477,7 +477,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject3 =
                     authBootstrapChild.authReplyParseObjectF0;
                 const std::string replyString1d =
-                    authBootstrapChild.CopyReplyString54_SOURCEOWNED();
+                    authBootstrapChild.CopyReplyString54();
                 g_CurrentLoginMediator->SetLaunchPadSourceBlock94FirstString(
                     replyString1d.c_str());
 

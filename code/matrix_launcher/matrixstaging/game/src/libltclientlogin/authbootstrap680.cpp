@@ -1063,7 +1063,7 @@ void AuthBootstrap680Child_0x441290::CopyOpaqueReplyBlobs108_10c() {
 }
 
 // anchor: launcher.exe:0x43d480
-std::string AuthBootstrap680Child_0x441290::CopyReplyString54_SOURCEOWNED() const {
+std::string AuthBootstrap680Child_0x441290::CopyReplyString54() const {
     const Packet_AsGetPublicKeyRequest_0x4b6c74* const parseObject = authReplyParseObjectF0;
     if (parseObject == nullptr || parseObject->replyString1dBytes54 == nullptr ||
         parseObject->replyString1dByteLength58 == 0u) {
@@ -1173,7 +1173,7 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
 }
 
 // anchor: launcher.exe:0x468f80
-static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
+static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
     AuthBootstrap680ChildBase_0x4b7134& child,
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
@@ -2463,7 +2463,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     }
 
     if (!EnsureAuthBootstrap680LazyPubkeyDatValidator(*this) ||
-        !AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(
+        !AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
             *this,
             modulusInteger,
             publicExponentInteger,

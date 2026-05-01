@@ -189,7 +189,7 @@ public:
     // anchor: launcher.exe:0x441170
     void CopyOpaqueReplyBlobs108_10c();
     // anchor: launcher.exe:0x43d480
-    std::string CopyReplyString54_SOURCEOWNED() const;
+    std::string CopyReplyString54() const;
 
     // anchor: launcher.exe:0x448050
     // Only known direct caller is state2 ready-side handoff at launcher.exe:0x43928b, where

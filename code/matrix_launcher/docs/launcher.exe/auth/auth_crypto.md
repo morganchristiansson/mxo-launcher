@@ -107,7 +107,7 @@ Decompile + disassembly show the launcher calls the validator-family virtual `+0
 
 So the launcher verifies the `AS_GetPublicKeyReply` embedded public key against a **256-byte signature**, not `0x80` bytes.
 
-Our recovered source had drifted here in `AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(...)` and was passing `0x80u` into `AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(...)`. That truncation causes otherwise-valid replies to fail with `0x19000004` when `skipPublicKeyValidation = false`.
+Our recovered source had drifted here in `AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(...)` and was passing `0x80u` into `AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(...)`. That truncation causes otherwise-valid replies to fail with `0x19000004` when `skipPublicKeyValidation = false`.
 
 Anchors:
 
