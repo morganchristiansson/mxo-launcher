@@ -1318,8 +1318,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
 
                 std::vector<uint8_t> decryptedChallengeBytes;
                 std::vector<uint8_t> processedChallengeMd5Bytes;
-                std::vector<uint8_t> plaintextBytes;
-                std::vector<uint8_t> ciphertextBytes;
 
                 // anchor: launcher.exe:0x44831c..0x448467
                 // This raw 0x0a path is inline in the child-side inbound handler, not a separate
@@ -1373,80 +1371,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 // - `0x4441a0(0x20)` writes the fixed little-endian word 0x0020
                 // - `0x443660(0x20 - (payloadLen & 0x0f))` appends zero padding
                 // So the old source-owned `AuthChallengeResponseLayout` knob bag was an infidel.
-                static constexpr uint8_t kAuthChallengeResponseLeadingByte = 0x00;
-                static constexpr uint16_t kAuthChallengeResponseUnknown1 = 23;
-                static constexpr uint8_t kAuthChallengeResponsePaddingByte = 0x00;
-
-                std::vector<uint8_t> passwordBytes(password, password + std::strlen(password));
-                passwordBytes.push_back(0u);
-                std::vector<uint8_t> soePasswordBytes(
-                    soePassword,
-                    soePassword + std::strlen(soePassword));
-                soePasswordBytes.push_back(0u);
-                if (passwordBytes.size() > 0xffffu || soePasswordBytes.size() > 0xffffu) {
-                    spdlog::error("launcher-owned auth rejected oversized raw0x0a password field");
+                const uint16_t passwordLengthField =
+                    static_cast<uint16_t>(std::strlen(password) + 1u);
+                const uint16_t soePasswordLengthField =
+                    static_cast<uint16_t>(std::strlen(soePassword) + 1u);
+                if (feedbackTransformSmall98 == nullptr) {
+                    spdlog::error(
+                        "launcher-owned auth missing child+0x98 small feedback transform for AS_AuthChallenge response path");
                     return kAuthBootstrap680InboundUnhandled;
-                }
-
-                const uint16_t passwordLengthField = static_cast<uint16_t>(passwordBytes.size());
-                const uint16_t soePasswordLengthField = static_cast<uint16_t>(soePasswordBytes.size());
-
-                const size_t plaintextSizeWithoutPadding =
-                    1u +
-                    processedChallengeMd5Bytes.size() +
-                    2u + 2u + 2u +
-                    2u + passwordBytes.size() +
-                    2u + soePasswordBytes.size() +
-                    2u;
-                const uint16_t paddingLengthField =
-                    static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
-
-                plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
-                plaintextBytes.push_back(kAuthChallengeResponseLeadingByte);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    processedChallengeMd5Bytes.begin(),
-                    processedChallengeMd5Bytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, kAuthChallengeResponseUnknown1);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    passwordBytes.begin(),
-                    passwordBytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    soePasswordBytes.begin(),
-                    soePasswordBytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, paddingLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    paddingLengthField,
-                    kAuthChallengeResponsePaddingByte);
-
-                if ((plaintextBytes.size() % 16u) != 0u) {
-                    spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
-                    return kAuthBootstrap680InboundUnhandled;
-                }
-                ciphertextBytes.assign(plaintextBytes.size(), 0u);
-                if (!plaintextBytes.empty()) {
-                    static constexpr uint8_t kZeroIv[16] = {0};
-                    try {
-                        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption responseCipher;
-                        responseCipher.SetKeyWithIV(
-                            cachedAuthRequestTwofishKeyBytesOwned_.data(),
-                            cachedAuthRequestTwofishKeyBytesOwned_.size(),
-                            kZeroIv);
-                        responseCipher.ProcessData(
-                            ciphertextBytes.data(),
-                            plaintextBytes.data(),
-                            plaintextBytes.size());
-                    } catch (const CryptoPP::Exception&) {
-                        spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
-                        return kAuthBootstrap680InboundUnhandled;
-                    }
                 }
 
                 Packet_AsAuthChallengeResponse_0x4b6cf4 plaintextPacket;
@@ -1463,24 +1395,45 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextPacket.AppendPassword(soePassword);
                 plaintextPacket.ReserveFieldLength(0x20u);
 
-                const size_t plaintextLen = plaintextBytes.size();
+                const uint16_t plaintextPayloadByteCount =
+                    plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
                 // anchor: launcher.exe:0x4483ce
-                // The launcher computes `0x20 - (len & 0x0f)` directly and forwards that raw
-                // value to `Packet_AsAuthChallengeResponse_0x4b6cf4::SetPadding`, even when the
-                // low nibble is already zero.
+                // The launcher computes `0x20 - (len & 0x0f)` directly from the built plaintext
+                // packet payload length and forwards that raw value to
+                // `Packet_AsAuthChallengeResponse_0x4b6cf4::SetPadding`, even when the low nibble
+                // is already zero.
                 const uint16_t paddingBytes =
-                    static_cast<uint16_t>(0x20u - (plaintextLen & 0x0fu));
+                    static_cast<uint16_t>(0x20u - (plaintextPayloadByteCount & 0x0fu));
                 plaintextPacket.SetPadding(paddingBytes);
+
+                const uint16_t ciphertextByteCount =
+                    plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
+                const uint8_t* const plaintextPayloadBytes =
+                    plaintextPacket.messageRef08 && plaintextPacket.messageRef08->messageStorage0c
+                        ? plaintextPacket.messageRef08->messageStorage0c->PayloadBase()
+                        : nullptr;
+                if ((ciphertextByteCount % 16u) != 0u || plaintextPayloadBytes == nullptr) {
+                    spdlog::error("launcher-owned auth built invalid AS_AuthChallengeResponse plaintext packet");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
 
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
                 encryptedPacket.InitializePayloadSize();
-                encryptedPacket.ReserveLengthPrefixedTail(
-                    static_cast<uint16_t>(ciphertextBytes.size()));
-                if (ciphertextBytes.size() != 0u && encryptedPacket.debugString14 != nullptr) {
-                    std::memcpy(
-                        const_cast<char*>(encryptedPacket.debugString14),
-                        ciphertextBytes.data(),
-                        ciphertextBytes.size());
+                encryptedPacket.ReserveLengthPrefixedTail(ciphertextByteCount);
+                if (ciphertextByteCount != 0u && encryptedPacket.debugString14 != nullptr) {
+                    try {
+                        // anchor: launcher.exe:0x44841d / child+0x98 vtable +0x1c
+                        // Static RE shows the outbound raw 0x0a tail encrypts directly through the
+                        // existing child-side small CBC Twofish object into the reserved tail of
+                        // the encrypted packet builder.
+                        feedbackTransformSmall98->ProcessData(
+                            reinterpret_cast<uint8_t*>(const_cast<char*>(encryptedPacket.debugString14)),
+                            plaintextPayloadBytes,
+                            ciphertextByteCount);
+                    } catch (const CryptoPP::Exception&) {
+                        spdlog::error("launcher-owned auth failed to encrypt AS_AuthChallengeResponse plaintext");
+                        return kAuthBootstrap680InboundUnhandled;
+                    }
                 }
 
                 auto* sendTarget = static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(sendTarget50);
@@ -1496,8 +1449,8 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
                     static_cast<unsigned>(passwordLengthField),
                     static_cast<unsigned>(soePasswordLengthField),
-                    static_cast<unsigned>(plaintextBytes.size()),
-                    static_cast<unsigned>(ciphertextBytes.size()),
+                    static_cast<unsigned>(plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u),
+                    static_cast<unsigned>(ciphertextByteCount),
                     static_cast<unsigned>(SmallStringMirrorLength(string10)),
                     static_cast<unsigned>(SmallStringMirrorLength(string1C)),
                     fmt::ptr(sendTarget50),
