@@ -874,6 +874,12 @@ Recovered behavior:
   family rooted at the queued context object
 - source now mirrors that more narrowly by mapping the side effect onto pending-send-queue cleanup on
   `CMessageConnection`, rather than inventing a new stand-alone helper object model
+- worker teardown is also being tightened in the same area:
+  - original `0x4316a0` marks the worker exit byte, signals the worker wakeup socket, then runs the
+    worker-owned virtual tail before unlink/lock release
+  - source previously used `CLTThread::Stop(true)` here, which can fall back to `TerminateThread`
+  - current source now prefers the wakeup-driven graceful exit path (`RequestExit` + `SignalWakeup`
+    + `Wait`) on this cleanup route, which is closer to the recovered intent than force-termination
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:

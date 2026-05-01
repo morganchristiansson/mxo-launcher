@@ -3216,9 +3216,18 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopWorkerThreadScaffold(
         return;
     }
 
+    // Fidelity tightening toward `0x4316a0`:
+    // - original cleanup does not read like an unconditional force-terminate path here
+    // - it marks the worker for exit, signals the wakeup socket, then continues through the
+    //   worker-owned virtual tail before erasing the node and leaving the lock
+    // - current source cannot reproduce the exact original vtable bodies yet, but it can avoid the
+    //   more disruptive `TerminateThread`-backed `CLTThread::Stop(true)` path on this hot queue
+    //   cleanup route
     workerThread->RequestExit();
     workerThread->SignalWakeup();
-    (void)workerThread->Stop(/*waitAfterTerminate=*/true);
+    if (workerThread->IsRunning()) {
+        (void)workerThread->Wait();
+    }
     if (CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(workerThread->ContextKey())) {
         connection->SetWorkerThreadScaffold(nullptr);
     }
