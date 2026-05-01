@@ -1653,35 +1653,29 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 *blockC4 = publicExponentInteger;
             }
 
-            std::vector<uint8_t> decryptedPrivateExponentBytes;
+            std::array<uint8_t, 0x60u> decryptedPrivateExponentBytes{};
             bool decryptedPrivateExponent = false;
             if (parseObject->encryptedPrivateExponentBytes24 != nullptr &&
                 feedbackTransformLarge94 != nullptr &&
-                (parseObject->encryptedPrivateExponentByteLength28 % 16u) == 0u) {
-                decryptedPrivateExponentBytes.assign(
-                    parseObject->encryptedPrivateExponentByteLength28,
-                    0u);
+                parseObject->encryptedPrivateExponentByteLength28 == decryptedPrivateExponentBytes.size()) {
                 decryptedPrivateExponent = true;
-                if (parseObject->encryptedPrivateExponentByteLength28 != 0u) {
-                    try {
-                        // anchor: launcher.exe:0x448241 / child+0x94 vtable +0x1c
-                        // The recovered raw 0x0b tail reuses the same large feedback transform
-                        // object that already consumed the raw 0x09 challenge block. That makes
-                        // this a continuation of the existing Crypto++ CBC object state, not a
-                        // fresh decryptor rebuild with a separately mirrored IV.
-                        feedbackTransformLarge94->ProcessData(
-                            decryptedPrivateExponentBytes.data(),
-                            parseObject->encryptedPrivateExponentBytes24,
-                            parseObject->encryptedPrivateExponentByteLength28);
-                    } catch (const CryptoPP::Exception&) {
-                        decryptedPrivateExponent = false;
-                        decryptedPrivateExponentBytes.clear();
-                    }
+                try {
+                    // anchor: launcher.exe:0x448241 / child+0x94 vtable +0x1c
+                    // The recovered raw 0x0b tail decrypts into a fixed 0x60-byte stack buffer and
+                    // then materializes child `+0xd8` from that exact buffer. Keep the same shape
+                    // here and reuse the existing large CBC transform object instead of rebuilding
+                    // another decryptor or staging a heap byte vector.
+                    feedbackTransformLarge94->ProcessData(
+                        decryptedPrivateExponentBytes.data(),
+                        parseObject->encryptedPrivateExponentBytes24,
+                        decryptedPrivateExponentBytes.size());
+                } catch (const CryptoPP::Exception&) {
+                    decryptedPrivateExponent = false;
                 }
             }
 
             bool builtBlockD8 = false;
-            if (decryptedPrivateExponent && decryptedPrivateExponentBytes.size() == 0x60u) {
+            if (decryptedPrivateExponent) {
                 const CryptoPP::Integer privateExponentInteger(
                     decryptedPrivateExponentBytes.data(),
                     decryptedPrivateExponentBytes.size());
