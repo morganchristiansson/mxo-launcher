@@ -87,13 +87,6 @@ static void SmallWorkItemPool_FreeStorageScaffold(
 static void CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemPool_Clear();
 static void CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemPool_Clear();
 
-// UNANCHORED: source-owned narrow mirror of the original queue block free-list behavior.
-// Static RE already shows that the consumer path recycles exhausted blocks instead of treating the
-// transition as a simple free-and-forget step. Current source keeps that narrower behavior in a
-// side cache keyed by the queue object while the exact original in-object free-list plumbing is
-// still unrecovered.
-static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord*, std::vector<uint32_t*>>
-    g_QueueRecycledBlocks;
 
 // GHIDRA layout audit anchors:
 // - derived ctor `launcher.exe:0x431c30`
@@ -177,26 +170,6 @@ static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorag
     // - do not reintroduce shell-owned queue mirroring here unless a future compiler/ABI port
     //   proves that raw cross-module queue-subobject access can no longer stay native
     return &reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(self)->queuePair0C;
-}
-
-static void MoveQueueRecycledBlocksScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* fromQueueRecord,
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* toQueueRecord) {
-    if (!fromQueueRecord || !toQueueRecord || fromQueueRecord == toQueueRecord) {
-        return;
-    }
-
-    auto fromIt = g_QueueRecycledBlocks.find(fromQueueRecord);
-    if (fromIt == g_QueueRecycledBlocks.end()) {
-        return;
-    }
-
-    std::vector<uint32_t*>& targetBlocks = g_QueueRecycledBlocks[toQueueRecord];
-    targetBlocks.insert(
-        targetBlocks.end(),
-        fromIt->second.begin(),
-        fromIt->second.end());
-    g_QueueRecycledBlocks.erase(fromIt);
 }
 
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -906,54 +879,6 @@ CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
     self->header.statusOrPayloadDword08 = 0u;
     self->header.vtable = g_CloseWorkItemVtable;
     return self;
-}
-
-// UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
-static void QueueRecycleBlockScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord,
-    uint32_t* block) {
-    if (!queueRecord || !block) {
-        return;
-    }
-    g_QueueRecycledBlocks[queueRecord].push_back(block);
-}
-
-// UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
-static uint32_t* QueueTakeRecycledBlockScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
-    if (!queueRecord) {
-        return nullptr;
-    }
-
-    auto it = g_QueueRecycledBlocks.find(queueRecord);
-    if (it == g_QueueRecycledBlocks.end() || it->second.empty()) {
-        return nullptr;
-    }
-
-    uint32_t* block = it->second.back();
-    it->second.pop_back();
-    if (it->second.empty()) {
-        g_QueueRecycledBlocks.erase(it);
-    }
-    return block;
-}
-
-// UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
-static void QueueFreeRecycledBlocksScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* queueRecord) {
-    if (!queueRecord) {
-        return;
-    }
-
-    auto it = g_QueueRecycledBlocks.find(queueRecord);
-    if (it == g_QueueRecycledBlocks.end()) {
-        return;
-    }
-
-    for (uint32_t* block : it->second) {
-        std::free(block);
-    }
-    g_QueueRecycledBlocks.erase(it);
 }
 
 static CRITICAL_SECTION* CriticalSectionFromOpaqueStorage(void* storage) {
@@ -1776,7 +1701,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(CLTThreadPerClientTCPEngin
         std::free(slotsBase);
     }
 
-    QueueFreeRecycledBlocksScaffold(queueRecord);
     std::memset(queueRecord, 0, sizeof(*queueRecord));
 }
 
@@ -1892,14 +1816,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::Queue_PushPair(
             slotsLast = newSlotsLast;
         }
 
-        uint32_t* newBlock = QueueTakeRecycledBlockScaffold(queueRecord);
+        uint32_t* newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
         if (!newBlock) {
-            newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
-            if (!newBlock) {
-                return;
-            }
-        } else {
-            std::memset(newBlock, 0, 0x80);
+            return;
         }
 
         slotsLast[1] = newBlock;
@@ -1950,12 +1869,7 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
         }
 
         if (oldBlock) {
-            // Current bounded fidelity step:
-            // - original `0x436d31..0x436ee7` uses block recycling / free-list behavior when the
-            //   dequeue cursor leaves a full `0x80` block
-            // - current source now mirrors that more closely by caching the exhausted head block for
-            //   later `Queue_PushPair` growth reuse instead of freeing it immediately
-            QueueRecycleBlockScaffold(queueRecord, oldBlock);
+            std::free(oldBlock);
         }
         ++slotsCurrent;
         queueRecord->slotArrayCurrent0C = slotsCurrent;

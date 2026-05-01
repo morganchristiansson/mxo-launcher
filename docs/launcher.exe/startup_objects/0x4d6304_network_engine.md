@@ -790,13 +790,19 @@ Current best read:
   - shell `queuePair0C` bytes should now be treated as ABI/layout coverage only for fallback
     detached-shell builds unless a future compiler-port proves direct cross-module subobject access
     can no longer remain native
-  - newer queue-fidelity correction from `0x4364d0/0x436b10`:
+  - newer queue-fidelity corrections from `0x4363e0/0x4364d0/0x436b10`:
     - `+0x5c` wait helper already performs the leave-lock / wait / reacquire sequence itself
     - current source was previously double-releasing the queue lock before calling that helper on
       blocking dequeue paths
     - source now enters/leaves through the recovered queue-lock helper family directly and lets the
       wait helper own the blocking unlock/relock transition, matching launcher/client control flow
       more closely
+    - cross-block pop helper `0x4363e0` immediately frees the exhausted head `0x80` block before
+      advancing to the next slot-array entry; current source had been keeping a source-owned
+      recycled-block cache instead
+    - source now frees exhausted queue blocks immediately on the cross-block dequeue path and
+      allocates fresh blocks on later growth, which is closer to the recovered helper family than
+      the earlier source-only recycle cache
 
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 
