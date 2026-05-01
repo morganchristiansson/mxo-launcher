@@ -869,6 +869,11 @@ Recovered behavior:
 - on miss:
   - logs the miss path
   - still calls `0x44ab60(arg)` before releasing the helper lock
+- current best interpretation of `0x44ab60` is **not** a trustworthy standalone OOAnalyzer-discovered
+  class boundary; it reads better as a helper operating on the existing connection/send-queue
+  family rooted at the queued context object
+- source now mirrors that more narrowly by mapping the side effect onto pending-send-queue cleanup on
+  `CMessageConnection`, rather than inventing a new stand-alone helper object model
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:
@@ -891,6 +896,9 @@ On the non-empty dequeue branch it:
     `RunCompletedOperationQueue` instead of factoring it into new source-owned helper boundaries
   - duplicating the same release order in the zero-thread `StopQueueThreads` drain path rather than
     pretending launcher.exe exposed separate helper methods for that tail
+  - dropping the older source-owned enqueue-success branchiness on the `0x436820` path so queued
+    work-item ownership transfer now follows the original `void`-return model more closely once the
+    caller has already committed to enqueueing
 
 That ties several earlier partial observations together:
 - the queued first-dword object really is a **work/status item** rather than only arbitrary pointer noise

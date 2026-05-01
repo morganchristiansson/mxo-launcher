@@ -607,6 +607,13 @@ bool CLTTCPConnection_PendingSendQueue::SendQueueEmptyFlag() const {
     return sendQueueEmptyFlag38_ != 0u;
 }
 
+// anchor: launcher.exe:0x44ab60 helper family consumed by CleanupConnection
+void CLTTCPConnection_PendingSendQueue::ReleasePendingSendQueueContents() {
+    std::lock_guard<std::mutex> lock(pendingSendQueueMutex_);
+    pendingSendQueue3c_.clear();
+    sendQueueEmptyFlag38_ = 1u;
+}
+
 // anchor: launcher.exe:0x44ad80
 bool CLTTCPConnection::QueueSendBuffer(
     const void* buffer,
@@ -651,6 +658,11 @@ bool CLTTCPConnection::TryPopQueuedSendBufferWithEndpoint(
 
 bool CLTTCPConnection::SendQueueEmptyFlag() const {
     return pendingSendQueueState38_.SendQueueEmptyFlag();
+}
+
+// anchor: launcher.exe:0x44ab60 helper family consumed by CleanupConnection
+void CLTTCPConnection::ReleasePendingSendQueueContentsScaffold() {
+    pendingSendQueueState38_.ReleasePendingSendQueueContents();
 }
 
 // anchor: launcher.exe:0x449ca0

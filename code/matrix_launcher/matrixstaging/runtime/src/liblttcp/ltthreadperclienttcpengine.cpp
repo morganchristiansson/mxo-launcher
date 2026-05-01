@@ -1358,21 +1358,12 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                     static_cast<unsigned>(workPayload));
                 return;
             }
-            const bool queued = engine->EnqueueCompletedOperationScaffold(
+            engine->EnqueueCompletedOperationScaffold(
                 &statusWorkItem->header,
                 connection->QueueContextScaffold(),
                 /*useQueue34=*/false,
                 connectStatusLabel,
                 /*queueLockAlreadyHeld=*/false);
-            if (!queued) {
-                std::free(statusWorkItem);
-                spdlog::warn(
-                    "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread direct queue connect status failed connection={} ownerContext={} payload=0x{:08x}",
-                    fmt::ptr(connection),
-                    fmt::ptr(connection->OwnerContext()),
-                    static_cast<unsigned>(workPayload));
-                return;
-            }
             connectStatusQueued = true;
         };
 
@@ -1391,21 +1382,12 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                 static_cast<unsigned>(connection->State()));
             return;
         }
-        const bool queued = engine->EnqueueCompletedOperationScaffold(
+        engine->EnqueueCompletedOperationScaffold(
             &closeWorkItem->header,
             connection->QueueContextScaffold(),
             /*useQueue34=*/false,
             closeStatusLabel,
             /*queueLockAlreadyHeld=*/false);
-        if (!queued) {
-            std::free(closeWorkItem);
-            spdlog::warn(
-                "CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread direct queue close failed connection={} ownerContext={} state={}",
-                fmt::ptr(connection),
-                fmt::ptr(connection->OwnerContext()),
-                static_cast<unsigned>(connection->State()));
-            return;
-        }
         closeQueued = true;
     };
 
@@ -2693,8 +2675,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     bool touchedConnectionState = false;
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> workerPayload;
+    CMessageConnection_0x4b7928* cleanupConnection = nullptr;
 
     if (CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(cleanupContextKey)) {
+        cleanupConnection = connection;
         connection->SetState(LTTCPEngineConnectionState::kClosed);
         connection->SetSocketHandle(kInvalidSocketHandle);
         connection->SetWorkerThreadScaffold(nullptr);
@@ -2717,6 +2701,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
                 fmt::ptr(cleanupContextKey));
         }
         result = touchedConnectionState ? kResultSuccess : 0u;
+    }
+
+    if (cleanupConnection) {
+        cleanupConnection->ReleasePendingSendQueueContentsScaffold();
     }
 
     (void)LeaveCleanupLockHelper();
@@ -2839,7 +2827,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
+void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     void* workItem,
     void* context,
     bool useQueue34,
@@ -2860,7 +2848,7 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* targetQueue = useQueue34 ? activeQueue34 : activeQueue0C;
     if (!targetQueue) {
-        return false;
+        return;
     }
 
     if (!queueLockAlreadyHeld) {
@@ -2890,7 +2878,6 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         fmt::ptr(context),
         queuePairWasEmpty ? 1u : 0u,
         queueLockAlreadyHeld ? 1u : 0u);
-    return true;
 }
 
 // UNANCHORED: connection-owned helper for the recovered `0x449d8a -> 0x436820` handoff.

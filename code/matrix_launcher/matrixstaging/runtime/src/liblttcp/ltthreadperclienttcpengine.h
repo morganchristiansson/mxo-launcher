@@ -508,13 +508,10 @@ private:
     uint32_t TryPopCompletedOperation(
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
         bool waitForSignal);
-    // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
-    // while still returning `false` to synthetic callers when no attached target queue exists.
-    // Unlike original `0x436820`, this source-owned helper exposes queue availability to bounded
-    // synthetic callers; once a target queue exists, it follows the
-    // original enter-lock -> empty-snapshot -> push -> leave-lock -> signal ordering and does not
-    // surface a push-success result.
-    bool EnqueueCompletedOperationScaffold(
+    // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape.
+    // Unlike older source scaffolds, this keeps the original `void`-return shape once the caller
+    // has already committed to queue ownership transfer.
+    void EnqueueCompletedOperationScaffold(
         void* workItem,
         void* context,
         bool useQueue34,

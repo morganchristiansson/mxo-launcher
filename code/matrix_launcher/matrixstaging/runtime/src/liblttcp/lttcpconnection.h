@@ -272,6 +272,8 @@ public:
     // anchor: launcher.exe:0x44aa70
     bool TryPopQueuedSendBufferWithEndpoint(CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem);
     bool SendQueueEmptyFlag() const;
+    // anchor: launcher.exe:0x44ab60 helper family consumed by CleanupConnection
+    void ReleasePendingSendQueueContents();
 
 private:
     uint8_t sendQueueEmptyFlag38_;
@@ -469,6 +471,8 @@ public:
     // anchor: launcher.exe:0x44aa70
     bool TryPopQueuedSendBufferWithEndpoint(CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem);
     bool SendQueueEmptyFlag() const;
+    // anchor: launcher.exe:0x44ab60 helper family consumed by CleanupConnection
+    void ReleasePendingSendQueueContentsScaffold();
 
     // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
     // Current best original read:
