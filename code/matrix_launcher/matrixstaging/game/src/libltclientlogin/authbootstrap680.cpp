@@ -115,13 +115,13 @@ static uint32_t ReadU32LE(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[3]) << 24u);
 }
 
-static void ResetAuthBootstrap680RsaPublicKeyPairOwnedState(
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    if (!ownedState) {
+static void ResetAuthBootstrap680RsaPublicKey(
+    CryptoPP::RSA::PublicKey* publicKey) {
+    if (!publicKey) {
         return;
     }
 
-    ownedState->publicKey = CryptoPP::RSA::PublicKey();
+    *publicKey = CryptoPP::RSA::PublicKey();
 }
 
 namespace {
@@ -132,9 +132,9 @@ static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
  child.replyAuthDataValidatorAC = nullptr;
 
  child.raw08PublicKeyWorkerA8Owned_.reset();
- ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.raw08PublicKeyWorkerA8PublicKeyPair0c_);
+ ResetAuthBootstrap680RsaPublicKey(&child.raw08PublicKeyWorkerA8PublicKey0c_);
  child.replyAuthDataValidatorACOwned_.reset();
- ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.replyAuthDataValidatorACPublicKeyPair0c_);
+ ResetAuthBootstrap680RsaPublicKey(&child.replyAuthDataValidatorACPublicKey0c_);
 }
 
 static void ResetAuthBootstrap680FeedbackTransforms(
@@ -559,7 +559,7 @@ AuthBootstrap680ChildBase_0x4b7134::AuthBootstrap680ChildBase_0x4b7134() {
  // +0x98: small transform nulled
 
  lazyPubkeyDatValidatorA4Owned_.reset();
- ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&lazyPubkeyDatValidatorA4PublicKeyPair0c_);
+ ResetAuthBootstrap680RsaPublicKey(&lazyPubkeyDatValidatorA4PublicKey0c_);
  lazyPubkeyDatValidatorA4 = nullptr; // +0xa4 = 0
 
  ResetAuthBootstrap680ReplyParseObject(*this);
@@ -782,17 +782,17 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
         kAuthBootstrap680PubkeyDatFallbackModulus.size());
     static const CryptoPP::Integer kFallbackPublicExponent(0x11u);
     child.lazyPubkeyDatValidatorA4Owned_.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
+    ResetAuthBootstrap680RsaPublicKey(&child.lazyPubkeyDatValidatorA4PublicKey0c_);
     try {
-        child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey.Initialize(
+        child.lazyPubkeyDatValidatorA4PublicKey0c_.Initialize(
             kFallbackModulus,
             kFallbackPublicExponent);
         child.lazyPubkeyDatValidatorA4Owned_ =
             std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
-                child.lazyPubkeyDatValidatorA4PublicKeyPair0c_.publicKey);
+                child.lazyPubkeyDatValidatorA4PublicKey0c_);
     } catch (const CryptoPP::Exception&) {
         child.lazyPubkeyDatValidatorA4Owned_.reset();
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&child.lazyPubkeyDatValidatorA4PublicKeyPair0c_);
+        ResetAuthBootstrap680RsaPublicKey(&child.lazyPubkeyDatValidatorA4PublicKey0c_);
         child.lazyPubkeyDatValidatorA4 = nullptr;
         return false;
     }
@@ -2076,34 +2076,34 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
     currentPublicKeyId9C = replyPublicKeyId09;
 
     raw08PublicKeyWorkerA8Owned_.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
+    ResetAuthBootstrap680RsaPublicKey(&raw08PublicKeyWorkerA8PublicKey0c_);
     try {
-        raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey.Initialize(
+        raw08PublicKeyWorkerA8PublicKey0c_.Initialize(
             modulusInteger,
             publicExponentInteger);
         raw08PublicKeyWorkerA8Owned_ =
             std::make_unique<CryptoPP::RSAES_OAEP_SHA_Encryptor>(
-                raw08PublicKeyWorkerA8PublicKeyPair0c_.publicKey);
+                raw08PublicKeyWorkerA8PublicKey0c_);
         raw08PublicKeyWorkerA8 = raw08PublicKeyWorkerA8Owned_.get();
     } catch (const CryptoPP::Exception&) {
         raw08PublicKeyWorkerA8Owned_.reset();
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&raw08PublicKeyWorkerA8PublicKeyPair0c_);
+        ResetAuthBootstrap680RsaPublicKey(&raw08PublicKeyWorkerA8PublicKey0c_);
         raw08PublicKeyWorkerA8 = nullptr;
     }
 
     replyAuthDataValidatorACOwned_.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
+    ResetAuthBootstrap680RsaPublicKey(&replyAuthDataValidatorACPublicKey0c_);
     try {
-        replyAuthDataValidatorACPublicKeyPair0c_.publicKey.Initialize(
+        replyAuthDataValidatorACPublicKey0c_.Initialize(
             modulusInteger,
             publicExponentInteger);
         replyAuthDataValidatorACOwned_ =
             std::make_unique<CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier>(
-                replyAuthDataValidatorACPublicKeyPair0c_.publicKey);
+                replyAuthDataValidatorACPublicKey0c_);
         replyAuthDataValidatorAC = replyAuthDataValidatorACOwned_.get();
     } catch (const CryptoPP::Exception&) {
         replyAuthDataValidatorACOwned_.reset();
-        ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&replyAuthDataValidatorACPublicKeyPair0c_);
+        ResetAuthBootstrap680RsaPublicKey(&replyAuthDataValidatorACPublicKey0c_);
         replyAuthDataValidatorAC = nullptr;
     }
 

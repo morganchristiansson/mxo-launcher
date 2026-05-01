@@ -17,8 +17,6 @@
 
 namespace mxo::ltlogin {
 
-struct AuthBootstrap680RsaPublicKeyPairOwnedState;
-
 class __attribute__((packed)) AuthBootstrapReplyCopyShadowF4_0x44add0 {
 public:
     std::array<uint8_t, 0x80> authSignature00{};
