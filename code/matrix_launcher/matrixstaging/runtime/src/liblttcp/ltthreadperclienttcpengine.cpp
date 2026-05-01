@@ -2925,36 +2925,35 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
     HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
     while (true) {
-        (void)EnterQueueLockHelper();
-
         CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
-        if (activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
-            selectedQueue = activeQueue34;
-        } else if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
-            selectedQueue = activeQueue0C;
-        }
-
-        if (!selectedQueue) {
+        while (true) {
+            (void)EnterQueueLockHelper();
+            if (activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
+                selectedQueue = activeQueue34;
+                break;
+            }
+            if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00) {
+                selectedQueue = activeQueue0C;
+                break;
+            }
             if (nonBlocking) {
                 (void)LeaveQueueLockHelper();
                 return;
             }
-
             if (!activeQueueSignalEvent) {
                 (void)LeaveQueueLockHelper();
                 return;
             }
 
             const uint32_t waitResult = WaitQueueEventHelper(INFINITE);
-            if (waitResult == 0u || waitResult == 3u) {
-                if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00 ||
-                    activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
-                    continue;
-                }
-                (void)LeaveQueueLockHelper();
-                continue;
+            if (waitResult != 0u && waitResult != 3u) {
+                return;
             }
-            return;
+            if (activeQueue0C->writeCursor10 != activeQueue0C->readCursor00 ||
+                activeQueue34->writeCursor10 != activeQueue34->readCursor00) {
+                break;
+            }
+            (void)LeaveQueueLockHelper();
         }
 
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair pair = {};

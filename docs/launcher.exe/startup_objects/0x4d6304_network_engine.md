@@ -900,10 +900,14 @@ Recovered behavior:
     - once the read cursor reaches `firstBlockEnd08 - 8`, source now follows the original
       `0x4363e0` shape directly: free current block, increment `slotArrayCurrent0C`, load the next
       block pointer, then reset `firstBlockBegin04/End08/readCursor00`
-  - blocking `0x436b10` wait handling was also nudged closer to the original loop shape: after the
-    `+0x5c` wait helper returns, source now immediately re-checks the raw cursor-empty conditions and
-    re-enters the loop if the queue is still empty instead of treating the wait helper return alone
-    as sufficient progress
+  - blocking `0x436b10` wait handling was also nudged closer to the original loop shape: source now
+    keeps the explicit inner lock/wait loop structure where it:
+    - enters the queue lock
+    - checks raw queue34 then queue0C cursor emptiness
+    - returns immediately on `nonBlocking`
+    - otherwise calls the `+0x5c` wait helper
+    - re-checks the raw cursor-empty conditions before deciding whether to break toward dequeue or
+      leave the lock and loop again on the still-empty case
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:
