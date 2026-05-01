@@ -1313,7 +1313,6 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
 // Full fidelity: builds MD5 of signedData80 and delegates to validator
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
     const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* validator,
-    const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair,
     int timeBias) const {
     // Calculate current auth server time
     const std::time_t now = std::time(nullptr);
@@ -1918,7 +1917,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
             const bool replyAuthDataValidatorAccepted =
                 copyShadowCandidate.VerifyWithValidator(
                     replyAuthDataValidatorACOwned_.get(),
-                    replyAuthDataValidatorACPublicKeyPair0c_,
                     authServerTimeBias80);
             if (!replyAuthDataValidatorAccepted) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;

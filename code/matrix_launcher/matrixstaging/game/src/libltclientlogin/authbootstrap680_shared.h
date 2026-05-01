@@ -28,7 +28,6 @@ public:
     bool IsFresh(int timeBias) const;
     uint32_t VerifyWithValidator(
         const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* validator,
-        const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair,
         int timeBias) const;
 };
 
