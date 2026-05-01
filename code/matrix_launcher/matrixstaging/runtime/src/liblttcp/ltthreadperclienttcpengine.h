@@ -487,7 +487,7 @@ public:
     // - nonBlocking=false now also waits on the attached arg5 queue-signal event when both queues
     //   are empty, matching the recovered `+0x5c` wait-helper role more closely than the older
     //   immediate-return scaffold
-    void RunCompletedOperationQueue(bool nonBlocking, bool preferType1CallbackBeforeCleanup = false);
+    void RunCompletedOperationQueue(bool nonBlocking);
 
     // anchor: launcher.exe:0x436920
     // Drains pending queue work when no queue threads exist; otherwise enqueues the shutdown

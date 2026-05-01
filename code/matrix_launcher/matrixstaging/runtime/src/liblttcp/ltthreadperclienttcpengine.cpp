@@ -2905,8 +2905,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationFromConnecti
 
 // anchor: launcher.exe:0x436b10
 void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
-    bool nonBlocking,
-    bool preferType1CallbackBeforeCleanup) {
+    bool nonBlocking) {
     // Current bounded mirror of the shared launcher/client consumer family:
     // - prefer queue34, else queue0C
     // - nonBlocking=true matches the client poll form; false waits on the attached signal event
@@ -2998,13 +2997,12 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             })();
 
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} preferType1CallbackBeforeCleanup={}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
             (selectedQueue == activeQueue34) ? "queue34" : "queue0C",
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),
-            shouldAutoReleaseContext ? 1u : 0u,
-            preferType1CallbackBeforeCleanup ? 1u : 0u);
+            shouldAutoReleaseContext ? 1u : 0u);
 
         if (context && isType1) {
             CleanupConnection(context);
