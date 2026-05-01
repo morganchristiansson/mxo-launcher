@@ -797,12 +797,16 @@ Current best read:
     - source now enters/leaves through the recovered queue-lock helper family directly and lets the
       wait helper own the blocking unlock/relock transition, matching launcher/client control flow
       more closely
-    - cross-block pop helper `0x4363e0` immediately frees the exhausted head `0x80` block before
-      advancing to the next slot-array entry; current source had been keeping a source-owned
-      recycled-block cache instead
-    - source now frees exhausted queue blocks immediately on the cross-block dequeue path and
-      allocates fresh blocks on later growth, which is closer to the recovered helper family than
-      the earlier source-only recycle cache
+    - cross-block pop helper `0x4363e0` immediately frees the exhausted head `0x80` block and
+      then unconditionally advances `slotArrayCurrent0C` to the next slot-array entry before
+      resetting `firstBlockBegin04/firstBlockEnd08/readCursor00`
+    - current source had been keeping a source-owned recycled-block cache instead, and also had a
+      special-case branch that tried to leave the queue "empty within the current block" when no
+      later block was visible
+    - source now frees exhausted queue blocks immediately on the cross-block dequeue path,
+      allocates fresh blocks on later growth, and advances to the next slot entry in the same
+      shape as `0x4363e0`, which is closer to the recovered helper family than the earlier
+      source-only recycle/cache special-casing
 
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 

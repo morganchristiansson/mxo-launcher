@@ -1860,11 +1860,10 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
     if (static_cast<void*>(queueRecord->readCursor00) == static_cast<void*>(lastPairInBlock)) {
         uint32_t* oldBlock = static_cast<uint32_t*>(queueRecord->firstBlockBegin04);
         uint32_t** slotsCurrent = static_cast<uint32_t**>(queueRecord->slotArrayCurrent0C);
-        uint32_t** slotsLast = static_cast<uint32_t**>(queueRecord->slotArrayLast1C);
-        if (!slotsCurrent || slotsCurrent >= slotsLast) {
-            // No later block is active; the queue just becomes empty within the current block.
-            // The recovered free-list behavior matters on the cross-block path below, not here.
-            queueRecord->readCursor00 = readCursor + 2;
+        if (!slotsCurrent) {
+            queueRecord->readCursor00 = nullptr;
+            queueRecord->firstBlockBegin04 = nullptr;
+            queueRecord->firstBlockEnd08 = nullptr;
             return true;
         }
 
@@ -1875,7 +1874,9 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::Queue_TryPopPair(
         queueRecord->slotArrayCurrent0C = slotsCurrent;
         uint32_t* newBlock = *slotsCurrent;
         queueRecord->firstBlockBegin04 = newBlock;
-        queueRecord->firstBlockEnd08 = newBlock ? (static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80) : nullptr;
+        queueRecord->firstBlockEnd08 = newBlock
+            ? (static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80)
+            : nullptr;
         queueRecord->readCursor00 = newBlock;
         return true;
     }
