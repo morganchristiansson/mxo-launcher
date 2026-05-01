@@ -1362,8 +1362,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                 &statusWorkItem->header,
                 connection->QueueContextScaffold(),
                 /*useQueue34=*/false,
-                connectStatusLabel,
-                /*queueLockAlreadyHeld=*/false);
+                connectStatusLabel);
             connectStatusQueued = true;
         };
 
@@ -1386,8 +1385,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             &closeWorkItem->header,
             connection->QueueContextScaffold(),
             /*useQueue34=*/false,
-            closeStatusLabel,
-            /*queueLockAlreadyHeld=*/false);
+            closeStatusLabel);
         closeQueued = true;
     };
 
@@ -2320,8 +2318,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
             queuedConnectionContext,
             /*useQueue34=*/false,
-            "connect:not-closed",
-            /*queueLockAlreadyHeld=*/false);
+            "connect:not-closed");
         return 0u;
     }
 
@@ -2348,8 +2345,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
             queuedConnectionContext,
             /*useQueue34=*/false,
-            "connect:socket-failed",
-            /*queueLockAlreadyHeld=*/false);
+            "connect:socket-failed");
         return 0u;
     }
 
@@ -2382,8 +2378,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
             queuedConnectionContext,
             /*useQueue34=*/false,
-            "connect:bind-failed",
-            /*queueLockAlreadyHeld=*/false);
+            "connect:bind-failed");
         return 0u;
     }
 
@@ -2417,8 +2412,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 closeWorkItem ? &closeWorkItem->header : nullptr,
                 queuedConnectionContext,
                 /*useQueue34=*/false,
-                "connect:immediate-close",
-                /*queueLockAlreadyHeld=*/false);
+                "connect:immediate-close");
 
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
@@ -2428,8 +2422,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
                 queuedConnectionContext,
                 /*useQueue34=*/false,
-                "connect:immediate-status",
-                /*queueLockAlreadyHeld=*/false);
+                "connect:immediate-status");
             return 0u;
         }
     }
@@ -2858,8 +2851,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
     void* workItem,
     void* context,
     bool useQueue34,
-    const char* label,
-    bool queueLockAlreadyHeld) {
+    const char* label) {
     // Current best read of original `0x436820` / `0x436670`:
     // - `0x436820` itself returns `void`
     // - lock/order is:
@@ -2878,9 +2870,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         return;
     }
 
-    if (!queueLockAlreadyHeld) {
-        (void)EnterQueueLockHelper();
-    }
+    (void)EnterQueueLockHelper();
 
     const bool queuePairWasEmpty =
         Queue_IsEmpty(activeQueue0C) && Queue_IsEmpty(activeQueue34);
@@ -2889,9 +2879,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
 
-    if (!queueLockAlreadyHeld) {
-        (void)LeaveQueueLockHelper();
-    }
+    (void)LeaveQueueLockHelper();
 
     if (queuePairWasEmpty) {
         (void)SignalQueueEventHelper();
@@ -2904,7 +2892,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationScaffold(
         static_cast<unsigned>(reinterpret_cast<uintptr_t>(workItem)),
         fmt::ptr(context),
         queuePairWasEmpty ? 1u : 0u,
-        queueLockAlreadyHeld ? 1u : 0u);
+        0u);
 }
 
 // UNANCHORED: connection-owned helper for the recovered `0x449d8a -> 0x436820` handoff.
@@ -2925,8 +2913,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationFromConnecti
         workItem,
         connection ? connection->QueueContextScaffold() : nullptr,
         /*useQueue34=*/false,
-        label,
-        /*queueLockAlreadyHeld=*/false);
+        label);
 }
 
 // anchor: launcher.exe:0x436b10
@@ -2990,8 +2977,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
                 nullptr,
                 nullptr,
                 /*useQueue34=*/false,
-                "RunCompletedOperationQueueShutdownCascade",
-                /*queueLockAlreadyHeld=*/false);
+                "RunCompletedOperationQueueShutdownCascade");
             return;
         }
 
@@ -3113,8 +3099,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
         nullptr,
         nullptr,
         /*useQueue34=*/false,
-        "StopQueueThreadsShutdown",
-        /*queueLockAlreadyHeld=*/false);
+        "StopQueueThreadsShutdown");
     for (uint32_t i = 0; i < existingQueueThreadCount; ++i) {
         CLTThreadPerClientTCPEngine_0x4b2768_QueueThread* thread = queueThreadArray ? queueThreadArray[i] : nullptr;
         if (!thread) {
@@ -3233,31 +3218,6 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopAcceptThreadScaffold(
     acceptThread->SignalWakeup();
     (void)acceptThread->Stop(/*waitAfterTerminate=*/true);
     acceptThread->CloseListenSocketScaffold();
-}
-
-// UNANCHORED: source-owned teardown helper for the direct `WorkerThread` payload stored at
-// `[contextNode+0x14]`.
-void CLTThreadPerClientTCPEngine_0x4b2768::StopWorkerThreadScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread) {
-    if (!workerThread) {
-        return;
-    }
-
-    // Fidelity tightening toward `0x4316a0`:
-    // - original cleanup does not read like an unconditional force-terminate path here
-    // - it marks the worker for exit, signals the wakeup socket, then continues through the
-    //   worker-owned virtual tail before erasing the node and leaving the lock
-    // - current source cannot reproduce the exact original vtable bodies yet, but it can avoid the
-    //   more disruptive `TerminateThread`-backed `CLTThread::Stop(true)` path on this hot queue
-    //   cleanup route
-    workerThread->RequestExit();
-    workerThread->SignalWakeup();
-    if (workerThread->IsRunning()) {
-        (void)workerThread->Wait();
-    }
-    if (CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(workerThread->ContextKey())) {
-        connection->SetWorkerThreadScaffold(nullptr);
-    }
 }
 
 // UNANCHORED starter binding helper.

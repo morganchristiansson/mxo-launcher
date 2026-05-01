@@ -886,6 +886,10 @@ Recovered behavior:
   - the same cleanup drift existed in the anchored derived destructor `0x431310`; source now keeps
     the remaining context-worker teardown visible there too instead of hiding it behind the same
     broad source-only helper
+  - the older `EnqueueCompletedOperationScaffold(..., queueLockAlreadyHeld)` parameterization was
+    also pruned because current source had no RE-backed callsites using the alternate lock-held
+    branch; the active enqueue path now matches the single original enter-lock -> push -> leave-lock
+    shape more directly
 
 That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
 On the non-empty dequeue branch it:

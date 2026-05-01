@@ -499,7 +499,6 @@ private:
     void StopAcceptThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* acceptThread);
     // UNANCHORED: source-owned teardown helper for the direct `WorkerThread` payload stored at
     // `[contextNode+0x14]`.
-    void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread);
     // anchor: launcher.exe:0x4364d0
     // Pop one completed-operation pair from the inline queue-pair storage, preferring the second
     // repeated record (pair +0x28 / engine +0x34) before the first record (pair +0x00 / engine
@@ -515,8 +514,7 @@ private:
         void* workItem,
         void* context,
         bool useQueue34,
-        const char* label,
-        bool queueLockAlreadyHeld);
+        const char* label);
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
