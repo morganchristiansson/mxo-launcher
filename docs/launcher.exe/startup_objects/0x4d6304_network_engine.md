@@ -884,9 +884,10 @@ On the non-empty dequeue branch it:
 - current source now mirrors that tail more narrowly by:
   - reading the type-1 auto-release decision from the raw low byte at `context+0x04`
     rather than inferring it through higher-level connection/wrapper branches
-  - sharing one callback/release tail between the main queue consumer and the zero-thread
-    `StopQueueThreads` drain path so the source no longer carries two slightly different
-    source-owned interpretations of the same recovered order
+  - keeping the anchored `0x436b10` callback/release tail inline in
+    `RunCompletedOperationQueue` instead of factoring it into new source-owned helper boundaries
+  - duplicating the same release order in the zero-thread `StopQueueThreads` drain path rather than
+    pretending launcher.exe exposed separate helper methods for that tail
 
 That ties several earlier partial observations together:
 - the queued first-dword object really is a **work/status item** rather than only arbitrary pointer noise
