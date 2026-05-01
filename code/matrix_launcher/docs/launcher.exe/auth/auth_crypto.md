@@ -92,6 +92,29 @@ So the best current model is:
 - `CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0` = source-owned seed-holder mirror for the helper's worker collection
 - transient Crypto++ classes participate inside `0x44d500`, but the helper itself is not a Crypto++ class renamed badly by OOAnalyzer
 
+## Follow-up: `AS_GetPublicKeyReply` signature length in pubkey validator path
+
+Date: 2026-05-01
+
+Static-RE of `launcher.exe:0x468f80` closes one important detail in the embedded auth-public-key verification path.
+
+Decompile + disassembly show the launcher calls the validator-family virtual `+0x2c` with:
+
+- signed bytes buffer length = `0x81`
+  - 128-byte modulus exported into a stack buffer
+  - final byte filled from the public exponent accessor at `0x45a3b0`
+- signature byte length = `0x100`
+
+So the launcher verifies the `AS_GetPublicKeyReply` embedded public key against a **256-byte signature**, not `0x80` bytes.
+
+Our recovered source had drifted here in `AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(...)` and was passing `0x80u` into `AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator_SOURCEOWNED(...)`. That truncation causes otherwise-valid replies to fail with `0x19000004` when `skipPublicKeyValidation = false`.
+
+Anchors:
+
+- `launcher.exe:0x447780` / `AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers`
+- `launcher.exe:0x468f80` / `AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator`
+- `launcher.exe:0x45a3b0` / byte accessor used to fetch the one-byte public exponent
+
 ## Result
 
 All source-owned structs were deleted from `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`, and the remaining packet encrypt/decrypt wrappers were also removed from the public auth header.
