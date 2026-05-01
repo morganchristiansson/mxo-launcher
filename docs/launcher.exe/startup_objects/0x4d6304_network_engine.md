@@ -142,9 +142,10 @@ New non-original-state audit from the current constructor / destructor / worker-
         higher-level wrapper record: it now mirrors launcher.exe more closely as the direct
         `WorkerThread` object pointer, with source-owned backing only retaining ownership of that
         object outside the raw tree node
-  - source-only launcher-ABI attachment now lives in a discrete engine-keyed map, while launcher
-    bridge contexts remain mediator-owned records hung directly off each connection's owner/context
-    pointer instead of a synthetic `CLTThreadPerClientTCPEngine_SideState` aggregate
+  - older source-only launcher-ABI attachment bookkeeping has now been pruned; current wrapper
+    state stays in `src/launcher_network_object_abi.cpp`, while launcher bridge contexts remain
+    mediator-owned records hung directly off each connection's owner/context pointer instead of a
+    synthetic `CLTThreadPerClientTCPEngine_SideState` aggregate
     - current Ghidra pass also sharpened why auth/margin-specific engine maps were infidelity:
       - `0x4325d0` / `0x4328a0` pass the direct connection object into worker helper `0x431ff0`
       - `0x431ff0` stores `[connection+0x08] = workerThread` and inserts key=`connection` into the
@@ -237,7 +238,9 @@ New queue-thread clarification from the current focused pass:
   - launcher ABI glue now delegates queue init/push/free to those liblttcp helpers rather than carrying a fully separate duplicate queue implementation
 - newer lockstep source cleanup also added an explicit sidecar bridge for the recovered ownership mismatch in the current implementation:
   - the runtime-visible queue fields still live on the launcher ABI object (`+0x0c` / `+0x34`)
-  - the current class-side attachment model now reaches those live shell queues through one explicit ABI-surface attachment map rather than a queue-only sidecar hook
+  - earlier queue passes used an explicit ABI-surface attachment map here, but that source-owned
+    bridge was later pruned once the active queue path stayed directly on native engine storage and
+    the remaining wrapper/vtable seam was kept in `src/launcher_network_object_abi.cpp`
   - source-level `RunCompletedOperationQueue(bool)` can therefore model the current best consumer ordering against either:
     - the live launcher-visible queue storage when attached, or
     - the class-owned fallback queue surrogates when not attached
@@ -1821,7 +1824,8 @@ source-owned surrogates for the missing object-facing surfaces:
 - mirrored count state for:
   - `+0x84`
   - `+0x90`
-- a new launcher-ABI attachment map so the class can use live shell queue/lock/event addresses when
+- launcher-side helper/vtable seam kept in `src/launcher_network_object_abi.cpp` so the class does
+  not own detached shell attachment bookkeeping when
   present, while still owning the conceptual engine-side state model
 
 That means the target class is now the canonical owner of:

@@ -1,6 +1,5 @@
 #include "ltthreadperclienttcpengine.h"
 
-#include "../../../../src/launcher_network_object_abi.h"
 #include "../libltmessaging/messageconnection.h"
 #include "../libltnet/sys/pc/pcsocket.h"
 #include <spdlog/spdlog.h>
@@ -130,33 +129,10 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking {
     std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry>> entries;
 };
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_SingleLauncherAbiAttachment {
-    CLTThreadPerClientTCPEngine_0x4b2768* engine = nullptr;
-    CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment attachment = {};
-};
-
-static CLTThreadPerClientTCPEngine_0x4b2768_SingleLauncherAbiAttachment
-    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment;
 static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking>
     g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings;
 static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking>
     g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings;
-
-static CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment* FindEngineLauncherAbiAttachment(
-    const CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    if (!self) {
-        return nullptr;
-    }
-    return (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == self)
-        ? &g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment
-        : nullptr;
-}
-
-static CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& EnsureEngineLauncherAbiAttachment(
-    CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = self;
-    return g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment;
-}
 
 static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorageScaffold(
     CLTThreadPerClientTCPEngine_0x4b2768* self) {
@@ -585,10 +561,6 @@ static bool ContextTreeEraseNode(
 }
 
 static void EraseEngineBackings(CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == self) {
-        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = nullptr;
-        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment = {};
-    }
     g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings.erase(self);
     g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings.erase(self);
 }
@@ -2076,7 +2048,6 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
 // vtable: launcher.exe:0x004b2768
 // NOTE: starter C++ destructor only models local sidecar cleanup, not the full original dtor body.
 CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
-    DetachLauncherAbiSurfaceScaffold();
     StopQueueThreads();
 
     if (CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking =
@@ -2763,20 +2734,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
         InitializeContextTreeHead18(ownedContextTreeHead8C_);
     }
     return result;
-}
-
-// UNANCHORED: launcher ABI-shell attachment entrypoint.
-void CLTThreadPerClientTCPEngine_0x4b2768::AttachLauncherAbiSurfaceScaffold(
-    const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment) {
-    EnsureEngineLauncherAbiAttachment(this) = attachment;
-}
-
-// UNANCHORED: launcher ABI-shell detach/reset helper.
-void CLTThreadPerClientTCPEngine_0x4b2768::DetachLauncherAbiSurfaceScaffold() {
-    if (g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine == this) {
-        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.engine = nullptr;
-        g_CLTThreadPerClientTCPEngine_0x4b2768LauncherAbiAttachment.attachment = {};
-    }
 }
 
 // anchor: launcher.exe:0x435f90

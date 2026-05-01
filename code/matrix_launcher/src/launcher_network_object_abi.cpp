@@ -10,7 +10,6 @@
 using LauncherObjectQueuePair = mxo::liblttcp::CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610;
 using LauncherObjectListHead24 = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24;
 using LauncherObjectListHead18 = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18;
-using LauncherObjectAbiAttachment = mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment;
 
 struct LauncherObjectLockHelper {
     void** vtable;          // +0x00
@@ -227,10 +226,6 @@ static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
         return;
     }
 
-    if (binding.Engine()) {
-        binding.Engine()->DetachLauncherAbiSurfaceScaffold();
-    }
-
     // Current fidelity correction from the latest queue/worker/context RE pass:
     // - original engine evidence stays connection-centric (`0x431ff0`, `0x4316a0`, `0x436820`,
     //   `0x436b10`, `0x449d40`)
@@ -285,10 +280,6 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
     if (!engine) {
         return NULL;
     }
-
-    LauncherObjectAbiAttachment attachment = {};
-    attachment.launcherObjectShell = owner;
-    engine->AttachLauncherAbiSurfaceScaffold(attachment);
 
     return engine;
 #endif
