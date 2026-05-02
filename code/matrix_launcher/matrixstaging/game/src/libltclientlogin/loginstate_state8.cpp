@@ -51,6 +51,32 @@ private:
     uint32_t& bits_;
 };
 
+// anchor: launcher.exe:0x43f8c0
+static void CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect(
+    const Packet_MsLoadCharacterReply_0x4b542c& parsedReplySectionEnvelope,
+    CLTLoginMediatorCharacterPersistenceData_0x41d900& persistence,
+    std::string& section11String1460) {
+    if (parsedReplySectionEnvelope.sectionByteCount > 4u) {
+        persistence.section11Dword540 = ReadU32LE(parsedReplySectionEnvelope.sectionData);
+        section11String1460.assign(
+            reinterpret_cast<const char*>(parsedReplySectionEnvelope.sectionData + 4u),
+            reinterpret_cast<const char*>(parsedReplySectionEnvelope.sectionData + parsedReplySectionEnvelope.sectionByteCount));
+    } else {
+        persistence.section11Dword540 = 0u;
+        if (!section11String1460.empty()) {
+            section11String1460[0] = '\0';
+            section11String1460.resize(0u);
+        } else {
+            section11String1460.clear();
+        }
+    }
+
+    char* const section11Begin = section11String1460.data();
+    persistence.section11StringBegin544 = section11Begin;
+    persistence.section11StringCurrent548 = section11Begin + section11String1460.size();
+    persistence.section11StringCapacity54c = section11Begin + section11String1460.capacity();
+}
+
 }  // namespace
 
 // anchor: launcher.exe vtable 0x4b5104
@@ -777,31 +803,22 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             g_CurrentLoginMediator->state8PersistenceDataF1c.section0aPresentFlag53e = 1u;
             break;
         case 11u:
-            // anchor: launcher.exe:0x43f8c0 = CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect
-            // Exact helper behavior:
-            // - if byteCount > 4, store leading dword and assign range [data+4, data+byteCount)
-            // - else zero dword and, if the current string is non-empty, write a terminating NUL at
-            //   begin and collapse current back to begin
-            g_CurrentLoginMediator->state8Section11Dword145c = 0u;
-            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount > 4u) {
-                g_CurrentLoginMediator->state8Section11Dword145c = ReadU32LE(loadCharacterReplyEnvelope.sectionData);
+            // anchor: launcher.exe:0x43f8c0
+            CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect(
+                loadCharacterReplyEnvelope,
+                g_CurrentLoginMediator->state8PersistenceDataF1c,
+                g_CurrentLoginMediator->state8Section11String1460);
+            g_CurrentLoginMediator->state8Section11Dword145c =
+                g_CurrentLoginMediator->state8PersistenceDataF1c.section11Dword540;
+            if (g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringBegin544 != nullptr &&
+                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCurrent548 != nullptr &&
+                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCurrent548 >=
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringBegin544) {
                 g_CurrentLoginMediator->state8Section11String1460.assign(
-                    reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + 4u),
-                    reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + loadCharacterReplyEnvelope.sectionByteCount));
-            } else if (!g_CurrentLoginMediator->state8Section11String1460.empty()) {
-                g_CurrentLoginMediator->state8Section11String1460[0] = '\0';
-                g_CurrentLoginMediator->state8Section11String1460.resize(0u);
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringBegin544,
+                    g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCurrent548);
             } else {
                 g_CurrentLoginMediator->state8Section11String1460.clear();
-            }
-            g_CurrentLoginMediator->state8PersistenceDataF1c.section11Dword540 = g_CurrentLoginMediator->state8Section11Dword145c;
-            {
-                char* const section11Begin = g_CurrentLoginMediator->state8Section11String1460.data();
-                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringBegin544 = section11Begin;
-                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCurrent548 =
-                    section11Begin + g_CurrentLoginMediator->state8Section11String1460.size();
-                g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCapacity54c =
-                    section11Begin + g_CurrentLoginMediator->state8Section11String1460.capacity();
             }
             spdlog::info(
                 "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage applied section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
