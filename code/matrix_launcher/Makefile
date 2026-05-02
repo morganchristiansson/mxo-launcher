@@ -5,7 +5,7 @@
 
 CMAKE ?= cmake
 GENERATOR ?= Ninja
-TOOLCHAIN_FILE ?= cmake/toolchains/i686-windows-gnu-gcc.cmake
+TOOLCHAIN_FILE ?= cmake/toolchains/i686-windows-msvc-clang.cmake
 TOOLCHAIN_FILE_NAME := $(notdir $(basename $(TOOLCHAIN_FILE)))
 ifeq ($(TOOLCHAIN_FILE_NAME),i686-windows-msvc-clang)
 TOOLCHAIN_TAG ?= msvc-clang
@@ -44,13 +44,13 @@ CMAKE_CONFIGURE = $(CMAKE) -S . -B $(BUILD_DIR) -G "$(GENERATOR)" \
 
 all: $(TARGET)
 
-$(BUILD_DIR)/build.ninja:
+configure:
 	$(CMAKE_CONFIGURE)
 
-$(TARGET): $(BUILD_DIR)/build.ninja
+$(TARGET): configure
 	$(CMAKE) --build $(BUILD_DIR) --target resurrections
 
-$(CRASHREPORTER_STUB): $(BUILD_DIR)/build.ninja
+$(CRASHREPORTER_STUB): configure
 	$(CMAKE) --build $(BUILD_DIR) --target crashreporter_stub
 
 run: $(TARGET)
@@ -83,8 +83,6 @@ release:
 
 full_debug:
 	@$(MAKE) BUILD_PROFILE=debug DEBUG_LEVEL=full all
-
-configure: $(BUILD_DIR)/build.ninja
 
 clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
