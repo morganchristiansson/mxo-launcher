@@ -7,6 +7,7 @@ CMAKE ?= cmake
 GENERATOR ?= Ninja
 TOOLCHAIN_FILE ?= cmake/toolchains/i686-windows-gnu-gcc.cmake
 TOOLCHAIN_TAG ?= $(notdir $(basename $(TOOLCHAIN_FILE)))
+MXO_MSVC_SYSROOT ?= $(if $(wildcard third_party/xwin),$(CURDIR)/third_party/xwin,$(HOME)/.xwin)
 GAME_DIR = ~/MxO_7.6005
 BUILD_ROOT = build
 BUILD_PROFILE ?= debug
@@ -23,6 +24,7 @@ LAUNCHER_ARGS = -nopatch -noeula $(if $(MXO_SERVER),-server $(MXO_SERVER)) $(if 
 
 CMAKE_CONFIGURE = $(CMAKE) -S . -B $(BUILD_DIR) -G "$(GENERATOR)" \
 	-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE) \
+	-DMXO_MSVC_SYSROOT=$(MXO_MSVC_SYSROOT) \
 	-DMXO_BUILD_PROFILE=$(BUILD_PROFILE) \
 	-DMXO_GAME_DIR=$(GAME_DIR) \
 	-DMXO_DEPLOY_TO_GAME_DIR=$(if $(filter 0,$(MXO_DEPLOY_TO_GAME_DIR)),OFF,ON) \

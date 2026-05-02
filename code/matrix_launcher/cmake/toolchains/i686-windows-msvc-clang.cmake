@@ -10,7 +10,10 @@ set(CMAKE_CXX_COMPILER_TARGET i686-pc-windows-msvc)
 set(CMAKE_RC_COMPILER llvm-rc)
 
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MXO_MSVC_SYSROOT)
-set(MXO_MSVC_SYSROOT "$ENV{MXO_MSVC_SYSROOT}" CACHE PATH "Path to xwin-extracted Windows SDK + MSVC CRT sysroot")
+set(MXO_MSVC_SYSROOT "" CACHE PATH "Path to xwin-extracted Windows SDK + MSVC CRT sysroot")
+if(NOT MXO_MSVC_SYSROOT)
+    set(MXO_MSVC_SYSROOT "$ENV{MXO_MSVC_SYSROOT}" CACHE PATH "Path to xwin-extracted Windows SDK + MSVC CRT sysroot" FORCE)
+endif()
 if(NOT MXO_MSVC_SYSROOT)
     message(FATAL_ERROR
         "MXO_MSVC_SYSROOT is not set.\n"
