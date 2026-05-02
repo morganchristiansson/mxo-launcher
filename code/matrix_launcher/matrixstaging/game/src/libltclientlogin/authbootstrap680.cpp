@@ -1372,66 +1372,9 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 // - `0x4441a0(0x20)` writes the fixed little-endian word 0x0020
                 // - `0x443660(0x20 - (payloadLen & 0x0f))` appends zero padding
                 // So the old source-owned `AuthChallengeResponseLayout` knob bag was an infidel.
-                static constexpr uint8_t kAuthChallengeResponseLeadingByte = 0x00;
-                static constexpr uint16_t kAuthChallengeResponseUnknown1 = 23;
-                static constexpr uint8_t kAuthChallengeResponsePaddingByte = 0x00;
-
-                std::vector<uint8_t> passwordBytes(password, password + std::strlen(password));
-                passwordBytes.push_back(0u);
-                std::vector<uint8_t> soePasswordBytes(
-                    soePassword,
-                    soePassword + std::strlen(soePassword));
-                soePasswordBytes.push_back(0u);
-                if (passwordBytes.size() > 0xffffu || soePasswordBytes.size() > 0xffffu) {
-                    spdlog::error("launcher-owned auth rejected oversized raw0x0a password field");
-                    return kAuthBootstrap680InboundUnhandled;
-                }
-
-                const uint16_t passwordLengthField = static_cast<uint16_t>(passwordBytes.size());
-                const uint16_t soePasswordLengthField = static_cast<uint16_t>(soePasswordBytes.size());
                 if (feedbackTransformSmall98 == nullptr) {
                     spdlog::error(
                         "launcher-owned auth missing child+0x98 small feedback transform for AS_AuthChallenge response path");
-                    return kAuthBootstrap680InboundUnhandled;
-                }
-
-                const size_t plaintextSizeWithoutPadding =
-                    1u +
-                    processedChallengeMd5Bytes.size() +
-                    2u + 2u + 2u +
-                    2u + passwordBytes.size() +
-                    2u + soePasswordBytes.size() +
-                    2u;
-                const uint16_t paddingLengthField =
-                    static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
-
-                plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
-                plaintextBytes.push_back(kAuthChallengeResponseLeadingByte);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    processedChallengeMd5Bytes.begin(),
-                    processedChallengeMd5Bytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, kAuthChallengeResponseUnknown1);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    passwordBytes.begin(),
-                    passwordBytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    soePasswordBytes.begin(),
-                    soePasswordBytes.end());
-                mxo::auth::internal::AppendU16LE(&plaintextBytes, paddingLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    paddingLengthField,
-                    kAuthChallengeResponsePaddingByte);
-
-                if ((plaintextBytes.size() % 16u) != 0u) {
-                    spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
                     return kAuthBootstrap680InboundUnhandled;
                 }
 
@@ -1449,14 +1392,81 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextPacket.AppendPassword(soePassword);
                 plaintextPacket.ReserveFieldLength(0x20u);
 
-                const size_t plaintextLen = plaintextBytes.size();
+                // anchor: launcher.exe:0x443ea0 / 0x443fa0 / 0x4440a0 / 0x4441a0 / 0x443660
+                // Keep the final flattened plaintext explicit for now, but derive it from the
+                // recovered `0x4b6cf4` builder object instead of re-stating launcher-owned field
+                // lengths from scratch. Static RE already proves:
+                // - leading word `0x0017` is the builder's fixed header byte count
+                // - the first/second string lengths come from inherited `+0x18` / `+0x20`
+                // - the third field length is the builder-local `+0x28` word rewritten by
+                //   `0x443660`
+                static constexpr uint8_t kAuthChallengeResponseLeadingByte = 0x00;
+                static constexpr uint16_t kAuthChallengeResponseBuilderFixedByteCount = 0x17u;
+                static constexpr uint8_t kAuthChallengeResponsePaddingByte = 0x00;
+
+                const uint16_t passwordLengthField = plaintextPacket.payloadSize18;
+                const uint16_t soePasswordLengthField = plaintextPacket.characterIdHigh20;
+                const size_t plaintextSizeWithoutPadding =
+                    1u +
+                    processedChallengeMd5Bytes.size() +
+                    2u + 2u + 2u +
+                    2u + static_cast<size_t>(passwordLengthField) +
+                    2u + static_cast<size_t>(soePasswordLengthField) +
+                    2u;
+                const uint16_t paddingBytes =
+                    static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
                 // anchor: launcher.exe:0x4483ce
                 // The launcher computes `0x20 - (len & 0x0f)` directly and forwards that raw
                 // value to `Packet_AsAuthChallengeResponse_0x4b6cf4::SetPadding`, even when the
                 // low nibble is already zero.
-                const uint16_t paddingBytes =
-                    static_cast<uint16_t>(0x20u - (plaintextLen & 0x0fu));
                 plaintextPacket.SetPadding(paddingBytes);
+
+                const uint16_t paddingLengthField = plaintextPacket.reservedFieldByteCount28;
+                const uint8_t* const passwordFieldBytes = reinterpret_cast<const uint8_t*>(
+                    plaintextPacket.debugString14);
+                const uint8_t* const soePasswordFieldBytes = reinterpret_cast<const uint8_t*>(
+                    static_cast<uintptr_t>(plaintextPacket.characterIdLow1c));
+                if ((passwordLengthField != 0u && passwordFieldBytes == nullptr) ||
+                    (soePasswordLengthField != 0u && soePasswordFieldBytes == nullptr)) {
+                    spdlog::error(
+                        "launcher-owned auth lost recovered raw0x0a builder field storage while flattening plaintext");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
+                plaintextBytes.push_back(kAuthChallengeResponseLeadingByte);
+                plaintextBytes.insert(
+                    plaintextBytes.end(),
+                    processedChallengeMd5Bytes.begin(),
+                    processedChallengeMd5Bytes.end());
+                mxo::auth::internal::AppendU16LE(
+                    &plaintextBytes, kAuthChallengeResponseBuilderFixedByteCount);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, passwordLengthField);
+                if (passwordLengthField != 0u) {
+                    plaintextBytes.insert(
+                        plaintextBytes.end(),
+                        passwordFieldBytes,
+                        passwordFieldBytes + passwordLengthField);
+                }
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, soePasswordLengthField);
+                if (soePasswordLengthField != 0u) {
+                    plaintextBytes.insert(
+                        plaintextBytes.end(),
+                        soePasswordFieldBytes,
+                        soePasswordFieldBytes + soePasswordLengthField);
+                }
+                mxo::auth::internal::AppendU16LE(&plaintextBytes, paddingLengthField);
+                plaintextBytes.insert(
+                    plaintextBytes.end(),
+                    paddingLengthField,
+                    kAuthChallengeResponsePaddingByte);
+
+                if ((plaintextBytes.size() % 16u) != 0u) {
+                    spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
 
                 const uint8_t* const plaintextBuilderPayloadBytes =
                     plaintextPacket.messageRef08 && plaintextPacket.messageRef08->messageStorage0c
