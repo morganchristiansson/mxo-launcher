@@ -163,8 +163,56 @@ static void** LauncherObjectSubVtable5C();
 static void** LauncherObjectSubVtable60();
 static void** LauncherObjectSubVtable98();
 
+static void* g_BaseConnectionQueueContextVtable[
+    mxo::liblttcp::CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex + 1] = {
+    nullptr, nullptr, nullptr, nullptr, nullptr};
+
+static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
+    mxo::liblttcp::CBaseConnection_QueueContextScaffold* /*self*/) {
+    return 1u;
+}
+
+static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffold(
+    mxo::liblttcp::CBaseConnection_QueueContextScaffold* self,
+    void* workItem) {
+    return (self && self->owner) ? self->owner->OnOperationCompleted(workItem) : 0u;
+}
+
+static void EnsureBaseConnectionQueueContextVtableInitialized() {
+    if (!g_BaseConnectionQueueContextVtable[
+            mxo::liblttcp::CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]) {
+        g_BaseConnectionQueueContextVtable[
+            mxo::liblttcp::CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] =
+            reinterpret_cast<void*>(BaseConnectionQueueContext_ReleaseScaffold);
+        g_BaseConnectionQueueContextVtable[
+            mxo::liblttcp::CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] =
+            reinterpret_cast<void*>(BaseConnectionQueueContext_OnOperationCompletedScaffold);
+    }
+}
+
+void mxo::liblttcp::InitializeBaseConnectionQueueContextScaffold(
+    CBaseConnection_QueueContextScaffold* queueContext,
+    CBaseConnection_0x4b8018* owner,
+    uint8_t autoReleaseFlag) {
+    if (!queueContext) {
+        return;
+    }
+    EnsureBaseConnectionQueueContextVtableInitialized();
+    queueContext->vtable = g_BaseConnectionQueueContextVtable;
+    queueContext->autoReleaseFlag = autoReleaseFlag;
+    queueContext->padding05[0] = 0u;
+    queueContext->padding05[1] = 0u;
+    queueContext->padding05[2] = 0u;
+    queueContext->owner = owner;
+}
+
 mxo::liblttcp::CBaseConnection_0x4b8018* mxo::liblttcp::CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext) {
-    return static_cast<CBaseConnection_0x4b8018*>(maybeQueueContext);
+    auto* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
+    if (!queueContext || queueContext->vtable != g_BaseConnectionQueueContextVtable) {
+        return nullptr;
+    }
+    return queueContext->owner;
 }
 
 #if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
