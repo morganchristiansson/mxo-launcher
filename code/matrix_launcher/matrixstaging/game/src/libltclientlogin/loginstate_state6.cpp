@@ -276,7 +276,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     // anchor: launcher.exe:0x44079e..0x440a30 - opcode 7 MS_ConnectChallenge handling
     // The original builds and sends a challenge response packet (opcode 0x08)
 
-    if (payloadByteCount < 0x0du) {
+    if (payloadByteCount < 0x11u) {
       spdlog::info(
         "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 payload too short={}",
         static_cast<unsigned>(payloadByteCount));
@@ -286,12 +286,14 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     const uint32_t goHereAddr = ReadU32LE(payloadBytes + 0x01u);
     const uint32_t goHerePort = ReadU32LE(payloadBytes + 0x05u);
     const uint32_t sessionSecret = ReadU32LE(payloadBytes + 0x09u);
+    const uint32_t nextHelperStateOrRouteWord0d = ReadU32LE(payloadBytes + 0x0du);
 
     spdlog::info(
-      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x}; mirroring original challenge-response flow",
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage opcode-0x07 goHereAddr=0x{:08x} goHerePort=0x{:08x} sessionSecret=0x{:08x} trailingWord0d=0x{:08x}; mirroring original challenge-response flow",
       static_cast<unsigned>(goHereAddr),
       static_cast<unsigned>(goHerePort),
-      static_cast<unsigned>(sessionSecret));
+      static_cast<unsigned>(sessionSecret),
+      static_cast<unsigned>(nextHelperStateOrRouteWord0d));
 
     // anchor: launcher.exe:0x43d800 = GenerateClientChunkHashes
     // State6 Slot6 generates client.dll chunk hashes on MS_ConnectChallenge
@@ -340,7 +342,7 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
           goHereAddr,
           goHerePort,
           sessionSecret,
-          0u,
+          nextHelperStateOrRouteWord0d,
       };
       sha1.Update(reinterpret_cast<const uint8_t*>(replyWords.data()), sizeof(replyWords));
       for (const ChunkHashResult& chunkHash : hashes) {
