@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.28)
 
 project(matrix_launcher LANGUAGES CXX)
 
+# Prefer the non-debug MSVC CRT even for Debug builds on Linux-hosted clang/lld setups.
+# The xwin payload we use does not necessarily ship the debug CRT import libraries.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+
 set(MXO_GAME_DIR "$ENV{HOME}/MxO_7.6005" CACHE PATH "Matrix Online game directory")
 set(MXO_BUILD_PROFILE "debug" CACHE STRING "Compatibility profile label used in output paths")
 set_property(CACHE MXO_BUILD_PROFILE PROPERTY STRINGS debug release)
@@ -86,7 +90,11 @@ list(FILTER MXO_CRYPTOPP_SOURCES EXCLUDE REGEX "/(adhoc|bench|bench[1-3]|benchma
 
 add_library(cryptopp STATIC ${MXO_CRYPTOPP_SOURCES})
 target_include_directories(cryptopp PUBLIC third_party/cryptopp890)
-target_compile_definitions(cryptopp PUBLIC CRYPTOPP_DISABLE_ASM=1)
+target_compile_definitions(cryptopp PUBLIC
+    CRYPTOPP_DISABLE_ASM=1
+    _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    _CRT_SECURE_NO_WARNINGS
+)
 target_compile_features(cryptopp PUBLIC cxx_std_17)
 set_target_properties(cryptopp PROPERTIES OUTPUT_NAME cryptopp)
 
@@ -98,11 +106,17 @@ target_include_directories(resurrections PRIVATE
 )
 target_link_libraries(resurrections PRIVATE cryptopp version ws2_32)
 target_compile_definitions(resurrections PRIVATE
+    _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    _CRT_SECURE_NO_WARNINGS
     $<$<BOOL:${MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR}>:MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR>
 )
 
 add_executable(crashreporter_stub WIN32 tools/crashreporter_stub.cpp)
 target_compile_features(crashreporter_stub PRIVATE cxx_std_17)
+target_compile_definitions(crashreporter_stub PRIVATE
+    _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    _CRT_SECURE_NO_WARNINGS
+)
 set_target_properties(crashreporter_stub PROPERTIES OUTPUT_NAME crashreporter.stub)
 
 set(MXO_COMMON_WARNINGS -Wall -Wextra)
