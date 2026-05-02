@@ -99,12 +99,13 @@ add_library(cryptopp STATIC ${MXO_CRYPTOPP_SOURCES})
 target_include_directories(cryptopp PUBLIC third_party/cryptopp890)
 target_compile_options(cryptopp PUBLIC
     $<$<AND:$<CXX_COMPILER_ID:Clang>,$<BOOL:${MINGW}>>:-include${CMAKE_SOURCE_DIR}/compat/cryptopp_clang_gnu/preinclude_config_ver.h>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:-include${CMAKE_SOURCE_DIR}/compat/cryptopp_clang_msvc/preinclude_config_ver.h>
 )
 target_compile_definitions(cryptopp PUBLIC
     CRYPTOPP_DISABLE_ASM=1
-    $<$<BOOL:${MSVC}>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
-    $<$<BOOL:${MSVC}>:_CRT_SECURE_NO_WARNINGS>
-    $<$<BOOL:${MSVC}>:_CRT_USE_BUILTIN_OFFSETOF>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
 )
 target_compile_features(cryptopp PUBLIC cxx_std_17)
 set_target_properties(cryptopp PROPERTIES OUTPUT_NAME cryptopp)
@@ -122,18 +123,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MINGW)
     target_link_libraries(resurrections PRIVATE winpthread)
 endif()
 target_compile_definitions(resurrections PRIVATE
-    $<$<BOOL:${MSVC}>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
-    $<$<BOOL:${MSVC}>:_CRT_SECURE_NO_WARNINGS>
-    $<$<BOOL:${MSVC}>:_CRT_USE_BUILTIN_OFFSETOF>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
     $<$<BOOL:${MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR}>:MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR>
 )
 
 add_executable(crashreporter_stub WIN32 tools/crashreporter_stub.cpp)
 target_compile_features(crashreporter_stub PRIVATE cxx_std_17)
 target_compile_definitions(crashreporter_stub PRIVATE
-    $<$<BOOL:${MSVC}>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
-    $<$<BOOL:${MSVC}>:_CRT_SECURE_NO_WARNINGS>
-    $<$<BOOL:${MSVC}>:_CRT_USE_BUILTIN_OFFSETOF>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
 )
 set_target_properties(crashreporter_stub PROPERTIES OUTPUT_NAME crashreporter.stub)
 
@@ -162,8 +163,8 @@ endif()
 
 target_compile_options(resurrections PRIVATE
     ${MXO_COMMON_COMPILE_OPTIONS}
-    $<$<BOOL:${MSVC}>:-idirafter${MXO_MINGW_LIBSTDCXX_ROOT}>
-    $<$<BOOL:${MSVC}>:-idirafter${MXO_MINGW_LIBSTDCXX_TARGET_ROOT}>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:-idirafter${MXO_MINGW_LIBSTDCXX_ROOT}>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:-idirafter${MXO_MINGW_LIBSTDCXX_TARGET_ROOT}>
 )
 target_compile_options(crashreporter_stub PRIVATE -Wall -Wextra -O2)
 

@@ -1,5 +1,7 @@
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86)
+set(MXO_CLANG_MSVC_ABI ON CACHE INTERNAL
+    "True when building with the experimental Clang frontend targeting the MSVC ABI")
 
 set(CMAKE_C_COMPILER clang)
 set(CMAKE_CXX_COMPILER clang++)
