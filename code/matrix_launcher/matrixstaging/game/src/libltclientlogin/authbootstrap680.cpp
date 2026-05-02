@@ -178,26 +178,6 @@ static void GenerateAuthBootstrap680Field54SeedBytes(
     helper.nextBufferedOutputByte28 = outputStart + static_cast<uint32_t>(outSeed.size());
 }
 
-static void GenerateAuthBootstrap680Field54FillBytes(
-    AuthBootstrap680Field54HelperSketch& helper,
-    uint8_t* outBytes,
-    size_t byteCount) {
-    if (outBytes == nullptr || byteCount == 0u) {
-        return;
-    }
-
-    // anchor: launcher.exe:0x4483ea..0x4483f9 / helper vtable +0x18 -> 0x437270
-    // The raw0x0a path dispatches through the launcher helper's byte-fill slot, which loops over
-    // the RandomPool family's GenerateByte-like slot (`+0x0c -> 0x468d30`). Model that with the
-    // real embedded Crypto++ pool directly rather than source-owned fake padding bytes.
-    mxo::liblttcp::EnsureCryptoContextInitialized();
-    mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().GenerateBlock(
-        outBytes, byteCount);
-
-    helper.bufferedStreamState24 = 0u;
-    helper.nextBufferedOutputByte28 = static_cast<uint32_t>(byteCount);
-}
-
 constexpr uint16_t kAuthBootstrap680Raw08PlaintextFixedByteCount = 0x1bu;
 constexpr uint16_t kAuthBootstrap680Raw08RequestFixedByteCount = 0x28u;
 
@@ -1457,10 +1437,19 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 }
 
                 if (paddingLengthField != 0u) {
-                    GenerateAuthBootstrap680Field54FillBytes(
-                        feedbackSeedHelper54,
+                    // anchor: launcher.exe:0x4483ea..0x4483f9 / child+0x54 helper vtable +0x18
+                    // Keep this inlined inside the recovered raw0x0a body: the launcher does not
+                    // split a separate free helper here. That helper slot loops over the embedded
+                    // RandomPool family's GenerateByte path (`+0x0c -> 0x468d30`). Source uses the
+                    // real pool directly to materialize the same random tail bytes into the third
+                    // builder field.
+                    mxo::liblttcp::EnsureCryptoContextInitialized();
+                    mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().GenerateBlock(
                         paddingFieldBytes,
                         paddingLengthField);
+                    feedbackSeedHelper54.bufferedStreamState24 = 0u;
+                    feedbackSeedHelper54.nextBufferedOutputByte28 =
+                        static_cast<uint32_t>(paddingLengthField);
                 }
 
                 plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
