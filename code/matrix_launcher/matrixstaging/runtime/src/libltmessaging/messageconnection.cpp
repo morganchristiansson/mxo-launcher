@@ -98,8 +98,12 @@ static bool CPacketEncryptor_EncryptPayloadScaffold(
     uint8_t ivBytes[16] = {0};
     std::vector<uint8_t> ciphertextBytes;
     try {
-        CryptoPP::AutoSeededRandomPool rng;
-        rng.GenerateBlock(ivBytes, sizeof(ivBytes));
+        // anchor: launcher.exe:0x4429b0 / 0x468640 / 0x468c30
+        // Prefer the recovered global Crypto++ RandomPool family over a source-owned transient
+        // AutoSeededRandomPool whenever the caller only needs launcher-style random bytes.
+        EnsureCryptoContextInitialized();
+        g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().GenerateBlock(
+            ivBytes, sizeof(ivBytes));
 
         CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
         feedbackTransform.SetKeyWithIV(seedBytes.data(), seedBytes.size(), ivBytes);
