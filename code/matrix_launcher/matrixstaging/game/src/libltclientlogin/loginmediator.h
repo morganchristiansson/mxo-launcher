@@ -78,7 +78,8 @@ struct LoginObserverTree674 {
 //   - `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`
 //   - `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
 // - current best read: this object owns the launcher-side auth/margin connection flow,
-//   while `ILTLoginMediator_0x4af2b8.Default` remains the runtime interface slot passed into client.dll
+//   while runtime arg6 slot `0x4d2c58` (`g_pILTLoginMediatorDefault` in Ghidra) is just the
+//   wrapper-facing interface pointer passed into client.dll for the same concrete object family
 // - discovered helper dispatch structure from Ghidra analysis of 0x43b300:
 //   - `CLTLoginMediator_InitializeHelperDispatchTable` allocates / installs the mediator-owned
 //     `CLTLoginState_*` dispatch objects
@@ -906,11 +907,11 @@ public:
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
-    // Keep the instance-role split explicit in source:
-    // - the wrapper-facing `ILTLoginMediator_0x4af2b8.Default` mirror should capture the source block even
-    //   when it is not the live owner/controller instance
-    // - the live owner/controller still applies the real `0x41c3c0` state gate and helper-state
-    //   transition to `10`
+    // Fidelity split:
+    // - launcher.exe keeps the real owner work in `0x41c3c0`
+    // - this wrapper-facing source helper only preserves the client-fed block when we are not
+    //   dispatching owner semantics on the live `g_CurrentLoginMediator`
+    // - owner semantics still burrow straight down into the anchored `0x41c3c0` body
     uint32_t CaptureCreateCharacterInputSlot120(
         const void* input120,
         void* returnAddress,
@@ -983,7 +984,6 @@ public:
     void PrepareState5MarginConnectionCopySend();
 
 private:
-    void MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input);
     void PersistCharactersIniFromRecoveredAuthStateScaffold() const;
 
     void InitializeObserverTree674();

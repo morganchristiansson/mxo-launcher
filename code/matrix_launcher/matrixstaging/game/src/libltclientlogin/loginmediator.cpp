@@ -1529,7 +1529,21 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
         return 4u;
     }
 
-    MirrorCreateCharacterInput120SourceBlock(input);
+    auto& createCharacterData = createCharacterData108;
+    std::copy(input.string00.begin(), input.string00.end(), createCharacterData.characterName00.begin());
+    createCharacterData.selectedWorldField24 = input.field24;
+
+    std::copy(input.dwords2c.begin(), input.dwords2c.end(), createCharacterData.header2c.begin());
+    std::copy(input.dwords4c.begin(), input.dwords4c.end(), createCharacterData.secondary4c.begin());
+    createCharacterData.bodyWord6c =
+        static_cast<uint32_t>(input.bytes6c[0]) |
+        (static_cast<uint32_t>(input.bytes6c[1]) << 8) |
+        (static_cast<uint32_t>(input.bytes6c[2]) << 16) |
+        (static_cast<uint32_t>(input.bytes6c[3]) << 24);
+
+    std::copy(input.string70.begin(), input.string70.end(), createCharacterData.realFirstName70.begin());
+    std::copy(input.string90.begin(), input.string90.end(), createCharacterData.realLastName90.begin());
+    std::copy(input.stringB0.begin(), input.stringB0.end(), createCharacterData.backgroundB0.begin());
 
     const CLTLoginState* const oldState = currentState_;
     uint32_t state10EntryResult = 0u;
@@ -1949,25 +1963,6 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input) {
-    auto& createCharacterData = createCharacterData108;
-    std::copy(input.string00.begin(), input.string00.end(), createCharacterData.characterName00.begin());
-    createCharacterData.selectedWorldField24 = input.field24;
-
-    std::copy(input.dwords2c.begin(), input.dwords2c.end(), createCharacterData.header2c.begin());
-    std::copy(input.dwords4c.begin(), input.dwords4c.end(), createCharacterData.secondary4c.begin());
-    createCharacterData.bodyWord6c =
-        static_cast<uint32_t>(input.bytes6c[0]) |
-        (static_cast<uint32_t>(input.bytes6c[1]) << 8) |
-        (static_cast<uint32_t>(input.bytes6c[2]) << 16) |
-        (static_cast<uint32_t>(input.bytes6c[3]) << 24);
-
-    std::copy(input.string70.begin(), input.string70.end(), createCharacterData.realFirstName70.begin());
-    std::copy(input.string90.begin(), input.string90.end(), createCharacterData.realLastName90.begin());
-    std::copy(input.stringB0.begin(), input.stringB0.end(), createCharacterData.backgroundB0.begin());
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
     const void* input120,
     void* returnAddress,
@@ -1982,7 +1977,26 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
 
     const auto& input = *static_cast<const ProcessCreateCharacterInput120Sketch*>(input120);
     if (!applyOwnerSemantics) {
-        MirrorCreateCharacterInput120SourceBlock(input);
+        // Source-only wrapper preservation path:
+        // - launcher.exe has no separate `MirrorCreateCharacterInput120SourceBlock` helper
+        // - keep the copy logic here instead of inventing another callable body
+        // - owner semantics still burrow straight down into the anchored `0x41c3c0` body below
+        auto& createCharacterData = createCharacterData108;
+        std::copy(input.string00.begin(), input.string00.end(), createCharacterData.characterName00.begin());
+        createCharacterData.selectedWorldField24 = input.field24;
+
+        std::copy(input.dwords2c.begin(), input.dwords2c.end(), createCharacterData.header2c.begin());
+        std::copy(input.dwords4c.begin(), input.dwords4c.end(), createCharacterData.secondary4c.begin());
+        createCharacterData.bodyWord6c =
+            static_cast<uint32_t>(input.bytes6c[0]) |
+            (static_cast<uint32_t>(input.bytes6c[1]) << 8) |
+            (static_cast<uint32_t>(input.bytes6c[2]) << 16) |
+            (static_cast<uint32_t>(input.bytes6c[3]) << 24);
+
+        std::copy(input.string70.begin(), input.string70.end(), createCharacterData.realFirstName70.begin());
+        std::copy(input.string90.begin(), input.string90.end(), createCharacterData.realLastName90.begin());
+        std::copy(input.stringB0.begin(), input.stringB0.end(), createCharacterData.backgroundB0.begin());
+
         spdlog::info(
             "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 mirror-only input={} caller={} field12c=0x{:08x} name='{}')",
             fmt::ptr(input120),
@@ -2263,7 +2277,10 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
 }
 
 
-// ILTLoginMediator_0x4af2b8::Default - static member initialization (original: launcher.exe:0x4d2c58)
-ILTLoginMediator_0x4af2b8* ILTLoginMediator_0x4af2b8::Default = new mxo::ltlogin::CLTLoginMediator();
+// Historical source compatibility alias: old call sites still spell the wrapper-facing runtime
+// object as `ILTLoginMediator_0x4af2b8::Default`, but the live controller is just
+// `g_CurrentLoginMediator`.
+ILTLoginMediator_0x4af2b8*& ILTLoginMediator_0x4af2b8::Default =
+    reinterpret_cast<ILTLoginMediator_0x4af2b8*&>(g_CurrentLoginMediator);
 
 } // namespace mxo::ltlogin

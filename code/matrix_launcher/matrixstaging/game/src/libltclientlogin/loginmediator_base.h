@@ -405,8 +405,11 @@ struct ProcessCreateCharacterInput120Sketch {
 // ILTLoginMediator_0x4af2b8 - current source-owned arg6 surface
 // =============================================================================
 // Important fidelity note:
-// - this header models the launcher-resolved `ILTLoginMediator_0x4af2b8.Default` surface consumed through
-//   the runtime pointer slot at `0x4d2c58`
+// - this header models the launcher-resolved arg6 surface consumed through runtime pointer slot
+//   `0x4d2c58` (`g_pILTLoginMediatorDefault` in Ghidra)
+// - current source keeps the historical `ILTLoginMediator_0x4af2b8::Default` spell only as a
+//   compatibility alias onto `g_CurrentLoginMediator`; there is no separate source-owned singleton
+// - `0x4d2c58` is the wrapper-facing interface pointer that burrows into the same concrete object family
 // - many slots align with the concrete owner object documented under vtable `0x004b01c8`, but they
 //   should not be treated as a one-to-one synonym
 // - newer destructor/raw-vtable RE now gives the abstraction itself a better static anchor too:
@@ -424,9 +427,9 @@ struct ProcessCreateCharacterInput120Sketch {
 
 class ILTLoginMediator_0x4af2b8 {
 public:
-    static ILTLoginMediator_0x4af2b8* Default;
+    static ILTLoginMediator_0x4af2b8*& Default;
     // Important wrapper/owner split correction:
-    // - this abstract base models the resolved `ILTLoginMediator_0x4af2b8.Default` arg6 surface
+    // - this abstract base models the resolved arg6 surface from `0x4d2c58`
     // - do not project owner-only `CLTLoginMediator` slots back onto this interface just because
     //   nearby concrete rows share related data
     // - in particular, owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex` is **not** the abstract
