@@ -795,7 +795,13 @@ static bool EnsureAuthBootstrap680LazyPubkeyDatValidator(
 // - caller passes exactly four stack args: modulusInteger, publicExponentInteger, signatureBytes,
 //   lazyPubkeyDatValidatorA4
 // - helper itself hard-codes the trailing validator signature length 0x100 and returns AL only
-static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
+// - the verified message is a launcher-owned fixed record body, not DER/X509 Crypto++ key
+//   serialization:
+//   `recordBody81 = modulus[0x80] || exponentLowByte[0x01]`
+// - the inner verifier dispatch is verifier vtable slot `+0x2c = VerifyMessageWithTemporaryWorker`
+// So this helper is best treated as launcher record shaping wrapped around a direct Crypto++
+// verifier convenience.
+static bool AuthBootstrap680_VerifyReplyPublicKeyRecordSignatureAgainstLazyPubkeyDatValidator(
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
     const uint8_t* signatureBytes,
@@ -825,7 +831,7 @@ static bool AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
 }
 
 // anchor: launcher.exe:0x447dd0
-static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
+static uint32_t AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
     uint32_t replyPublicKeyId09,
     const CryptoPP::Integer& modulusInteger,
     const CryptoPP::Integer& publicExponentInteger,
@@ -845,7 +851,12 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
     // `0x447dd0` constructs a Crypto++ FileSink-family object configured with:
     // - OutputFileName = "pubkey.dat"
     // - OutputBinaryMode = true
-    // Then it emits the exact serialized record into that sink.
+    // Then it emits the exact launcher-owned serialized reply-public-key record into that sink:
+    // - dword replyPublicKeyId09
+    // - modulus integer bytes
+    // - public exponent integer bytes
+    // - one zero padding byte
+    // - 0x100-byte signature over the sibling fixed record body used by `0x468f80`
     const std::array<uint8_t, 4u> replyPublicKeyIdBytes = {
         static_cast<uint8_t>(replyPublicKeyId09 & 0xffu),
         static_cast<uint8_t>((replyPublicKeyId09 >> 8u) & 0xffu),
@@ -2089,7 +2100,7 @@ uint32_t AuthBootstrap680Child_0x441290::RebuildReplyPublicKeyWorkers(
             return 0x19000004u;
         }
 
-        if (!AuthBootstrap680_VerifyReplyPublicKeyAgainstLazyPubkeyDatValidator(
+        if (!AuthBootstrap680_VerifyReplyPublicKeyRecordSignatureAgainstLazyPubkeyDatValidator(
                 modulusInteger,
                 publicExponentInteger,
                 signatureBytes,
@@ -2183,7 +2194,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
             return rebuildResult;
         }
 
-        AuthBootstrap680_RecordReplyPublicKeyToPubkeyDat(
+        AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
             replyPublicKeyId09,
             modulusInteger,
             publicExponentInteger,

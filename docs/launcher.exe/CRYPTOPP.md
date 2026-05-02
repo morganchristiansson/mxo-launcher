@@ -132,7 +132,7 @@ address-to-class / address-to-method mapping rather than the noisy ctor-state OO
 |---|---|
 | `0x447020` | construct-from-reply-public-key |
 | `0x447260` | lazy fallback-key verifier builder |
-| `0x468f80` | verify embedded auth reply public key against `pubkey.dat` signer |
+| `0x468f80` | verify launcher fixed reply-public-key record signature against `pubkey.dat` signer |
 | `0x44aec0` | verify auth reply copy shadow with verifier |
 
 #### `0x004b6fe8`
@@ -181,9 +181,17 @@ Implementation note:
 |---|---|
 | `0x004b77f8` | `CryptoPP::FileSink` family / configured output sink |
 | `0x447b50` | `CryptoPP::FileSink` ctor/config-init path |
-| `0x447dd0` | launcher auth helper that serializes a reply-public-key record into the sink |
+| `0x447dd0` | `AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat` launcher auth helper that serializes a reply-public-key record into the sink |
 
 Source now uses direct `CryptoPP::FileSink("pubkey.dat", true)`.
+
+RE note:
+- `0x468f80` verifies a launcher-owned fixed 0x81-byte record body:
+  `modulus[0x80] || exponentLowByte[0x01]`
+- `0x447dd0` writes the broader on-disk `pubkey.dat` record carrying the same public-key material:
+  `replyPublicKeyId09 || modulusBytes || publicExponentBytes || 0x00 || signature[0x100]`
+- this is not X.509/DER Crypto++ key serialization; the inner Crypto++ helper is still the verifier
+  leaf `VerifyMessage(...)` convenience used over the launcher-shaped record body
 
 ### 2.6 Source implementation status
 
