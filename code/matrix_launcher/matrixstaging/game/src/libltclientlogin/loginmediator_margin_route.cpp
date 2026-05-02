@@ -59,14 +59,22 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
             StringAssignFromRange(routeDescriptor30_, newRouteDescriptor, sourceEnd);
         }
 
-        // Original reads global pointer slot `DAT_004d6814` and passes it as arg2 to
-        // `0x403f20 = recovered basic_string reset/assign helper`. Current static evidence only
-        // shows a read and the pointed-at bytes are zero, so model the second concatenation input
-        // as empty until a real initializer/write is recovered.
-        // anchor: launcher.exe:0x4043b0 = recovered basic_string concat helper
-        // Current static evidence only proves the second input is empty here, so this reduces to a
-        // plain copy of the recovered route-descriptor string.
+        // Original reads global pointer slot `DAT_004d6814`, materializes it through
+        // `0x403f20`, then concatenates `owner+0x30` with that global string through
+        // `0x4043b0` before calling `CLTIPAddressList_Reinit`.
+        //
+        // Replacement fidelity correction:
+        // - the recovered launcher config path exposes that global as the margin DNS suffix
+        //   (`MarginServerDNSSuffix`), mirrored here as `g_marginServerDNSName`
+        // - public-server flow needs `routePrefix + marginSuffix` (for example
+        //   `reality` + `.lith.thematrixonline.net`), while localhost works even with the
+        //   earlier infidel plain-prefix model
+        // - keep the concat shape explicit instead of trial-and-error special casing
+        // anchor: launcher.exe:0x41e5c8..0x41e61a / DAT_004d6814 -> 0x403f20 -> 0x4043b0 -> CLTIPAddressList_Reinit
         std::string rebuiltAddressListInput = routeDescriptor30_;
+        if (g_marginServerDNSName && g_marginServerDNSName[0] != '\0') {
+            rebuiltAddressListInput += g_marginServerDNSName;
+        }
 
         if (const char* const rebuiltBegin = StringBeginOrNull(rebuiltAddressListInput);
             rebuiltBegin != nullptr) {
