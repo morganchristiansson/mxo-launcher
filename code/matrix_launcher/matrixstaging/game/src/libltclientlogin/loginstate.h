@@ -322,10 +322,10 @@ public:
 
 private:
     // `0x43f930` uses byte-sized fields on the 8-byte state object at `this+4/+5` as
-    // reply-fragment progress counters. Keep them state-owned here instead of smearing them onto
-    // the mediator.
-    uint8_t replySectionsSeen_ = 0;
-    uint8_t replySectionsExpected_ = 0;
+    // reply-fragment progress counters. Keep the offset suffixes explicit so source stays aligned
+    // with the static-RE-backed helper-local storage.
+    uint8_t replySectionsSeen04_ = 0;
+    uint8_t replySectionsExpected05_ = 0;
 
 public:
     // anchor: launcher.exe vtable 0x004b5104
@@ -412,10 +412,10 @@ public:
 
 private:
     // `0x440320` uses two byte-sized fields on the 8-byte helper11 object at `this+4/+5` as
-    // reply-fragment progress counters. Keep them state-owned here rather than smearing them onto
-    // the mediator.
-    uint8_t replySectionsSeen_ = 0;
-    uint8_t replySectionsExpected_ = 0;
+    // reply-fragment progress counters. Keep the offset suffixes explicit so source stays aligned
+    // with the static-RE-backed helper-local storage.
+    uint8_t replySectionsSeen04_ = 0;
+    uint8_t replySectionsExpected05_ = 0;
 
 public:
     // anchor: launcher.exe vtable 0x004b5154

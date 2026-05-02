@@ -117,8 +117,8 @@ void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstrea
         static_cast<unsigned>(g_CurrentLoginMediator->state6UdpSessionSecretF18_),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
 
-    replySectionsSeen_ = 0;
-    replySectionsExpected_ = 0;
+    replySectionsSeen04_ = 0;
+    replySectionsExpected05_ = 0;
     const Packet_AsAuthReply_0x4b5328* currentSlotRecord =
         g_CurrentLoginMediator->GetCurrentAuthReplyPacket44();
 
@@ -348,7 +348,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         return 1u;
     }
 
-    const bool firstFragment = (replySectionsSeen_ == 0u);
+    const bool firstFragment = (replySectionsSeen04_ == 0u);
     bool usedCurrentSlotRecord = false;
     if (firstFragment) {
         // anchor: launcher.exe:0x438a50 first-fragment reset
@@ -480,7 +480,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
     }
 
     if (loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount) {
-        replySectionsExpected_ = loadCharacterReplyEnvelope.expectedSectionCount0b;
+        replySectionsExpected05_ = loadCharacterReplyEnvelope.expectedSectionCount0b;
     }
 
     switch (loadCharacterReplyEnvelope.sectionSelectorMinus2) {
@@ -860,8 +860,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             break;
     }
 
-    if (replySectionsSeen_ < 0xffu) {
-        ++replySectionsSeen_;
+    if (replySectionsSeen04_ < 0xffu) {
+        ++replySectionsSeen04_;
     }
 
  spdlog::info(
@@ -878,23 +878,23 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
 
  // anchor: launcher.exe:0x4408ed completion check
  // Exact `0x43f930` tail shape from Ghidra now tightened enough to keep literal here:
- // - byte `this+5` / our `replySectionsExpected_` is only latched when packet byte `+0x0c == 1`
- // - byte `this+4` / our `replySectionsSeen_` is then incremented for every accepted reply
- // - completion is only `replySectionsExpected_ != 0 && replySectionsSeen_ >= replySectionsExpected_`
+ // - byte `this+5` / our `replySectionsExpected05_` is only latched when packet byte `+0x0c == 1`
+ // - byte `this+4` / our `replySectionsSeen04_` is then incremented for every accepted reply
+ // - completion is only `replySectionsExpected05_ != 0 && replySectionsSeen04_ >= replySectionsExpected05_`
  // - there is no alternate early-complete path on section-0 presence, chunk presence, or
  //   zero-byte terminal markers in the original slot-6 tail
  const uint8_t packetExpectedCount = loadCharacterReplyEnvelope.expectedSectionCount0b;
  const uint8_t currentSection = loadCharacterReplyEnvelope.sectionSelectorMinus2;
  const uint16_t sectionBytes = loadCharacterReplyEnvelope.sectionByteCount;
- const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
+ const bool completed = (replySectionsExpected05_ != 0u) && (replySectionsSeen04_ >= replySectionsExpected05_);
 
  spdlog::info(
  "DIAGNOSTIC: CLTLoginState_State8 completion check: packetExpected={} seededExpected={} currentSection={} sectionBytes={} seen={} completed={} seedFlag={} section0Flag={} section0aFlag={} chunkBitmap=0x{:08x}",
  packetExpectedCount,
- replySectionsExpected_,
+ replySectionsExpected05_,
  currentSection,
  static_cast<unsigned>(sectionBytes),
- replySectionsSeen_,
+ replySectionsSeen04_,
  completed ? 1u : 0u,
  loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
  static_cast<unsigned>(g_CurrentLoginMediator->section0Flag13f6),
@@ -902,8 +902,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  static_cast<unsigned>(g_State8Section10ChunkBitmap_0x4f79e4));
 
  if (completed) {
-        replySectionsSeen_ = 0;
-        replySectionsExpected_ = 0;
+        replySectionsSeen04_ = 0;
+        replySectionsExpected05_ = 0;
         if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr) {
             size_t firstChunkIndex = 0u;
             while (firstChunkIndex < 32u &&
@@ -945,8 +945,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
             loadCharacterReplyEnvelope.handoffWord09,
-            replySectionsSeen_,
-            replySectionsExpected_,
+            replySectionsSeen04_,
+            replySectionsExpected05_,
             firstFragment ? 1u : 0u,
             usedCurrentSlotRecord ? 1u : 0u);
         g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
@@ -957,8 +957,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
             loadCharacterReplyEnvelope.handoffWord09,
-            replySectionsSeen_,
-            replySectionsExpected_,
+            replySectionsSeen04_,
+            replySectionsExpected05_,
             loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
             firstFragment ? 1u : 0u,
             usedCurrentSlotRecord ? 1u : 0u);

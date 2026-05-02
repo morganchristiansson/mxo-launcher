@@ -98,8 +98,8 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
         g_CurrentLoginMediator->createCharacterData108.secondary4c.end(),
         sourceDwords134.begin() + 8);
     sourceDwords134[16] = g_CurrentLoginMediator->createCharacterData108.bodyWord6c;
-    replySectionsSeen_ = 0;
-    replySectionsExpected_ = 0;
+    replySectionsSeen04_ = 0;
+    replySectionsExpected05_ = 0;
     // anchor: launcher.exe:0x43a470 = Packet_MsCreateCharacterRequest_0x4b53c8::ResetAndInitialize
     Packet_MsCreateCharacterRequest_0x4b53c8 packetBuilder;
     packetBuilder.ResetAndInitialize();
@@ -309,10 +309,10 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
     }
 
     if (loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount) {
-        replySectionsExpected_ = loadCharacterReplyEnvelope.expectedSectionCount0b;
+        replySectionsExpected05_ = loadCharacterReplyEnvelope.expectedSectionCount0b;
     }
 
-    const bool firstFragment = (replySectionsSeen_ == 0u);
+    const bool firstFragment = (replySectionsSeen04_ == 0u);
     if (firstFragment) {
         // anchor: launcher.exe:0x438a50 first-fragment reset inside `0x440320`
         // Keep this inlined here instead of routing through replacement-only helper methods:
@@ -530,11 +530,11 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             break;
     }
 
-    if (replySectionsSeen_ < 0xffu) {
-        ++replySectionsSeen_;
+    if (replySectionsSeen04_ < 0xffu) {
+        ++replySectionsSeen04_;
     }
 
-    const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
+    const bool completed = (replySectionsExpected05_ != 0u) && (replySectionsSeen04_ >= replySectionsExpected05_);
     if (completed) {
         if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
             // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
@@ -559,12 +559,12 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
             loadCharacterReplyEnvelope.handoffWord09,
-            replySectionsSeen_,
-            replySectionsExpected_,
+            replySectionsSeen04_,
+            replySectionsExpected05_,
             firstFragment ? 1u : 0u,
             g_CurrentLoginMediator->characterNameBufferF1c[0] ? g_CurrentLoginMediator->characterNameBufferF1c : "<empty>");
-        replySectionsSeen_ = 0;
-        replySectionsExpected_ = 0;
+        replySectionsSeen04_ = 0;
+        replySectionsExpected05_ = 0;
     } else {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage routed helper11 reply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} section={} bytes={} seen={} expected={} seedCount={} firstFragment={} name='{}'",
@@ -573,8 +573,8 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
             loadCharacterReplyEnvelope.handoffWord09,
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
-            replySectionsSeen_,
-            replySectionsExpected_,
+            replySectionsSeen04_,
+            replySectionsExpected05_,
             loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
             firstFragment ? 1u : 0u,
             g_CurrentLoginMediator->characterNameBufferF1c[0] ? g_CurrentLoginMediator->characterNameBufferF1c : "<empty>");
