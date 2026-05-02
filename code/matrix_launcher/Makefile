@@ -5,7 +5,7 @@
 
 CMAKE ?= cmake
 GENERATOR ?= Ninja
-TOOLCHAIN_FILE ?= cmake/toolchains/i686-windows-msvc-clang.cmake
+TOOLCHAIN_FILE ?= cmake/toolchains/i686-windows-gnu-gcc.cmake
 GAME_DIR = ~/MxO_7.6005
 BUILD_ROOT = build
 BUILD_PROFILE ?= debug
@@ -70,7 +70,11 @@ full_debug:
 configure: $(BUILD_DIR)/build.ninja
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(CRASHREPORTER_STUB)
+	rm -f $(BUILD_DIR)/resurrections.exe $(BUILD_DIR)/crashreporter.stub.exe
+
+# Full tree wipe when we really want to discard CMake state and third-party build products.
+distclean: clean
 	rm -rf $(BUILD_ROOT)
 
-.PHONY: all release full_debug configure run run_original crashdump install_crashreporter_stub restore_crashreporter clean
+.PHONY: all release full_debug configure run run_original crashdump install_crashreporter_stub restore_crashreporter clean distclean

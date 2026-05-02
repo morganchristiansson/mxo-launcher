@@ -42,40 +42,37 @@ Current work is now about tightening faithfulness of the active launcher-owned r
 
 Canonical build logic now lives in CMake, but the old `make` workflow is intentionally kept as a wrapper.
 
-### Prerequisites on Ubuntu
+### Current stable toolchain
 
-You already have:
-- `clang++`
-- `cmake`
-- `ninja`
-- `lld-link`
+The default stable path is now:
+- CMake
+- MinGW g++ (`i686-w64-mingw32-g++-posix`)
 
-What is still missing for the requested MSVC-targeted Clang build is a **Windows SDK + MSVC CRT sysroot**.
-On Ubuntu, the easiest route is usually `xwin`.
+That gives us a working checkpoint while preserving the recovered SGI/libstdc++ tree usage.
 
-Expected environment after installing/extracting that sysroot:
+### Experimental toolchains
+
+The repo also keeps two experimental Clang paths:
+- `cmake/toolchains/i686-windows-gnu-clang.cmake`
+- `cmake/toolchains/i686-windows-msvc-clang.cmake`
+
+Current status:
+- GNU-target Clang configures and partially builds, but is not yet the stable default
+- MSVC-target Clang remains the long-term ABI experiment and still needs more work
+
+For the MSVC-target experiment, Ubuntu also needs an xwin-provided Windows SDK + MSVC CRT sysroot, for example:
 
 ```bash
-export MXO_MSVC_SYSROOT=/path/to/xwin-splat
-```
-
-Expected layout under `MXO_MSVC_SYSROOT`:
-
-```text
-crt/include
-crt/lib/x86
-sdk/include/shared
-sdk/include/ucrt
-sdk/include/um
-sdk/lib/ucrt/x86
-sdk/lib/um/x86
+export MXO_MSVC_SYSROOT=$HOME/.xwin
 ```
 
 ### Configure and build with CMake directly
 
+Stable default:
+
 ```bash
 cmake -S . -B build/debug -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-windows-msvc-clang.cmake \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-windows-gnu-gcc.cmake \
   -DMXO_BUILD_PROFILE=debug
 
 cmake --build build/debug --target resurrections
@@ -88,6 +85,9 @@ make
 ```
 
 That wrapper now delegates to CMake and still deploys the built executable to:
+
+- `make clean` removes the launcher executables only and preserves the configured build tree and third-party build products
+- `make distclean` removes the entire CMake build tree when you want a full rebuild
 
 - `~/MxO_7.6005/resurrections.exe`
 
