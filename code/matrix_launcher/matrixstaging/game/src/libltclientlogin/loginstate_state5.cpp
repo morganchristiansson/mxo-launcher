@@ -60,7 +60,7 @@ uint32_t CLTLoginState_State5_0x4b5064::Slot2_HandleSecondaryGate(void* workItem
         static_cast<unsigned>(status),
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(nextHelperStateId),
-        g_CurrentLoginMediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold() ? 1u : 0u,
+        g_CurrentLoginMediator->marginConnectionFlag2d_ != 0u ? 1u : 0u,
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
     return 1u;

@@ -94,7 +94,8 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
         return 0u;
     }
 
-    if (g_CurrentLoginMediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold()) {
+    // anchor: launcher.exe:0x00438e0a / direct owner byte +0x2d close-wait-event-0x0f gate test
+    if (g_CurrentLoginMediator->marginConnectionFlag2d_ != 0u) {
         g_CurrentLoginMediator->PostEvent(0x0fu);
         spdlog::info(
             "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed armed owner+0x2d -> event=0x0f currentState={}",
