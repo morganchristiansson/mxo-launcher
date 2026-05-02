@@ -26,6 +26,7 @@
 #include <memory>
 
 #include <files.h>
+#include <filters.h>
 #include <integer.h>
 
 #include <spdlog/spdlog.h>
@@ -1979,37 +1980,32 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
         return;
     }
 
-    // anchor: launcher.exe:0x468f00
-    uint8_t* ciphertextCursor =
-        reinterpret_cast<uint8_t*>(const_cast<char*>(authRequestPacket.debugString14));
-    const uint8_t* plaintextCursor = plaintextPayload;
-    size_t plaintextBytesRemaining = plaintextPayloadByteCount;
-    size_t ciphertextBytesWritten = 0u;
-    while (plaintextBytesRemaining != 0u) {
-        const size_t currentChunkByteCount =
-            std::min<size_t>(plaintextChunkByteCount, plaintextBytesRemaining);
-        if (ciphertextBytesWritten + ciphertextChunkByteCount > raw08WorkerExpectedBlobLen) {
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
-            return;
-        }
-        try {
-            CryptoPP::AutoSeededRandomPool rng;
-            raw08PublicKeyWorkerA8->Encrypt(
-                rng,
-                plaintextCursor,
-                currentChunkByteCount,
-                ciphertextCursor + ciphertextBytesWritten);
-        } catch (const CryptoPP::Exception&) {
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 raw08 worker loop");
-            return;
-        }
-
-        plaintextCursor += currentChunkByteCount;
-        plaintextBytesRemaining -= currentChunkByteCount;
-        ciphertextBytesWritten += ciphertextChunkByteCount;
+    // anchor: launcher.exe:0x4382c0 / 0x438120 / 0x438320 / 0x468f00
+    // Static RE shows the raw0x08 path does not hand-roll a source-owned RSA chunk loop. It
+    // routes the plaintext packet through the old Crypto++ PK_DefaultEncryptionFilter family,
+    // which internally chunks by FixedMaxPlaintextLength / ciphertext block size and calls the
+    // reply-public-key worker with the child `+0x54` RNG wrapper. Source should therefore use the
+    // direct Crypto++ encryptor filter stack rather than re-implementing the chunk walker.
+    std::string ciphertextBytes;
+    ciphertextBytes.reserve(raw08WorkerExpectedBlobLen);
+    try {
+        mxo::liblttcp::EnsureCryptoContextInitialized();
+        CryptoPP::StringSource encryptSource(
+            plaintextPayload,
+            plaintextPayloadByteCount,
+            true,
+            new CryptoPP::PK_EncryptorFilter(
+                mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04(),
+                *raw08PublicKeyWorkerA8,
+                new CryptoPP::StringSink(ciphertextBytes)));
+        (void)encryptSource;
+    } catch (const CryptoPP::Exception&) {
+        spdlog::info(
+            "DIAGNOSTIC: launcher-owned auth failed to encrypt recovered 0x4474f0 plaintext blob through child+0xa8 Crypto++ PK_EncryptorFilter path");
+        return;
     }
+
+    const size_t ciphertextBytesWritten = ciphertextBytes.size();
     if (ciphertextBytesWritten != raw08WorkerExpectedBlobLen) {
         spdlog::info(
             "DIAGNOSTIC: launcher-owned auth rejected recovered 0x4474f0 ciphertext byte count actual={} expected={}",
@@ -2017,6 +2013,10 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
             raw08WorkerExpectedBlobLen);
         return;
     }
+    std::memcpy(
+        const_cast<char*>(authRequestPacket.debugString14),
+        ciphertextBytes.data(),
+        ciphertextBytesWritten);
 
     cachedAuthRequestTwofishKeyBytesOwned_.assign(
         feedbackSeed84.begin(),
