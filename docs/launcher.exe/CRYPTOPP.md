@@ -192,6 +192,9 @@ Current source uses direct Crypto++ classes for the identified launcher crypto f
 - `CryptoPP::RSAES_OAEP_SHA_Decryptor`
 - `CryptoPP::RSA::PrivateKey`
 - `CryptoPP::RSAES_OAEP_SHA_Encryptor`
+- `CryptoPP::PK_EncryptorFilter`
+- `CryptoPP::StringSource`
+- `CryptoPP::StringSink`
 - `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
 - `CryptoPP::Integer`
 - `CryptoPP::OldRandomPool`
@@ -547,6 +550,12 @@ section factual and address-oriented.
 | `0x438120` | ctor |
 | `0x438180` | dtor |
 | `0x438320` | `Put2()` |
+
+Source implementation note:
+
+- auth-bootstrap raw `0x08` no longer re-implements the packet-encryption chunk loop in source
+- source now routes the identified `0x4382c0 -> 0x438120 -> 0x438320` family through modern
+  `CryptoPP::StringSource` + `CryptoPP::PK_EncryptorFilter` + `CryptoPP::StringSink`
 
 #### `0x004b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
 
