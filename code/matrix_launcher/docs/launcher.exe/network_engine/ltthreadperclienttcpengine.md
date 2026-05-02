@@ -46,6 +46,20 @@ Recovered field roles:
   - current tree-family pruning pass removes shell-side fake pre-allocation of `+0x80` / `+0x8c` tree heads; after attach those pointer fields are populated only from the real engine object's authoritative tree storage
   - the shell no longer mirrors `+0x84` / `+0x90` live tree counts from the engine sidecar; those dwords stay as inert ABI padding unless proven client-visible
 
+## Small queued work items
+
+- `ConnectionStatusWorkItem`
+  - ctor with payload: `launcher.exe:0x435050`
+  - deleting dtor/free-list return path: `launcher.exe:0x435c30`
+  - vftable: `launcher.exe:0x4b3df8`
+  - recovered 3-dword shape: `vfptr`, `workType=2`, `statusOrPayloadDword08`
+- `CloseWorkItem`
+  - ctor: `launcher.exe:0x435070`
+  - deleting dtor/free-list return path: `launcher.exe:0x435c80`
+  - vftable: `launcher.exe:0x4b3e00`
+  - recovered 3-dword shape: `vfptr`, `workType=1`, `statusOrPayloadDword08=0`
+  - current source now models this one as a real polymorphic class (`CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00`) instead of a raw scaffold so the queued-release path exercises compiler-emitted vfptr/vtable layout under the MSVC-compatible toolchain
+
 ## Worker creation / queueing
 
 - `0x431ff0` allocates a worker thread, stores it at `[connection+0x08]`, inserts it into the context tree under the `+0x98` cleanup lock, and optionally starts it.

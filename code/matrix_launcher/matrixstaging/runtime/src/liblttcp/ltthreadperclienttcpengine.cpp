@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <new>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -50,7 +51,6 @@ static spdlog::logger* LoggerForQueueLabel(const char* label) {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_ConnectionStatusWorkItemVtable[2] = {0};
-static void* g_CloseWorkItemVtable[2] = {0};
 static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
 static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
@@ -500,26 +500,10 @@ static uint32_t __thiscall ConnectionStatusWorkItem_ReleaseScaffold(
     return 1u;
 }
 
-// anchor: launcher.exe:0x435c80 / vtable `0x004b3e00`
-static uint32_t __thiscall CloseWorkItem_ReleaseScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* self) {
-    if (!self) {
-        return 1u;
-    }
-
-    // Source-owned narrowed stand-in for the deleting-dtor free-list return path in `0x435c80`.
-    SmallWorkItemPool_FreeStorageScaffold(&g_CloseWorkItemPoolState, self);
-    return 1u;
-}
-
 static void EnsureSmallConnectionWorkItemVtablesInitialized() {
     if (!g_ConnectionStatusWorkItemVtable[1]) {
         g_ConnectionStatusWorkItemVtable[1] =
             reinterpret_cast<void*>(ConnectionStatusWorkItem_ReleaseScaffold);
-    }
-    if (!g_CloseWorkItemVtable[1]) {
-        g_CloseWorkItemVtable[1] =
-            reinterpret_cast<void*>(CloseWorkItem_ReleaseScaffold);
     }
 }
 
@@ -739,26 +723,22 @@ static void* CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemPool_AllocateStor
 }
 
 // anchor: launcher.exe:0x435da0
-static CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold*
+static CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00*
 CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate() {
-    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold*>(
+    return static_cast<CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00*>(
         CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemPool_AllocateStorage(
-            sizeof(CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold)));
+            sizeof(CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00)));
 }
 
 // anchor: launcher.exe:0x435070
-static CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold*
+static CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00*
 CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
-    CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* self) {
+    CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00* self) {
     if (!self) {
         return nullptr;
     }
 
-    EnsureSmallConnectionWorkItemVtablesInitialized();
-    self->header.workType = CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose;
-    self->header.statusOrPayloadDword08 = 0u;
-    self->header.vtable = g_CloseWorkItemVtable;
-    return self;
+    return new (self) CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00();
 }
 
 static CRITICAL_SECTION* CriticalSectionFromOpaqueStorage(void* storage) {
@@ -857,6 +837,20 @@ static uint32_t CLTIPSocket_StaticAllocateSocket(
 }
 
 }  // namespace
+
+// anchor: launcher.exe:0x435070 / vtable `0x004b3e00`
+CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00::CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00()
+    : workType_(CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose)
+    , statusOrPayloadDword08_(0u) {}
+
+// anchor: launcher.exe:0x435c80 / deleting dtor slot at vtable `0x004b3e00`
+CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00::~CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00() = default;
+
+uint32_t CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00::ReleaseSlot() {
+    this->~CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00();
+    SmallWorkItemPool_FreeStorageScaffold(&g_CloseWorkItemPoolState, this);
+    return 1u;
+}
 
 // anchor: launcher.exe:0x4319e0
 CLTThread::CLTThread(const char* threadName)
@@ -1278,7 +1272,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
         if (closeQueued) {
             return;
         }
-        CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* closeWorkItem =
+        CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00* closeWorkItem =
             CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
                 CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate());
         if (!closeWorkItem) {
@@ -1290,7 +1284,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             return;
         }
         engine->EnqueueCompletedOperation(
-            &closeWorkItem->header,
+            closeWorkItem,
             connection->QueueContextScaffold(),
             /*useQueue34=*/false,
             closeStatusLabel);
@@ -2315,11 +2309,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 static_cast<unsigned>(wsaError),
                 std::system_category().message(wsaError));
 
-            CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* closeWorkItem =
+            CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00* closeWorkItem =
                 CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
                     CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate());
             (void)EnqueueCompletedOperation(
-                closeWorkItem ? &closeWorkItem->header : nullptr,
+                closeWorkItem,
                 queuedConnectionContext,
                 /*useQueue34=*/false,
                 "connect:immediate-close");

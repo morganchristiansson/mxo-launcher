@@ -100,13 +100,22 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold {
 
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold) == 0x0c, "connection-status work-item size mismatch");
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold {
+class CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00 {
+public:
     // anchor: launcher.exe:0x435070 / vtable `0x004b3e00`
     // Small queued type-1 work item used by the worker-thread close/peer-closed path.
-    CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader header{};
+    CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00();
+    // anchor: launcher.exe:0x435c80 / deleting dtor slot at vtable `0x004b3e00`
+    virtual ~CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00();
+    // Source-owned slot-`+0x04` stand-in used by queued release dispatch.
+    virtual uint32_t ReleaseSlot();
+
+private:
+    uint32_t workType_;
+    uint32_t statusOrPayloadDword08_;
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold) == 0x0c, "close work-item size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00) == 0x0c, "close work-item size mismatch");
 
 // Recovered launcher-visible arg5 helper root at +0x5c.
 // Current source note:
