@@ -1403,19 +1403,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 //   `0x443660`
                 const uint16_t passwordLengthField = plaintextPacket.payloadSize18;
                 const uint16_t soePasswordLengthField = plaintextPacket.characterIdHigh20;
-                const size_t plaintextSizeWithoutPadding =
-                    1u +
-                    processedChallengeMd5Bytes.size() +
-                    2u + 2u + 2u +
-                    2u + static_cast<size_t>(passwordLengthField) +
-                    2u + static_cast<size_t>(soePasswordLengthField) +
-                    2u;
+                const uint16_t plaintextBuilderPayloadByteCountBeforePadding =
+                    plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
                 const uint16_t paddingBytes =
-                    static_cast<uint16_t>(0x20u - (plaintextSizeWithoutPadding & 0x0fu));
+                    static_cast<uint16_t>(0x20u - (plaintextBuilderPayloadByteCountBeforePadding & 0x0fu));
                 // anchor: launcher.exe:0x4483ce
-                // The launcher computes `0x20 - (len & 0x0f)` directly and forwards that raw
-                // value to `Packet_AsAuthChallengeResponse_0x4b6cf4::SetPadding`, even when the
-                // low nibble is already zero.
+                // The launcher computes `0x20 - (builderPayloadLen & 0x0f)` from the live
+                // `0x4b6cf4` payload byte count and forwards that raw value to SetPadding(...),
+                // even when the low nibble is already zero.
                 plaintextPacket.SetPadding(paddingBytes);
 
                 const uint16_t paddingLengthField = plaintextPacket.reservedFieldByteCount28;
@@ -1462,42 +1457,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 }
 
                 // anchor: launcher.exe:0x448389..0x44844c
-                // The best current closure is to flatten directly from the recovered 0x4b6cf4
-                // builder payload itself. The fixed prefix `payload[0..0x10]` is already the final
-                // leading plaintext bytes, while words at `+0x11/+0x13/+0x15` point at the three
-                // length-prefixed tail records that are re-emitted as `[len][bytes]` spans.
-                plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
+                // The assembly-level source pointer/length consumed by child+0x98 are taken
+                // directly from the `0x4b6cf4` builder's message-storage payload, after the third
+                // field has been filled and its in-place length rewritten by `SetPadding(...)`.
+                // So the strongest current closure is: the CBC input bytes are the builder payload
+                // itself, not a second source-owned flattening of that payload.
+                plaintextBytes.assign(
                     plaintextBuilderPayloadBytes,
-                    plaintextBuilderPayloadBytes + 0x11u);
-                for (const size_t offsetFieldOffset : {0x11u, 0x13u, 0x15u}) {
-                    const uint16_t fieldOffset = ReadU16LE(plaintextBuilderPayloadBytes + offsetFieldOffset);
-                    if (fieldOffset == 0u ||
-                        static_cast<size_t>(fieldOffset) + 2u > plaintextBuilderPayloadByteCount) {
-                        spdlog::error(
-                            "launcher-owned auth found invalid raw0x0a builder field offset=0x{:04x} at payload+0x{:02x}",
-                            static_cast<unsigned>(fieldOffset),
-                            static_cast<unsigned>(offsetFieldOffset));
-                        return kAuthBootstrap680InboundUnhandled;
-                    }
-                    const uint16_t fieldLength =
-                        ReadU16LE(plaintextBuilderPayloadBytes + fieldOffset);
-                    const size_t fieldDataOffset = static_cast<size_t>(fieldOffset) + 2u;
-                    const size_t fieldEndOffset = fieldDataOffset + fieldLength;
-                    if (fieldEndOffset > plaintextBuilderPayloadByteCount) {
-                        spdlog::error(
-                            "launcher-owned auth found invalid raw0x0a builder field length={} at payload+0x{:02x}",
-                            static_cast<unsigned>(fieldLength),
-                            static_cast<unsigned>(offsetFieldOffset));
-                        return kAuthBootstrap680InboundUnhandled;
-                    }
-                    mxo::auth::internal::AppendU16LE(&plaintextBytes, fieldLength);
-                    plaintextBytes.insert(
-                        plaintextBytes.end(),
-                        plaintextBuilderPayloadBytes + fieldDataOffset,
-                        plaintextBuilderPayloadBytes + fieldEndOffset);
-                }
+                    plaintextBuilderPayloadBytes + plaintextBuilderPayloadByteCount);
 
                 if ((plaintextBytes.size() % 16u) != 0u) {
                     spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
