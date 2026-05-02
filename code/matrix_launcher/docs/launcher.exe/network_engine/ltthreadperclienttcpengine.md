@@ -33,6 +33,26 @@ Recovered field roles:
 
 ## Wrapper boundary
 
+### Queued connection-context seam
+
+Current highest-value client.dll-facing ABI seam is the queued connection-context adapter rooted in
+`CBaseConnection_QueueContextScaffold`.
+
+Current recovered queue-consumer slot contract:
+- object size: `0x0c`
+- `+0x00` = vfptr / synthetic vtable pointer
+- `+0x04` = auto-release flag tested on type-1 close work
+- `+0x08` = owning `CBaseConnection_0x4b8018*`
+- `vtable[1]` / slot `+0x04` = optional auto-release entry
+- `vtable[4]` / slot `+0x10` = `OnOperationCompleted(void*)`
+
+Important modeling note:
+- this adapter is still a synthetic minimal slot surface, not yet a proven drop-in native
+  `CBaseConnection_0x4b8018`-family object
+- replacing it with a real class requires matching the queue consumer's raw slot expectations, not
+  just matching field layout
+
+
 - Current binding model is one active arg5 shell attached to one `CLTThreadPerClientTCPEngine_0x4b2768` sidecar through `CLTThreadPerClientTCPEngine_0x4b2768Binding`.
 - Queue-family experiment result:
   - moving live queue/event/lock ownership onto the real engine object did **not** break launcher-side auth flow

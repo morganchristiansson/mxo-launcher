@@ -450,12 +450,13 @@ uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
     }
 
     void** vtable = *reinterpret_cast<void***>(object);
-    if (!vtable || !vtable[1]) {
+    if (!vtable || !vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]) {
         return 0u;
     }
 
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+    ReleaseFn fn = reinterpret_cast<ReleaseFn>(
+        vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]);
     return fn(object);
 }
 
@@ -468,8 +469,9 @@ uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueConte
     CBaseConnection_QueueContextScaffold* queueContext =
         static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = queueContext->vtable[1]
-        ? reinterpret_cast<ReleaseFn>(queueContext->vtable[1])
+    ReleaseFn fn = queueContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]
+        ? reinterpret_cast<ReleaseFn>(
+              queueContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex])
         : nullptr;
     return fn ? fn(queueContext) : 0u;
 }

@@ -163,7 +163,9 @@ static void** LauncherObjectSubVtable5C();
 static void** LauncherObjectSubVtable60();
 static void** LauncherObjectSubVtable98();
 
-static void* g_BaseConnectionQueueContextVtable[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+static void* g_BaseConnectionQueueContextVtable[
+    mxo::liblttcp::CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex + 1] = {
+    nullptr, nullptr, nullptr, nullptr, nullptr};
 
 static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
     mxo::liblttcp::CBaseConnection_QueueContextScaffold* /*self*/) {
@@ -177,10 +179,13 @@ static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffo
 }
 
 static void EnsureBaseConnectionQueueContextVtableInitialized() {
-    if (!g_BaseConnectionQueueContextVtable[1]) {
-        g_BaseConnectionQueueContextVtable[1] =
+    if (!g_BaseConnectionQueueContextVtable[
+            mxo::liblttcp::CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]) {
+        g_BaseConnectionQueueContextVtable[
+            mxo::liblttcp::CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] =
             reinterpret_cast<void*>(BaseConnectionQueueContext_ReleaseScaffold);
-        g_BaseConnectionQueueContextVtable[4] =
+        g_BaseConnectionQueueContextVtable[
+            mxo::liblttcp::CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] =
             reinterpret_cast<void*>(BaseConnectionQueueContext_OnOperationCompletedScaffold);
     }
 }

@@ -317,12 +317,25 @@ uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueConte
 // Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
 // mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`
 // (`vtable[4]`) and the optional type-1 auto-release slot `+0x04`.
+// Current recovered slot contract at this seam:
+// - `vtable[1]` / slot `+0x04` = optional queued-context auto-release entry used only by type-1
+//   close work
+// - `vtable[4]` / slot `+0x10` = `OnOperationCompleted(void*)`
+// This is intentionally *not* the full `CBaseConnection_0x4b8018` native vtable family yet; it is
+// the minimum slot surface the queue consumer needs.
 struct CBaseConnection_QueueContextScaffold {
+    static constexpr size_t kReleaseSlotIndex = 1;
+    static constexpr size_t kOnOperationCompletedSlotIndex = 4;
+
     void** vtable;           // +0x00
     uint8_t autoReleaseFlag; // +0x04
     uint8_t padding05[3];    // +0x05..+0x07
     CBaseConnection_0x4b8018* owner;  // +0x08
 };
+
+static_assert(sizeof(CBaseConnection_QueueContextScaffold) == 0x0c, "queue-context scaffold size mismatch");
+static_assert(offsetof(CBaseConnection_QueueContextScaffold, autoReleaseFlag) == 0x04, "queue-context scaffold autoReleaseFlag offset mismatch");
+static_assert(offsetof(CBaseConnection_QueueContextScaffold, owner) == 0x08, "queue-context scaffold owner offset mismatch");
 
 // Source-owned abstraction over the recovered connection family.
 // Recovered base vtable `0x004b8018` currently reads as 7 rows under the MSVC ABI:
