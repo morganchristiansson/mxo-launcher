@@ -385,7 +385,7 @@ public:
     // anchor: launcher.exe:0x41f050 = vtable +0x18
     // Returns owner `+0x05` (mbr_0x5). Default 0, set to 1 by SetUnknownByte05().
     // This byte is written to MS_ConnectRequest offset 0x22.
-    uint8_t GetUnknownByte05() const;
+    uint8_t GetUnknownByte05() const override;
 
     // source-owned narrow accessor for owner `+0x94 + 0x60` small-string begin pointer.
     // Current concrete state7 use from `0x43ba20`:
@@ -825,9 +825,9 @@ public:
     // anchor: launcher.exe:0x41f270 / owner vtable +0x150
     void SetLaunchPadSourceBlock94FirstString(const char* value);
     // anchor: launcher.exe:0x41f330 / owner vtable +0x14c
-    void SetSharedMarginPacketField660(uint32_t value);
+    void SetSharedMarginPacketField660(uint32_t value) override;
     // anchor: launcher.exe:0x420d00 / owner vtable +0x134
-    LaunchPadClient_0x4b0e48* EnsureLaunchPadClient65c();
+    LaunchPadClient_0x4b0e48* EnsureLaunchPadClient65c() override;
     // anchor: launcher.exe:0x420e70
     void CommitSessionCallbackHelperGameSessionId664();
     // source-owned shared helper used by `CLTLoginState_State18_0x4b0c00` slot 3 / `0x421a50`
@@ -883,7 +883,7 @@ public:
 
     // +0x24
     // anchor: launcher.exe:0x41ecd0
-    uint32_t ProcessLoginRequest(const SubmitLoginRequestInput_0x407d50& input);
+    uint32_t ProcessLoginRequest(const SubmitLoginRequestInput_0x407d50& input) override;
 
     // +0xe8
     // anchor: launcher.exe:0x41ec00
@@ -912,7 +912,7 @@ public:
     uint32_t DispatchSecondaryMessageToOwnerCallback84(void* workItem);
     // - state12-gated owner helper that stores `+0x90` and switches to state13 /
     //   launcher.exe:0x41c510
-    uint32_t SetState9OptionalField90AndSwitchToState13(uint32_t field90Value);
+    uint32_t SetState9OptionalField90AndSwitchToState13(uint32_t field90Value) override;
     // - state9 slot 3 / launcher.exe:0x41de40 + 0x439780
     //   - newer natural-original WineDbg now proves `0x439780 -> 0x41de40`
     //   - representative live state there: helper byte `+4 = 0`, helper word `+6 = 0x2710`

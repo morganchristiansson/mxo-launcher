@@ -20,9 +20,6 @@ extern void* g_pLauncherObject6304;
 
 MinimalLoginMediatorStub g_LoginMediatorStub = {};
 void* g_LoginMediatorVtable[104] = {0};
-static const char g_MediatorStringA[] = "resurrections";
-static const char g_MediatorStringC[] = "standalone";
-static const char g_MediatorEmptyString[] = "";
 
 static constexpr size_t kDiagnosticSelectionContextSize = 0xb4; // from client.dll:6211d3e0 zero-init of the +0xec handoff object
 
