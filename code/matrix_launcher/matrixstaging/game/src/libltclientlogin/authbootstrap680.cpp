@@ -1986,7 +1986,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
     // which internally chunks by FixedMaxPlaintextLength / ciphertext block size and calls the
     // reply-public-key worker with the child `+0x54` RNG wrapper. Source should therefore use the
     // direct Crypto++ encryptor filter stack rather than re-implementing the chunk walker.
-    std::string ciphertextBytes;
+    std::vector<uint8_t> ciphertextBytes;
     ciphertextBytes.reserve(raw08WorkerExpectedBlobLen);
     try {
         mxo::liblttcp::EnsureCryptoContextInitialized();
@@ -1997,7 +1997,7 @@ void AuthBootstrap680Child_0x441290::SendAuthRequest() {
             new CryptoPP::PK_EncryptorFilter(
                 mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04(),
                 *raw08PublicKeyWorkerA8,
-                new CryptoPP::StringSink(ciphertextBytes)));
+                new CryptoPP::VectorSink(ciphertextBytes)));
         (void)encryptSource;
     } catch (const CryptoPP::Exception&) {
         spdlog::info(
