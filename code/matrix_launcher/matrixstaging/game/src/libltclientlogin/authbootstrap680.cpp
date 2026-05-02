@@ -178,6 +178,26 @@ static void GenerateAuthBootstrap680Field54SeedBytes(
     helper.nextBufferedOutputByte28 = outputStart + static_cast<uint32_t>(outSeed.size());
 }
 
+static void GenerateAuthBootstrap680Field54FillBytes(
+    AuthBootstrap680Field54HelperSketch& helper,
+    uint8_t* outBytes,
+    size_t byteCount) {
+    if (outBytes == nullptr || byteCount == 0u) {
+        return;
+    }
+
+    // anchor: launcher.exe:0x4483ea..0x4483f9 / helper vtable +0x18 -> 0x437270
+    // The raw0x0a path dispatches through the launcher helper's byte-fill slot, which loops over
+    // the RandomPool family's GenerateByte-like slot (`+0x0c -> 0x468d30`). Model that with the
+    // real embedded Crypto++ pool directly rather than source-owned fake padding bytes.
+    mxo::liblttcp::EnsureCryptoContextInitialized();
+    mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().GenerateBlock(
+        outBytes, byteCount);
+
+    helper.bufferedStreamState24 = 0u;
+    helper.nextBufferedOutputByte28 = static_cast<uint32_t>(byteCount);
+}
+
 constexpr uint16_t kAuthBootstrap680Raw08PlaintextFixedByteCount = 0x1bu;
 constexpr uint16_t kAuthBootstrap680Raw08RequestFixedByteCount = 0x28u;
 
@@ -1403,7 +1423,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 //   `0x443660`
                 static constexpr uint8_t kAuthChallengeResponseLeadingByte = 0x00;
                 static constexpr uint16_t kAuthChallengeResponseBuilderFixedByteCount = 0x17u;
-                static constexpr uint8_t kAuthChallengeResponsePaddingByte = 0x00;
 
                 const uint16_t passwordLengthField = plaintextPacket.payloadSize18;
                 const uint16_t soePasswordLengthField = plaintextPacket.characterIdHigh20;
@@ -1427,11 +1446,21 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     plaintextPacket.debugString14);
                 const uint8_t* const soePasswordFieldBytes = reinterpret_cast<const uint8_t*>(
                     static_cast<uintptr_t>(plaintextPacket.characterIdLow1c));
+                uint8_t* const paddingFieldBytes = reinterpret_cast<uint8_t*>(
+                    static_cast<uintptr_t>(plaintextPacket.worldId24));
                 if ((passwordLengthField != 0u && passwordFieldBytes == nullptr) ||
-                    (soePasswordLengthField != 0u && soePasswordFieldBytes == nullptr)) {
+                    (soePasswordLengthField != 0u && soePasswordFieldBytes == nullptr) ||
+                    (paddingLengthField != 0u && paddingFieldBytes == nullptr)) {
                     spdlog::error(
                         "launcher-owned auth lost recovered raw0x0a builder field storage while flattening plaintext");
                     return kAuthBootstrap680InboundUnhandled;
+                }
+
+                if (paddingLengthField != 0u) {
+                    GenerateAuthBootstrap680Field54FillBytes(
+                        feedbackSeedHelper54,
+                        paddingFieldBytes,
+                        paddingLengthField);
                 }
 
                 plaintextBytes.reserve(plaintextSizeWithoutPadding + paddingLengthField);
@@ -1459,10 +1488,12 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                         soePasswordFieldBytes + soePasswordLengthField);
                 }
                 mxo::auth::internal::AppendU16LE(&plaintextBytes, paddingLengthField);
-                plaintextBytes.insert(
-                    plaintextBytes.end(),
-                    paddingLengthField,
-                    kAuthChallengeResponsePaddingByte);
+                if (paddingLengthField != 0u) {
+                    plaintextBytes.insert(
+                        plaintextBytes.end(),
+                        paddingFieldBytes,
+                        paddingFieldBytes + paddingLengthField);
+                }
 
                 if ((plaintextBytes.size() % 16u) != 0u) {
                     spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
@@ -1488,15 +1519,16 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 }
 
                 // anchor: launcher.exe:0x4483ea..0x44844c
-                // Concrete assembly facts from the working raw0x0a path:
-                // - `child+0x54` dispatches wrapper vtable `+0x18`, which is `0x468640`
-                // - that happens after the `0x4b6cf4` builder receives `SetPadding(...)`
-                // - the later `child+0x98` CBC encrypt call still consumes a source pointer/length
+                // Bigger closure on the raw0x0a bridge:
+                // - after `SetPadding(...)`, the launcher fills the third builder field through
+                //   child `+0x54` helper vtable `+0x18`
+                // - that helper slot loops over the RandomPool family's GenerateByte path rather
+                //   than writing zero padding
+                // - the later child `+0x98` CBC encrypt call still consumes a source pointer/length
                 //   derived from the `0x4b6cf4` stack builder state, not directly from the final
                 //   `0x4b6d08` envelope
-                // So there is still a launcher materialization/bridging step between the builder
-                // representation and the bytes fed to CBC encryption. Keep the known-good explicit
-                // plaintext byte view until that bridge is closed with stronger static-RE.
+                // So source still keeps an explicit flattened plaintext view, but it is now built
+                // from the recovered builder fields including the helper-generated random tail.
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
                 encryptedPacket.InitializePayloadSize();
                 encryptedPacket.ReserveLengthPrefixedTail(
