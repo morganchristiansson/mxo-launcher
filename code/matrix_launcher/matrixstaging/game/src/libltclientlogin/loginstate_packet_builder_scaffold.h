@@ -1072,13 +1072,13 @@ public:
    *reinterpret_cast<uint16_t*>(payload + 0x11) = 0u;  // First length-prefixed field pos
  }
 
- // Clear recovered field mirrors
+ // Clear recovered field mirrors inherited from Packet_0x4af2a4 / this builder's +0x28 tail
  debugString14 = nullptr;
  payloadSize18 = 0u;
  characterIdLow1c = 0u;
  characterIdHigh20 = 0u;
  worldId24 = 0u;
- mbr_0x28 = 0u;
+ reservedFieldByteCount28 = 0u;
  }
 
  // anchor: launcher.exe:0x444040 = meth_0x444040 - AppendEncryptedChallenge
@@ -1107,7 +1107,9 @@ public:
    if (characterIdHigh20 != 0) return;
    size_t len = strlen(str);
    // Reserve space for string + null terminator
-   uint16_t reserved = ReserveLengthPrefixedTailForPassword(static_cast<uint16_t>(len + 1));
+   uint16_t reserved = ReserveLengthPrefixedTail(static_cast<uint16_t>(len + 1));
+   characterIdLow1c = reinterpret_cast<uint32_t>(const_cast<char*>(debugString14));
+   characterIdHigh20 = reserved;
    if (reserved != 0 && characterIdLow1c != 0u) {
      char* dest = reinterpret_cast<char*>(static_cast<uintptr_t>(characterIdLow1c));
      strncpy(dest, str, reserved - 1);
@@ -1123,10 +1125,11 @@ public:
  }
 
  // anchor: launcher.exe:0x443660 = meth_0x443660 - SetPadding
- // Sets the padding value at offset +0x28
- // Logic: mbr_0x28 = param_1; update word at (payloadBegin10 + 0x15)
+ // Uses this builder's derived +0x28 word plus the inherited Packet_0x4af2a4 fields.
+ // Logic: store new padding size in the builder's +0x28 tail word, then follow the offset
+ // currently stored at payload+0x15 to rewrite the reserved field length in-place.
  void SetPadding(uint16_t paddingBytes) {
-   mbr_0x28 = paddingBytes;
+   reservedFieldByteCount28 = paddingBytes;
    uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
    uint8_t* payloadBase = static_cast<uint8_t*>(GetPayloadBase());
    if (!payload || !payloadBase || !messageRef08 || !messageRef08->messageStorage0c) {
@@ -1142,16 +1145,8 @@ public:
    }
  }
 
-private:
- uint16_t ReserveLengthPrefixedTailForPassword(uint16_t contentByteCount) {
-   const uint16_t actualCount = ReserveLengthPrefixedTail(contentByteCount);
-   characterIdLow1c = reinterpret_cast<uint32_t>(const_cast<char*>(debugString14));
-   characterIdHigh20 = actualCount;
-   return actualCount;
- }
-
 public:
- uint16_t mbr_0x28 = 0u;
+ uint16_t reservedFieldByteCount28 = 0u; // builder-local +0x28 tail word used by 0x4441a0/0x443660
 
  // Override virtual methods to match 5-slot vtable
  ~Packet_AsAuthChallengeResponse_0x4b6cf4() override = default;
