@@ -1072,18 +1072,13 @@ public:
    *reinterpret_cast<uint16_t*>(payload + 0x11) = 0u;  // First length-prefixed field pos
  }
 
- // Clear field reservation offsets
- encryptedChallengeField14_.writePointer00 = nullptr;
- encryptedChallengeField14_.reservedContentByteCount04 = 0u;
- encryptedChallengeField14_.reservedPadding06 = 0u;
-
- passwordField1c_.writePointer00 = nullptr;
- passwordField1c_.reservedContentByteCount04 = 0u;
- passwordField1c_.reservedPadding06 = 0u;
-
- soePasswordField24_.writePointer00 = nullptr;
- soePasswordField24_.reservedContentByteCount04 = 0u;
- soePasswordField24_.reservedPadding06 = 0u;
+ // Clear recovered field mirrors
+ debugString14 = nullptr;
+ payloadSize18 = 0u;
+ characterIdLow1c = 0u;
+ characterIdHigh20 = 0u;
+ worldId24 = 0u;
+ mbr_0x28 = 0u;
  }
 
  // anchor: launcher.exe:0x444040 = meth_0x444040 - AppendEncryptedChallenge
@@ -1096,9 +1091,8 @@ public:
    size_t len = strlen(str);
    // Reserve space for string + null terminator
    uint16_t reserved = ReserveLengthPrefixedTail(static_cast<uint16_t>(len + 1));
-   if (reserved != 0 && encryptedChallengeField14_.writePointer00) {
-     // Write the string at the reserved position
-     char* dest = reinterpret_cast<char*>(encryptedChallengeField14_.writePointer00);
+   if (reserved != 0 && debugString14) {
+     char* dest = const_cast<char*>(debugString14);
      strncpy(dest, str, reserved - 1);
      dest[reserved - 1] = '\0';
    }
@@ -1113,9 +1107,9 @@ public:
    if (characterIdHigh20 != 0) return;
    size_t len = strlen(str);
    // Reserve space for string + null terminator
-   uint16_t reserved = ReserveLengthPrefixedTailForField(passwordField1c_, static_cast<uint16_t>(len + 1));
-   if (reserved != 0 && passwordField1c_.writePointer00) {
-     char* dest = reinterpret_cast<char*>(passwordField1c_.writePointer00);
+   uint16_t reserved = ReserveLengthPrefixedTailForPassword(static_cast<uint16_t>(len + 1));
+   if (reserved != 0 && characterIdLow1c != 0u) {
+     char* dest = reinterpret_cast<char*>(static_cast<uintptr_t>(characterIdLow1c));
      strncpy(dest, str, reserved - 1);
      dest[reserved - 1] = '\0';
    }
@@ -1132,51 +1126,32 @@ public:
  // Sets the padding value at offset +0x28
  // Logic: mbr_0x28 = param_1; update word at (payloadBegin10 + 0x15)
  void SetPadding(uint16_t paddingBytes) {
-   // Store padding in field at +0x28 (worldId24 is at +0x24, mbr_0x28 at +0x28)
-   // The original writes to a word at payloadBegin10 + 0x15
+   mbr_0x28 = paddingBytes;
    uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
-   if (payload) {
-     // Update the length field at +0x15 to reflect padding
-     *reinterpret_cast<uint16_t*>(payload + 0x15) = paddingBytes;
+   uint8_t* payloadBase = static_cast<uint8_t*>(GetPayloadBase());
+   if (!payload || !payloadBase || !messageRef08 || !messageRef08->messageStorage0c) {
+     return;
+   }
+
+   const uint16_t fieldOffset = *reinterpret_cast<uint16_t*>(payload + 0x15);
+   uint16_t* fieldLength = reinterpret_cast<uint16_t*>(payloadBase + fieldOffset);
+   const uint16_t previousPaddingBytes = *fieldLength;
+   *fieldLength = paddingBytes;
+   if (paddingBytes > previousPaddingBytes) {
+     messageRef08->messageStorage0c->GrowPayloadByteCount(paddingBytes - previousPaddingBytes);
    }
  }
 
 private:
- // helper to reserve space for a specific field
- uint16_t ReserveLengthPrefixedTailForField(
-     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold& field,
-     uint16_t contentByteCount) {
-   if (!messageRef08 || !messageRef08->messageStorage0c) {
-     return 0;
-   }
-
-   // Calculate available space (max 0xFFC bytes per message)
-   uint8_t* storage = reinterpret_cast<uint8_t*>(messageRef08->messageStorage0c);
-   uint16_t currentSize = *reinterpret_cast<uint16_t*>(storage + 0x08);
-   uint16_t maxSize = *reinterpret_cast<uint16_t*>(storage + 0x0a) & 0x7FFF;
-   uint16_t available = 0xFFC - maxSize - currentSize;
-
-   uint16_t actualCount = contentByteCount;
-   if (available < contentByteCount) {
-     actualCount = available;
-   }
-
-   // Grow payload to make room
-   if (messageRef08->messageStorage0c) {
-     messageRef08->messageStorage0c->GrowPayloadByteCount(actualCount + 2);
-   }
-
-   // Update field scaffold
-   field.reservedContentByteCount04 = actualCount;
-   field.writePointer00 = messageRef08->messageStorage0c->PayloadBase();
-
+ uint16_t ReserveLengthPrefixedTailForPassword(uint16_t contentByteCount) {
+   const uint16_t actualCount = ReserveLengthPrefixedTail(contentByteCount);
+   characterIdLow1c = reinterpret_cast<uint32_t>(const_cast<char*>(debugString14));
+   characterIdHigh20 = actualCount;
    return actualCount;
  }
 
 public:
- ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold encryptedChallengeField14_{};
- ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold passwordField1c_{};
- ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold soePasswordField24_{};
+ uint16_t mbr_0x28 = 0u;
 
  // Override virtual methods to match 5-slot vtable
  ~Packet_AsAuthChallengeResponse_0x4b6cf4() override = default;
