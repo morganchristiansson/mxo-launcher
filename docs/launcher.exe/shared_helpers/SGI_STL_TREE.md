@@ -129,6 +129,15 @@ Current compare-helper note from `0x44b040` as used by the endpoint tree wrapper
 - recovered `family/reserved0/reserved1` fields are still copied in the node key payload, but are
   not currently evidenced as tree-ordering fields in launcher.exe
 
+Current source status:
+- caller-side recovery now also reads this outer layer best as a plain unique map keyed by the
+  endpoint
+- source now models it directly with map semantics plus staged placeholder insertion before later
+  accept-thread attachment, mirroring the original `InsertUniqueHint -> socket setup -> payload store`
+  workflow more directly than the older source-owned tree-wrapper mechanics
+- the recovered `+0x80/+0x84` head/count surface remains visible on the engine object for layout and
+  diagnostic parity
+
 ### Context-keyed tree (`+0x8c`, `0x18` nodes)
 - `0x4196b0` = `CLTThreadPerClientTCPEngine_ContextTree_InsertUniqueHint`
 - `0x42fe10` = `CLTThreadPerClientTCPEngine_ContextTree_Find`

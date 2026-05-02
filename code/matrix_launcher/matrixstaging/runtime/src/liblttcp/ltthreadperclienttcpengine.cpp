@@ -22,6 +22,16 @@ namespace mxo::liblttcp {
 
 namespace {
 
+static int CompareEndpointTreeKeys(
+    const LTTCPEndpointKey_0x44b070& lhs,
+    const LTTCPEndpointKey_0x44b070& rhs);
+
+static bool EndpointTreeKeyLess(
+    const LTTCPEndpointKey_0x44b070& lhs,
+    const LTTCPEndpointKey_0x44b070& rhs) {
+    return CompareEndpointTreeKeys(lhs, rhs) < 0;
+}
+
 // Per-logger SPDLOG_LEVEL overrides only apply on call sites that explicitly fetch a named logger.
 // Keep the receive hot-path seam narrow by only routing labels with registered logger names through
 // spdlog::get(...); all other queue labels fall back to the default logger.
@@ -113,12 +123,13 @@ static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode) == 0
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode) == 0x18, "context tree node size mismatch");
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry {
+    LTTCPEndpointKey_0x44b070 key{};
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload;
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode node = {};
 };
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking {
-    std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry>> entries;
+    std::map<LTTCPEndpointKey_0x44b070, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread>,
+             bool(*)(const LTTCPEndpointKey_0x44b070&, const LTTCPEndpointKey_0x44b070&)> entries{EndpointTreeKeyLess};
 };
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking {
@@ -273,115 +284,84 @@ static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeFindNo
         CompareEndpointTreeKeys);
 }
 
-static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry* FindEngineEndpointPayloadEntry(
+static CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindEngineEndpointPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node) {
-    if (!node) {
-        return nullptr;
-    }
-
+    const LTTCPEndpointKey_0x44b070& key) {
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* backing =
         FindEngineEndpointPayloadBacking(self);
     if (!backing) {
         return nullptr;
     }
 
-    auto it = backing->entries.find(node);
-    return (it != backing->entries.end()) ? it->second.get() : nullptr;
+    auto it = backing->entries.find(key);
+    return (it != backing->entries.end() && it->second) ? it->second.get() : nullptr;
 }
 
-// Source-owned endpoint-tree insertion adapter.
+// Source-owned endpoint-tree outer-layer adapter.
 // Evidence addresses: launcher.exe:0x4318f0 / 0x431240 / 0x431ce0 / 0x431200.
-// Static-RE note:
-// - launcher.exe already gets the red/black mechanics from SGI STL tree helpers
-// - this wrapper only bridges recovered head/node layout plus source-owned payload backing
-// - original flow inserts an endpoint node first with `[node+0x20] == nullptr`, then later fills
-//   that slot with the direct `AcceptThread*`, or erases the node again on bind/listen failure
-static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeInsertUniqueNode(
+// Current semantic read of the callsites is a unique map keyed by the endpoint, with staged
+// insertion before the eventual accept-thread payload attachment.
+static bool EndpointTreeInsertPlaceholder(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
     const LTTCPEndpointKey_0x44b070& key,
     bool* outInserted) {
+    (void)head;
     if (outInserted) {
         *outInserted = false;
     }
-    if (!self || !head) {
-        return nullptr;
+    if (!self) {
+        return false;
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking& backing =
         EnsureEngineEndpointPayloadBacking(self);
-    auto entry = std::make_unique<CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry>();
-    if (!entry) {
-        return nullptr;
-    }
-
-    entry->node._M_valptr()->first = key;
-    entry->node._M_valptr()->second = nullptr;
-
-    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
-    mxo::sgi_tree::_Rb_tree_node_base* parent = header;
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* current =
-        TreeRootNode<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode>(head);
-    bool insertLeft = true;
-    while (current) {
-        parent = current;
-        const int cmp = CompareEndpointTreeKeys(
-            entry->node._M_valptr()->first,
-            current->_M_valptr()->first);
-        if (cmp == 0) {
-            return current;
-        }
-        insertLeft = (cmp < 0);
-        current = insertLeft
-            ? static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(current->_M_left)
-            : static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(current->_M_right);
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* insertedNode = &entry->node;
-    insertedNode->_M_parent = nullptr;
-    insertedNode->_M_left = nullptr;
-    insertedNode->_M_right = nullptr;
-    insertedNode->_M_color = mxo::sgi_tree::_S_red;
-
-    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
-    backing.entries.emplace(insertedNode, std::move(entry));
+    auto [_, inserted] = backing.entries.emplace(key, nullptr);
     if (outInserted) {
-        *outInserted = true;
+        *outInserted = inserted;
     }
-    return insertedNode;
+    return true;
 }
 
 static bool EndpointTreeAttachPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node,
+    const LTTCPEndpointKey_0x44b070& key,
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload) {
     if (!payload) {
         return false;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry* entry =
-        FindEngineEndpointPayloadEntry(self, node);
-    if (!entry) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* backing =
+        FindEngineEndpointPayloadBacking(self);
+    if (!backing) {
         return false;
     }
 
-    node->_M_valptr()->second = payload.get();
-    entry->payload = std::move(payload);
+    auto it = backing->entries.find(key);
+    if (it == backing->entries.end()) {
+        return false;
+    }
+    it->second = std::move(payload);
     return true;
 }
 
-static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> EndpointTreeDetachPayload(
+static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> EndpointTreeDetachPayloadByKey(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node) {
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry* entry =
-        FindEngineEndpointPayloadEntry(self, node);
-    if (!entry) {
+    const LTTCPEndpointKey_0x44b070& key) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* backing =
+        FindEngineEndpointPayloadBacking(self);
+    if (!backing) {
         return nullptr;
     }
 
-    node->_M_valptr()->second = nullptr;
-    return std::move(entry->payload);
+    auto it = backing->entries.find(key);
+    if (it == backing->entries.end()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload = std::move(it->second);
+    backing->entries.erase(it);
+    return payload;
 }
 
 // anchor: launcher.exe:0x42fe10
@@ -459,18 +439,16 @@ static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> Contex
 }
 
 // Source-owned endpoint-tree erase adapter.
-// Evidence address: launcher.exe:0x4154d0.
-// Static-RE note:
-// - `_Rb_tree_rebalance_for_erase` already handles the shared unlink/rebalance mechanics
-// - this wrapper only bridges recovered head/node layout and source-owned backing cleanup
+// Current source models the recovered outer layer as a plain endpoint-keyed map, so erase is
+// handled by key-removal in `EndpointTreeDetachPayloadByKey` / direct `map::erase` cleanup.
 static bool EndpointTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node) {
-    return LauncherTreeEraseOwnedNode(
-        FindEngineEndpointPayloadBacking(self),
-        head,
-        node);
+    (void)self;
+    (void)head;
+    (void)node;
+    return true;
 }
 
 // Source-owned context-tree erase adapter.
@@ -1945,7 +1923,7 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
     if (CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking =
             FindEngineEndpointPayloadBacking(this)) {
         for (auto& it : endpointBacking->entries) {
-            StopAcceptThreadScaffold(it.second->payload.get());
+            StopAcceptThreadScaffold(it.second.get());
         }
         endpointBacking->entries.clear();
     }
@@ -2013,12 +1991,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     const uint32_t ipv4NetworkOrder = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(reservedArg3));
     const LTTCPEndpointKey_0x44b070 key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
     bool inserted = false;
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node = EndpointTreeInsertUniqueNode(
-        this,
-        ownedEndpointTreeHead80_,
-        key,
-        &inserted);
-    if (!node) {
+    if (!EndpointTreeInsertPlaceholder(this, ownedEndpointTreeHead80_, key, &inserted)) {
         return 1u;
     }
     if (!inserted) {
@@ -2030,7 +2003,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
         IPPROTO_TCP,
         /*flags=*/0u);
     if (listenSocketHandle == kInvalidSocketHandle) {
-        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
         return 1u;
     }
 
@@ -2042,7 +2015,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     if (bind(listenSocket, reinterpret_cast<const sockaddr*>(&listenAddr), sizeof(listenAddr)) == SOCKET_ERROR ||
         listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
         closesocket(listenSocket);
-        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
         return 1u;
     }
 
@@ -2056,20 +2029,20 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
             closesocket(static_cast<SOCKET>(socketHandleToClose));
             socketHandleToClose = kInvalidSocketHandle;
         }
-        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
         return 1u;
     }
-    if (!EndpointTreeAttachPayload(this, node, std::move(acceptThread))) {
+    if (!EndpointTreeAttachPayload(this, key, std::move(acceptThread))) {
         uint32_t socketHandleToClose = listenSocketHandle;
         if (socketHandleToClose != kInvalidSocketHandle) {
             closesocket(static_cast<SOCKET>(socketHandleToClose));
             socketHandleToClose = kInvalidSocketHandle;
         }
-        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
         return 1u;
     }
 
-    if (CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload = node->_M_valptr()->second) {
+    if (CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload = FindEngineEndpointPayload(this, key)) {
         (void)payload->Start(/*startPriority=*/2);
     }
     ownedEndpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
@@ -2166,10 +2139,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Slot4_42F7C0(void* arg1) {
 // vtable: launcher.exe:0x004b2768 slot +0x14
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) {
     const LTTCPEndpointKey_0x44b070 key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node = EndpointTree_Find(key);
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* endpointTreeSentinel =
-        reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(ownedEndpointTreeHead80_);
-    if (node == endpointTreeSentinel || !(node)->_M_valptr()->second) {
+    if (!FindEngineEndpointPayload(this, key)) {
         if (outOwnerContext) {
             *outOwnerContext = nullptr;
         }
@@ -2177,12 +2147,10 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOr
     }
 
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> acceptThread =
-        EndpointTreeDetachPayload(this, node);
+        EndpointTreeDetachPayloadByKey(this, key);
     if (outOwnerContext) {
         *outOwnerContext = acceptThread ? acceptThread->OwnerContext() : nullptr;
     }
-
-    (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
     StopAcceptThreadScaffold(acceptThread.get());
     acceptThread.reset();
     ownedEndpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
@@ -2998,10 +2966,11 @@ LTTCPEndpointKey_0x44b070 CLTThreadPerClientTCPEngine_0x4b2768::MakeEndpointKey(
 
 // anchor: launcher.exe:0x42fdb0
 CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* CLTThreadPerClientTCPEngine_0x4b2768::EndpointTree_Find(const LTTCPEndpointKey_0x44b070& key) {
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
-        EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
-    return node ? node
-                : reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(ownedEndpointTreeHead80_);
+    (void)key;
+    // The recovered outer callsites now read best as a plain endpoint-keyed map with staged
+    // placeholder insertion before accept-thread attachment. Keep this legacy node-returning helper
+    // only as a boundary marker while active callers migrate to direct map-like helpers.
+    return reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(ownedEndpointTreeHead80_);
 }
 
 // anchor: launcher.exe:0x42fe10
