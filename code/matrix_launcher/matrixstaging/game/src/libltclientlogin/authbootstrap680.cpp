@@ -1444,9 +1444,13 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     // real pool directly to materialize the same random tail bytes into the third
                     // builder field.
                     mxo::liblttcp::EnsureCryptoContextInitialized();
-                    mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().GenerateBlock(
-                        paddingFieldBytes,
-                        paddingLengthField);
+                    auto& helperRandomPool =
+                        mxo::liblttcp::g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04();
+                    for (uint16_t paddingIndex = 0u;
+                         paddingIndex < paddingLengthField;
+                         ++paddingIndex) {
+                        paddingFieldBytes[paddingIndex] = helperRandomPool.GenerateByte();
+                    }
                     feedbackSeedHelper54.bufferedStreamState24 = 0u;
                     feedbackSeedHelper54.nextBufferedOutputByte28 =
                         static_cast<uint32_t>(paddingLengthField);

@@ -201,6 +201,7 @@ Current source uses direct Crypto++ classes for the identified launcher crypto f
 - `CryptoPP::Integer`
 - `CryptoPP::OldRandomPool`
 - `CryptoPP::FileSink`
+- `CryptoPP::OS_GenerateRandomBlock`
 
 Canonical docs should therefore prefer address/vtable to Crypto++ class and method mappings over
 long evidence logs once source is using the concrete library classes directly.

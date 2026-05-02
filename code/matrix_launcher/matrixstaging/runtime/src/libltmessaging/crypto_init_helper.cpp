@@ -26,9 +26,12 @@ void EnsureCryptoContextInitialized() {
     g_CryptoInitializedFlag_0x4f7c20 |= 1u;
 
     try {
-        CryptoPP::AutoSeededRandomPool osSeedRng;
+        // anchor: launcher.exe:0x4429b0 / 0x468dc0 / MicrosoftCryptoProvider family
+        // Prefer the direct Crypto++ OS entropy path over a transient AutoSeededRandomPool. The
+        // recovered launcher helper seeds its embedded OldRandomPool from the old OS-provider
+        // family before later callers consume bytes through the wrapper/random-pool subobjects.
         std::array<CryptoPP::byte, 0x20> entropySeed{};
-        osSeedRng.GenerateBlock(entropySeed.data(), entropySeed.size());
+        CryptoPP::OS_GenerateRandomBlock(false, entropySeed.data(), entropySeed.size());
         g_CryptoInitHelper_0x4f7bf4.RandomPoolSubobject04().IncorporateEntropy(
             entropySeed.data(), entropySeed.size());
 
