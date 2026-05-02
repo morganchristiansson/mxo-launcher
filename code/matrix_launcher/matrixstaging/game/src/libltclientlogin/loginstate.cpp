@@ -310,6 +310,7 @@ void Packet_MsCreateCharacterRequest_0x4b53c8::ResolveFields(char resolveFieldsN
     debugString14 = nullptr;
 }
 
+
 // Implementation of Packet_MsLoadCharacterReply_0x4b542c
 
 // More faithful constructor using CMessageConnectionMessageRef_0x4ba23c directly

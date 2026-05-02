@@ -1503,8 +1503,14 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[103] = (void*)Mediator_UnimplementedSlot19c; // +0x19c
 
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
-    // inline UnregisterActiveStateSourceScaffold
-    mxo::ltlogin::g_CurrentLoginMediator = nullptr;
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
+
+    // Startup fidelity correction:
+    // - early launcher startup immediately uses the resolved arg6 surface (`+0x1c/+0x24` here)
+    // - our current source spells that surface through `g_CurrentLoginMediator`
+    // - so do not clear the active mediator during stub init; seed one concrete owner if absent
+    if (mxo::ltlogin::g_CurrentLoginMediator == nullptr) {
+        mxo::ltlogin::g_CurrentLoginMediator = new mxo::ltlogin::CLTLoginMediator();
+    }
 }
 

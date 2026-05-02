@@ -53,6 +53,52 @@ static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& fla
     flag = 0u;
 }
 
+static void Packet0x4d_SetLengthPrefixedTextAtFixedOffset(
+    Packet_MsCreateCharacterRequest_0x4b53c8& packetBuilder,
+    const char* text,
+    uint16_t fixedOffset,
+    mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold& reservation) {
+    if (!text || reservation.reservedContentByteCount04 != 0u || !packetBuilder.messageRef08 || !packetBuilder.messageRef08->messageStorage0c) {
+        return;
+    }
+
+    uint8_t* const payload = static_cast<uint8_t*>(packetBuilder.payloadAlias10);
+    if (!payload) {
+        return;
+    }
+
+    size_t textLen = 0u;
+    for (const char* cursor = text; *cursor != '\0'; ++cursor) {
+        ++textLen;
+    }
+    ++textLen;
+
+    auto* const storage = packetBuilder.messageRef08->messageStorage0c;
+    const uint16_t currentSize = storage->PayloadByteCount();
+    const uint16_t remaining = storage->RemainingAppendableByteCount();
+    if (remaining < textLen) {
+        textLen = remaining;
+    }
+
+    const uint16_t reserved = static_cast<uint16_t>(textLen);
+    if (reserved == 0u) {
+        return;
+    }
+
+    uint8_t* const reservationHeader = payload + currentSize;
+    storage->GrowPayloadByteCount(static_cast<uint16_t>(reserved + 2u));
+    reservationHeader[0] = static_cast<uint8_t>(reserved & 0xffu);
+    reservationHeader[1] = static_cast<uint8_t>((reserved >> 8) & 0xffu);
+    *reinterpret_cast<uint16_t*>(payload + fixedOffset) = currentSize;
+    reservation.writePointer00 = reservationHeader + 2u;
+    reservation.reservedContentByteCount04 = reserved;
+
+    if (reserved > 1u) {
+        std::copy_n(text, reserved - 1u, reservation.writePointer00);
+    }
+    reservation.writePointer00[reserved - 1u] = '\0';
+}
+
 }  // namespace
 
 // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
@@ -127,117 +173,28 @@ void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstre
         *reinterpret_cast<uint32_t*>(payload + 0x41) = sourceDwords134[16];
     }
 
-    // SetRealFirstName - anchor: launcher.exe:0x43a640
-    const char* realFirstName = g_CurrentLoginMediator->createCharacterData108.realFirstName70.data();
-    if (payload && realFirstName && packetBuilder.realFirstName14_.reservedContentByteCount04 == 0u) {
-        size_t textLen = 0;
-        const char* p = realFirstName;
-        while (*p++) ++textLen;
-        ++textLen;
-        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
-            auto* storage = packetBuilder.messageRef08->messageStorage0c;
-            const uint16_t currentSize = storage->PayloadByteCount();
-            const uint16_t remaining = storage->RemainingAppendableByteCount();
-            if (remaining >= 2u + textLen) {
-                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
-                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
-                if (newSize == currentSize + growth) {
-                    uint8_t* lengthPrefix = payload + currentSize;
-                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
-                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
-                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kRealFirstNameOffset) = currentSize;
-                    if (textLen > 1u) std::copy_n(realFirstName, textLen - 1u, lengthPrefix + 2u);
-                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
-                    packetBuilder.realFirstName14_.writePointer00 = lengthPrefix + 2u;
-                    packetBuilder.realFirstName14_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
-                }
-            }
-        }
-    }
-
-    // SetRealLastName - anchor: launcher.exe:0x43a740
-    const char* realLastName = g_CurrentLoginMediator->createCharacterData108.realLastName90.data();
-    if (payload && realLastName && packetBuilder.realLastName1c_.reservedContentByteCount04 == 0u) {
-        size_t textLen = 0;
-        const char* p = realLastName;
-        while (*p++) ++textLen;
-        ++textLen;
-        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
-            auto* storage = packetBuilder.messageRef08->messageStorage0c;
-            const uint16_t currentSize = storage->PayloadByteCount();
-            const uint16_t remaining = storage->RemainingAppendableByteCount();
-            if (remaining >= 2u + textLen) {
-                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
-                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
-                if (newSize == currentSize + growth) {
-                    uint8_t* lengthPrefix = payload + currentSize;
-                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
-                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
-                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kRealLastNameOffset) = currentSize;
-                    if (textLen > 1u) std::copy_n(realLastName, textLen - 1u, lengthPrefix + 2u);
-                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
-                    packetBuilder.realLastName1c_.writePointer00 = lengthPrefix + 2u;
-                    packetBuilder.realLastName1c_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
-                }
-            }
-        }
-    }
-
-    // SetBackground - anchor: launcher.exe:0x43a840
-    const char* background = g_CurrentLoginMediator->createCharacterData108.backgroundB0.data();
-    if (payload && background && packetBuilder.background24_.reservedContentByteCount04 == 0u) {
-        size_t textLen = 0;
-        const char* p = background;
-        while (*p++) ++textLen;
-        ++textLen;
-        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
-            auto* storage = packetBuilder.messageRef08->messageStorage0c;
-            const uint16_t currentSize = storage->PayloadByteCount();
-            const uint16_t remaining = storage->RemainingAppendableByteCount();
-            if (remaining >= 2u + textLen) {
-                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
-                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
-                if (newSize == currentSize + growth) {
-                    uint8_t* lengthPrefix = payload + currentSize;
-                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
-                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
-                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kBackgroundOffset) = currentSize;
-                    if (textLen > 1u) std::copy_n(background, textLen - 1u, lengthPrefix + 2u);
-                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
-                    packetBuilder.background24_.writePointer00 = lengthPrefix + 2u;
-                    packetBuilder.background24_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
-                }
-            }
-        }
-    }
-
-    // SetGameSessionId - anchor: launcher.exe:0x43a940
-    const char* gameSessionId = g_CurrentLoginMediator->GetGameSessionId();
-    if (payload && gameSessionId && packetBuilder.gameSessionId2c_.reservedContentByteCount04 == 0u) {
-        size_t textLen = 0;
-        const char* p = gameSessionId;
-        while (*p++) ++textLen;
-        ++textLen;
-        if (packetBuilder.messageRef08 && packetBuilder.messageRef08->messageStorage0c) {
-            auto* storage = packetBuilder.messageRef08->messageStorage0c;
-            const uint16_t currentSize = storage->PayloadByteCount();
-            const uint16_t remaining = storage->RemainingAppendableByteCount();
-            if (remaining >= 2u + textLen) {
-                const uint16_t growth = static_cast<uint16_t>(2u + textLen);
-                const uint16_t newSize = storage->GrowPayloadByteCount(growth);
-                if (newSize == currentSize + growth) {
-                    uint8_t* lengthPrefix = payload + currentSize;
-                    lengthPrefix[0] = static_cast<uint8_t>(textLen & 0xffu);
-                    lengthPrefix[1] = static_cast<uint8_t>((textLen >> 8) & 0xffu);
-                    *reinterpret_cast<uint16_t*>(payload + State11Packet0x4dFixedPayload::kGameSessionIdOffset) = currentSize;
-                    if (textLen > 1u) std::copy_n(gameSessionId, textLen - 1u, lengthPrefix + 2u);
-                    if (textLen > 0u) lengthPrefix[2u + textLen - 1u] = '\0';
-                    packetBuilder.gameSessionId2c_.writePointer00 = lengthPrefix + 2u;
-                    packetBuilder.gameSessionId2c_.reservedContentByteCount04 = static_cast<uint16_t>(textLen);
-                }
-            }
-        }
-    }
+    // SetRealFirstName / SetRealLastName / SetBackground / SetGameSessionId
+    // anchors: launcher.exe:0x43a640 / 0x43a740 / 0x43a840 / 0x43a940
+    Packet0x4d_SetLengthPrefixedTextAtFixedOffset(
+        packetBuilder,
+        g_CurrentLoginMediator->createCharacterData108.realFirstName70.data(),
+        State11Packet0x4dFixedPayload::kRealFirstNameOffset,
+        packetBuilder.realFirstName14_);
+    Packet0x4d_SetLengthPrefixedTextAtFixedOffset(
+        packetBuilder,
+        g_CurrentLoginMediator->createCharacterData108.realLastName90.data(),
+        State11Packet0x4dFixedPayload::kRealLastNameOffset,
+        packetBuilder.realLastName1c_);
+    Packet0x4d_SetLengthPrefixedTextAtFixedOffset(
+        packetBuilder,
+        g_CurrentLoginMediator->createCharacterData108.backgroundB0.data(),
+        State11Packet0x4dFixedPayload::kBackgroundOffset,
+        packetBuilder.background24_);
+    Packet0x4d_SetLengthPrefixedTextAtFixedOffset(
+        packetBuilder,
+        g_CurrentLoginMediator->GetGameSessionId(),
+        State11Packet0x4dFixedPayload::kGameSessionIdOffset,
+        packetBuilder.gameSessionId2c_);
 
     // anchor: launcher.exe state11 send thunk - pass the stack-local packet builder itself
     g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
