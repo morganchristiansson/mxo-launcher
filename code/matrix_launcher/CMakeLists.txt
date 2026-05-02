@@ -97,6 +97,9 @@ list(FILTER MXO_CRYPTOPP_SOURCES EXCLUDE REGEX "/(adhoc|bench|bench[1-3]|benchma
 
 add_library(cryptopp STATIC ${MXO_CRYPTOPP_SOURCES})
 target_include_directories(cryptopp PUBLIC third_party/cryptopp890)
+target_compile_options(cryptopp PUBLIC
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<BOOL:${MINGW}>>:-include${CMAKE_SOURCE_DIR}/compat/cryptopp_clang_gnu/preinclude_config_ver.h>
+)
 target_compile_definitions(cryptopp PUBLIC
     CRYPTOPP_DISABLE_ASM=1
     $<$<BOOL:${MSVC}>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
@@ -113,6 +116,11 @@ target_include_directories(resurrections PRIVATE
     third_party/spdlog-1.17.0/include
 )
 target_link_libraries(resurrections PRIVATE cryptopp version ws2_32)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MINGW)
+    # GNU-target Clang needs the MinGW posix thread runtime explicitly once we
+    # force the posix libstdc++ header/lib selection in the experimental toolchain.
+    target_link_libraries(resurrections PRIVATE winpthread)
+endif()
 target_compile_definitions(resurrections PRIVATE
     $<$<BOOL:${MSVC}>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
     $<$<BOOL:${MSVC}>:_CRT_SECURE_NO_WARNINGS>
