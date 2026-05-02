@@ -408,7 +408,8 @@ struct ProcessCreateCharacterInput120Sketch {
 // - this header models the launcher-resolved arg6 surface consumed through runtime pointer slot
 //   `0x4d2c58` (`g_pILTLoginMediatorDefault` in Ghidra)
 // - current source keeps the historical `ILTLoginMediator_0x4af2b8::Default` spell only as a
-//   compatibility alias onto `g_CurrentLoginMediator`; there is no separate source-owned singleton
+//   compatibility alias for the wrapper-facing arg6 surface; do not read that name as proof of a
+//   separate source-owned singleton object
 // - `0x4d2c58` is the wrapper-facing interface pointer that burrows into the same concrete object family
 // - many slots align with the concrete owner object documented under vtable `0x004b01c8`, but they
 //   should not be treated as a one-to-one synonym

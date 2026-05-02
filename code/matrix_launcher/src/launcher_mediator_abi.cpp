@@ -13,8 +13,10 @@
 
 extern void* g_pLauncherObject6304;
 
-// Broad ILTLoginMediator_0x4af2b8.Default ABI shell:
-// - keep startup-selection and general arg6 surface here
+// Broad wrapper-facing arg6 ABI shell:
+// - keep startup-selection and general mediator surface here
+// - the historical `ILTLoginMediator_0x4af2b8::Default` spell is treated as naming baggage for the
+//   resolved arg6 surface, not as proof of a distinct startup-owned singleton object
 
 MinimalLoginMediatorStub g_LoginMediatorStub = {};
 void* g_LoginMediatorVtable[104] = {0};
@@ -32,7 +34,7 @@ const char* MaskedSensitiveValue(const char* value) {
 
 // UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
-    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default);
+    return mxo::ltlogin::g_CurrentLoginMediator;
 }
 
 bool IsProfilePathBuilderCaller(void* returnAddress) {
