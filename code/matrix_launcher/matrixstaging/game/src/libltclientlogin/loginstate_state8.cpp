@@ -17,6 +17,10 @@
 namespace mxo::ltlogin {
 namespace {
 
+// anchor: launcher.exe:DAT_004f79e4
+// State8 slot6 keeps the section-0x0a seen-chunk bitmap in a process-global dword.
+static uint32_t g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
+
 // Faithful file-local class used only by state8 slot6 chunk reassembly.
 // Ghidra shows the original class is tiny and just wraps a uint32_t bitfield reference.
 class StateReplyChunkBitset_0x43c240 {
@@ -415,7 +419,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         }
         g_CurrentLoginMediator->allocatedBufferLength1458 = 0u;
         g_CurrentLoginMediator->flag145a = 0u;
-        g_CurrentLoginMediator->state8Section10ChunkBitmap = 0u;
+        g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
         g_CurrentLoginMediator->state8Section11Dword145c = 0u;
         g_CurrentLoginMediator->state8Section11String1460.clear();
 
@@ -747,7 +751,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             if (g_CurrentLoginMediator->allocatedBuffer1454 == nullptr) {
                 g_CurrentLoginMediator->allocatedBuffer1454 = std::malloc(0x7d00u);
                 g_CurrentLoginMediator->allocatedBufferLength1458 = 0u;
-                g_CurrentLoginMediator->state8Section10ChunkBitmap = 0u;
+                g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
             }
             if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr && loadCharacterReplyEnvelope.sectionData != nullptr) {
                 if (loadCharacterReplyEnvelope.expectedSectionCount0b == 0u) {
@@ -761,7 +765,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                             static_cast<uint8_t*>(g_CurrentLoginMediator->allocatedBuffer1454) + chunkOffset,
                             loadCharacterReplyEnvelope.sectionData,
                             loadCharacterReplyEnvelope.sectionByteCount);
-                        StateReplyChunkBitset_0x43c240(g_CurrentLoginMediator->state8Section10ChunkBitmap).SetSeen(chunkIndex);
+                        StateReplyChunkBitset_0x43c240(g_State8Section10ChunkBitmap_0x4f79e4).SetSeen(chunkIndex);
                         g_CurrentLoginMediator->allocatedBufferLength1458 = static_cast<uint16_t>(
                             g_CurrentLoginMediator->allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
                     }
@@ -858,7 +862,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
  static_cast<unsigned>(g_CurrentLoginMediator->section0Flag13f6),
  static_cast<unsigned>(g_CurrentLoginMediator->flag145a),
- static_cast<unsigned>(g_CurrentLoginMediator->state8Section10ChunkBitmap));
+ static_cast<unsigned>(g_State8Section10ChunkBitmap_0x4f79e4));
 
  // anchor: launcher.exe:0x4408ed completion check
  // Exact `0x43f930` tail shape from Ghidra now tightened enough to keep literal here:
@@ -883,13 +887,13 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
  static_cast<unsigned>(g_CurrentLoginMediator->section0Flag13f6),
  static_cast<unsigned>(g_CurrentLoginMediator->flag145a),
- static_cast<unsigned>(g_CurrentLoginMediator->state8Section10ChunkBitmap));
+ static_cast<unsigned>(g_State8Section10ChunkBitmap_0x4f79e4));
 
  if (completed) {
         if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr) {
             size_t firstChunkIndex = 0u;
             while (firstChunkIndex < 32u &&
-                   !StateReplyChunkBitset_0x43c240(g_CurrentLoginMediator->state8Section10ChunkBitmap).HasSeen(firstChunkIndex)) {
+                   !StateReplyChunkBitset_0x43c240(g_State8Section10ChunkBitmap_0x4f79e4).HasSeen(firstChunkIndex)) {
                 ++firstChunkIndex;
             }
             if (firstChunkIndex < 32u) {
@@ -933,7 +937,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             usedCurrentSlotRecord ? 1u : 0u);
         replySectionsSeen_ = 0;
         replySectionsExpected_ = 0;
-        g_CurrentLoginMediator->state8Section10ChunkBitmap = 0u;
+        g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
     } else {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage routed state8 reply status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} seedCount={} firstFragment={} usedCurrentSlotRecord={}",

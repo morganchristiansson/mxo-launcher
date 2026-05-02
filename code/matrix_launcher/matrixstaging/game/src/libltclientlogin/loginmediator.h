@@ -1186,7 +1186,6 @@ public:
     void* allocatedBuffer1454 = nullptr;
     uint16_t allocatedBufferLength1458 = 0;
     uint8_t flag145a = 0;
-    uint32_t state8Section10ChunkBitmap = 0;
     uint32_t state8Section11Dword145c = 0;
     std::string state8Section11String1460;
     std::array<uint8_t, 8> replyParseBuffer{};
