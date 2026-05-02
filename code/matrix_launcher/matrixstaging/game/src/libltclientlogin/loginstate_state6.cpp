@@ -11,6 +11,8 @@
 #include <string>
 #include <windows.h>
 
+#include <sha.h>
+
 namespace mxo::ltlogin {
 namespace {
 
@@ -326,7 +328,30 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
     // - state6 slot6 uses 0x43d800 + 0x4566a0 only for the opcode-0x08 challenge response path
     // - it does NOT overwrite owner +0xcd0..+0xd7f / persisted selection-context blocks here
     // - state8 later serializes the earlier owner-side 0x41c1f0 snapshot directly
-    const auto hashes = g_ClientChunkHashStorage.GetHashes();
+    const auto& hashes = g_ClientChunkHashStorage.GetHashes();
+    std::array<uint32_t, 4> digestWords = {0u, 0u, 0u, 0u};
+    {
+      // anchor: launcher.exe:0x440977..0x440983 -> 0x4566a0
+      // Keep this inline in the state6 body: the original path passes a stack-local 16-byte
+      // reply-word block and the chunk-hash aggregate directly into `0x4566a0`; it is not a
+      // separate state6-local helper in launcher.exe.
+      CryptoPP::SHA1 sha1;
+      const std::array<uint32_t, 4> replyWords = {
+          goHereAddr,
+          goHerePort,
+          sessionSecret,
+          0u,
+      };
+      sha1.Update(reinterpret_cast<const uint8_t*>(replyWords.data()), sizeof(replyWords));
+      for (const ChunkHashResult& chunkHash : hashes) {
+        sha1.Update(
+            reinterpret_cast<const uint8_t*>(chunkHash.hashWords.data()),
+            sizeof(chunkHash.hashWords));
+      }
+      uint8_t digestBytes[CryptoPP::SHA1::DIGESTSIZE] = {};
+      sha1.Final(digestBytes);
+      std::memcpy(digestWords.data(), digestBytes, sizeof(digestWords));
+    }
 
     spdlog::info("State6 Slot6: Generated {} chunk hashes for client verification", hashes.size());
 
@@ -340,14 +365,21 @@ uint32_t CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage(mxo::libltt
   // Using Packet_MsConnectChallengeResponse_0x4b5378 builder faithful to static-RE
   Packet_MsConnectChallengeResponse_0x4b5378 packetBuilder;
   packetBuilder.ResetAndInitialize();
-  packetBuilder.SetChallengeResponseFields(goHereAddr, sessionSecret);
+  packetBuilder.SetChallengeResponseFields(
+      digestWords[0],
+      digestWords[1],
+      goHereAddr,
+      sessionSecret);
 
   // anchor: launcher.exe:0x440a0b..0x440a18 - pass the stack-local packet builder itself
   g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder);
 
   spdlog::info(
-      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage sent opcode-0x08 challenge response goHereAddr=0x{:08x} sessionSecret=0x{:08x}",
-      static_cast<unsigned>(goHereAddr), static_cast<unsigned>(sessionSecret));
+      "CLTLoginState_State6_0x4b508c::Slot6_HandleSecondaryMessage sent opcode-0x08 challenge response statusCode=0x{:08x} metricIdBase=0x{:08x} goHereAddr=0x{:08x} sessionSecret=0x{:08x}",
+      static_cast<unsigned>(digestWords[0]),
+      static_cast<unsigned>(digestWords[1]),
+      static_cast<unsigned>(goHereAddr),
+      static_cast<unsigned>(sessionSecret));
 
   // anchor: launcher.exe:0x440a18..0x440a30 - no state transition after sending 0x08
   // In original, state transition happens AFTER receiving the ConnectReply (0x09), not after sending 0x08.

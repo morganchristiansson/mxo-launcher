@@ -121,14 +121,22 @@ class Packet_MsConnectChallengeResponse_0x4b5378 : public mxo::liblttcp::Packet_
     }
   }
 
-  // anchor: launcher.exe:0x4409c0..0x4409d0 - inline writes from parsed opcode-7 reply
-  void SetChallengeResponseFields(uint32_t goHereAddr, uint32_t sessionSecret) {
+  // anchor: launcher.exe:0x4409ae..0x4409d0 - inline writes from parsed opcode-7 reply and
+  // the 0x4566a0-derived digest block
+  void SetChallengeResponseFields(
+      uint32_t statusCode,
+      uint32_t metricIdBase,
+      uint32_t goHereAddr,
+      uint32_t sessionSecret) {
     uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
     if (payload) {
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kStatusCodeOffset) =
+          statusCode;
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kMetricIdBaseOffset) =
+          metricIdBase;
       *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kGoHereAddrOffset) =
           goHereAddr;
-      *reinterpret_cast<uint32_t*>(payload +
-                                    State6ChallengeResponsePayload::kSessionSecretOffset) =
+      *reinterpret_cast<uint32_t*>(payload + State6ChallengeResponsePayload::kSessionSecretOffset) =
           sessionSecret;
     }
   }
