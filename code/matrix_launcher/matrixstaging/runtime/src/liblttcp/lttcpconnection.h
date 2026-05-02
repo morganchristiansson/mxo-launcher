@@ -430,9 +430,6 @@ public:
     // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
     LTTCPEngineConnectionState State() const;
 
-    // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
-    const std::string& RemoteHostName() const;
-
     // anchor: launcher.exe:0x42fe50 TCP receive subpath
     // Narrow source-owned mirror of the worker-thread receive delivery shape:
     // - each recv iteration allocates a `CLTTCPReadOperation`-family fragment
@@ -507,7 +504,6 @@ private:
     void* ownerContext_;
     uint32_t socketHandle_;
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread08_;
-    std::string remoteHostName_;
     CLTTCPConnection_PendingSendQueue pendingSendQueueState38_;
     // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete
     // `CVariableLengthPrefixedTCPStreamParser` object pointer at connection `+0x6c`.

@@ -367,7 +367,6 @@ CLTTCPConnection::CLTTCPConnection()
       ownerContext_(nullptr),
       socketHandle_(kInvalidSocketHandle),
       workerThread08_(nullptr),
-      remoteHostName_(),
       pendingSendQueueState38_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
@@ -379,7 +378,6 @@ CLTTCPConnection::CLTTCPConnection(void* ownerContext)
       ownerContext_(ownerContext),
       socketHandle_(kInvalidSocketHandle),
       workerThread08_(nullptr),
-      remoteHostName_(),
       pendingSendQueueState38_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
