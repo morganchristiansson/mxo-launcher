@@ -902,6 +902,8 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
  static_cast<unsigned>(g_State8Section10ChunkBitmap_0x4f79e4));
 
  if (completed) {
+        replySectionsSeen_ = 0;
+        replySectionsExpected_ = 0;
         if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr) {
             size_t firstChunkIndex = 0u;
             while (firstChunkIndex < 32u &&
@@ -947,8 +949,6 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
             replySectionsExpected_,
             firstFragment ? 1u : 0u,
             usedCurrentSlotRecord ? 1u : 0u);
-        replySectionsSeen_ = 0;
-        replySectionsExpected_ = 0;
         g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
     } else {
         spdlog::info(
