@@ -18,6 +18,10 @@ Current source usage after the first MSVC-target-Clang portability pass:
 - current recovered users routed through that shim:
   - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp`
   - `matrixstaging/runtime/src/libltbase/consolevar.cpp`
+  - current source no longer re-owns the SGI tree mechanics there either
+  - the recovered outer layer is now modeled directly as a case-insensitive unique name registry
+    using plain STL map semantics, with only the tiny lazily-created `0x0c` registry-global mirror
+    retained for parity/logging
   - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
 
 Current local header provenance:
