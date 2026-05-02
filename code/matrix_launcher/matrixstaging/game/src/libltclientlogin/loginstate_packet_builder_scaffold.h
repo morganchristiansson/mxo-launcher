@@ -1222,6 +1222,10 @@ public:
    *fieldLength = paddingBytes;
    if (paddingBytes > previousPaddingBytes) {
      messageRef08->messageStorage0c->GrowPayloadByteCount(paddingBytes - previousPaddingBytes);
+   } else if (paddingBytes < previousPaddingBytes) {
+     const uint16_t currentPayloadByteCount = messageRef08->messageStorage0c->PayloadByteCount();
+     messageRef08->messageStorage0c->ResetPayloadByteCount(
+         static_cast<uint16_t>(currentPayloadByteCount - (previousPaddingBytes - paddingBytes)));
    }
    reservedFieldByteCount28 = paddingBytes;
  }
