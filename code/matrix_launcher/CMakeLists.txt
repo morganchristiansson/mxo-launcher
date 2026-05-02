@@ -1,0 +1,156 @@
+cmake_minimum_required(VERSION 3.28)
+
+project(matrix_launcher LANGUAGES CXX)
+
+set(MXO_GAME_DIR "$ENV{HOME}/MxO_7.6005" CACHE PATH "Matrix Online game directory")
+set(MXO_BUILD_PROFILE "debug" CACHE STRING "Compatibility profile label used in output paths")
+set_property(CACHE MXO_BUILD_PROFILE PROPERTY STRINGS debug release)
+set(MXO_DEBUG_LEVEL "slim" CACHE STRING "Debug info level: full, slim, or none")
+set_property(CACHE MXO_DEBUG_LEVEL PROPERTY STRINGS full slim none)
+set(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR OFF CACHE BOOL "Retain old MinGW arg5 wrapper mode opt-out macro")
+
+if(NOT CMAKE_BUILD_TYPE)
+    if(MXO_BUILD_PROFILE STREQUAL "release")
+        set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    else()
+        set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+    endif()
+endif()
+
+set(MXO_OUTPUT_ROOT "${CMAKE_SOURCE_DIR}/build/${MXO_BUILD_PROFILE}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${MXO_OUTPUT_ROOT}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${MXO_OUTPUT_ROOT}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${MXO_OUTPUT_ROOT}")
+
+set(MXO_LAUNCHER_SOURCES
+    src/resurrections.cpp
+    src/diagnostics.cpp
+    src/launcher_replacement_support.cpp
+    src/textmode_launcher_flow.cpp
+    src/server_config.cpp
+    matrixstaging/runtime/src/libltbase/launchercommandline.cpp
+    matrixstaging/runtime/src/libltbase/ltresult.cpp
+    src/launcher_mediator_abi.cpp
+    src/launcher_network_object_abi.cpp
+    matrixstaging/runtime/src/libltbase/consolevar.cpp
+    matrixstaging/runtime/src/libltbase/consoleint.cpp
+    matrixstaging/runtime/src/libltbase/consolestring.cpp
+    matrixstaging/runtime/src/libltbase/consolebool.cpp
+    matrixstaging/runtime/src/libltbase/consolefloat.cpp
+    matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp
+    matrixstaging/runtime/src/liblttcp/ltipaddresslist.cpp
+    matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp
+    matrixstaging/runtime/src/libltnet/sys/pc/pcsocket.cpp
+    matrixstaging/runtime/src/libltnet/sys/pc/pcdns.cpp
+    matrixstaging/runtime/src/libltmessaging/messageconnection.cpp
+    matrixstaging/runtime/src/libltmessaging/crypto_init_helper.cpp
+    matrixstaging/game/src/libltclientlogin/loginmediator.cpp
+    matrixstaging/game/src/libltclientlogin/loginmediator_active_state.cpp
+    matrixstaging/game/src/libltclientlogin/authbootstrap680.cpp
+    matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp
+    matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp
+    matrixstaging/game/src/libltclientlogin/loginmediator_margin_route.cpp
+    matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp
+    matrixstaging/game/src/launcher/launcher.cpp
+    matrixstaging/game/src/launcher/autodetectdialog.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state0.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state1.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state2.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state3.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state4.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state5.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state6.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state7.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state8.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state10.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state11.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state13.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state14.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state15.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state16.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state17.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state18.cpp
+    matrixstaging/game/src/libltclientlogin/loginstate_state19.cpp
+    matrixstaging/game/src/libltclientlogin/client_chunk_hashes.cpp
+    matrixstaging/game/src/libltclientlogin/launchpad.cpp
+    matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp
+    matrixstaging/runtime/src/libltcrypto/filters.cpp
+    matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
+)
+
+file(GLOB MXO_CRYPTOPP_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/third_party/cryptopp890/*.cpp")
+list(FILTER MXO_CRYPTOPP_SOURCES EXCLUDE REGEX "/(adhoc|bench|bench[1-3]|benchmark|cryptest|datatest|dlltest|fipsalgt|fipstest|regtest[0-9]*|test|testproc|validat[0-9]*|xtrcrypt)\\.cpp$")
+
+add_library(cryptopp STATIC ${MXO_CRYPTOPP_SOURCES})
+target_include_directories(cryptopp PUBLIC third_party/cryptopp890)
+target_compile_definitions(cryptopp PUBLIC CRYPTOPP_DISABLE_ASM=1)
+target_compile_features(cryptopp PUBLIC cxx_std_17)
+set_target_properties(cryptopp PROPERTIES OUTPUT_NAME cryptopp)
+
+add_executable(resurrections WIN32 ${MXO_LAUNCHER_SOURCES})
+target_compile_features(resurrections PRIVATE cxx_std_17)
+target_include_directories(resurrections PRIVATE
+    third_party/cryptopp890
+    third_party/spdlog-1.17.0/include
+)
+target_link_libraries(resurrections PRIVATE cryptopp version ws2_32)
+target_compile_definitions(resurrections PRIVATE
+    $<$<BOOL:${MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR}>:MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR>
+)
+
+add_executable(crashreporter_stub WIN32 tools/crashreporter_stub.cpp)
+target_compile_features(crashreporter_stub PRIVATE cxx_std_17)
+set_target_properties(crashreporter_stub PROPERTIES OUTPUT_NAME crashreporter.stub)
+
+set(MXO_COMMON_WARNINGS -Wall -Wextra)
+set(MXO_COMMON_COMPILE_OPTIONS ${MXO_COMMON_WARNINGS})
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    list(APPEND MXO_COMMON_COMPILE_OPTIONS -pipe)
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    list(APPEND MXO_COMMON_COMPILE_OPTIONS -Os -DNDEBUG -ffunction-sections -fdata-sections)
+    target_link_options(resurrections PRIVATE -Wl,--gc-sections -Wl,-s)
+else()
+    list(APPEND MXO_COMMON_COMPILE_OPTIONS -O0 -fno-omit-frame-pointer)
+endif()
+
+if(MXO_DEBUG_LEVEL STREQUAL "full")
+    list(APPEND MXO_COMMON_COMPILE_OPTIONS -g)
+elseif(MXO_DEBUG_LEVEL STREQUAL "slim")
+    list(APPEND MXO_COMMON_COMPILE_OPTIONS -g1)
+elseif(MXO_DEBUG_LEVEL STREQUAL "none")
+else()
+    message(FATAL_ERROR "Unsupported MXO_DEBUG_LEVEL='${MXO_DEBUG_LEVEL}' (expected full/slim/none)")
+endif()
+
+target_compile_options(cryptopp PRIVATE ${MXO_COMMON_COMPILE_OPTIONS})
+target_compile_options(resurrections PRIVATE ${MXO_COMMON_COMPILE_OPTIONS})
+target_compile_options(crashreporter_stub PRIVATE -Wall -Wextra -O2)
+
+set(MXO_DEPLOYED_EXE "${MXO_GAME_DIR}/resurrections.exe")
+set(MXO_DEPLOYED_CRASHREPORTER_STUB "${MXO_GAME_DIR}/crashreporter.stub.exe")
+
+add_custom_command(
+    TARGET resurrections POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${MXO_GAME_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:resurrections>" "${MXO_DEPLOYED_EXE}"
+    BYPRODUCTS "${MXO_DEPLOYED_EXE}"
+    COMMENT "Deploying resurrections.exe into ${MXO_GAME_DIR}"
+)
+
+add_custom_command(
+    TARGET crashreporter_stub POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${MXO_GAME_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:crashreporter_stub>" "${MXO_DEPLOYED_CRASHREPORTER_STUB}"
+    BYPRODUCTS "${MXO_DEPLOYED_CRASHREPORTER_STUB}"
+    COMMENT "Deploying crashreporter.stub.exe into ${MXO_GAME_DIR}"
+)
+
+message(STATUS "MXO build profile: ${MXO_BUILD_PROFILE}")
+message(STATUS "MXO game dir: ${MXO_GAME_DIR}")
+message(STATUS "MXO debug level: ${MXO_DEBUG_LEVEL}")

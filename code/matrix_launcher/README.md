@@ -40,11 +40,54 @@ Current work is now about tightening faithfulness of the active launcher-owned r
 
 ## Build
 
+Canonical build logic now lives in CMake, but the old `make` workflow is intentionally kept as a wrapper.
+
+### Prerequisites on Ubuntu
+
+You already have:
+- `clang++`
+- `cmake`
+- `ninja`
+- `lld-link`
+
+What is still missing for the requested MSVC-targeted Clang build is a **Windows SDK + MSVC CRT sysroot**.
+On Ubuntu, the easiest route is usually `xwin`.
+
+Expected environment after installing/extracting that sysroot:
+
+```bash
+export MXO_MSVC_SYSROOT=/path/to/xwin-splat
+```
+
+Expected layout under `MXO_MSVC_SYSROOT`:
+
+```text
+crt/include
+crt/lib/x86
+sdk/include/shared
+sdk/include/ucrt
+sdk/include/um
+sdk/lib/ucrt/x86
+sdk/lib/um/x86
+```
+
+### Configure and build with CMake directly
+
+```bash
+cmake -S . -B build/debug -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-windows-msvc-clang.cmake \
+  -DMXO_BUILD_PROFILE=debug
+
+cmake --build build/debug --target resurrections
+```
+
+### Compatibility wrapper
+
 ```bash
 make
 ```
 
-This builds the active launcher directly to:
+That wrapper now delegates to CMake and still deploys the built executable to:
 
 - `~/MxO_7.6005/resurrections.exe`
 
@@ -67,7 +110,7 @@ MXO_PASS := your-password
 # MXO_CHAR := your-character-name
 ```
 
-If that file exists, the Makefile now passes launcher-style switches to `resurrections.exe`, e.g.:
+If that file exists, the wrapper Makefile passes launcher-style switches to `resurrections.exe`, e.g.:
 - `-user <name>`
 - `-pwd <password>`
 - optional `-session <token>`
