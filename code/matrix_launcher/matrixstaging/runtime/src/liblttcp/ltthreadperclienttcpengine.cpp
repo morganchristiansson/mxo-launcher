@@ -1976,7 +1976,10 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
 }
 
 // anchor: launcher.exe:0x4319a0
-// vtable: launcher.exe:0x004b2768 slot +0x00
+// source-owned compatibility shim only:
+// - launcher.exe `0x4319a0` is the deleting-dtor slot for vtable `0x004b2768`
+// - this helper remains available for source paths that still speak in older `Release(...)`
+//   terms, but it is not modeled as a virtual slot on the recovered class anymore
 int CLTThreadPerClientTCPEngine_0x4b2768::Release(uint32_t flags) {
     // Current sidecar owner still handles the real arg5 object lifetime/teardown.
     // Keep the primary-slot surface source-owned here so wrappers can forward through

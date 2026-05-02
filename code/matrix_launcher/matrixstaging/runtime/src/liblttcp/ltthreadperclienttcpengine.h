@@ -310,6 +310,49 @@ private:
     bool exitRequested_;
 };
 
+// Recovered abstract/base TCP engine shell.
+// anchor: launcher.exe:0x4b3e74 (13-slot vftable)
+// Vtable ordering note:
+// - slot 0 = scalar deleting destructor (`0x437050`)
+// - slots 1..12 stay in the same relative order as the derived `0x4b2768` table
+// - many base implementations are still unresolved/import-thunk stubs in launcher.exe, but the
+//   slot count/order must remain identical for ABI compatibility with the recovered derived class
+class CLTBaseThreadPerClientTCPEngine_0x4b3e74 {
+public:
+    CLTBaseThreadPerClientTCPEngine_0x4b3e74() {}
+    virtual ~CLTBaseThreadPerClientTCPEngine_0x4b3e74() = default;
+
+    // slot 1 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) = 0;
+    // slot 2 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder) = 0;
+    // slot 3 / shared body `launcher.exe:0x436000`
+    virtual uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder) = 0;
+    // slot 4 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t Slot4_42F7C0(void* arg1) = 0;
+    // slot 5 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) = 0;
+    // slot 6 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t Connect(void* contextKey) = 0;
+    // slot 7 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t Close(void* contextKey, bool graceful) = 0;
+    // slot 8 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* contextKey, void* completionContext) = 0;
+    // slot 9 / unresolved-import family at base vtable `0x4b3e74`
+    virtual uint32_t SendBufferWithEndpoint(
+        void* buffer,
+        uint32_t byteCount,
+        LTTCPEndpointKey_0x44b070* remoteEndpoint,
+        void* contextKey,
+        void* ownershipMode) = 0;
+    // slot 10 / shared stub `launcher.exe:0x443810`
+    virtual uint32_t Slot10_443810(void* arg1) = 0;
+    // slot 11 / shared stub `launcher.exe:0x431670`
+    virtual uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) = 0;
+    // slot 12 / derived body `launcher.exe:0x4316a0`, base stub currently unresolved (`0x441790`)
+    virtual uint32_t CleanupConnection(void* contextKey) = 0;
+};
+
 // Reimplementation note:
 // This file intentionally mirrors recovered original launcher.exe naming.
 // Keep the names stable even where behavior is still scaffold-first or only partially recovered.
@@ -327,7 +370,7 @@ private:
 // - primary vtable 0x4b2768
 // strongest current class string:
 // - CLTThreadPerClientTCPEngine_0x4b2768
-class CLTThreadPerClientTCPEngine_0x4b2768 : public ILTTCPEngine {
+class CLTThreadPerClientTCPEngine_0x4b2768 : public CLTBaseThreadPerClientTCPEngine_0x4b3e74 {
 public:
     // Source note:
     // - original slot return conventions are not uniform
@@ -377,10 +420,14 @@ public:
     // anchor: launcher.exe:0x431c30 / base ctor 0x4366f0
     CLTThreadPerClientTCPEngine_0x4b2768();
     // anchor: launcher.exe:0x40b389..0x40b404 teardown release path; current C++ body remains scaffold-only
-    ~CLTThreadPerClientTCPEngine_0x4b2768();
+    ~CLTThreadPerClientTCPEngine_0x4b2768() override;
 
-    // anchor: launcher.exe:0x4319a0
-    int Release(uint32_t flags) override;
+    // Note: despite the old source-owned `ILTTCPEngine` sketch, the recovered `0x4b2768`
+    // vtable is a 13-slot class table headed by the deleting destructor slot, not a 13-method
+    // interface headed by `Release`.
+    // Source-owned compatibility shim only; not part of the recovered `0x4b2768` vtable.
+    int Release(uint32_t flags);
+
     // anchor: launcher.exe:0x431ce0
     uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) override;
     // anchor: launcher.exe:0x4325d0

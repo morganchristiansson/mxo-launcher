@@ -369,7 +369,7 @@ static uint32_t __thiscall LauncherObject_MonitorPort(
     void* port,
     void* ownerContext,
     void* reservedArg3) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
+    auto* engine = ResolveLauncherObjectEngineSidecar(self);
     return engine->MonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         ownerContext,
@@ -383,7 +383,7 @@ static uint32_t __thiscall LauncherObject_UDPMonitorPort(
     void* port,
     void* contextKey,
     void* ipv4NetworkOrder) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
+    auto* engine = ResolveLauncherObjectEngineSidecar(self);
     return engine->UDPMonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         contextKey,
@@ -397,7 +397,7 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
     void* outBoundPortHostOrder,
     void* contextKey,
     void* ipv4NetworkOrder) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
+    auto* engine = ResolveLauncherObjectEngineSidecar(self);
     uint16_t boundPortHostOrder = 0;
     return engine->MonitorEphemeralUDPPort(
         outBoundPortHostOrder ? static_cast<uint16_t*>(outBoundPortHostOrder) : &boundPortHostOrder,
@@ -420,7 +420,7 @@ static uint32_t __thiscall LauncherObject_UnmonitorPort(
     void* port,
     void** outOwnerContext,
     void* ipv4NetworkOrder) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
+    auto* engine = ResolveLauncherObjectEngineSidecar(self);
     return engine->UnmonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         outOwnerContext,
@@ -452,7 +452,7 @@ static uint32_t __thiscall LauncherObject_SendBuffer(
     void* byteCount,
     void* contextKey,
     void* completionContext) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
+    auto* engine = ResolveLauncherObjectEngineSidecar(self);
     return engine->SendBuffer(
         buffer,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
@@ -469,7 +469,7 @@ static uint32_t __thiscall LauncherObject_SendBufferWithEndpoint(
     void* remoteEndpoint,
     void* contextKey,
     void* ownershipMode) {
-    mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
+    auto* engine = ResolveLauncherObjectEngineSidecar(self);
     return engine->SendBufferWithEndpoint(
         buffer,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
