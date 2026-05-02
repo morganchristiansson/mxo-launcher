@@ -194,7 +194,8 @@ RE note:
   leaf `VerifyMessage(...)` convenience used over the launcher-shaped record body
 - the file-write path is nevertheless now identifiable as direct Crypto++ sink usage rather than a
   launcher-private byte loop:
-  - id dword written through sink word-output helper
+  - id dword written through sink word-output helper, and `0x437ef0 -> 0x4370a0` proves this is
+    BIG-endian word emission (`BIG_ENDIAN_ORDER = 1`), not little-endian
   - modulus/public exponent written via old `CryptoPP::Integer::Encode(bt, len, UNSIGNED)` shape
   - trailing zero and signature emitted through the FileSink / BufferedTransformation put path
 

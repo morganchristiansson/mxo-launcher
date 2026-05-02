@@ -863,7 +863,11 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
 
     try {
         CryptoPP::FileSink outputSink("pubkey.dat", true);
-        outputSink.PutWord32(replyPublicKeyId09, CryptoPP::LITTLE_ENDIAN_ORDER);
+        // `0x447e28 -> 0x437ef0 -> 0x4370a0` proves the dword is emitted in BIG endian order
+        // (`param_3 == 1`, and old Crypto++ uses `BIG_ENDIAN_ORDER = 1`). This same helper is
+        // also reused by OAEP MGF1 counter emission at `0x4684e2`, which is a strong cross-check
+        // against the earlier source-owned little-endian guess here.
+        outputSink.PutWord32(replyPublicKeyId09, CryptoPP::BIG_ENDIAN_ORDER);
         modulusInteger.Encode(outputSink, modulusByteCount, CryptoPP::Integer::UNSIGNED);
         publicExponentInteger.Encode(outputSink, publicExponentByteCount, CryptoPP::Integer::UNSIGNED);
         outputSink.Put(&kPublicKeyRecordPaddingByte, 1u);
