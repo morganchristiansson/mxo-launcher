@@ -2576,32 +2576,37 @@ void* CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption(
         const size_t ciphertextByteCount = cryptoPPDecryptor_0x442b70.FixedCiphertextLength();
         const size_t plaintextCapacity =
             std::max<size_t>(cryptoPPDecryptor_0x442b70.FixedMaxPlaintextLength(), 1u);
-        std::vector<CryptoPP::byte> plaintextBytes(plaintextCapacity, 0u);
 
-        const CryptoPP::DecodingResult decodingResult = cryptoPPDecryptor_0x442b70.Decrypt(
-            cryptoHelper->RandomPoolSubobject04(),
+        // anchor: launcher.exe:0x438430 = CryptoPP_PK_DefaultDecryptionFilter_Put2
+        // Bigger fidelity win: the launcher's bootstrap decrypt side is identified as going
+        // through the old Crypto++ PK_DefaultDecryptionFilter family rather than a source-owned
+        // direct Decrypt(...) leaf call. Keep the launcher-owned result packing, but hand the
+        // OAEP/SHA1 message-end decrypt flow back to Crypto++ via the modern filter stack.
+        std::vector<CryptoPP::byte> plaintextBytes;
+        plaintextBytes.reserve(plaintextCapacity);
+        CryptoPP::StringSource decryptSource(
             reinterpret_cast<const CryptoPP::byte*>(encryptedBlobPtr),
             ciphertextByteCount,
-            plaintextBytes.data(),
-            CryptoPP::g_nullNameValuePairs);
-
-        if (!decodingResult.isValidCoding) {
-            spdlog::warn(
-                "CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption OAEP decode failed");
-            return outputBuffer;
-        }
+            true,
+            new CryptoPP::PK_DecryptorFilter(
+                cryptoHelper->RandomPoolSubobject04(),
+                cryptoPPDecryptor_0x442b70,
+                new CryptoPP::VectorSink(plaintextBytes)));
+        (void)decryptSource;
 
         outBytes[0] = 1;
         *reinterpret_cast<uint32_t*>(outBytes + 4) =
-            static_cast<uint32_t>(decodingResult.messageLength);
-        const size_t bytesToCopy = std::min<size_t>(decodingResult.messageLength, 96u);
-        std::copy_n(plaintextBytes.data(), bytesToCopy, outBytes + 8);
+            static_cast<uint32_t>(plaintextBytes.size());
+        const size_t bytesToCopy = std::min<size_t>(plaintextBytes.size(), 96u);
+        if (bytesToCopy != 0u) {
+            std::copy_n(plaintextBytes.data(), bytesToCopy, outBytes + 8);
+        }
 
         spdlog::debug(
             "CMarginConnectionAuthBootstrapState_0x443220::PerformRSADecryption SUCCESS "
             "ciphertextBytes={} plaintextBytes={} copiedBytes={} algorithm='{}'",
             ciphertextByteCount,
-            decodingResult.messageLength,
+            plaintextBytes.size(),
             bytesToCopy,
             cryptoPPDecryptor_0x442b70.AlgorithmName());
     } catch (const CryptoPP::Exception& exception) {

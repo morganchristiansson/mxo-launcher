@@ -193,8 +193,10 @@ Current source uses direct Crypto++ classes for the identified launcher crypto f
 - `CryptoPP::RSA::PrivateKey`
 - `CryptoPP::RSAES_OAEP_SHA_Encryptor`
 - `CryptoPP::PK_EncryptorFilter`
+- `CryptoPP::PK_DecryptorFilter`
 - `CryptoPP::StringSource`
 - `CryptoPP::StringSink`
+- `CryptoPP::VectorSink`
 - `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier`
 - `CryptoPP::Integer`
 - `CryptoPP::OldRandomPool`
@@ -563,6 +565,12 @@ Source implementation note:
 |---|---|
 | `0x438210` | dtor |
 | `0x438430` | `Put2()` |
+
+Source implementation note:
+
+- margin/bootstrap RSA decrypt flow now routes the identified `0x438430` family through modern
+  `CryptoPP::StringSource` + `CryptoPP::PK_DecryptorFilter` + `CryptoPP::VectorSink`
+  instead of a source-owned direct `Decrypt(...)` leaf call
 
 #### `0x004b75e4` = `CryptoPP::RSAES_OAEP_SHA_Encryptor`
 
