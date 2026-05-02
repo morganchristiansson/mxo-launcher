@@ -1962,59 +1962,6 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
  // It also duplicates CLTLoginMediator::ProcessLoginRequest anchor
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::CaptureCreateCharacterInputSlot120(
-    const void* input120,
-    void* returnAddress,
-    bool applyOwnerSemantics) {
-    if (!input120) {
-        spdlog::info(
-            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120) input=<null> caller={} applyOwnerSemantics={}",
-            fmt::ptr(returnAddress),
-            applyOwnerSemantics ? 1u : 0u);
-        return 1u;
-    }
-
-    const auto& input = *static_cast<const ProcessCreateCharacterInput120Sketch*>(input120);
-    if (!applyOwnerSemantics) {
-        // Source-only wrapper preservation path:
-        // - launcher.exe has no separate `MirrorCreateCharacterInput120SourceBlock` helper
-        // - keep the copy logic here instead of inventing another callable body
-        // - owner semantics still burrow straight down into the anchored `0x41c3c0` body below
-        auto& createCharacterData = createCharacterData108;
-        std::copy(input.string00.begin(), input.string00.end(), createCharacterData.characterName00.begin());
-        createCharacterData.selectedWorldField24 = input.field24;
-
-        std::copy(input.dwords2c.begin(), input.dwords2c.end(), createCharacterData.header2c.begin());
-        std::copy(input.dwords4c.begin(), input.dwords4c.end(), createCharacterData.secondary4c.begin());
-        createCharacterData.bodyWord6c =
-            static_cast<uint32_t>(input.bytes6c[0]) |
-            (static_cast<uint32_t>(input.bytes6c[1]) << 8) |
-            (static_cast<uint32_t>(input.bytes6c[2]) << 16) |
-            (static_cast<uint32_t>(input.bytes6c[3]) << 24);
-
-        std::copy(input.string70.begin(), input.string70.end(), createCharacterData.realFirstName70.begin());
-        std::copy(input.string90.begin(), input.string90.end(), createCharacterData.realLastName90.begin());
-        std::copy(input.stringB0.begin(), input.stringB0.end(), createCharacterData.backgroundB0.begin());
-
-        spdlog::info(
-            "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 mirror-only input={} caller={} field12c=0x{:08x} name='{}')",
-            fmt::ptr(input120),
-            fmt::ptr(returnAddress),
-            static_cast<unsigned>(createCharacterData108.selectedWorldField24),
-            createCharacterData108.characterName00[0]
-                ? createCharacterData108.characterName00.data()
-                : "<empty>");
-        return 0u;
-    }
-
-    spdlog::debug(
-        "CLTLoginMediator::CaptureCreateCharacterInputSlot120(+0x120 owner-dispatch input={} caller={})",
-        fmt::ptr(input120),
-        fmt::ptr(returnAddress));
-    return ProcessCreateCharacterInput120(input);
-}
-
 // Post-auth margin/loading state ownership (`launcher.exe:0x4f78b8`) shared by the later
 // state11 send/reply path and the active existing-character path.
 

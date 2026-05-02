@@ -906,17 +906,6 @@ public:
   // +0x120
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
-    // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
-    // Fidelity split:
-    // - launcher.exe keeps the real owner work in `0x41c3c0`
-    // - this wrapper-facing source helper only preserves the client-fed block when we are not
-    //   dispatching owner semantics on the live `g_CurrentLoginMediator`
-    // - owner semantics still burrow straight down into the anchored `0x41c3c0` body
-    uint32_t CaptureCreateCharacterInputSlot120(
-        const void* input120,
-        void* returnAddress,
-        bool applyOwnerSemantics);
-
     // Internal source-owned scaffolds for active CLTLoginState vtable bodies:
     // - owner callback84 secondary-message bridge shared by state8/state9 fallbacks and state12
     //   slot 6 / launcher.exe:0x41c5c0

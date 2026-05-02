@@ -1045,38 +1045,42 @@ __attribute__((naked)) static void Mediator_PersistSelectionContextForState8() {
 }
 
 // UNANCHORED: C helper behind the recovered +0x120 ABI wrapper.
-// Evidence-backed slot decision:
-// - client.dll:0x62054d1d builds a larger stack-local input object during the loading-character /
-//   create-character transition
-// - the populated offsets line up with owner `+0x120 / 0x41c3c0`
-// - current best read is create-character source-block submit, but preserve the instance-role
-//   split between the wrapper mirror and whichever mediator currently owns the active state source
+// Fidelity correction:
+// - launcher.exe already has the real body at owner `+0x120 / 0x41c3c0`
+// - do not invent a second capture/mirror helper in source
+// - wrapper dispatch should just burrow to the live owner/controller (`g_CurrentLoginMediator`)
 extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
     MinimalLoginMediatorStub* self,
     void* input120,
     void* returnAddress) {
     (void)self;
 
-    uint32_t result = 1u;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    mxo::ltlogin::CLTLoginMediator* activeStateSource =
-        mxo::ltlogin::g_CurrentLoginMediator;
-
-    if (mediator) {
-        const bool applyOwnerSemantics = (activeStateSource == nullptr || activeStateSource == mediator);
-        result = mediator->CaptureCreateCharacterInputSlot120(
-            input120,
-            returnAddress,
-            applyOwnerSemantics);
+    if (input120 == nullptr) {
+        spdlog::info(
+            "MediatorStub::ProcessCreateCharacterInput120 caller={} [{}] input=<null>",
+            fmt::ptr(returnAddress),
+            DescribeMediatorCaller(returnAddress));
+        return 1u;
     }
 
-    if (activeStateSource && activeStateSource != mediator) {
-        result = activeStateSource->CaptureCreateCharacterInputSlot120(
-            input120,
-            returnAddress,
-            true);
+    mxo::ltlogin::CLTLoginMediator* const mediator = mxo::ltlogin::g_CurrentLoginMediator;
+    if (mediator == nullptr) {
+        spdlog::info(
+            "MediatorStub::ProcessCreateCharacterInput120 caller={} [{}] activeMediator=<null>",
+            fmt::ptr(returnAddress),
+            DescribeMediatorCaller(returnAddress));
+        return 1u;
     }
 
+    const auto& input = *static_cast<const mxo::ltlogin::ProcessCreateCharacterInput120Sketch*>(input120);
+    const uint32_t result = mediator->ProcessCreateCharacterInput120(input);
+    spdlog::info(
+        "MediatorStub::ProcessCreateCharacterInput120 caller={} [{}] activeMediator={} field12c=0x{:08x} result=0x{:08x}",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(mediator),
+        static_cast<unsigned>(input.field24),
+        static_cast<unsigned>(result));
     return result;
 }
 
