@@ -859,8 +859,6 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
     //   shape over the live FileSink
     // - `0x447e50` appends the single zero byte
     // - final sink `+0x14` emits the 0x100-byte signature block
-    static constexpr uint8_t kPublicKeyRecordPaddingByte = 0u;
-
     try {
         CryptoPP::FileSink outputSink("pubkey.dat", true);
         // `0x447e28 -> 0x437ef0 -> 0x4370a0` proves the dword is emitted in BIG endian order
@@ -870,7 +868,9 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
         outputSink.PutWord32(replyPublicKeyId09, CryptoPP::BIG_ENDIAN_ORDER);
         modulusInteger.Encode(outputSink, modulusByteCount, CryptoPP::Integer::UNSIGNED);
         publicExponentInteger.Encode(outputSink, publicExponentByteCount, CryptoPP::Integer::UNSIGNED);
-        outputSink.Put(&kPublicKeyRecordPaddingByte, 1u);
+        // `0x447e50 -> 0x444640` is the sink byte-append helper; use the direct Crypto++ `Put(byte)`
+        // surface instead of staging a one-byte array.
+        outputSink.Put(0u);
         outputSink.Put(signatureBytes, 0x100u);
         outputSink.MessageEnd();
         return 1u;
