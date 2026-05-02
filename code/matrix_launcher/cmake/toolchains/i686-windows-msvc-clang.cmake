@@ -88,10 +88,12 @@ add_compile_options(
     --target=i686-pc-windows-msvc
     -fms-compatibility
     -fms-extensions
+    -fms-runtime-lib=dll
 )
 
 add_link_options(
     --target=i686-pc-windows-msvc
+    -fms-runtime-lib=dll
     -fuse-ld=lld-link
     LINKER:/libpath:${MXO_CRT_LIB}
     LINKER:/libpath:${MXO_SDK_LIB_UCRT}

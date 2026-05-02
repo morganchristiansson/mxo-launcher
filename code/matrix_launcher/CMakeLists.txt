@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 project(matrix_launcher LANGUAGES CXX)
 
-if(MSVC)
+if(MSVC OR MXO_CLANG_MSVC_ABI)
     # Prefer the non-debug MSVC CRT even for Debug builds on Linux-hosted clang/lld setups.
     # The xwin payload we use does not necessarily ship the debug CRT import libraries.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
@@ -106,6 +106,7 @@ target_compile_definitions(cryptopp PUBLIC
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING>
 )
 target_compile_features(cryptopp PUBLIC cxx_std_17)
 set_target_properties(cryptopp PROPERTIES OUTPUT_NAME cryptopp)
@@ -138,6 +139,7 @@ target_compile_definitions(resurrections PRIVATE
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING>
     $<$<BOOL:${MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR}>:MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR>
 )
 
@@ -147,8 +149,18 @@ target_compile_definitions(crashreporter_stub PRIVATE
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
+    $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING>
 )
 set_target_properties(crashreporter_stub PROPERTIES OUTPUT_NAME crashreporter.stub)
+if(MXO_CLANG_MSVC_ABI)
+    target_link_options(crashreporter_stub PRIVATE
+        LINKER:/nodefaultlib:msvcrtd
+        LINKER:/nodefaultlib:msvcprtd
+        LINKER:/defaultlib:msvcrt
+        LINKER:/defaultlib:msvcprt
+        LINKER:/defaultlib:vcruntime
+    )
+endif()
 
 set(MXO_COMMON_WARNINGS -Wall -Wextra)
 set(MXO_COMMON_COMPILE_OPTIONS ${MXO_COMMON_WARNINGS})

@@ -243,3 +243,12 @@ int main(int argc, char* argv[]) {
 
     return FinishAndReturn(g_Launcher.InitInstance() ? 0 : 1);
 }
+
+#if defined(_WIN32)
+extern int __argc;
+extern char** __argv;
+
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+    return main(__argc, __argv);
+}
+#endif
