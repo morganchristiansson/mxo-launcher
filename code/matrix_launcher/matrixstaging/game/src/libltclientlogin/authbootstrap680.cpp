@@ -1458,6 +1458,24 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     static_cast<uint16_t>(0x20u - (plaintextLen & 0x0fu));
                 plaintextPacket.SetPadding(paddingBytes);
 
+                const uint8_t* const plaintextPacketPayloadBytes =
+                    plaintextPacket.messageRef08 && plaintextPacket.messageRef08->messageStorage0c
+                        ? plaintextPacket.messageRef08->messageStorage0c->PayloadBase()
+                        : nullptr;
+                const uint16_t plaintextPacketPayloadByteCount =
+                    plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
+                size_t plaintextPacketMismatchCount = 0u;
+                if (plaintextPacketPayloadBytes != nullptr &&
+                    plaintextPacketPayloadByteCount == plaintextBytes.size()) {
+                    for (size_t i = 0; i < plaintextBytes.size(); ++i) {
+                        if (plaintextPacketPayloadBytes[i] != plaintextBytes[i]) {
+                            ++plaintextPacketMismatchCount;
+                        }
+                    }
+                } else {
+                    plaintextPacketMismatchCount = plaintextBytes.size() + 1u;
+                }
+
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
                 encryptedPacket.InitializePayloadSize();
                 encryptedPacket.ReserveLengthPrefixedTail(
@@ -1491,11 +1509,15 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     static_cast<unsigned>(decryptedChallengeBytes.size()),
                     static_cast<unsigned>(processedChallengeMd5Bytes.size()));
                 spdlog::info(
-                    "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
+                    "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} packetPlaintextLen={} packetPlaintextMismatchCount={} packetPlaintextPrefix='{}' explicitPlaintextPrefix='{}' childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
                     static_cast<unsigned>(passwordLengthField),
                     static_cast<unsigned>(soePasswordLengthField),
                     static_cast<unsigned>(plaintextBytes.size()),
                     static_cast<unsigned>(plaintextBytes.size()),
+                    static_cast<unsigned>(plaintextPacketPayloadByteCount),
+                    static_cast<unsigned>(plaintextPacketMismatchCount),
+                    BuildHexPreview(plaintextPacketPayloadBytes, plaintextPacketPayloadByteCount, 32u),
+                    BuildHexPreview(plaintextBytes.data(), plaintextBytes.size(), 32u),
                     static_cast<unsigned>(SmallStringMirrorLength(string10)),
                     static_cast<unsigned>(SmallStringMirrorLength(string1C)),
                     fmt::ptr(sendTarget50),
