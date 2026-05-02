@@ -178,6 +178,32 @@ That comparison also tightens one important behavioral detail:
 So the current active runtime path proves that all of these are now dynamically live on the runtime path:
 - arg5 helper subobject at `+0x60`
 - the surrounding shared queue-consumer logic at `0x62531c10`
+
+### Queue-context ABI forensic logging
+
+To investigate the current native-object-vs-scaffold queue stall without immediately re-flipping the
+ABI seam again, source now logs the queue-context call boundary itself:
+- `InitializeBaseConnectionQueueContextScaffold ...` logs replacement-side scaffold creation with
+  `(queueContext, owner, ownerVtable, autoReleaseFlag)`
+- `DIAGNOSTIC: RunCompletedOperationQueue ...` / `DIAGNOSTIC: StopQueueThreads ...` log the raw
+  queued context bytes the consumer is about to use:
+  - context pointer / vtable
+  - slot `+0x04` / `vtable[1]`
+  - slot `+0x10` / `vtable[4]`
+  - byte `+0x04`
+  - decoded scaffold owner / owner vtable when the context matches the launcher-owned bridge
+- `DIAGNOSTIC: queue-context scaffold OnOperationCompleted ...` and
+  `DIAGNOSTIC: queue-context scaffold release ...` log the **return address of the caller** via
+  `_ReturnAddress()`, which should let us distinguish launcher.exe-side dispatch from live
+  `client.dll` queue-consumer traffic
+- if a direct native `CBaseConnection_0x4b8018*` ever crosses the seam again, source now emits
+  `DIAGNOSTIC: direct/native queued connection dispatch ...` or
+  `DIAGNOSTIC: direct/native queued connection auto-release bypass ...`
+
+This instrumentation is meant to answer two narrow questions before the next ABI change:
+1. does the active stalled path actually invoke the queued connection-context callback/release slots?
+2. if yes, is it doing so through the launcher-owned scaffold shape or through a native object whose
+   field/vtable layout still diverges from the original MSVC2003 object family?
 - arg5 queue cursor comparisons at:
   - queue0C `current1` vs `current0`
   - queue34 `current1` vs `current0`

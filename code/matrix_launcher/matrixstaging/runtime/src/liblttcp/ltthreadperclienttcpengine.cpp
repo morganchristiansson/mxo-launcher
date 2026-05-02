@@ -53,6 +53,33 @@ static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
 static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
+static void LogQueuedContextForensics(
+    const char* label,
+    void* context,
+    void* workItem,
+    uint32_t workType) {
+    if (!context) {
+        return;
+    }
+
+    auto* queueContext = static_cast<CBaseConnection_QueueContextScaffold*>(context);
+    void** contextVtable = *reinterpret_cast<void***>(context);
+    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(context);
+    void** ownerVtable = owner ? *reinterpret_cast<void***>(owner) : nullptr;
+    spdlog::info(
+        "DIAGNOSTIC: {} context={} contextVtable={} slot1={} slot4={} autoReleaseByte={} owner={} ownerVtable={} workItem={} workType=0x{:08x}",
+        label ? label : "queued-context",
+        fmt::ptr(context),
+        fmt::ptr(contextVtable),
+        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] : nullptr),
+        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] : nullptr),
+        static_cast<unsigned>(queueContext->autoReleaseFlag),
+        fmt::ptr(owner),
+        fmt::ptr(ownerVtable),
+        fmt::ptr(workItem),
+        workType);
+}
+
 struct CLTThreadPerClientTCPEngine_0x4b2768_SmallWorkItemPoolBackingBlock {
     CLTThreadPerClientTCPEngine_0x4b2768_SmallWorkItemPoolBackingBlock* next;
 };
@@ -2870,6 +2897,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             workType,
             fmt::ptr(context),
             shouldAutoReleaseContext ? 1u : 0u);
+        LogQueuedContextForensics(
+            "RunCompletedOperationQueue",
+            context,
+            workItem,
+            workType);
 
         if (context && isType1) {
             CleanupConnection(context);
@@ -2898,7 +2930,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
-                (void)CBaseConnection_FromQueueContextScaffold(context);
+                LogQueuedContextForensics(
+                    "StopQueueThreads",
+                    context,
+                    workItem,
+                    workType);
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }

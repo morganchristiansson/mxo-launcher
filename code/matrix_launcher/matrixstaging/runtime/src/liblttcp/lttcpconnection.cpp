@@ -439,6 +439,14 @@ uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQue
     }
 
     CBaseConnection_0x4b8018* directConnection = static_cast<CBaseConnection_0x4b8018*>(maybeQueueContext);
+    void** directVtable = *reinterpret_cast<void***>(directConnection);
+    spdlog::warn(
+        "DIAGNOSTIC: direct/native queued connection dispatch context={} vtable={} slot1={} slot4={} workItem={}",
+        fmt::ptr(directConnection),
+        fmt::ptr(directVtable),
+        fmt::ptr(directVtable ? directVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] : nullptr),
+        fmt::ptr(directVtable ? directVtable[CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] : nullptr),
+        fmt::ptr(workItem));
     return directConnection->OnOperationCompleted(workItem);
 }
 
@@ -462,7 +470,17 @@ uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
 
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
 uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext) {
-    if (!CBaseConnection_FromQueueContextScaffold(maybeQueueContext)) {
+    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
+    if (!owner) {
+        if (maybeQueueContext) {
+            void** directVtable = *reinterpret_cast<void***>(maybeQueueContext);
+            spdlog::warn(
+                "DIAGNOSTIC: direct/native queued connection auto-release bypass context={} vtable={} slot1={} slot4={}",
+                fmt::ptr(maybeQueueContext),
+                fmt::ptr(directVtable),
+                fmt::ptr(directVtable ? directVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] : nullptr),
+                fmt::ptr(directVtable ? directVtable[CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] : nullptr));
+        }
         return 0u;
     }
 

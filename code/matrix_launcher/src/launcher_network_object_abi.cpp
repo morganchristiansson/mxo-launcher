@@ -167,14 +167,36 @@ static void* g_BaseConnectionQueueContextVtable[
     mxo::liblttcp::CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex + 1] = {
     nullptr, nullptr, nullptr, nullptr, nullptr};
 
+static void* QueueContextScaffoldReturnAddress() {
+    return __builtin_return_address(0);
+}
+
 static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
-    mxo::liblttcp::CBaseConnection_QueueContextScaffold* /*self*/) {
+    mxo::liblttcp::CBaseConnection_QueueContextScaffold* self) {
+    void** ownerVtable =
+        (self && self->owner) ? *reinterpret_cast<void***>(self->owner) : nullptr;
+    spdlog::info(
+        "DIAGNOSTIC: queue-context scaffold release caller={} self={} owner={} ownerVtable={} autoReleaseFlag={}",
+        fmt::ptr(QueueContextScaffoldReturnAddress()),
+        fmt::ptr(self),
+        fmt::ptr(self ? self->owner : nullptr),
+        fmt::ptr(ownerVtable),
+        self ? static_cast<unsigned>(self->autoReleaseFlag) : 0u);
     return 1u;
 }
 
 static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffold(
     mxo::liblttcp::CBaseConnection_QueueContextScaffold* self,
     void* workItem) {
+    void** ownerVtable =
+        (self && self->owner) ? *reinterpret_cast<void***>(self->owner) : nullptr;
+    spdlog::info(
+        "DIAGNOSTIC: queue-context scaffold OnOperationCompleted caller={} self={} owner={} ownerVtable={} workItem={}",
+        fmt::ptr(QueueContextScaffoldReturnAddress()),
+        fmt::ptr(self),
+        fmt::ptr(self ? self->owner : nullptr),
+        fmt::ptr(ownerVtable),
+        fmt::ptr(workItem));
     return (self && self->owner) ? self->owner->OnOperationCompleted(workItem) : 0u;
 }
 
@@ -204,6 +226,12 @@ void mxo::liblttcp::InitializeBaseConnectionQueueContextScaffold(
     queueContext->padding05[1] = 0u;
     queueContext->padding05[2] = 0u;
     queueContext->owner = owner;
+    spdlog::debug(
+        "InitializeBaseConnectionQueueContextScaffold queueContext={} owner={} ownerVtable={} autoReleaseFlag={}",
+        fmt::ptr(queueContext),
+        fmt::ptr(owner),
+        fmt::ptr(owner ? *reinterpret_cast<void***>(owner) : nullptr),
+        static_cast<unsigned>(autoReleaseFlag));
 }
 
 mxo::liblttcp::CBaseConnection_0x4b8018* mxo::liblttcp::CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext) {
