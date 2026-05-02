@@ -1003,10 +1003,14 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
 }
 
 // anchor: launcher.exe:0x44aec0
-// Full fidelity for runtime behavior: builds MD5 of signedData80 and delegates to the verifier
-// leaf's message-verify convenience. Static RE still shows an older temporary-worker /
-// accumulator family (`0x4472f0 / 0x468520 / 0x467ee0`), but the direct public Crypto++
-// accumulator path is not currently runtime-safe in this launcher replacement.
+// Static RE tightened here:
+// - `0x44aec0` dispatches to verifier leaf vtable slot `+0x2c`
+// - `0x4b7580 + 0x2c = 0x437ba0`
+// - `0x437ba0` is the older Crypto++ verifier convenience that internally does
+//   `NewVerificationAccumulator()` -> `InputSignature()` -> `Update()` -> `VerifyAndRestart()`
+// Therefore the direct `VerifyMessage(...)` leaf call below is already the faithful public
+// Crypto++ replacement for this launcher path; forcing the worker family manually in source was a
+// worse match and also proved runtime-unsafe in our replacement.
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
     const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* validator,
     int timeBias) const {

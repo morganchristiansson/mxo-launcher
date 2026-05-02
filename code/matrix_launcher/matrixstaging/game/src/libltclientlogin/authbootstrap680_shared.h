@@ -50,9 +50,17 @@ public:
 // - `launcher.exe:0x467ee0` / `0x467f70` finalize against the outer verifier object
 //
 // Static RE now identifies child `+0xa4/+0xac` as old Crypto++ verifier-family objects, so source
-// uses direct `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` leaves. The older temporary-worker /
-// accumulator family (`0x4472f0 / 0x468520 / 0x467ee0`) remains documented, but the current
-// runtime-safe validation path still uses the verifier leaf's direct message-verify convenience.
+// uses direct `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` leaves.
+//
+// Important RE clarification:
+// - the raw `0x0b` auth-reply path at `0x44aec0` does *not* bypass the temporary worker family
+// - it calls verifier vtable slot `+0x2c`, and the `0x4b7580` leaf maps that slot to the older
+//   Crypto++ `VerifyMessage(...)` convenience (`0x437ba0`)
+// - that convenience internally drives the same worker family:
+//   `0x4472f0` create -> `0x468520` input signature -> accumulator `Update()` -> `0x467ee0`
+//   verify/finalize
+// So source should prefer the direct verifier-leaf `VerifyMessage(...)` call here unless/until a
+// lower-level replacement is proven to be both more faithful *and* runtime-safe.
 
 // Launcher-owned wrapper around embedded Crypto++ RNG / BufferedTransformation slices.
 // This is not a standalone Crypto++ leaf type by itself; static RE of `0x4686e0` and `0x468640`

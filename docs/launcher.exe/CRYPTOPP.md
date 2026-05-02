@@ -511,12 +511,26 @@ section factual and address-oriented.
 | `0x446f30` | `AlgorithmName()` body for `RSA/EMSA-PKCS1-v1_5(MD5)` |
 | `0x445410` | MD5 `DigestInfo` prefix getter |
 | `0x4472f0` | temporary accumulator create |
-| `0x468520` | load signature into temporary accumulator |
-| `0x467ee0` | finalize/verify on temporary accumulator |
-| `0x467f70` | fill temporary-accumulator result pair |
+| `0x468520` | `InputSignature()` / load signature into temporary accumulator |
+| `0x467ee0` | `VerifyAndRestart()` / finalize verify on temporary accumulator |
+| `0x467f70` | `RecoverAndRestart()`-style result-pair fill |
 | `0x4474c0` | dtor / leaf teardown |
 | `0x4470e0` | adjustor thunk to leaf dtor (`this -= 0x50`) |
 | `0x446d70` | adjustor thunk to related verifier-family dtor (`this -= 0x50`) |
+
+`0x4b7580` vtable slots now line up usefully with old Crypto++ verifier conveniences:
+
+| Leaf slot | Address | Best match |
+|---|---:|---|
+| `+0x1c` | `0x4472f0` | `NewVerificationAccumulator()` |
+| `+0x20` | `0x468520` | `InputSignature(PK_MessageAccumulator&, const byte*, size_t)` |
+| `+0x28` | `0x467ee0` | `VerifyAndRestart(PK_MessageAccumulator&)` |
+| `+0x2c` | `0x437ba0` | `VerifyMessage(const byte*, size_t, const byte*, size_t)` convenience |
+| `+0x34` | `0x467f70` | `RecoverAndRestart(...)`-style helper |
+
+Most important implication for source fidelity: when `0x44aec0` calls verifier slot `+0x2c`, that
+is already the higher-level old Crypto++ `VerifyMessage(...)` convenience, and that convenience
+internally drives the same temporary-worker family (`0x4472f0 / 0x468520 / 0x467ee0`).
 
 #### `0x004b7668` = `CryptoPP::PK_MessageAccumulatorImpl<MD5>`-like leaf
 
@@ -559,11 +573,16 @@ Source implementation note:
 - auth-bootstrap raw `0x08` no longer re-implements the packet-encryption chunk loop in source
 - source now routes the identified `0x4382c0 -> 0x438120 -> 0x438320` family through modern
   `CryptoPP::StringSource` + `CryptoPP::PK_EncryptorFilter` + `CryptoPP::VectorSink`
-- raw `0x0b` auth-reply validation is still routed through the verifier leaf's direct
-  message-verify convenience in source because the modern public Crypto++ accumulator worker path
-  (`NewVerificationAccumulator()` + `InputSignature()` + `Update()` + `VerifyAndRestart()`) was
-  not runtime-safe in the current launcher replacement, despite the older launcher binary clearly
-  containing that worker family (`0x4472f0 / 0x468520 / 0x467ee0`)
+- raw `0x0b` auth-reply validation should stay on the verifier leaf's direct
+  `VerifyMessage(...)` convenience in source
+  - `0x44aec0` calls verifier vtable slot `+0x2c`
+  - `0x4b7580 + 0x2c = 0x437ba0`
+  - `0x437ba0` is the older Crypto++ convenience that internally performs
+    `NewVerificationAccumulator()` + `InputSignature()` + accumulator `Update()` +
+    `VerifyAndRestart()`
+  So the direct leaf call is already the faithful public-Crypto++ replacement for this launcher
+  path; manually open-coding the worker sequence in source is unnecessary and, in our current
+  replacement, was not runtime-safe.
 
 #### `0x004b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
 
