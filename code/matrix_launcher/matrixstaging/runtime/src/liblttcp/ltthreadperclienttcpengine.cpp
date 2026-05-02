@@ -2870,6 +2870,9 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
 
+        (void)(context
+            ? CBaseConnection_FromQueueContextScaffold(context)
+            : nullptr);
         const bool shouldAutoReleaseContext =
             isType1 && context != nullptr &&
             (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
@@ -2909,6 +2912,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
+                (void)CBaseConnection_FromQueueContextScaffold(context);
                 if (workType == kWorkTypeClose) {
                     CleanupConnection(context);
                 }

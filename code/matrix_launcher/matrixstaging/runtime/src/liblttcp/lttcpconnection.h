@@ -285,10 +285,21 @@ private:
 };
 
 class CBaseConnection_0x4b8018;
+struct CBaseConnection_QueueContextScaffold;
 
+// UNANCHORED: launcher-owned queued connection-context ABI wrapper initializer.
+// The active replacement still materializes a tiny MSVC2003-compatible queue callback surface for
+// client.dll consumers; ownership of that ABI lie lives in `src/launcher_network_object_abi.cpp`.
+void InitializeBaseConnectionQueueContextScaffold(
+    CBaseConnection_QueueContextScaffold* queueContext,
+    CBaseConnection_0x4b8018* owner,
+    uint8_t autoReleaseFlag);
+// UNANCHORED: launcher-owned helper that recognizes the queued connection-context ABI adapter
+// object and returns its owning `CBaseConnection_0x4b8018` when present.
+CBaseConnection_0x4b8018* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
-// With the MSVC-compatible object ABI active, queued context keys now flow as direct
-// `CBaseConnection_0x4b8018` / derived object pointers just like launcher.exe `0x436b10` and `0x436920`.
+// The active replacement still needs the explicit adapter object whenever queued contexts may cross
+// into raw client.dll queue consumers compiled against the original MSVC object ABI.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
 // Current source accepts either the queue-context adapter object or a direct CBaseConnection_0x4b8018-family
@@ -302,6 +313,16 @@ uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object);
 // CBaseConnection_0x4b8018 pointers are accepted for completion dispatch but are not released through their
 // native C++ vtable because that slot numbering does not match the original MSVC ABI contract.
 uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext);
+
+// Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
+// mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`
+// (`vtable[4]`) and the optional type-1 auto-release slot `+0x04`.
+struct CBaseConnection_QueueContextScaffold {
+    void** vtable;           // +0x00
+    uint8_t autoReleaseFlag; // +0x04
+    uint8_t padding05[3];    // +0x05..+0x07
+    CBaseConnection_0x4b8018* owner;  // +0x08
+};
 
 // Source-owned abstraction over the recovered connection family.
 // Recovered base vtable `0x004b8018` currently reads as 7 rows under the MSVC ABI:
@@ -342,11 +363,14 @@ class CBaseConnection_0x4b8018 {
   // `0x436d31..0x436ee7` before the later queued-context `+0x04` release call on type-1 work.
   uint8_t AutoReleaseFlag04() const { return autoReleaseFlag04_; }
   // UNANCHORED: source-owned setter for the same recovered base `+0x04` byte.
-  void SetAutoReleaseFlag04(uint8_t autoReleaseFlag) { autoReleaseFlag04_ = autoReleaseFlag; }
+  void SetAutoReleaseFlag04(uint8_t autoReleaseFlag) {
+    autoReleaseFlag04_ = autoReleaseFlag;
+    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag;
+  }
 
-  // UNANCHORED: recovered queue consumers dequeue the real connection-family object pointer as the
-  // completed-operation context. Keep the historical accessor name for local source churn control.
-  void* QueueContextScaffold() { return this; }
+  // UNANCHORED: source-owned queue-dispatch ABI adapter accessor used where queued contexts may be
+  // consumed by raw client.dll code that expects original MSVC vtable slot numbering.
+  void* QueueContextScaffold() { return &queueContextScaffold_; }
 
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {
@@ -365,6 +389,7 @@ class CBaseConnection_0x4b8018 {
   // Source-owned compatibility mirror of the recovered base connection `+0x10` engine field.
   CLTThreadPerClientTCPEngine_0x4b2768* engine_;
   LTTCPEngineConnectionState state_;
+  CBaseConnection_QueueContextScaffold queueContextScaffold_;
 };
 
 // Recovered CLTTCPConnection-family wrapper surface.

@@ -397,7 +397,10 @@ CBaseConnection_0x4b8018::CBaseConnection_0x4b8018(LTTCPEngineConnectionState in
     : autoReleaseFlag04_(0u),
       padding05_07_{0u, 0u, 0u},
       engine_(nullptr),
-      state_(initialState) {}
+      state_(initialState),
+      queueContextScaffold_() {
+    InitializeBaseConnectionQueueContextScaffold(&queueContextScaffold_, this, autoReleaseFlag04_);
+}
 
 // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
 void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
@@ -421,11 +424,16 @@ void* CLTTCPConnection::OwnerContext() const {
 
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext) {
-    return maybeQueueContext;
+    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
+    return owner ? static_cast<void*>(owner) : maybeQueueContext;
 }
 
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
 uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem) {
+    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
+    if (owner) {
+        return owner->OnOperationCompleted(workItem);
+    }
     if (!maybeQueueContext) {
         return 0u;
     }
@@ -453,16 +461,17 @@ uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
 
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
 uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext) {
-    if (!maybeQueueContext) {
+    if (!CBaseConnection_FromQueueContextScaffold(maybeQueueContext)) {
         return 0u;
     }
 
-    void** vtable = *reinterpret_cast<void***>(maybeQueueContext);
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = (vtable && vtable[1])
-        ? reinterpret_cast<ReleaseFn>(vtable[1])
+    ReleaseFn fn = queueContext->vtable[1]
+        ? reinterpret_cast<ReleaseFn>(queueContext->vtable[1])
         : nullptr;
-    return fn ? fn(maybeQueueContext) : 0u;
+    return fn ? fn(queueContext) : 0u;
 }
 
 // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.
