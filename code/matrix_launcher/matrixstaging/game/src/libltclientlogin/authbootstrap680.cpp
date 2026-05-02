@@ -1394,13 +1394,11 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextPacket.ReserveFieldLength(0x20u);
 
                 // anchor: launcher.exe:0x443ea0 / 0x443fa0 / 0x4440a0 / 0x4441a0 / 0x443660
-                // Keep the final flattened plaintext explicit for now, but derive it from the
-                // recovered `0x4b6cf4` builder object instead of re-stating launcher-owned field
-                // lengths from scratch. Static RE already proves:
-                // - leading word `0x0017` is the builder's fixed header byte count
-                // - the first/second string lengths come from inherited `+0x18` / `+0x20`
-                // - the third field length is the builder-local `+0x28` word rewritten by
-                //   `0x443660`
+                // The recovered `0x4b6cf4` builder is now the source of truth for raw0x0a plaintext
+                // shaping. Static RE proves:
+                // - leading bytes live in the fixed builder payload prefix
+                // - first/second string lengths come from inherited `+0x18` / `+0x20`
+                // - third field length is the builder-local `+0x28` word rewritten by `0x443660`
                 const uint16_t passwordLengthField = plaintextPacket.payloadSize18;
                 const uint16_t soePasswordLengthField = plaintextPacket.characterIdHigh20;
                 const uint16_t plaintextBuilderPayloadByteCountBeforePadding =
@@ -1457,11 +1455,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 }
 
                 // anchor: launcher.exe:0x448389..0x44844c
-                // The assembly-level source pointer/length consumed by child+0x98 are taken
+                // Confirmed closure: the source pointer/length consumed by child+0x98 are taken
                 // directly from the `0x4b6cf4` builder's message-storage payload, after the third
                 // field has been filled and its in-place length rewritten by `SetPadding(...)`.
-                // So the strongest current closure is: the CBC input bytes are the builder payload
-                // itself, not a second source-owned flattening of that payload.
+                // So the CBC input bytes are the builder payload itself.
                 plaintextBytes.assign(
                     plaintextBuilderPayloadBytes,
                     plaintextBuilderPayloadBytes + plaintextBuilderPayloadByteCount);
@@ -1492,16 +1489,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 }
 
                 // anchor: launcher.exe:0x4483ea..0x44844c
-                // Bigger closure on the raw0x0a bridge:
-                // - after `SetPadding(...)`, the launcher fills the third builder field through
-                //   child `+0x54` helper vtable `+0x18`
-                // - that helper slot loops over the RandomPool family's GenerateByte path rather
-                //   than writing zero padding
-                // - the later child `+0x98` CBC encrypt call still consumes a source pointer/length
-                //   derived from the `0x4b6cf4` stack builder state, not directly from the final
-                //   `0x4b6d08` envelope
-                // So source still keeps an explicit flattened plaintext view, but it is now built
-                // from the recovered builder fields including the helper-generated random tail.
+                // After `SetPadding(...)`, the launcher fills the third builder field through
+                // child `+0x54` helper vtable `+0x18`, looping over the RandomPool family's
+                // GenerateByte path rather than writing zero padding. The resulting builder payload
+                // is then encrypted through child `+0x98`.
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
                 encryptedPacket.InitializePayloadSize();
                 encryptedPacket.ReserveLengthPrefixedTail(
@@ -1509,12 +1500,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 if (!plaintextBytes.empty() && encryptedPacket.debugString14 != nullptr) {
                     try {
                         // anchor: launcher.exe:0x44841d / child+0x98 vtable +0x1c
-                        // Static RE shows the outbound raw 0x0a tail encrypts directly through the
-                        // existing child-side small CBC Twofish object into the reserved tail of
-                        // the encrypted packet builder. The current packet scaffold is still not
-                        // byte-faithful enough to eliminate this separately materialized plaintext
-                        // view, so keep the direct Crypto++ object while preserving the known-good
-                        // launcher byte layout here.
+                        // Static RE shows the outbound raw 0x0a tail encrypts the confirmed
+                        // `0x4b6cf4` builder payload directly through the existing child-side
+                        // small CBC Twofish object into the reserved tail of the encrypted packet
+                        // builder.
                         feedbackTransformSmall98->ProcessData(
                             reinterpret_cast<uint8_t*>(const_cast<char*>(encryptedPacket.debugString14)),
                             plaintextBytes.data(),
@@ -1535,7 +1524,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     static_cast<unsigned>(decryptedChallengeBytes.size()),
                     static_cast<unsigned>(processedChallengeMd5Bytes.size()));
                 spdlog::info(
-                    "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} builderPayloadLen={} builderPayloadMismatchCount={} builderPayloadPrefix='{}' explicitPlaintextPrefix='{}' childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
+                    "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} builderPayloadLen={} builderPayloadMismatchCount={} builderPayloadPrefix='{}' plaintextPrefix='{}' childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
                     static_cast<unsigned>(passwordLengthField),
                     static_cast<unsigned>(soePasswordLengthField),
                     static_cast<unsigned>(plaintextBytes.size()),

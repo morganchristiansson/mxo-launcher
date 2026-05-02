@@ -558,7 +558,7 @@ Source implementation note:
 
 - auth-bootstrap raw `0x08` no longer re-implements the packet-encryption chunk loop in source
 - source now routes the identified `0x4382c0 -> 0x438120 -> 0x438320` family through modern
-  `CryptoPP::StringSource` + `CryptoPP::PK_EncryptorFilter` + `CryptoPP::StringSink`
+  `CryptoPP::StringSource` + `CryptoPP::PK_EncryptorFilter` + `CryptoPP::VectorSink`
 
 #### `0x004b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
 
@@ -586,6 +586,16 @@ Source implementation note:
 ## 7. Open questions / negative results
 
 - The auth-reply parse accessor/object sketches remain launcher-owned packet shells.
+
+- **Raw `0x0a` auth challenge response plaintext source is now closed well enough for source
+  fidelity purposes** — the CBC input bytes consumed by child `+0x98` come directly from the
+  `Packet_AsAuthChallengeResponse_0x4b6cf4` builder payload after:
+  - first/second field reservation helpers (`0x443fa0` / `0x4440a0`)
+  - third field reservation helper (`0x4441a0`)
+  - in-place length rewrite (`0x443660`)
+  - helper54 RandomPool-byte fill through child `+0x54`
+  Source should treat the builder payload itself as the raw0x0a plaintext source, not maintain a
+  second independently-shaped plaintext layout.
 
 - **Exact Crypto++ version** — the launcher was likely built against 5.1.x or 5.2.x.
   The `OldRandomPool` in 8.9.0 is a faithful reproduction, but slot-level vtable offsets
