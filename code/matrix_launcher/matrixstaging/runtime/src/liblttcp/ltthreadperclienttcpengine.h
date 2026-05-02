@@ -92,13 +92,23 @@ static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord) == 0x28, 
 static_assert(sizeof(CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610) == 0x50, "queue pair storage size mismatch");
 static_assert(offsetof(CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610, queue28) == 0x28, "queue pair second-record offset mismatch");
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold {
+class CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8 {
+public:
     // anchor: launcher.exe:0x435050 / vtable `0x004b3df8`
     // Small queued type-2 work item used by the worker-thread connect-completion path.
-    CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader header{};
+    explicit CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8(
+        uint32_t statusOrPayloadDword08);
+    // anchor: launcher.exe:0x435c30 / deleting dtor slot at vtable `0x004b3df8`
+    virtual ~CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8();
+    // Source-owned slot-`+0x04` stand-in used by queued release dispatch.
+    virtual uint32_t ReleaseSlot();
+
+private:
+    uint32_t workType_;
+    uint32_t statusOrPayloadDword08_;
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold) == 0x0c, "connection-status work-item size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8) == 0x0c, "connection-status work-item size mismatch");
 
 class CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00 {
 public:

@@ -53,6 +53,7 @@ Recovered field roles:
   - deleting dtor/free-list return path: `launcher.exe:0x435c30`
   - vftable: `launcher.exe:0x4b3df8`
   - recovered 3-dword shape: `vfptr`, `workType=2`, `statusOrPayloadDword08`
+  - current source now models this one as a real polymorphic class (`CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8`) instead of a raw scaffold so the queued-release path also exercises compiler-emitted vfptr/vtable layout for the payload-bearing type-2 item
 - `CloseWorkItem`
   - ctor: `launcher.exe:0x435070`
   - deleting dtor/free-list return path: `launcher.exe:0x435c80`

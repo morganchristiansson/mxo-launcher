@@ -50,7 +50,6 @@ static spdlog::logger* LoggerForQueueLabel(const char* label) {
 }
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
-static void* g_ConnectionStatusWorkItemVtable[2] = {0};
 static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
 static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
@@ -488,25 +487,6 @@ static const char* EngineWorkTypeName(uint32_t workType) {
     }
 }
 
-// anchor: launcher.exe:0x435c30 / vtable `0x004b3df8`
-static uint32_t __thiscall ConnectionStatusWorkItem_ReleaseScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* self) {
-    if (!self) {
-        return 1u;
-    }
-
-    // Source-owned narrowed stand-in for the deleting-dtor free-list return path in `0x435c30`.
-    SmallWorkItemPool_FreeStorageScaffold(&g_ConnectionStatusWorkItemPoolState, self);
-    return 1u;
-}
-
-static void EnsureSmallConnectionWorkItemVtablesInitialized() {
-    if (!g_ConnectionStatusWorkItemVtable[1]) {
-        g_ConnectionStatusWorkItemVtable[1] =
-            reinterpret_cast<void*>(ConnectionStatusWorkItem_ReleaseScaffold);
-    }
-}
-
 // UNANCHORED source-owned helper shared by the small fixed allocators rooted at `0x435720`
 // and `0x435840`.
 static uint32_t SmallWorkItemPool_SystemPageSizeScaffold() {
@@ -690,27 +670,24 @@ static void* CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemPool_A
 }
 
 // anchor: launcher.exe:0x435d90
-static CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold*
+static CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8*
 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate() {
-    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold*>(
+    return static_cast<CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8*>(
         CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemPool_AllocateStorage(
-            sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold)));
+            sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8)));
 }
 
 // anchor: launcher.exe:0x435050
-static CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold*
+static CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8*
 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
-    CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* self,
+    CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8* self,
     uint32_t statusOrPayloadDword08) {
     if (!self) {
         return nullptr;
     }
 
-    EnsureSmallConnectionWorkItemVtablesInitialized();
-    self->header.workType = CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus;
-    self->header.vtable = g_ConnectionStatusWorkItemVtable;
-    self->header.statusOrPayloadDword08 = statusOrPayloadDword08;
-    return self;
+    return new (self) CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8(
+        statusOrPayloadDword08);
 }
 
 // anchor: launcher.exe:0x435840
@@ -837,6 +814,21 @@ static uint32_t CLTIPSocket_StaticAllocateSocket(
 }
 
 }  // namespace
+
+// anchor: launcher.exe:0x435050 / vtable `0x004b3df8`
+CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8::CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8(
+    uint32_t statusOrPayloadDword08)
+    : workType_(CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus)
+    , statusOrPayloadDword08_(statusOrPayloadDword08) {}
+
+// anchor: launcher.exe:0x435c30 / deleting dtor slot at vtable `0x004b3df8`
+CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8::~CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8() = default;
+
+uint32_t CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8::ReleaseSlot() {
+    this->~CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8();
+    SmallWorkItemPool_FreeStorageScaffold(&g_ConnectionStatusWorkItemPoolState, this);
+    return 1u;
+}
 
 // anchor: launcher.exe:0x435070 / vtable `0x004b3e00`
 CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00::CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00()
@@ -1248,7 +1240,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             if (connectStatusQueued) {
                 return;
             }
-            CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* statusWorkItem =
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8* statusWorkItem =
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                     CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                     workPayload);
@@ -1261,7 +1253,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
                 return;
             }
             engine->EnqueueCompletedOperation(
-                &statusWorkItem->header,
+                statusWorkItem,
                 connection->QueueContextScaffold(),
                 /*useQueue34=*/false,
                 connectStatusLabel);
@@ -2214,12 +2206,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder));
 
-        CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8* connectionStatusWorkItem =
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                 kConnectRejectedNotClosedPayload);
         (void)EnqueueCompletedOperation(
-            connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+            connectionStatusWorkItem,
             queuedConnectionContext,
             /*useQueue34=*/false,
             "connect:not-closed");
@@ -2241,12 +2233,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             static_cast<unsigned>(wsaError),
             std::system_category().message(wsaError));
 
-        CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8* connectionStatusWorkItem =
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                 kConnectImmediateFailurePayload);
         (void)EnqueueCompletedOperation(
-            connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+            connectionStatusWorkItem,
             queuedConnectionContext,
             /*useQueue34=*/false,
             "connect:socket-failed");
@@ -2274,12 +2266,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             static_cast<unsigned>(wsaError),
             std::system_category().message(wsaError));
 
-        CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8* connectionStatusWorkItem =
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                 kConnectImmediateFailurePayload);
         (void)EnqueueCompletedOperation(
-            connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+            connectionStatusWorkItem,
             queuedConnectionContext,
             /*useQueue34=*/false,
             "connect:bind-failed");
@@ -2318,12 +2310,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 /*useQueue34=*/false,
                 "connect:immediate-close");
 
-            CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8* connectionStatusWorkItem =
                 CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
                     CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_Allocate(),
                     kConnectImmediateFailurePayload);
             (void)EnqueueCompletedOperation(
-                connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+                connectionStatusWorkItem,
                 queuedConnectionContext,
                 /*useQueue34=*/false,
                 "connect:immediate-status");
