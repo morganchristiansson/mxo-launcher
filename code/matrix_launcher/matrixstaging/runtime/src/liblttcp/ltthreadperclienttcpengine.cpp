@@ -13,6 +13,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -116,17 +117,12 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry {
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode node = {};
 };
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry {
-    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload;
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode node = {};
-};
-
 struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking {
     std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry>> entries;
 };
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking {
-    std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry>> entries;
+    std::map<uint32_t, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread>> entries;
 };
 
 static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking>
@@ -398,136 +394,68 @@ static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeFindNode
         CompareContextTreeKeys);
 }
 
-static CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry* FindEngineContextPayloadEntry(
+static CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindEngineContextWorkerPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node) {
-    if (!node) {
-        return nullptr;
-    }
-
+    uint32_t key) {
     CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* backing =
         FindEngineContextPayloadBacking(self);
     if (!backing) {
         return nullptr;
     }
 
-    auto it = backing->entries.find(node);
-    return (it != backing->entries.end()) ? it->second.get() : nullptr;
+    auto it = backing->entries.find(key);
+    return (it != backing->entries.end() && it->second) ? it->second.get() : nullptr;
 }
 
-// Source-owned context-tree insertion adapter.
+// Source-owned context-tree outer-layer adapter.
 // Evidence addresses: launcher.exe:0x4196b0 / 0x420ba0 / 0x431ff0.
-// Static-RE note:
-// - launcher.exe already gets the red/black mechanics from SGI STL tree helpers
-// - this wrapper only bridges recovered head/node layout plus source-owned payload backing
-// - original flow inserts a context-keyed node whose `[node+0x14]` payload is the direct
-//   `WorkerThread*` object pointer
-static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeInsertUniqueNode(
-    CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
-    uint32_t key,
-    bool* outInserted) {
-    if (outInserted) {
-        *outInserted = false;
-    }
-    if (!self || !head) {
-        return nullptr;
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking& backing =
-        EnsureEngineContextPayloadBacking(self);
-    auto entry = std::make_unique<CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry>();
-    if (!entry) {
-        return nullptr;
-    }
-
-    entry->node._M_valptr()->first = key;
-    entry->node._M_valptr()->second = nullptr;
-
-    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
-    mxo::sgi_tree::_Rb_tree_node_base* parent = header;
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* current =
-        TreeRootNode<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode>(head);
-    bool insertLeft = true;
-    while (current) {
-        parent = current;
-        const int cmp = CompareContextTreeKeys(
-            entry->node._M_valptr()->first,
-            current->_M_valptr()->first);
-        if (cmp == 0) {
-            return current;
-        }
-        insertLeft = (cmp < 0);
-        current = insertLeft
-            ? static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(current->_M_left)
-            : static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(current->_M_right);
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* insertedNode = &entry->node;
-    insertedNode->_M_parent = nullptr;
-    insertedNode->_M_left = nullptr;
-    insertedNode->_M_right = nullptr;
-    insertedNode->_M_color = mxo::sgi_tree::_S_red;
-
-    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
-    backing.entries.emplace(insertedNode, std::move(entry));
-    if (outInserted) {
-        *outInserted = true;
-    }
-    return insertedNode;
-}
-
-static bool ContextTreeAttachPayload(
-    CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node,
-    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload) {
-    if (!payload) {
-        return false;
-    }
-
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry* entry =
-        FindEngineContextPayloadEntry(self, node);
-    if (!entry) {
-        return false;
-    }
-
-    node->_M_valptr()->second = payload.get();
-    entry->payload = std::move(payload);
-    return true;
-}
-
-// Source-owned adapter for the original `0x4196b0 -> 0x420ba0` insert-unique flow where the
-// key/value pair is materialized before the helper call instead of inserted first and patched later.
-static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeInsertUniqueWorkerNode(
+// Current semantic read of the callsites is a plain unique map keyed by the normalized connection
+// context pointer.
+static CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* ContextTreeInsertUniqueWorkerNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
     uint32_t key,
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload,
     bool* outInserted) {
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
-        ContextTreeInsertUniqueNode(self, head, key, outInserted);
-    if (!node) {
+    (void)head;
+    if (outInserted) {
+        *outInserted = false;
+    }
+    if (!self || !payload) {
         return nullptr;
     }
-    if (outInserted && *outInserted) {
-        if (!ContextTreeAttachPayload(self, node, std::move(payload))) {
-            return nullptr;
-        }
+
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking& backing =
+        EnsureEngineContextPayloadBacking(self);
+    auto [it, inserted] = backing.entries.emplace(key, nullptr);
+    if (!inserted) {
+        return it->second.get();
     }
-    return node;
+
+    it->second = std::move(payload);
+    if (outInserted) {
+        *outInserted = true;
+    }
+    return it->second.get();
 }
 
-static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> ContextTreeDetachPayload(
+static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> ContextTreeDetachPayloadByKey(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node) {
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadEntry* entry =
-        FindEngineContextPayloadEntry(self, node);
-    if (!entry) {
+    uint32_t key) {
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* backing =
+        FindEngineContextPayloadBacking(self);
+    if (!backing) {
         return nullptr;
     }
 
-    node->_M_valptr()->second = nullptr;
-    return std::move(entry->payload);
+    auto it = backing->entries.find(key);
+    if (it == backing->entries.end()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload = std::move(it->second);
+    backing->entries.erase(it);
+    return payload;
 }
 
 // Source-owned endpoint-tree erase adapter.
@@ -546,18 +474,16 @@ static bool EndpointTreeEraseNode(
 }
 
 // Source-owned context-tree erase adapter.
-// Evidence address: launcher.exe:0x4154d0.
-// Static-RE note:
-// - `_Rb_tree_rebalance_for_erase` already handles the shared unlink/rebalance mechanics
-// - this wrapper only bridges recovered head/node layout and source-owned backing cleanup
+// Current source models the recovered outer layer as a plain map keyed by the normalized
+// connection/context pointer, so erase is handled by key-removal in `ContextTreeDetachPayloadByKey`.
 static bool ContextTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node) {
-    return LauncherTreeEraseOwnedNode(
-        FindEngineContextPayloadBacking(self),
-        head,
-        node);
+    (void)self;
+    (void)head;
+    (void)node;
+    return true;
 }
 
 static void EraseEngineBackings(CLTThreadPerClientTCPEngine_0x4b2768* self) {
@@ -2027,7 +1953,7 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
     if (CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking =
             FindEngineContextPayloadBacking(this)) {
         for (auto& it : contextBacking->entries) {
-            CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread = it.second->payload.get();
+            CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread = it.second.get();
             if (!workerThread) {
                 continue;
             }
@@ -2679,13 +2605,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
         touchedConnectionState = true;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* contextTreeSentinel =
-        reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
-        ContextTree_Find(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cleanupContextKey)));
-    if (node != contextTreeSentinel && node->_M_valptr()->second != nullptr) {
-        workerPayload = ContextTreeDetachPayload(this, node);
-        (void)ContextTreeEraseNode(this, ownedContextTreeHead8C_, node);
+    const uint32_t contextTreeKey = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cleanupContextKey));
+    if (FindEngineContextWorkerPayload(this, contextTreeKey) != nullptr) {
+        workerPayload = ContextTreeDetachPayloadByKey(this, contextTreeKey);
         result = kResultSuccess;
     } else {
         if (!touchedConnectionState) {
@@ -3084,10 +3006,11 @@ CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* CLTThreadPerClientTCPEngi
 
 // anchor: launcher.exe:0x42fe10
 CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* CLTThreadPerClientTCPEngine_0x4b2768::ContextTree_Find(uint32_t key) {
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
-        ContextTreeFindNode(ownedContextTreeHead8C_, key);
-    return node ? node
-                : reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
+    (void)key;
+    // The recovered outer callsites now read best as a plain map lookup keyed by the normalized
+    // connection/context pointer. Source keeps this legacy node-returning helper only as a stub so
+    // the anchored method boundary remains visible while callers move to direct map-like helpers.
+    return reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
 }
 
 // anchor: launcher.exe:0x431ff0
@@ -3108,13 +3031,12 @@ CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0
     const uint32_t key = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(connection));
     (void)EnterCleanupLockHelper();
     bool inserted = false;
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node = ContextTreeInsertUniqueWorkerNode(
+    result = ContextTreeInsertUniqueWorkerNode(
         this,
         ownedContextTreeHead8C_,
         key,
         std::move(worker),
         &inserted);
-    result = node ? node->_M_valptr()->second : nullptr;
     (void)LeaveCleanupLockHelper();
 
     if (!result) {

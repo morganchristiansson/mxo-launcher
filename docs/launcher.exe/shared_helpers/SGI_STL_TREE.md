@@ -141,6 +141,14 @@ Recovered node shape:
 - key at `+0x10` = 32-bit context key
 - payload at `+0x14` = `WorkerThread`-style payload pointer
 
+Current source status:
+- caller-side recovery now reads this outer layer best as a plain unique map keyed by the
+  normalized connection/context pointer
+- source now models that outer layer directly with map semantics while keeping the recovered
+  `+0x8c/+0x90` head/count surface visible on the engine object
+- the endpoint tree still uses the narrower SGI-tree compatibility layer because its lifecycle is a
+  little more coupled to staged insertion / later payload attachment
+
 ## B. Console-variable registry tree
 
 String-keyed tree use also exists outside the network engine:
