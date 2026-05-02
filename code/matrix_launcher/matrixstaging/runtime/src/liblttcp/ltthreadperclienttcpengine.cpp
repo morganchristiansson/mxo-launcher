@@ -1975,6 +1975,37 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
     EraseEngineBackings(this);
 }
 
+// anchor: launcher.exe:0x436000
+// source-owned inheritance bridge:
+// - base vtable `0x4b3e74` and derived vtable `0x4b2768` share this slot body unchanged
+// - current C++ layout has not yet split the recovered base fields (+0x04..+0x7c) from the
+//   derived extension (+0x80..+0xb3), so keep one implementation body on the derived class and
+//   forward the base declaration here for ABI-documentation fidelity
+uint32_t CLTBaseThreadPerClientTCPEngine_0x4b3e74::MonitorEphemeralUDPPort(
+    uint16_t* outBoundPortHostOrder,
+    void* contextKey,
+    void* ipv4NetworkOrder) {
+    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(this)
+        ->CLTThreadPerClientTCPEngine_0x4b2768::MonitorEphemeralUDPPort(
+            outBoundPortHostOrder,
+            contextKey,
+            ipv4NetworkOrder);
+}
+
+// anchor: launcher.exe:0x443810
+// source-owned inheritance bridge; see note above on shared unchanged base/derived slots.
+uint32_t CLTBaseThreadPerClientTCPEngine_0x4b3e74::Slot10_443810(void* arg1) {
+    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(this)
+        ->CLTThreadPerClientTCPEngine_0x4b2768::Slot10_443810(arg1);
+}
+
+// anchor: launcher.exe:0x431670
+// source-owned inheritance bridge; see note above on shared unchanged base/derived slots.
+uint32_t CLTBaseThreadPerClientTCPEngine_0x4b3e74::Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) {
+    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(this)
+        ->CLTThreadPerClientTCPEngine_0x4b2768::Slot11_431670(arg1, out0, out1);
+}
+
 // anchor: launcher.exe:0x4319a0
 // source-owned compatibility shim only:
 // - launcher.exe `0x4319a0` is the deleting-dtor slot for vtable `0x004b2768`

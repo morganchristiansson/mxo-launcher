@@ -326,8 +326,11 @@ public:
     virtual uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) = 0;
     // slot 2 / unresolved-import family at base vtable `0x4b3e74`
     virtual uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder) = 0;
-    // slot 3 / shared body `launcher.exe:0x436000`
-    virtual uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder) = 0;
+    // slot 3 / inherited concrete body `launcher.exe:0x436000`
+    // Current source caveat: the implementation body still lives under the derived-class source
+    // symbol until the recovered field split between base (+0x04..+0x7c) and derived
+    // (+0x80..+0xb3) is modeled explicitly in C++.
+    virtual uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder);
     // slot 4 / unresolved-import family at base vtable `0x4b3e74`
     virtual uint32_t Slot4_42F7C0(void* arg1) = 0;
     // slot 5 / unresolved-import family at base vtable `0x4b3e74`
@@ -345,10 +348,10 @@ public:
         LTTCPEndpointKey_0x44b070* remoteEndpoint,
         void* contextKey,
         void* ownershipMode) = 0;
-    // slot 10 / shared stub `launcher.exe:0x443810`
-    virtual uint32_t Slot10_443810(void* arg1) = 0;
-    // slot 11 / shared stub `launcher.exe:0x431670`
-    virtual uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) = 0;
+    // slot 10 / inherited concrete stub `launcher.exe:0x443810`
+    virtual uint32_t Slot10_443810(void* arg1);
+    // slot 11 / inherited concrete stub `launcher.exe:0x431670`
+    virtual uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1);
     // slot 12 / derived body `launcher.exe:0x4316a0`, base stub currently unresolved (`0x441790`)
     virtual uint32_t CleanupConnection(void* contextKey) = 0;
 };
@@ -433,6 +436,8 @@ public:
     // anchor: launcher.exe:0x4325d0
     uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder = nullptr) override;
     // anchor: launcher.exe:0x436000
+    // inherited unchanged from base vtable `0x4b3e74`; declaration retained here temporarily as a
+    // source-placement reminder until the base/derived field split is modeled in C++.
     uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder = nullptr) override;
     // anchor: launcher.exe:0x42f7c0
     uint32_t Slot4_42F7C0(void* arg1) override;
@@ -455,8 +460,12 @@ public:
         void* contextKey,
         void* ownershipMode) override;
     // anchor: launcher.exe:0x443810
+    // inherited unchanged from base vtable `0x4b3e74`; declaration retained here temporarily as a
+    // source-placement reminder until the base/derived field split is modeled in C++.
     uint32_t Slot10_443810(void* arg1) override;
     // anchor: launcher.exe:0x431670
+    // inherited unchanged from base vtable `0x4b3e74`; declaration retained here temporarily as a
+    // source-placement reminder until the base/derived field split is modeled in C++.
     uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) override;
     // anchor: launcher.exe:0x4316a0
     uint32_t CleanupConnection(void* contextKey) override;
