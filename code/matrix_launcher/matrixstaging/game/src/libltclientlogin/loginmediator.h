@@ -980,6 +980,7 @@ private:
     LoginObserverTreeNode674* ObserverTreeBegin674() const;
     LoginObserverTreeNode674* ObserverTreeEnd674() const;
     LoginObserverTreeNode674* FindObserverNode674(void* observer) const;
+    uint32_t RemoveObserverNode674(void* observer);
     void EqualRangeObserver674(
         void* observer,
         LoginObserverTreeNode674** outLowerBound,

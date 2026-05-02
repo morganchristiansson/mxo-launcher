@@ -1781,8 +1781,11 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     LoginObserverTreeNode674* lowerBound = nullptr;
     LoginObserverTreeNode674* upperBound = nullptr;
     EqualRangeObserver674(observer, &lowerBound, &upperBound);
-    const uint32_t rangeCount = LoginObserverTreeHelper674::CountRange(lowerBound, upperBound);
-    EraseObserverRange674(lowerBound, upperBound);
+    const uint32_t rangeCount = (FindObserverNode674(observer) != nullptr) ? 1u : 0u;
+    if (rangeCount != 0u) {
+        (void)RemoveObserverNode674(observer);
+        EraseObserverRange674(lowerBound, upperBound);
+    }
     const bool returnValue = (rangeCount == 0u);
 
     spdlog::info(

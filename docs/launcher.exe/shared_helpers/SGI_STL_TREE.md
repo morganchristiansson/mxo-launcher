@@ -287,6 +287,10 @@ The current source split is:
   `matrixstaging/runtime/src/libltbase/consolevar.cpp`
 - mediator-observer-specific pointer-keyed insert/erase/range helpers in
   `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
+  - current source no longer re-owns the SGI tree mechanics there
+  - the recovered outer layer is now modeled directly as a unique observer set keyed by the
+    observer pointer, with the owner `+0x674` header/count retained only as a lightweight mirror
+    for logging/layout diagnostics
 
 Current non-duplication boundary in source:
 - **kept**: launcher-specific key comparison, search shape, duplicate handling, payload/backing
