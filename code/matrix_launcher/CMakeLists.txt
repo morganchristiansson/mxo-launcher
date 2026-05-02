@@ -14,6 +14,7 @@ set(MXO_MINGW_LIBSTDCXX_TARGET_ROOT "/usr/lib/gcc/i686-w64-mingw32/13-win32/incl
     "MinGW libstdc++ target-specific internal header root used by the recovered SGI tree helper lineage")
 
 set(MXO_GAME_DIR "$ENV{HOME}/MxO_7.6005" CACHE PATH "Matrix Online game directory")
+set(MXO_DEPLOY_TO_GAME_DIR ON CACHE BOOL "Copy built launchers into MXO_GAME_DIR after build")
 set(MXO_BUILD_PROFILE "debug" CACHE STRING "Compatibility profile label used in output paths")
 set_property(CACHE MXO_BUILD_PROFILE PROPERTY STRINGS debug release)
 set(MXO_DEBUG_LEVEL "slim" CACHE STRING "Debug info level: full, slim, or none")
@@ -195,22 +196,25 @@ target_compile_options(crashreporter_stub PRIVATE -Wall -Wextra -O2)
 set(MXO_DEPLOYED_EXE "${MXO_GAME_DIR}/resurrections.exe")
 set(MXO_DEPLOYED_CRASHREPORTER_STUB "${MXO_GAME_DIR}/crashreporter.stub.exe")
 
-add_custom_command(
-    TARGET resurrections POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${MXO_GAME_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:resurrections>" "${MXO_DEPLOYED_EXE}"
-    BYPRODUCTS "${MXO_DEPLOYED_EXE}"
-    COMMENT "Deploying resurrections.exe into ${MXO_GAME_DIR}"
-)
+if(MXO_DEPLOY_TO_GAME_DIR)
+    add_custom_command(
+        TARGET resurrections POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${MXO_GAME_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:resurrections>" "${MXO_DEPLOYED_EXE}"
+        BYPRODUCTS "${MXO_DEPLOYED_EXE}"
+        COMMENT "Deploying resurrections.exe into ${MXO_GAME_DIR}"
+    )
 
-add_custom_command(
-    TARGET crashreporter_stub POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${MXO_GAME_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:crashreporter_stub>" "${MXO_DEPLOYED_CRASHREPORTER_STUB}"
-    BYPRODUCTS "${MXO_DEPLOYED_CRASHREPORTER_STUB}"
-    COMMENT "Deploying crashreporter.stub.exe into ${MXO_GAME_DIR}"
-)
+    add_custom_command(
+        TARGET crashreporter_stub POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${MXO_GAME_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:crashreporter_stub>" "${MXO_DEPLOYED_CRASHREPORTER_STUB}"
+        BYPRODUCTS "${MXO_DEPLOYED_CRASHREPORTER_STUB}"
+        COMMENT "Deploying crashreporter.stub.exe into ${MXO_GAME_DIR}"
+    )
+endif()
 
 message(STATUS "MXO build profile: ${MXO_BUILD_PROFILE}")
 message(STATUS "MXO game dir: ${MXO_GAME_DIR}")
+message(STATUS "MXO deploy to game dir: ${MXO_DEPLOY_TO_GAME_DIR}")
 message(STATUS "MXO debug level: ${MXO_DEBUG_LEVEL}")
