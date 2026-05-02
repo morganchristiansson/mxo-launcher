@@ -59,6 +59,14 @@ public:
 // - that convenience internally drives the same worker family:
 //   `0x4472f0` create -> `0x468520` input signature -> accumulator `Update()` -> `0x467ee0`
 //   verify/finalize
+// - sibling inherited slots also line up cleanly:
+//   `+0x28 = 0x437b70` ->
+//     `CryptoPP::TF_VerifierBase_0x4b6e40::VerifyAccumulatorAndDestroyOwnedWorker`
+//     (`Verify(PK_MessageAccumulator*)` convenience with ownership transfer)
+//   `+0x34 = 0x437c20` ->
+//     `CryptoPP::TF_VerifierBase_0x4b6e40::RecoverMessageWithTemporaryWorker`
+//     driving `0x467f70 = AuthBootstrap680ReplyAuthDataValidator_RecoverTemporaryWorkerResultPair`
+// The auth-bootstrap validator path currently only needs the `VerifyMessage(...)` route above.
 // So source should prefer the direct verifier-leaf `VerifyMessage(...)` call here unless/until a
 // lower-level replacement is proven to be both more faithful *and* runtime-safe.
 

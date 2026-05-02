@@ -524,13 +524,19 @@ section factual and address-oriented.
 |---|---:|---|
 | `+0x1c` | `0x4472f0` | `NewVerificationAccumulator()` |
 | `+0x20` | `0x468520` | `InputSignature(PK_MessageAccumulator&, const byte*, size_t)` |
-| `+0x28` | `0x467ee0` | `VerifyAndRestart(PK_MessageAccumulator&)` |
-| `+0x2c` | `0x437ba0` | `VerifyMessage(const byte*, size_t, const byte*, size_t)` convenience |
-| `+0x34` | `0x467f70` | `RecoverAndRestart(...)`-style helper |
+| `+0x24` | `0x467ee0` | `VerifyAndRestart(PK_MessageAccumulator&)` |
+| `+0x28` | `0x437b70` | `VerifyAccumulatorAndDestroyOwnedWorker` = `Verify(PK_MessageAccumulator*)` convenience; calls `+0x24`, then destroys the accumulator |
+| `+0x2c` | `0x437ba0` | `VerifyMessageWithTemporaryWorker` = `VerifyMessage(const byte*, size_t, const byte*, size_t)` convenience |
+| `+0x34` | `0x467f70` | `AuthBootstrap680ReplyAuthDataValidator_RecoverTemporaryWorkerResultPair` = `RecoverAndRestart(...)` worker |
+| `+0x38` | `0x437c20` | `RecoverMessageWithTemporaryWorker` = `Recover(byte*, PK_MessageAccumulator*, const byte*, size_t, const byte*, size_t)`-style convenience |
 
 Most important implication for source fidelity: when `0x44aec0` calls verifier slot `+0x2c`, that
 is already the higher-level old Crypto++ `VerifyMessage(...)` convenience, and that convenience
-internally drives the same temporary-worker family (`0x4472f0 / 0x468520 / 0x467ee0`).
+internally drives the same temporary-worker family (`0x4472f0 / 0x468520 / 0x467ee0`). The sibling
+recover path is also now visible: `0x437c20` allocates a worker, loads the signature, updates the
+message bytes, then dispatches to `0x467f70`, which fills the result pair and marks the accumulator
+empty again. In the auth-bootstrap area this recover-capable inherited surface appears to be carried
+by the verifier family but not directly consumed by the current launcher reply-validation path.
 
 #### `0x004b7668` = `CryptoPP::PK_MessageAccumulatorImpl<MD5>`-like leaf
 
@@ -583,6 +589,12 @@ Source implementation note:
   So the direct leaf call is already the faithful public-Crypto++ replacement for this launcher
   path; manually open-coding the worker sequence in source is unnecessary and, in our current
   replacement, was not runtime-safe.
+- the sibling recover-oriented inherited surface is also mapped now:
+  - `0x437c20 = RecoverMessageWithTemporaryWorker` is the convenience that creates a worker, loads
+    the signature, updates the message, then calls `0x467f70`
+  - `0x467f70 = AuthBootstrap680ReplyAuthDataValidator_RecoverTemporaryWorkerResultPair` is best
+    treated as `RecoverAndRestart(...)`-style worker logic, not as the normal auth-reply
+    verification path
 
 #### `0x004b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
 

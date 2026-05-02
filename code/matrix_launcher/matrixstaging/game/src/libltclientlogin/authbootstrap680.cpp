@@ -1008,6 +1008,12 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
 // - `0x4b7580 + 0x2c = 0x437ba0`
 // - `0x437ba0` is the older Crypto++ verifier convenience that internally does
 //   `NewVerificationAccumulator()` -> `InputSignature()` -> `Update()` -> `VerifyAndRestart()`
+// - the sibling inherited recover surface also maps cleanly now:
+//   `0x437c20 = CryptoPP::TF_VerifierBase_0x4b6e40::RecoverMessageWithTemporaryWorker`
+//   wraps worker create/input/update and then dispatches to
+//   `0x467f70 = AuthBootstrap680ReplyAuthDataValidator_RecoverTemporaryWorkerResultPair`, which is
+//   best treated as `RecoverAndRestart(...)`-style worker logic rather than the normal auth reply
+//   path
 // Therefore the direct `VerifyMessage(...)` leaf call below is already the faithful public
 // Crypto++ replacement for this launcher path; forcing the worker family manually in source was a
 // worse match and also proved runtime-unsafe in our replacement.
