@@ -1003,34 +1003,42 @@ void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::arra
 }
 
 // anchor: launcher.exe:0x44aec0
-// Full fidelity: builds MD5 of signedData80 and delegates to validator
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
     const CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier* validator,
     int timeBias) const {
-    // Calculate current auth server time
     const std::time_t now = std::time(nullptr);
     const uint32_t currentAuthServerTime =
         (now > static_cast<std::time_t>(timeBias))
             ? static_cast<uint32_t>(now - static_cast<std::time_t>(timeBias))
             : 0u;
 
-    // Read expiry from signedData80 + 0x2c (= +0xac in class)
     const uint32_t expiryTimeAc = *reinterpret_cast<const uint32_t*>(signedData80.data() + 0x2c);
-    if (currentAuthServerTime >= expiryTimeAc) {
-        return 0;
+    if (currentAuthServerTime >= expiryTimeAc || validator == nullptr) {
+        return 0u;
     }
 
-    // Build MD5 over signed data (0xb6 bytes from +0x80)
-    std::array<uint8_t, 16> md5Digest10{};
-    BuildSignedDataMd5Digest(&md5Digest10);
+    // `0x44aec0` first builds the sibling `0x44ae40` MD5 digest helper, then dispatches into a
+    // verifier-leaf convenience that consumes the prehashed 16-byte digest plus the 0x80-byte
+    // signature. Modern Crypto++ does not surface that exact convenience on the public verifier
+    // leaf, but static RE also identified the same verifier family's concrete temporary-worker /
+    // accumulator path (`0x4472f0 / 0x468520 / 0x467ee0`). Route through those real Crypto++
+    // objects instead of restating the RSA/PKCS#1-v1_5(MD5) verification math in source.
+    std::unique_ptr<CryptoPP::PK_MessageAccumulator> verificationAccumulator(
+        validator->NewVerificationAccumulator());
+    if (!verificationAccumulator) {
+        return 0u;
+    }
 
-    // Call validator verify with public key pair
-    return validator != nullptr &&
-                   validator->VerifyMessage(
-                       md5Digest10.data(),
-                       md5Digest10.size(),
-                       authSignature00.data(),
-                       authSignature00.size());
+    try {
+        validator->InputSignature(
+            *verificationAccumulator,
+            authSignature00.data(),
+            authSignature00.size());
+        verificationAccumulator->Update(signedData80.data(), signedData80.size());
+        return validator->VerifyAndRestart(*verificationAccumulator) ? 1u : 0u;
+    } catch (const CryptoPP::Exception&) {
+        return 0u;
+    }
 }
 
 // anchor: launcher.exe:0x4435f0
