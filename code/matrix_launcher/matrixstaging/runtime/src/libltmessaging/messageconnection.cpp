@@ -1888,26 +1888,27 @@ bool CMessageConnection_0x4b7928_DecodeMessageCode(
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
 uint32_t CMessageConnection_0x4b7928::DispatchCopiedParsedPacketTailScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
-    (void)messageRef;
-    return 0u;
+    return DispatchMessage(&messageRef);
 }
 
-// anchor family: launcher.exe:0x4490c0 -> vtable `+0x30`
 uint32_t CMessageConnection_0x4b7928::DispatchPacketizedProtocol5MessageRefScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 1u;
 }
 
-// anchor family: launcher.exe:0x4490c0 -> vtable `+0x34`
 uint32_t CMessageConnection_0x4b7928::DispatchPacketizedProtocol7MessageRefScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 1u;
 }
 
-// anchor family: launcher.exe:0x4490c0 -> vtable `+0x38`
 void CMessageConnection_0x4b7928::PreDispatchMessageRefScaffold(
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
+    (void)messageRef;
+}
+
+void CMessageConnection_0x4b7928::UnknownSlot3CScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
 }
@@ -2278,20 +2279,49 @@ uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
 
 
 // ============================================================
+// VTable 0x004b62b8 - thread-safe connection intermediate
+// ============================================================
+CThreadSafeConnection_0x4b62b8::CThreadSafeConnection_0x4b62b8()
+    : CMessageConnection_0x4b7928() {}
+
+CThreadSafeConnection_0x4b62b8::CThreadSafeConnection_0x4b62b8(
+    CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine)
+    : CMessageConnection_0x4b7928(connectionEngine) {}
+
+CThreadSafeConnection_0x4b62b8::~CThreadSafeConnection_0x4b62b8() = default;
+
+uint32_t CThreadSafeConnection_0x4b62b8::DispatchPacketizedProtocol5MessageRefScaffold(
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
+    (void)messageRef;
+    return 1u;
+}
+
+uint32_t CThreadSafeConnection_0x4b62b8::DispatchPacketizedProtocol7MessageRefScaffold(
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
+    (void)messageRef;
+    return 1u;
+}
+
+void CThreadSafeConnection_0x4b62b8::PreDispatchMessageRefScaffold(
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
+    (void)messageRef;
+}
+
+void CThreadSafeConnection_0x4b62b8::UnknownSlot3CScaffold(
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
+    (void)messageRef;
+}
+
+// ============================================================
 // VTable 0x004b64a8 - shared base margin router
 // ============================================================
 CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8()
-    : CMessageConnection_0x4b7928() {}
+    : CThreadSafeConnection_0x4b62b8() {}
 
 CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine)
-    : CMessageConnection_0x4b7928(connectionEngine) {}
+    : CThreadSafeConnection_0x4b62b8(connectionEngine) {}
 
 CBaseMarginConnection_0x4b64a8::~CBaseMarginConnection_0x4b64a8() = default;
-
-uint32_t CBaseMarginConnection_0x4b64a8::DispatchCopiedParsedPacketTailScaffold(
-    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
-    return DispatchMessage(&messageRef);
-}
 
 // ============================================================
 // VTable 0x004afef0 - auth-side startup leaf wrapper

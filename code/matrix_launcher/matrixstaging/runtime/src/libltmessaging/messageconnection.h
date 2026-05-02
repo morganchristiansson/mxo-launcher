@@ -1237,7 +1237,33 @@ public:
         CLTThreadPerClientTCPEngine_0x4b2768* engine,
         bool allocateCompletionHelpers = false);
     // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
-    ~CMessageConnection_0x4b7928();
+    ~CMessageConnection_0x4b7928() override;
+
+    // anchor: launcher.exe:0x4490c0
+    // string-backed original name: CMessageConnection_0x4b7928::OnOperationCompleted
+    uint32_t OnOperationCompleted(void* workItem) override;
+
+    // anchor: launcher.exe:0x41cf30
+    // Wrapper immediately beneath mediator send helper `0x41af70`.
+    // Original body extracts packetBuilder `+0x08` and forwards that retained message-ref object
+    // into vtable `+0x28` / `0x448cf0`.
+    virtual void ForwardPacketBuilderToSendPacket(
+        Packet_0x4af2a4& packetBuilder);
+
+    // anchor: launcher.exe:0x448cf0
+    // Narrow source-owned mirror of the message-ref-based send path.
+    // Current bounded send-side tightening preserves three concrete original facts:
+    // - original input is the retained outer message-ref object, not the local packet-builder shell
+    // - if connection `+0x74` exists, `0x448cf0` consults `0x469950` before submit
+    // - the send-mode/headerless branch mutates raw inner bytes around `+0x12/+0x16/+0x17`, then
+    //   later clears the first payload byte high bit on the original input object after the
+    //   agenda/submit branch
+    virtual void SendPacketMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef);
+
+    // anchor: launcher.exe:0x004b7954 / purecall in the recovered `0x004b7928` table.
+    // Later startup-connection family tables override this row with the message-ref dispatch body
+    // (`0x442d00`, `0x449a30`, `0x44af20`).
+    virtual uint32_t DispatchMessage(void* messageRef) = 0;
 
     // UNANCHORED: source-owned compatibility pass-through over the recovered base-connection
     // `+0x10` engine field; no separate leaf-owned engine slot is evidenced here.
@@ -1251,23 +1277,6 @@ public:
     // Keep this distinct from the local packet-builder / message-ref send family rooted at:
     // - `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00`
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
-
-    // anchor: launcher.exe:0x41cf30
-    // Wrapper immediately beneath mediator send helper `0x41af70`.
-    // Original body extracts packetBuilder `+0x08` and forwards that retained message-ref object
-    // into vtable `+0x28` / `0x448cf0`.
-    void ForwardPacketBuilderToSendPacket(
-        Packet_0x4af2a4& packetBuilder);
-
-    // anchor: launcher.exe:0x448cf0
-    // Narrow source-owned mirror of the message-ref-based send path.
-    // Current bounded send-side tightening preserves three concrete original facts:
-    // - original input is the retained outer message-ref object, not the local packet-builder shell
-    // - if connection `+0x74` exists, `0x448cf0` consults `0x469950` before submit
-    // - the send-mode/headerless branch mutates raw inner bytes around `+0x12/+0x16/+0x17`, then
-    //   later clears the first payload byte high bit on the original input object after the
-    //   agenda/submit branch
-    void SendPacketMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef);
 
     // anchor: launcher.exe:0x448960
     // Narrow source-owned wrapper over the per-connection packet-name callback configuration:
@@ -1342,46 +1351,27 @@ public:
     //   - source-owned synthetic receive-drain and local type-`0x0b` continuations are therefore
     //     outside the original base body and remain only as later compatibility / owner-fallback
     //     scaffolding
-    uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
 
 protected:
-    // anchor: launcher.exe:0x4490c0 -> vtable `+0x2c`
-    // Source-owned post-copy dispatch seam beneath the narrowed type-3 receive path.
-    // Current bounded use:
-    // - base `0x4490c0` now still owns the copied-packet extraction, locator gate, agenda handoff,
-    //   and the later packetized protocol branch that chooses `+0x2c/+0x30/+0x34`
-    // - leaf families receive a nearer outer-ref/inner-storage scaffold instead of a naked byte
-    //   vector, matching the real `0x455cd0 -> 0x41bc20/0x41bbb0` seam more closely
-    // - this local seam stands in for the original one-argument `+0x2c(messageRef)` body only
-    // - unlike earlier source-owned fallback logic, original `0x4490c0` still consumes the packet
-    //   locally after calling this seam even when the callee returns false-ish
+    // anchor: launcher.exe:0x004b7954 / purecall in the recovered `0x004b7928` table, later
+    // overridden by the thread-safe/margin startup family.
     virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
         CMessageConnectionMessageRef_0x4ba23c& messageRef);
-    // anchor: launcher.exe:0x4490c0 -> vtable `+0x30`
-    // Non-zero-flag protocol-`5` receive seam beneath the same callback tail.
-    // Original call shape is `this->+0x30(messageRef)`.
-    // Current startup auth/margin leaf tables keep this row on `0x441790`, so the default source
-    // implementation mirrors that as a locally consumed no-op.
+    // anchor: launcher.exe:0x004b7958 / `0x441790` in the recovered `0x004b62b8` table.
     virtual uint32_t DispatchPacketizedProtocol5MessageRefScaffold(
         CMessageConnectionMessageRef_0x4ba23c& messageRef);
-    // anchor: launcher.exe:0x4490c0 -> vtable `+0x34`
-    // Non-zero-flag protocol-`7` receive seam beneath the same callback tail.
-    // Original call shape is `this->+0x34(messageRef)`.
-    // Current startup auth/margin leaf tables also keep this row on `0x441790`, so the default
-    // source implementation mirrors that as a locally consumed no-op.
+    // anchor: launcher.exe:0x004b795c / `0x441790` in the recovered `0x004b62b8` table.
     virtual uint32_t DispatchPacketizedProtocol7MessageRefScaffold(
         CMessageConnectionMessageRef_0x4ba23c& messageRef);
-    // anchor: launcher.exe:0x4490c0 -> vtable `+0x38`
-    // Pre-dispatch receive hook reached after the optional read-agenda handoff and before the
-    // later `+0x2c/+0x30/+0x34` branch.
-    // Original call shape is `this->+0x38(messageRef)`.
-    // Current startup auth/margin/base tables keep this row on `0x441790`, so the default source
-    // implementation remains a no-op.
+    // anchor: launcher.exe:0x004b7960 / `0x441790` in the recovered `0x004b62b8` table.
     virtual void PreDispatchMessageRefScaffold(
+        CMessageConnectionMessageRef_0x4ba23c& messageRef);
+    // anchor: launcher.exe:0x004b7964 / recovered extra row before the send wrapper family.
+    virtual void UnknownSlot3CScaffold(
         CMessageConnectionMessageRef_0x4ba23c& messageRef);
 
 private:
@@ -1488,7 +1478,28 @@ struct CBaseMarginConnection_0x4b64a8_Code5MessageScaffold {
     std::array<uint8_t, 16> seedBytes0c{};
 };
 
-class CBaseMarginConnection_0x4b64a8 : public CMessageConnection_0x4b7928 {
+class CThreadSafeConnection_0x4b62b8 : public CMessageConnection_0x4b7928 {
+public:
+    CThreadSafeConnection_0x4b62b8();
+    explicit CThreadSafeConnection_0x4b62b8(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine);
+    ~CThreadSafeConnection_0x4b62b8() override;
+
+protected:
+    // anchor: launcher.exe:0x004b62ec / `0x441790` in the recovered `0x004b62b8` table.
+    uint32_t DispatchPacketizedProtocol5MessageRefScaffold(
+        CMessageConnectionMessageRef_0x4ba23c& messageRef) override;
+    // anchor: launcher.exe:0x004b62f0 / `0x441790` in the recovered `0x004b62b8` table.
+    uint32_t DispatchPacketizedProtocol7MessageRefScaffold(
+        CMessageConnectionMessageRef_0x4ba23c& messageRef) override;
+    // anchor: launcher.exe:0x004b62f4 / `0x441790` in the recovered `0x004b62b8` table.
+    void PreDispatchMessageRefScaffold(
+        CMessageConnectionMessageRef_0x4ba23c& messageRef) override;
+    // anchor: launcher.exe:0x004b62f8 / `0x441790` in the recovered `0x004b62b8` table.
+    void UnknownSlot3CScaffold(
+        CMessageConnectionMessageRef_0x4ba23c& messageRef) override;
+};
+
+class CBaseMarginConnection_0x4b64a8 : public CThreadSafeConnection_0x4b62b8 {
 public:
     // UNANCHORED: source-owned narrow intermediate-base ctor.
     CBaseMarginConnection_0x4b64a8();
@@ -1544,14 +1555,6 @@ public:
     // Recovered original field at connection+0x85. Kept public because original
     // consumers (e.g., login mediator +0xd4 callback) access it directly.
     std::array<uint8_t, 16> messageCode5SeedBytes85_{};
-
-protected:
-    // anchor: launcher.exe:0x442d00 -> vtable `+0x2c`
-    // The recovered intermediate-base table still owns the `+0x2c(messageRef)` row. Keep the
-    // post-copy seam thin here by forwarding the local message-ref scaffold straight into the
-    // concrete base/leaf `DispatchMessage` body.
-    uint32_t DispatchCopiedParsedPacketTailScaffold(
-        CMessageConnectionMessageRef_0x4ba23c& messageRef) override;
 
 private:
     friend class CMarginConnectionBootstrapPrepStateOwner_0x443340;

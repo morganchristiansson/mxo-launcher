@@ -1818,7 +1818,7 @@ void AuthBootstrap680Child_0x441290::SendGetPublicKeyRequest() {
         return;
     }
 
-    auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(sendTarget50);
+    auto* sendTarget = static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(sendTarget50);
     const uint8_t rawCode = getPublicKeyRequestPayload[0];
     const uint32_t sendResult = sendTarget->SendPacket(
         packetBytes.data(),

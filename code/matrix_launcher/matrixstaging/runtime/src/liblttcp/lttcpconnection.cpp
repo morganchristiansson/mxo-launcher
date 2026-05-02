@@ -362,7 +362,7 @@ static unsigned EndpointIpv4OctetForOnReceiveLogScaffold(
 
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family.
 CLTTCPConnection::CLTTCPConnection()
-    : CBaseConnection(LTTCPEngineConnectionState::kClosed),
+    : CBaseConnection_0x4b8018(LTTCPEngineConnectionState::kClosed),
       remoteEndpoint_(),
       ownerContext_(nullptr),
       socketHandle_(kInvalidSocketHandle),
@@ -373,7 +373,7 @@ CLTTCPConnection::CLTTCPConnection()
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family that also seeds the
 // replacement-side owner-context scaffold.
 CLTTCPConnection::CLTTCPConnection(void* ownerContext)
-    : CBaseConnection(LTTCPEngineConnectionState::kClosed),
+    : CBaseConnection_0x4b8018(LTTCPEngineConnectionState::kClosed),
       remoteEndpoint_(),
       ownerContext_(ownerContext),
       socketHandle_(kInvalidSocketHandle),
@@ -388,12 +388,12 @@ CLTTCPConnection::~CLTTCPConnection() {
 }
 
 // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
-bool CBaseConnection::IsConnected() const {
+bool CBaseConnection_0x4b8018::IsConnected() const {
     return static_cast<uint32_t>(state_) != static_cast<uint32_t>(LTTCPEngineConnectionState::kClosed);
 }
 
 // UNANCHORED: source-owned narrow mirror of the `0x44a9f0` base-ctor state write.
-CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
+CBaseConnection_0x4b8018::CBaseConnection_0x4b8018(LTTCPEngineConnectionState initialState)
     : autoReleaseFlag04_(0u),
       padding05_07_{0u, 0u, 0u},
       engine_(nullptr),
@@ -430,7 +430,7 @@ uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQue
         return 0u;
     }
 
-    CBaseConnection* directConnection = static_cast<CBaseConnection*>(maybeQueueContext);
+    CBaseConnection_0x4b8018* directConnection = static_cast<CBaseConnection_0x4b8018*>(maybeQueueContext);
     return directConnection->OnOperationCompleted(workItem);
 }
 
@@ -491,7 +491,7 @@ void CLTTCPConnection::SetState(LTTCPEngineConnectionState state) {
 
 // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
 LTTCPEngineConnectionState CLTTCPConnection::State() const {
-    return CBaseConnection::State();
+    return CBaseConnection_0x4b8018::State();
 }
 
 CLTTCPConnection_QueuedSendBufferStorage::CLTTCPConnection_QueuedSendBufferStorage()
@@ -660,7 +660,7 @@ void CLTTCPConnection::ReleasePendingSendQueueContentsScaffold() {
 }
 
 // anchor: launcher.exe:0x449ca0
-uint32_t CBaseConnection::Close(bool graceful) {
+uint32_t CBaseConnection_0x4b8018::Close(bool graceful) {
     if (state_ == LTTCPEngineConnectionState::kClosed) {
         return 0u;
     }
@@ -763,7 +763,7 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
                 portHostOrder);
         }
         // `0x449fac..0x449fb2` reaches the inherited base close slot through virtual dispatch.
-        (void)static_cast<CBaseConnection*>(this)->Close(false);
+        (void)static_cast<CBaseConnection_0x4b8018*>(this)->Close(false);
     }
 
     // `0x449d40` ends with a direct `readOperationFragment->+0x08()` on the outer OnReceive-held

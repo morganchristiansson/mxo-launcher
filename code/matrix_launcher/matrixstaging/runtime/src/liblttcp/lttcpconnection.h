@@ -197,7 +197,7 @@ static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08) == 
 // - implementation owned by
 //   `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
 class CVariableLengthPrefixedTCPStreamParser;
-class CBaseConnection;
+class CBaseConnection_0x4b8018;
 
 // Recovered worker/send family tightening from `0x44a9f0`,
 // `TryPopQueuedSendBufferWithEndpoint (0x44aa70)`,
@@ -284,14 +284,14 @@ private:
     std::deque<CLTTCPConnection_QueuedSendBufferWithEndpoint> pendingSendQueue3c_;
 };
 
-class CBaseConnection;
+class CBaseConnection_0x4b8018;
 
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
 // With the MSVC-compatible object ABI active, queued context keys now flow as direct
-// `CBaseConnection` / derived object pointers just like launcher.exe `0x436b10` and `0x436920`.
+// `CBaseConnection_0x4b8018` / derived object pointers just like launcher.exe `0x436b10` and `0x436920`.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
-// Current source accepts either the queue-context adapter object or a direct CBaseConnection-family
+// Current source accepts either the queue-context adapter object or a direct CBaseConnection_0x4b8018-family
 // object pointer on this path.
 uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem);
 // UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
@@ -299,40 +299,44 @@ uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQue
 uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object);
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
 // Current source only auto-releases the explicit queue-context adapter object here; direct
-// CBaseConnection pointers are accepted for completion dispatch but are not released through their
+// CBaseConnection_0x4b8018 pointers are accepted for completion dispatch but are not released through their
 // native C++ vtable because that slot numbering does not match the original MSVC ABI contract.
 uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext);
 
 // Source-owned abstraction over the recovered connection family.
-// Current fidelity tightening from `0x44a9f0` and `0x436d31..0x436ee7`:
-// - base field `+0x04` is modeled explicitly as the type-1 auto-release flag byte read by the
-//   queue consumer
-// - but the active replacement still keeps a tiny queue-dispatch ABI adapter beside the object so
-//   raw client.dll consumers do not call into MinGW virtual tables with MSVC slot assumptions
-// Important current limitation:
-// - this C++ base keeps the recovered state/virtual relationships useful to the replacement
-//   launcher, but it is not yet a byte-faithful class-layout reconstruction of the original
-//   `CBaseConnection` / `CLTTCPConnection` hierarchy.
-class CBaseConnection {
+// Recovered base vtable `0x004b8018` currently reads as 7 rows under the MSVC ABI:
+// - deleting-dtor pair synthesized from the virtual destructor
+// - slot `+0x08` = purecall in the base, `0x437860` / return-true in `CLTTCPConnection`
+// - slot `+0x0c` = `0x449ca0` Close(bool)
+// - slot `+0x10` = `0x443810` / return-false in `CLTTCPConnection`, later `0x4490c0`
+//   `OnOperationCompleted` in `CMessageConnection_0x4b7928`
+// - slot `+0x14` = purecall in the base, later `0x449d40` `CLTTCPConnection::OnReceive`
+// - slot `+0x18` = purecall in the base, later `0x449fd0` `CLTTCPConnection::OnClose`
+class CBaseConnection_0x4b8018 {
  public:
-  // UNANCHORED: source-owned abstract base for the recovered connection family.
-  virtual ~CBaseConnection() = default;
+  virtual ~CBaseConnection_0x4b8018() = default;
 
-  // UNANCHORED: source-owned abstraction over the recovered receive entry surface.
-  virtual void OnReceive(CLTTCPReadOperation* readOperationFragment) = 0;
-  // UNANCHORED: source-owned abstraction over the recovered completion callback surface.
-  virtual uint32_t OnOperationCompleted(void* workItem) = 0;
-  // UNANCHORED: source-owned abstraction over the recovered send callback surface.
-  virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;
+  // anchor: launcher.exe:0x004b8020 / `0x437860` on the `0x004b8034` row
+  virtual bool UsesTcpConnectionVtableShape() const = 0;
   // anchor: launcher.exe:0x449ca0
   // vtable: launcher.exe:0x004b8024
-  // Shared inherited close wrapper body also reused by the derived `CLTTCPConnection` slot at
-  // `0x004b8040`. Current source still keeps a null-engine fallback because this C++ hierarchy is
-  // not yet a byte-faithful reconstruction of the original connection layout.
   virtual uint32_t Close(bool graceful);
+  // anchor: launcher.exe:0x004b8028 / `0x443810` on the `0x004b8034` row, later overridden by
+  // `CMessageConnection_0x4b7928::OnOperationCompleted` at `0x4490c0`.
+  virtual uint32_t OnOperationCompleted(void* workItem) {
+    (void)workItem;
+    return 0u;
+  }
+  // anchor: launcher.exe:0x004b802c / `0x449d40` on the `0x004b8034` row
+  virtual void OnReceive(CLTTCPReadOperation* readOperationFragment) = 0;
+  // anchor: launcher.exe:0x004b8030 / `0x449fd0` on the `0x004b8034` row
+  virtual void OnClose(
+      CLTTCPReadOperation* readOperationFragment,
+      void* opaqueArg08 = nullptr,
+      void* opaqueArg0c = nullptr) = 0;
 
   // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
-  virtual bool IsConnected() const;
+  bool IsConnected() const;
 
   // UNANCHORED: source-owned accessor over the recovered base `+0x04` auto-release byte tested by
   // `0x436d31..0x436ee7` before the later queued-context `+0x04` release call on type-1 work.
@@ -352,7 +356,8 @@ class CBaseConnection {
   // UNANCHORED: source-owned narrow mirror of the `0x44a9f0` base-ctor state write.
   // The original base ctor initializes much more of the eventual full object than this reduced
   // source-side base class owns.
-  CBaseConnection(LTTCPEngineConnectionState initialState = LTTCPEngineConnectionState::kClosed);
+  CBaseConnection_0x4b8018(
+      LTTCPEngineConnectionState initialState = LTTCPEngineConnectionState::kClosed);
 
  protected:
   uint8_t autoReleaseFlag04_;
@@ -369,7 +374,7 @@ class CBaseConnection {
 // - `0x00449fd0` = OnClose callback-forwarder
 // - `0x00449cd0` = Connect wrapper that updates endpoint `+0x24` then calls engine slot `+0x18`
 // - `0x00449d20` = SendBuffer wrapper into engine slot `+0x20`
-class CLTTCPConnection : public CBaseConnection {
+class CLTTCPConnection : public CBaseConnection_0x4b8018 {
 public:
     // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family.
     // Current source ctor seeds only the replacement-side fields we model explicitly and does not
@@ -379,7 +384,15 @@ public:
     // replacement-side owner-context scaffold.
     explicit CLTTCPConnection(void* ownerContext);
     // anchor: launcher.exe:0x44ac40
-    ~CLTTCPConnection();
+    ~CLTTCPConnection() override;
+
+    // anchor: launcher.exe:0x004b803c / `0x437860`
+    bool UsesTcpConnectionVtableShape() const override { return true; }
+    // anchor: launcher.exe:0x004b8044 / `0x443810`
+    uint32_t OnOperationCompleted(void* workItem) override {
+        (void)workItem;
+        return 0u;
+    }
 
     // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
     void SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine);
@@ -411,20 +424,19 @@ public:
     // - recv lands directly into fragment `+0x0c`
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
-    // Inherited shared `CBaseConnection::Close(bool)` body; this table does not add a distinct
-    // `CLTTCPConnection::Close` override.
+    // Inherited shared `CBaseConnection_0x4b8018::Close(bool)` body; this table does not add a
+    // distinct `CLTTCPConnection::Close` override.
 
-    // anchor: launcher.exe:0x449cd0
-    // vtable: launcher.exe:0x004b8050
-    // This wrapper is first introduced on the concrete `CLTTCPConnection` table, not on
-    // `CBaseConnection`.
-    uint32_t Connect(const LTTCPEndpointKey_0x44b070& endpoint);
-
-    // anchor: launcher.exe:0x449d20
-    // vtable: launcher.exe:0x004b8054
-    // Active `0x448a00` callers currently reach this wrapper with ownership-mode `1` in the
-    // fourth stack slot, not an arbitrary callback pointer.
-    uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* completionContext);
+    // anchor: launcher.exe:0x449d40
+    // vtable: launcher.exe:0x004b8048
+    // Current best read: retain one typed `CLTTCPReadOperation`-family fragment, hand it to the
+    // parser at connection `+0x6c` as `Parse(fragment, &completedPacketWorkItem)`, enqueue each
+    // parser-emitted completed packet work item as the exact `0x449d8a -> 0x436820` handoff
+    // `(engine+0x10, completedPacketWorkItem, this, false)`, then branch through the original
+    // endpoint-based terminal-error log split before releasing the outer fragment reference.
+    // Active source now queues the direct connection object pointer, matching the original
+    // `(engine+0x10, completedPacketWorkItem, this, false)` handoff from `0x449d8a -> 0x436820`.
+    void OnReceive(CLTTCPReadOperation* readOperationFragment) override;
 
     // anchor: launcher.exe:0x449fd0
     // vtable: launcher.exe:0x004b804c
@@ -438,18 +450,19 @@ public:
     void OnClose(
         CLTTCPReadOperation* readOperationFragment,
         void* opaqueArg08 = nullptr,
-        void* opaqueArg0c = nullptr);
+        void* opaqueArg0c = nullptr) override;
 
-    // anchor: launcher.exe:0x449d40
-    // vtable: launcher.exe:0x004b8048
-    // Current best read: retain one typed `CLTTCPReadOperation`-family fragment, hand it to the
-    // parser at connection `+0x6c` as `Parse(fragment, &completedPacketWorkItem)`, enqueue each
-    // parser-emitted completed packet work item as the exact `0x449d8a -> 0x436820` handoff
-    // `(engine+0x10, completedPacketWorkItem, this, false)`, then branch through the original
-    // endpoint-based terminal-error log split before releasing the outer fragment reference.
-    // Active source now queues the direct connection object pointer, matching the original
-    // `(engine+0x10, completedPacketWorkItem, this, false)` handoff from `0x449d8a -> 0x436820`.
-    void OnReceive(CLTTCPReadOperation* readOperationFragment) override;
+    // anchor: launcher.exe:0x449cd0
+    // vtable: launcher.exe:0x004b8050
+    // This wrapper is first introduced on the concrete `CLTTCPConnection` table, not on
+    // `CBaseConnection_0x4b8018`.
+    virtual uint32_t Connect(const LTTCPEndpointKey_0x44b070& endpoint);
+
+    // anchor: launcher.exe:0x449d20
+    // vtable: launcher.exe:0x004b8054
+    // Active `0x448a00` callers currently reach this wrapper with ownership-mode `1` in the
+    // fourth stack slot, not an arbitrary callback pointer.
+    virtual uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* completionContext);
 
     // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.
     // Current best helper names from Ghidra/source lockstep:
