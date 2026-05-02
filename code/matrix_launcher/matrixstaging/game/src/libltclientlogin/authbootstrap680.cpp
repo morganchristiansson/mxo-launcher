@@ -1467,9 +1467,10 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                         // anchor: launcher.exe:0x44841d / child+0x98 vtable +0x1c
                         // Static RE shows the outbound raw 0x0a tail encrypts directly through the
                         // existing child-side small CBC Twofish object into the reserved tail of
-                        // the encrypted packet builder. Keep the direct Crypto++ object usage even
-                        // though the current packet scaffold still needs the separately materialized
-                        // plaintext byte view to mirror the exact padded content.
+                        // the encrypted packet builder. The current packet scaffold is still not
+                        // byte-faithful enough to eliminate this separately materialized plaintext
+                        // view, so keep the direct Crypto++ object while preserving the known-good
+                        // launcher byte layout here.
                         feedbackTransformSmall98->ProcessData(
                             reinterpret_cast<uint8_t*>(const_cast<char*>(encryptedPacket.debugString14)),
                             plaintextBytes.data(),
