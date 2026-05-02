@@ -6,7 +6,16 @@
 CMAKE ?= cmake
 GENERATOR ?= Ninja
 TOOLCHAIN_FILE ?= cmake/toolchains/i686-windows-gnu-gcc.cmake
-TOOLCHAIN_TAG ?= $(notdir $(basename $(TOOLCHAIN_FILE)))
+TOOLCHAIN_FILE_NAME := $(notdir $(basename $(TOOLCHAIN_FILE)))
+ifeq ($(TOOLCHAIN_FILE_NAME),i686-windows-msvc-clang)
+TOOLCHAIN_TAG ?= msvc-clang
+else ifeq ($(TOOLCHAIN_FILE_NAME),i686-windows-gnu-gcc)
+TOOLCHAIN_TAG ?= gnu-gcc
+else ifeq ($(TOOLCHAIN_FILE_NAME),i686-windows-gnu-clang)
+TOOLCHAIN_TAG ?= gnu-clang
+else
+TOOLCHAIN_TAG ?= $(TOOLCHAIN_FILE_NAME)
+endif
 MXO_MSVC_SYSROOT ?= $(if $(wildcard third_party/xwin),$(CURDIR)/third_party/xwin,$(HOME)/.xwin)
 GAME_DIR = ~/MxO_7.6005
 BUILD_ROOT = build
