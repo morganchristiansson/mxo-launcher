@@ -1458,24 +1458,34 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     static_cast<uint16_t>(0x20u - (plaintextLen & 0x0fu));
                 plaintextPacket.SetPadding(paddingBytes);
 
-                const uint8_t* const plaintextPacketPayloadBytes =
+                const uint8_t* const plaintextBuilderPayloadBytes =
                     plaintextPacket.messageRef08 && plaintextPacket.messageRef08->messageStorage0c
                         ? plaintextPacket.messageRef08->messageStorage0c->PayloadBase()
                         : nullptr;
-                const uint16_t plaintextPacketPayloadByteCount =
+                const uint16_t plaintextBuilderPayloadByteCount =
                     plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
-                size_t plaintextPacketMismatchCount = 0u;
-                if (plaintextPacketPayloadBytes != nullptr &&
-                    plaintextPacketPayloadByteCount == plaintextBytes.size()) {
+                size_t plaintextBuilderPayloadMismatchCount = 0u;
+                if (plaintextBuilderPayloadBytes != nullptr &&
+                    plaintextBuilderPayloadByteCount == plaintextBytes.size()) {
                     for (size_t i = 0; i < plaintextBytes.size(); ++i) {
-                        if (plaintextPacketPayloadBytes[i] != plaintextBytes[i]) {
-                            ++plaintextPacketMismatchCount;
+                        if (plaintextBuilderPayloadBytes[i] != plaintextBytes[i]) {
+                            ++plaintextBuilderPayloadMismatchCount;
                         }
                     }
                 } else {
-                    plaintextPacketMismatchCount = plaintextBytes.size() + 1u;
+                    plaintextBuilderPayloadMismatchCount = plaintextBytes.size() + 1u;
                 }
 
+                // anchor: launcher.exe:0x4483ea..0x44844c
+                // Concrete assembly facts from the working raw0x0a path:
+                // - `child+0x54` dispatches wrapper vtable `+0x18`, which is `0x468640`
+                // - that happens after the `0x4b6cf4` builder receives `SetPadding(...)`
+                // - the later `child+0x98` CBC encrypt call still consumes a source pointer/length
+                //   derived from the `0x4b6cf4` stack builder state, not directly from the final
+                //   `0x4b6d08` envelope
+                // So there is still a launcher materialization/bridging step between the builder
+                // representation and the bytes fed to CBC encryption. Keep the known-good explicit
+                // plaintext byte view until that bridge is closed with stronger static-RE.
                 Packet_AsAuthChallengeResponse_0x4b6d08 encryptedPacket;
                 encryptedPacket.InitializePayloadSize();
                 encryptedPacket.ReserveLengthPrefixedTail(
@@ -1509,14 +1519,14 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     static_cast<unsigned>(decryptedChallengeBytes.size()),
                     static_cast<unsigned>(processedChallengeMd5Bytes.size()));
                 spdlog::info(
-                    "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} packetPlaintextLen={} packetPlaintextMismatchCount={} packetPlaintextPrefix='{}' explicitPlaintextPrefix='{}' childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
+                    "DIAGNOSTIC: launcher-owned auth built/sent AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} builderPayloadLen={} builderPayloadMismatchCount={} builderPayloadPrefix='{}' explicitPlaintextPrefix='{}' childString10Len={} childString1CLen={} sendTarget50={} helper={} module={} childBase={}",
                     static_cast<unsigned>(passwordLengthField),
                     static_cast<unsigned>(soePasswordLengthField),
                     static_cast<unsigned>(plaintextBytes.size()),
                     static_cast<unsigned>(plaintextBytes.size()),
-                    static_cast<unsigned>(plaintextPacketPayloadByteCount),
-                    static_cast<unsigned>(plaintextPacketMismatchCount),
-                    BuildHexPreview(plaintextPacketPayloadBytes, plaintextPacketPayloadByteCount, 32u),
+                    static_cast<unsigned>(plaintextBuilderPayloadByteCount),
+                    static_cast<unsigned>(plaintextBuilderPayloadMismatchCount),
+                    BuildHexPreview(plaintextBuilderPayloadBytes, plaintextBuilderPayloadByteCount, 32u),
                     BuildHexPreview(plaintextBytes.data(), plaintextBytes.size(), 32u),
                     static_cast<unsigned>(SmallStringMirrorLength(string10)),
                     static_cast<unsigned>(SmallStringMirrorLength(string1C)),
