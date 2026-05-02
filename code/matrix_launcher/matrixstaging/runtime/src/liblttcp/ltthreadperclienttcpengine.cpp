@@ -207,8 +207,8 @@ static const Node* TreeRootNode(const Head* head) {
     return (header && header->_M_parent) ? static_cast<const Node*>(header->_M_parent) : nullptr;
 }
 
-// Tree users below now call the MinGW libstdc++ `bits/stl_tree.h` API directly.
-// Reference donor/header lineage for this pass:
+// Tree users below now route through the narrow `compat/sgi_tree_compat.h` shim.
+// Provenance/reference lineage for the recovered helper family:
 // - `/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++/bits/stl_tree.h`
 // - the local `13-posix` copy is identical on this machine
 // Launcher.exe remains the source of truth for object layout, call shape, and wrapper behavior.

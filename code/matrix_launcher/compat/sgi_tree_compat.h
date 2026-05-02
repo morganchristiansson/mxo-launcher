@@ -1,47 +1,27 @@
 #pragma once
 
 #include <cstddef>
-#include <type_traits>
 #include <utility>
 
-#if defined(__MINGW32__)
-#include <bits/stl_tree.h>
-
 namespace mxo::sgi_tree {
-using _Rb_tree_color = std::_Rb_tree_color;
-inline constexpr _Rb_tree_color _S_red = std::_S_red;
-inline constexpr _Rb_tree_color _S_black = std::_S_black;
-using _Rb_tree_node_base = std::_Rb_tree_node_base;
 
-template <typename Value>
-using _Rb_tree_node = std::_Rb_tree_node<Value>;
-
-inline _Rb_tree_node_base* _Rb_tree_increment(_Rb_tree_node_base* node) {
-    return std::_Rb_tree_increment(node);
-}
-
-inline const _Rb_tree_node_base* _Rb_tree_increment(const _Rb_tree_node_base* node) {
-    return std::_Rb_tree_increment(node);
-}
-
-inline void _Rb_tree_insert_and_rebalance(
-    const bool insertLeft,
-    _Rb_tree_node_base* x,
-    _Rb_tree_node_base* p,
-    _Rb_tree_node_base& header) {
-    std::_Rb_tree_insert_and_rebalance(insertLeft, x, p, header);
-}
-
-inline _Rb_tree_node_base* _Rb_tree_rebalance_for_erase(
-    _Rb_tree_node_base* const z,
-    _Rb_tree_node_base& header) {
-    return std::_Rb_tree_rebalance_for_erase(z, header);
-}
-} // namespace mxo::sgi_tree
-
-#else
-
-namespace mxo::sgi_tree {
+// Narrow project-owned compatibility shim for the launcher.exe SGI/libstdc++ tree lineage.
+//
+// Provenance/reference implementation:
+// - MinGW libstdc++ `bits/stl_tree.h` as documented in
+//   `../../docs/launcher.exe/shared_helpers/SGI_STL_TREE.md`
+//
+// Project policy for this shim:
+// - preserve the recovered launcher-facing node/header layout and helper semantics we actually use
+// - avoid directly including libstdc++ internal headers in project translation units
+// - keep the compatibility surface deliberately tiny instead of re-owning a general-purpose STL tree
+//
+// Current exported subset:
+// - `_Rb_tree_node_base`
+// - `_Rb_tree_node<Value>`
+// - `_Rb_tree_increment`
+// - `_Rb_tree_insert_and_rebalance`
+// - `_Rb_tree_rebalance_for_erase`
 
 enum _Rb_tree_color {
     _S_red = false,
@@ -374,4 +354,3 @@ inline _Rb_tree_node_base* _Rb_tree_rebalance_for_erase(
 }
 
 } // namespace mxo::sgi_tree
-#endif

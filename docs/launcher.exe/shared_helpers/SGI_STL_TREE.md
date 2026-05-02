@@ -9,12 +9,12 @@ This is **not** currently best understood as an engine-specific custom container
 It is reused by multiple launcher subsystems, including but not limited to
 `CLTThreadPerClientTCPEngine`.
 
-Current source usage after the first MSVC-target-Clang portability pass:
-- GNU / MinGW-family builds still use the donor `<bits/stl_tree.h>` implementation directly, but
-  now only through `compat/sgi_tree_compat.h`
-- MSVC-target Clang now uses the same project-facing `mxo::sgi_tree::*` API surface, backed by a
-  narrow local compatibility implementation of just the recovered node layout and helper family we
-  actually depend on (`increment`, `insert_and_rebalance`, `rebalance_for_erase`)
+Current source usage after the current MSVC-target-Clang portability pass:
+- all build families now route through one project-owned `compat/sgi_tree_compat.h` shim
+- that shim keeps only the recovered node layout and helper subset we actually depend on
+  (`increment`, `insert_and_rebalance`, `rebalance_for_erase`)
+- the MinGW `bits/stl_tree.h` lineage remains the donor/reference implementation for fidelity, but
+  project translation units no longer include libstdc++ internal tree headers directly
 - current recovered users routed through that shim:
   - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp`
   - `matrixstaging/runtime/src/libltbase/consolevar.cpp`
@@ -32,7 +32,7 @@ Current local header provenance:
   as the launcher match
 
 Launcher.exe remains the source of truth; the MinGW STL headers are the strongest external lineage
-match and are now also the direct API surface used by the current source pass.
+match for the current shim, but are no longer the direct API surface included by project code.
 
 ---
 
@@ -231,33 +231,34 @@ container instantiations/adapters.
 
 ---
 
-## Current source decision: direct MinGW `bits/stl_tree.h` API use
+## Current source decision: one narrow project-owned SGI-tree compatibility shim
 
 For the current faithfulness pass, the project no longer keeps a separate local mirror in
-`src/launcher_tree.*`.
+`src/launcher_tree.*`, but it also no longer includes `<bits/stl_tree.h>` directly from project
+translation units.
 
-Instead, `CLTThreadPerClientTCPEngine` now calls the MinGW libstdc++ `_Rb_tree` API directly via
-`<bits/stl_tree.h>`, using the recovered launcher node/head layouts as the concrete objects passed
-into:
+Instead, recovered users now route through one narrow project-owned compatibility surface in
+`compat/sgi_tree_compat.h`, using the recovered launcher node/head layouts as the concrete objects
+passed into:
 - `_Rb_tree_insert_and_rebalance`
 - `_Rb_tree_rebalance_for_erase`
 
-The current source also reads the direct `_Rb_tree_node_base` / `_Rb_tree_node<_Val>` layout
-surface (`_M_parent/_M_left/_M_right`, `_M_valptr()`) instead of keeping a separate local mirror of
-those same mechanics.
+The current source still reads the recovered `_Rb_tree_node_base` / `_Rb_tree_node<_Val>`-style
+layout surface (`_M_parent/_M_left/_M_right`, `_M_valptr()`), but that surface is now defined by
+our bounded shim rather than by direct dependency on libstdc++ internals.
 
 Current rationale:
-- the recovered launcher helper family matches this implementation lineage closely enough that using
-  the API directly is the most faithful simplification for the current engine-tree pass
-- the win32/posix MinGW headers are identical on this machine
+- the recovered launcher helper family matches the SGI/libstdc++ lineage closely enough that a
+  small donor-shaped shim is the most faithful simplification for this pass
+- keeping one project-owned shim removes the MSVC-STL incompatibility caused by directly including
+  libstdc++ internal tree headers into mixed-STL translation units
 - launcher.exe still remains the authority for wrapper behavior, key comparison, and object layout
 - node/head structs in project source stay source-owned so recovered `0x24` / `0x18` payload shapes
   and `+0x80` / `+0x8c` sentinel heads remain explicit
 
 This means the current direction is now:
 - **keep one project-local compatibility façade** (`compat/sgi_tree_compat.h`)
-- **use the MinGW SGI/libstdc++ `stl_tree.h` helper API directly where that STL family is active**
-- **fall back to the narrow local compatibility implementation for MSVC-STL builds**
+- **treat MinGW SGI/libstdc++ `stl_tree.h` as donor/reference provenance, not as a directly included build dependency**
 - **do not reintroduce a second project-specific container wrapper layer on top of that façade unless
   a future fidelity need forces it**
 
@@ -297,9 +298,8 @@ now route their tree mechanics through `compat/sgi_tree_compat.h`.
 
 The current source split is:
 - shared low-level RB-tree mechanics exposed as `mxo::sgi_tree::*`
-- GNU / MinGW builds: direct donor `_Rb_tree` helpers from `<bits/stl_tree.h>` behind that façade
-- MSVC-target Clang builds: narrow local implementation of the same helper subset behind that
-  façade
+- all build families: the same narrow project-owned implementation behind that façade
+- donor/reference lineage: classic MinGW SGI/libstdc++ `stl_tree.h`
 - direct `_Rb_tree_node<std::pair<key,payload*>>`-style node types for recovered engine and
   console-registry node families
 - engine-specific comparison/search/container decisions in

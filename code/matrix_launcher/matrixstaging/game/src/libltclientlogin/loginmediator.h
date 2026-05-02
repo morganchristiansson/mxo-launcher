@@ -193,7 +193,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     //   is source-owned there instead of in the mediator wrapper
     // - keep access narrow by granting focused friendship instead of widening the mediator
     //   surface generically
-    friend struct AuthBootstrap680Child_0x441290;
+    friend class AuthBootstrap680Child_0x441290;
     friend class CLTLoginState_AuthenticatePending_0x4b5014;
     friend class CLTLoginState_State4_0x4b503c;
     friend class CLTLoginState_State6_0x4b508c;

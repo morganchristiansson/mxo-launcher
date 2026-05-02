@@ -1417,7 +1417,7 @@ public:
     // tightened `0x4490c0` receive tail consumes the auth/margin packet path locally.
 };
 
-struct CMarginConnectionLocalCompletionWorkItemScaffold;
+class CMarginConnectionLocalCompletionWorkItemScaffold;
 class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 
 // ============================================================

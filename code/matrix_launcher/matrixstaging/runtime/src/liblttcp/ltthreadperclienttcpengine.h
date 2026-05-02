@@ -21,7 +21,7 @@ class CMessageConnection_0x4b7928;
 class CLTThreadPerClientTCPEngine_0x4b2768;
 class CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread;
 class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
-struct LTTCPEndpointKey_0x44b070;
+class LTTCPEndpointKey_0x44b070;
 
 using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
     mxo::sgi_tree::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;

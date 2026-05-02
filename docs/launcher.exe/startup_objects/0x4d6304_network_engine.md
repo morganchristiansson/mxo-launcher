@@ -199,19 +199,20 @@ New shared-tree clarification from the current helper-xref pass:
   - other integer-keyed trees through `0x415f20`, `0x4568a0`, `0x47e8e0`, and related helpers
 - so the current best naming direction is a **shared launcher tree helper family** rather than an
   engine-specific tree implementation
-- current source now routes the arg5 tree family directly through MinGW libstdc++
-  `<bits/stl_tree.h>`, using the recovered launcher node/head layouts as the concrete `_Rb_tree`
-  objects while still treating launcher.exe itself as source of truth
-- the intended donor/reference is `/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++/bits/stl_tree.h`
+- current source now routes the arg5 tree family through the narrow project-owned
+  `compat/sgi_tree_compat.h` shim, using the recovered launcher node/head layouts as the concrete
+  `_Rb_tree`-shaped objects while still treating launcher.exe itself as source of truth
+- the intended donor/reference remains
+  `/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++/bits/stl_tree.h`
   (the local `13-posix` copy is identical on this machine)
-- current arg5 tree users now call the low-level `_Rb_tree` helpers directly
+- current arg5 tree users now call the low-level `_Rb_tree`-shaped helpers through that shim
   (`_Rb_tree_insert_and_rebalance`, `_Rb_tree_rebalance_for_erase`) and keep
   engine-specific search/insert decisions local
 - the currently recovered endpoint-key compare helper (`0x44b040`) orders by
   `portNetworkOrder`, then `ipv4NetworkOrder`; the wider copied endpoint-key payload still carries
   `family/reserved` fields, but those are not currently evidenced as tree-ordering fields
-- once that direct insert/erase path was in place, the older local header relink/sync helpers were
-  pruned too; current source now relies on upstream `_Rb_tree` header maintenance for non-empty
+- once that insert/erase path was in place, the older local header relink/sync helpers were
+  pruned too; current source now relies on the shared shim's header maintenance for non-empty
   trees instead of resynchronizing `root/first/last` by hand after each change
 
 New queue-thread clarification from the current focused pass:
