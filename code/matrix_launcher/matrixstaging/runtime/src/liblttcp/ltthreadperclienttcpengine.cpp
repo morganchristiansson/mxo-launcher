@@ -1860,57 +1860,64 @@ void CLTThreadPerClientTCPEngine_0x4b2768::InitializeContextTreeHead18(
     header->_M_right = header;
 }
 
-CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
-    : ctorFlagsField04_(0),
-      queueThreadArrayField08_(nullptr),
-      ownedQueuePair0C_(),
-      ownedWaitHelper5C_{nullptr},
-      ownedQueueLockHelper60_(),
-      ownedQueueSignalEvent7C_(NULL),
-      ownedEndpointTreeHead80_(nullptr),
-      ownedEndpointCount84_(0),
-      reserved88_(0),
-      ownedContextTreeHead8C_(nullptr),
-      ownedContextCount90_(0),
-      reserved94_(0),
-      ownedCleanupLockHelper98_() {
+CLTBaseThreadPerClientTCPEngine_0x4b3e74::CLTBaseThreadPerClientTCPEngine_0x4b3e74()
+    : field04_(0),
+      field08_(nullptr),
+      queuePair0c_(),
+      waitHelper5c_{nullptr},
+      queueLockHelper60_(),
+      queueSignalEvent7c_(NULL) {
     // anchor: launcher.exe:0x4366f0
-    // Faithfulness restructuring:
-    // - keep the real recovered arg5 fields on the object body itself
-    // - keep only source-only launcher-shell attachment + generic direct-connection bookkeeping in
-    //   discrete engine-keyed maps instead of a synthetic per-engine side-state record
-    // - active auth/margin worker flow now stays on the direct connection object and its direct
-    //   mediator owner pointer at `+0xa4`, not a mediator-owned bridge context
-    // - queued completed-operation identity is still the direct connection object in launcher.exe,
-    //   but the active replacement may wrap that object in a tiny queue-dispatch ABI adapter before
-    //   it crosses into raw client.dll queue consumers compiled against the original MSVC vtable
-    //   layout
-    // - keep recovered payload families (`+0x08`, `+0x80/+0x84`, `+0x8c/+0x90`) in dedicated
-    //   source backings keyed by `this`, not as pretend hidden object fields
-    ownedQueueLockHelper60_.vtable = nullptr;
-    ownedCleanupLockHelper98_.vtable = nullptr;
-    Queue_Init(&ownedQueuePair0C_.queue00, 0);
-    Queue_Init(&ownedQueuePair0C_.queue28, 0);
-    ownedQueueSignalEvent7C_ = CreateEventA(NULL, FALSE, FALSE, NULL);
-    InitializeLockHelperScaffold(&ownedQueueLockHelper60_);
-    InitializeLockHelperScaffold(&ownedCleanupLockHelper98_);
+    queueLockHelper60_.vtable = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&queuePair0c_.queue00, 0);
+    CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&queuePair0c_.queue28, 0);
+    queueSignalEvent7c_ = CreateEventA(NULL, FALSE, FALSE, NULL);
+    std::memset(&queueLockHelper60_.crit, 0, sizeof(queueLockHelper60_.crit));
+    InitializeCriticalSection(&queueLockHelper60_.crit);
+}
 
-    ownedEndpointTreeHead80_ =
+// anchor: launcher.exe:0x436fd0 / deleting wrapper 0x437050
+CLTBaseThreadPerClientTCPEngine_0x4b3e74::~CLTBaseThreadPerClientTCPEngine_0x4b3e74() {
+    CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&queuePair0c_.queue00);
+    CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&queuePair0c_.queue28);
+    DeleteCriticalSection(&queueLockHelper60_.crit);
+    if (queueSignalEvent7c_) {
+        CloseHandle(queueSignalEvent7c_);
+        queueSignalEvent7c_ = NULL;
+    }
+}
+
+CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
+    : endpointTreeHead80_(nullptr),
+      endpointCount84_(0),
+      reserved88_(0),
+      contextTreeHead8c_(nullptr),
+      contextCount90_(0),
+      reserved94_(0),
+      cleanupLockHelper98_() {
+    // anchor: launcher.exe:0x431c30 / base ctor 0x4366f0
+    // Faithfulness restructuring:
+    // - base now owns the recovered `+0x04..+0x7c` field family for real inheritance
+    // - keep only the derived `+0x80..+0xb3` extension here
+    cleanupLockHelper98_.vtable = nullptr;
+    InitializeLockHelperScaffold(&cleanupLockHelper98_);
+
+    endpointTreeHead80_ =
         static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24*>(
             std::malloc(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24)));
-    if (ownedEndpointTreeHead80_) {
-        InitializeEndpointTreeHead24(ownedEndpointTreeHead80_);
+    if (endpointTreeHead80_) {
+        InitializeEndpointTreeHead24(endpointTreeHead80_);
     }
 
-    ownedContextTreeHead8C_ =
+    contextTreeHead8c_ =
         static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18*>(
             std::malloc(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18)));
-    if (ownedContextTreeHead8C_) {
-        InitializeContextTreeHead18(ownedContextTreeHead8C_);
+    if (contextTreeHead8c_) {
+        InitializeContextTreeHead18(contextTreeHead8c_);
     }
 
-    ownedEndpointCount84_ = 0u;
-    ownedContextCount90_ = 0u;
+    endpointCount84_ = 0u;
+    contextCount90_ = 0u;
 
     // Original base ctor 0x4366f0 allocates queue-thread children only when the effective
     // ctor flag/count at +0x04 is non-zero. The current scaffold still enters through a
@@ -1955,55 +1962,63 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
         contextBacking->entries.clear();
     }
 
-    Queue_Free(&ownedQueuePair0C_.queue00);
-    Queue_Free(&ownedQueuePair0C_.queue28);
-    DeleteLockHelperScaffold(&ownedQueueLockHelper60_);
-    DeleteLockHelperScaffold(&ownedCleanupLockHelper98_);
-    if (ownedQueueSignalEvent7C_) {
-        CloseHandle(ownedQueueSignalEvent7C_);
-        ownedQueueSignalEvent7C_ = NULL;
+    DeleteLockHelperScaffold(&cleanupLockHelper98_);
+    if (endpointTreeHead80_) {
+        std::free(endpointTreeHead80_);
+        endpointTreeHead80_ = nullptr;
     }
-    if (ownedEndpointTreeHead80_) {
-        std::free(ownedEndpointTreeHead80_);
-        ownedEndpointTreeHead80_ = nullptr;
-    }
-    if (ownedContextTreeHead8C_) {
-        std::free(ownedContextTreeHead8C_);
-        ownedContextTreeHead8C_ = nullptr;
+    if (contextTreeHead8c_) {
+        std::free(contextTreeHead8c_);
+        contextTreeHead8c_ = nullptr;
     }
 
     EraseEngineBackings(this);
 }
 
 // anchor: launcher.exe:0x436000
-// source-owned inheritance bridge:
-// - base vtable `0x4b3e74` and derived vtable `0x4b2768` share this slot body unchanged
-// - current C++ layout has not yet split the recovered base fields (+0x04..+0x7c) from the
-//   derived extension (+0x80..+0xb3), so keep one implementation body on the derived class and
-//   forward the base declaration here for ABI-documentation fidelity
+// vtable: launcher.exe:0x004b3e74 slot +0x0c and 0x004b2768 slot +0x0c
 uint32_t CLTBaseThreadPerClientTCPEngine_0x4b3e74::MonitorEphemeralUDPPort(
     uint16_t* outBoundPortHostOrder,
     void* contextKey,
     void* ipv4NetworkOrder) {
-    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(this)
-        ->CLTThreadPerClientTCPEngine_0x4b2768::MonitorEphemeralUDPPort(
-            outBoundPortHostOrder,
-            contextKey,
-            ipv4NetworkOrder);
+    // Current best static read: thin helper around slot 2 / UDPMonitorPort(port=0, ...)
+    // followed by getsockname/ntohs to report the chosen local port.
+    const uint32_t result = UDPMonitorPort(/*portHostOrder=*/0, contextKey, ipv4NetworkOrder);
+    if (result == 0u && outBoundPortHostOrder) {
+        *outBoundPortHostOrder = 0;
+        CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(contextKey);
+        if (connection && connection->SocketHandle() != kInvalidSocketHandle) {
+            sockaddr_in boundAddr = {};
+            int boundAddrSize = sizeof(boundAddr);
+            if (getsockname(
+                    static_cast<SOCKET>(connection->SocketHandle()),
+                    reinterpret_cast<sockaddr*>(&boundAddr),
+                    &boundAddrSize) == 0) {
+                *outBoundPortHostOrder = ntohs(boundAddr.sin_port);
+            }
+        }
+    }
+    return result;
 }
 
 // anchor: launcher.exe:0x443810
-// source-owned inheritance bridge; see note above on shared unchanged base/derived slots.
+// vtable: launcher.exe:0x004b3e74 slot +0x28 and 0x004b2768 slot +0x28
 uint32_t CLTBaseThreadPerClientTCPEngine_0x4b3e74::Slot10_443810(void* arg1) {
-    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(this)
-        ->CLTThreadPerClientTCPEngine_0x4b2768::Slot10_443810(arg1);
+    (void)arg1;
+    return 0;
 }
 
 // anchor: launcher.exe:0x431670
-// source-owned inheritance bridge; see note above on shared unchanged base/derived slots.
+// vtable: launcher.exe:0x004b3e74 slot +0x2c and 0x004b2768 slot +0x2c
 uint32_t CLTBaseThreadPerClientTCPEngine_0x4b3e74::Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) {
-    return static_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(this)
-        ->CLTThreadPerClientTCPEngine_0x4b2768::Slot11_431670(arg1, out0, out1);
+    (void)arg1;
+    if (out0) {
+        *out0 = 0;
+    }
+    if (out1) {
+        *out1 = 0;
+    }
+    return 0;
 }
 
 // anchor: launcher.exe:0x4319a0
@@ -2029,7 +2044,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     const uint32_t ipv4NetworkOrder = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(reservedArg3));
     const LTTCPEndpointKey_0x44b070 key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
     bool inserted = false;
-    if (!EndpointTreeInsertPlaceholder(this, ownedEndpointTreeHead80_, key, &inserted)) {
+    if (!EndpointTreeInsertPlaceholder(this, endpointTreeHead80_, key, &inserted)) {
         return 1u;
     }
     if (!inserted) {
@@ -2083,7 +2098,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     if (CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload = FindEngineEndpointPayload(this, key)) {
         (void)payload->Start(/*startPriority=*/2);
     }
-    ownedEndpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
+    endpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
     return 0u;
 }
 
@@ -2139,31 +2154,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostO
 
     connection->SetState(LTTCPEngineConnectionState::kUdpMonitorActive);
     (void)worker->Start(/*startPriority=*/2);
-    ownedContextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
+    contextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
     return 0u;
-}
-
-// anchor: launcher.exe:0x436000
-// vtable: launcher.exe:0x004b2768 slot +0x0c
-uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder) {
-    // Current best static read: thin helper around slot 2 / UDPMonitorPort(port=0, ...)
-    // followed by getsockname/ntohs to report the chosen local port.
-    const uint32_t result = UDPMonitorPort(/*portHostOrder=*/0, contextKey, ipv4NetworkOrder);
-    if (result == 0u && outBoundPortHostOrder) {
-        *outBoundPortHostOrder = 0;
-        CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(contextKey);
-        if (connection && connection->SocketHandle() != kInvalidSocketHandle) {
-            sockaddr_in boundAddr = {};
-            int boundAddrSize = sizeof(boundAddr);
-            if (getsockname(
-                    static_cast<SOCKET>(connection->SocketHandle()),
-                    reinterpret_cast<sockaddr*>(&boundAddr),
-                    &boundAddrSize) == 0) {
-                *outBoundPortHostOrder = ntohs(boundAddr.sin_port);
-            }
-        }
-    }
-    return result;
 }
 
 // anchor: launcher.exe:0x42f7c0
@@ -2191,9 +2183,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOr
     }
     StopAcceptThreadScaffold(acceptThread.get());
     acceptThread.reset();
-    ownedEndpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
-    if (ownedEndpointTreeHead80_ && ownedEndpointCount84_ == 0u) {
-        InitializeEndpointTreeHead24(ownedEndpointTreeHead80_);
+    endpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
+    if (endpointTreeHead80_ && endpointCount84_ == 0u) {
+        InitializeEndpointTreeHead24(endpointTreeHead80_);
     }
     return 0u;
 }
@@ -2375,7 +2367,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
         static_cast<unsigned>(connection->State()),
         fmt::ptr(connection->OwnerContext()));
-    ownedContextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
+    contextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
     return kResultSuccess;
 }
 
@@ -2559,26 +2551,6 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SendBufferWithEndpoint(
     return 1u;
 }
 
-// anchor: launcher.exe:0x443810
-// vtable: launcher.exe:0x004b2768 slot +0x28
-uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Slot10_443810(void* arg1) {
-    (void)arg1;
-    return 0;
-}
-
-// anchor: launcher.exe:0x431670
-// vtable: launcher.exe:0x004b2768 slot +0x2c
-uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) {
-    (void)arg1;
-    if (out0) {
-        *out0 = 0;
-    }
-    if (out1) {
-        *out1 = 0;
-    }
-    return 0;
-}
-
 // anchor: launcher.exe:0x4316a0
 // vtable: launcher.exe:0x004b2768 slot +0x30
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKey) {
@@ -2649,25 +2621,25 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
-    ownedContextCount90_ = contextBacking
+    contextCount90_ = contextBacking
         ? static_cast<uint32_t>(contextBacking->entries.size())
         : 0u;
-    if (ownedContextTreeHead8C_ && ownedContextCount90_ == 0u) {
-        InitializeContextTreeHead18(ownedContextTreeHead8C_);
+    if (contextTreeHead8c_ && contextCount90_ == 0u) {
+        InitializeContextTreeHead18(contextTreeHead8c_);
     }
     return result;
 }
 
 // anchor: launcher.exe:0x435f90
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SignalQueueEventHelper() {
-    return (ownedQueueSignalEvent7C_ && SetEvent(ownedQueueSignalEvent7C_)) ? 0u : 1u;
+    return (queueSignalEvent7c_ && SetEvent(queueSignalEvent7c_)) ? 0u : 1u;
 }
 
 // anchor: launcher.exe:0x435fa0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMilliseconds) {
     (void)LeaveQueueLockHelper();
-    const DWORD waitResult = ownedQueueSignalEvent7C_
-        ? WaitForSingleObject(ownedQueueSignalEvent7C_, static_cast<DWORD>(reasonMilliseconds))
+    const DWORD waitResult = queueSignalEvent7c_
+        ? WaitForSingleObject(queueSignalEvent7c_, static_cast<DWORD>(reasonMilliseconds))
         : WAIT_FAILED;
     if (waitResult == WAIT_OBJECT_0) {
         (void)EnterQueueLockHelper();
@@ -2685,22 +2657,22 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMi
 // - arg5 +0x60 remains as ABI helper surface only
 // - live queue-lock state now stays on the real engine object's recovered helper storage
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
-    EnterCriticalSection(&ownedQueueLockHelper60_.crit);
+    EnterCriticalSection(&queueLockHelper60_.crit);
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
-    LeaveCriticalSection(&ownedQueueLockHelper60_.crit);
+    LeaveCriticalSection(&queueLockHelper60_.crit);
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
-    EnterCriticalSection(&ownedCleanupLockHelper98_.crit);
+    EnterCriticalSection(&cleanupLockHelper98_.crit);
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
-    LeaveCriticalSection(&ownedCleanupLockHelper98_.crit);
+    LeaveCriticalSection(&cleanupLockHelper98_.crit);
     return 0u;
 }
 
@@ -2711,7 +2683,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
     if (!outPair) {
         return 0x700000a;
     }
-    if (ctorFlagsField04_ != 0u) {
+    if (field04_ != 0u) {
         outPair->value0 = 0u;
         outPair->value1 = 0u;
         return 0x7000006u;
@@ -2723,7 +2695,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         activeQueuePair ? &activeQueuePair->queue00 : nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
-    HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
+    HANDLE activeQueueSignalEvent = queueSignalEvent7c_;
     (void)EnterQueueLockHelper();
 
     while (waitForSignal &&
@@ -2821,8 +2793,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperation(
             fmt::ptr(activeQueue0C ? activeQueue0C->writeCursor10 : nullptr),
             fmt::ptr(activeQueue34 ? activeQueue34->readCursor00 : nullptr),
             fmt::ptr(activeQueue34 ? activeQueue34->writeCursor10 : nullptr),
-            fmt::ptr(ownedQueueSignalEvent7C_),
-            ctorFlagsField04_);
+            fmt::ptr(queueSignalEvent7c_),
+            field04_);
     }
 }
 
@@ -2844,7 +2816,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         activeQueuePair ? &activeQueuePair->queue00 : nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
-    HANDLE activeQueueSignalEvent = ownedQueueSignalEvent7C_;
+    HANDLE activeQueueSignalEvent = queueSignalEvent7c_;
     while (true) {
         CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
         while (true) {
@@ -2931,8 +2903,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 // anchor: launcher.exe:0x436920
 void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
     CLTThreadPerClientTCPEngine_0x4b2768_QueueThread** queueThreadArray =
-        static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(queueThreadArrayField08_);
-    const uint32_t existingQueueThreadCount = ctorFlagsField04_;
+        static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(field08_);
+    const uint32_t existingQueueThreadCount = field04_;
     if (existingQueueThreadCount == 0u) {
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair pair = {};
         while (TryPopCompletedOperation(&pair, /*waitForSignal=*/false) == 0u) {
@@ -2976,15 +2948,15 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
         std::free(queueThreadArray);
     }
 
-    queueThreadArrayField08_ = nullptr;
-    ctorFlagsField04_ = 0u;
+    field08_ = nullptr;
+    field04_ = 0u;
 }
 
 // Source-owned extraction of the queue-thread allocation/start tail embedded in ctor 0x4366f0.
 void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32_t queueThreadCount) {
     if (queueThreadCount == 0u) {
-        queueThreadArrayField08_ = nullptr;
-        ctorFlagsField04_ = 0u;
+        field08_ = nullptr;
+        field04_ = 0u;
         return;
     }
 
@@ -2992,8 +2964,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32
         static_cast<CLTThreadPerClientTCPEngine_0x4b2768_QueueThread**>(
             std::calloc(queueThreadCount, sizeof(CLTThreadPerClientTCPEngine_0x4b2768_QueueThread*)));
     if (!queueThreadArray) {
-        queueThreadArrayField08_ = nullptr;
-        ctorFlagsField04_ = 0u;
+        field08_ = nullptr;
+        field04_ = 0u;
         return;
     }
 
@@ -3002,8 +2974,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::CreateQueueThreadsForCtorCount(uint32
         (void)queueThreadArray[i]->Start(/*startPriority=*/2);
     }
 
-    queueThreadArrayField08_ = queueThreadArray;
-    ctorFlagsField04_ = queueThreadCount;
+    field08_ = queueThreadArray;
+    field04_ = queueThreadCount;
 }
 
 // UNANCHORED starter helper.
@@ -3022,7 +2994,7 @@ CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* CLTThreadPerClientTCPEngi
     // The recovered outer callsites now read best as a plain endpoint-keyed map with staged
     // placeholder insertion before accept-thread attachment. Keep this legacy node-returning helper
     // only as a boundary marker while active callers migrate to direct map-like helpers.
-    return reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(ownedEndpointTreeHead80_);
+    return reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(endpointTreeHead80_);
 }
 
 // anchor: launcher.exe:0x42fe10
@@ -3031,7 +3003,7 @@ CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* CLTThreadPerClientTCPEngin
     // The recovered outer callsites now read best as a plain map lookup keyed by the normalized
     // connection/context pointer. Source keeps this legacy node-returning helper only as a stub so
     // the anchored method boundary remains visible while callers move to direct map-like helpers.
-    return reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(ownedContextTreeHead8C_);
+    return reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(contextTreeHead8c_);
 }
 
 // anchor: launcher.exe:0x431ff0
@@ -3054,7 +3026,7 @@ CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0
     bool inserted = false;
     result = ContextTreeInsertUniqueWorkerNode(
         this,
-        ownedContextTreeHead8C_,
+        contextTreeHead8c_,
         key,
         std::move(worker),
         &inserted);

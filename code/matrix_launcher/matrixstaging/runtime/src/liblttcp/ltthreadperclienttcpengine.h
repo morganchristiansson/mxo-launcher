@@ -319,8 +319,10 @@ private:
 //   slot count/order must remain identical for ABI compatibility with the recovered derived class
 class CLTBaseThreadPerClientTCPEngine_0x4b3e74 {
 public:
-    CLTBaseThreadPerClientTCPEngine_0x4b3e74() {}
-    virtual ~CLTBaseThreadPerClientTCPEngine_0x4b3e74() = default;
+    // anchor: launcher.exe:0x4366f0
+    CLTBaseThreadPerClientTCPEngine_0x4b3e74();
+    // anchor: launcher.exe:0x436fd0 / deleting wrapper 0x437050
+    virtual ~CLTBaseThreadPerClientTCPEngine_0x4b3e74();
 
     // slot 1 / unresolved-import family at base vtable `0x4b3e74`
     virtual uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) = 0;
@@ -354,6 +356,14 @@ public:
     virtual uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1);
     // slot 12 / derived body `launcher.exe:0x4316a0`, base stub currently unresolved (`0x441790`)
     virtual uint32_t CleanupConnection(void* contextKey) = 0;
+
+protected:
+    uint32_t field04_;
+    void* field08_;
+    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 queuePair0c_;
+    CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold waitHelper5c_;
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold queueLockHelper60_;
+    HANDLE queueSignalEvent7c_;
 };
 
 // Reimplementation note:
@@ -435,10 +445,7 @@ public:
     uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) override;
     // anchor: launcher.exe:0x4325d0
     uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder = nullptr) override;
-    // anchor: launcher.exe:0x436000
-    // inherited unchanged from base vtable `0x4b3e74`; declaration retained here temporarily as a
-    // source-placement reminder until the base/derived field split is modeled in C++.
-    uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder = nullptr) override;
+    // anchor: launcher.exe:0x436000 inherited unchanged from base vtable `0x4b3e74`
     // anchor: launcher.exe:0x42f7c0
     uint32_t Slot4_42F7C0(void* arg1) override;
     // anchor: launcher.exe:0x431840
@@ -459,14 +466,8 @@ public:
         LTTCPEndpointKey_0x44b070* remoteEndpoint,
         void* contextKey,
         void* ownershipMode) override;
-    // anchor: launcher.exe:0x443810
-    // inherited unchanged from base vtable `0x4b3e74`; declaration retained here temporarily as a
-    // source-placement reminder until the base/derived field split is modeled in C++.
-    uint32_t Slot10_443810(void* arg1) override;
-    // anchor: launcher.exe:0x431670
-    // inherited unchanged from base vtable `0x4b3e74`; declaration retained here temporarily as a
-    // source-placement reminder until the base/derived field split is modeled in C++.
-    uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) override;
+    // anchor: launcher.exe:0x443810 inherited unchanged from base vtable `0x4b3e74`
+    // anchor: launcher.exe:0x431670 inherited unchanged from base vtable `0x4b3e74`
     // anchor: launcher.exe:0x4316a0
     uint32_t CleanupConnection(void* contextKey) override;
 
@@ -559,24 +560,22 @@ private:
     uint32_t TryPopCompletedOperation(
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
         bool waitForSignal);
+
+protected:
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
+
+private:
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
     static void InitializeContextTreeHead18(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head);
 
-    uint32_t ctorFlagsField04_;
-    void* queueThreadArrayField08_;
-    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 ownedQueuePair0C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold ownedWaitHelper5C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold ownedQueueLockHelper60_;
-    HANDLE ownedQueueSignalEvent7C_;
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* ownedEndpointTreeHead80_;
-    uint32_t ownedEndpointCount84_;
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* endpointTreeHead80_;
+    uint32_t endpointCount84_;
     uint32_t reserved88_;
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* ownedContextTreeHead8C_;
-    uint32_t ownedContextCount90_;
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* contextTreeHead8c_;
+    uint32_t contextCount90_;
     uint32_t reserved94_;
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold ownedCleanupLockHelper98_;
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold cleanupLockHelper98_;
 };
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
