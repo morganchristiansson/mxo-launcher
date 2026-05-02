@@ -1467,7 +1467,15 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     plaintextBuilderPayloadBytes + plaintextBuilderPayloadByteCount);
 
                 if ((plaintextBytes.size() % 16u) != 0u) {
-                    spdlog::error("launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext");
+                    spdlog::error(
+                        "launcher-owned auth built misaligned AS_AuthChallengeResponse plaintext builderLenBeforePadding={} paddingBytes={} paddingLengthField={} builderLenAfterPadding={} field1Len={} field2Len={} field3OffsetWord=0x{:04x}",
+                        static_cast<unsigned>(plaintextBuilderPayloadByteCountBeforePadding),
+                        static_cast<unsigned>(paddingBytes),
+                        static_cast<unsigned>(paddingLengthField),
+                        static_cast<unsigned>(plaintextBytes.size()),
+                        static_cast<unsigned>(passwordLengthField),
+                        static_cast<unsigned>(soePasswordLengthField),
+                        static_cast<unsigned>(ReadU16LE(plaintextBuilderPayloadBytes + 0x15u)));
                     return kAuthBootstrap680InboundUnhandled;
                 }
 
