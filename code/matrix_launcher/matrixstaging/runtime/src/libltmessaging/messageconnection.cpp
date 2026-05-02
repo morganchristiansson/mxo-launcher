@@ -7,6 +7,7 @@
 #include "variablelengthprefixedtcpstreamparser.h"
 #include "spdlog/spdlog.h"
 
+#include <filters.h>
 #include <integer.h>
 
 #include <algorithm>
@@ -108,15 +109,15 @@ static bool CPacketEncryptor_EncryptPayloadScaffold(
         CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption feedbackTransform;
         feedbackTransform.SetKeyWithIV(seedBytes.data(), seedBytes.size(), ivBytes);
 
-        std::string ciphertext;
+        // Keep the Crypto++ filter pipeline direct all the way through to the final byte vector
+        // instead of staging through a source-owned std::string mirror.
         CryptoPP::StringSource source(
             plaintextBytes.data(),
             plaintextBytes.size(),
             true,
             new CryptoPP::StreamTransformationFilter(
                 feedbackTransform,
-                new CryptoPP::StringSink(ciphertext)));
-        ciphertextBytes.assign(ciphertext.begin(), ciphertext.end());
+                new CryptoPP::VectorSink(ciphertextBytes)));
     } catch (const CryptoPP::Exception&) {
         return false;
     }
@@ -148,15 +149,15 @@ static bool CPacketDecryptor_DecryptPayloadScaffold(
         CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption feedbackTransform;
         feedbackTransform.SetKeyWithIV(seedBytes.data(), seedBytes.size(), encryptedPayloadBytes);
 
-        std::string plaintext;
+        // Same shave on the decrypt side: let Crypto++ materialize directly into the output byte
+        // vector instead of bouncing through a temporary std::string.
         CryptoPP::StringSource source(
             encryptedPayloadBytes + 16u,
             encryptedPayloadByteCount - 16u,
             true,
             new CryptoPP::StreamTransformationFilter(
                 feedbackTransform,
-                new CryptoPP::StringSink(plaintext)));
-        plaintextBytes.assign(plaintext.begin(), plaintext.end());
+                new CryptoPP::VectorSink(plaintextBytes)));
     } catch (const CryptoPP::Exception&) {
         outPayloadBytes->clear();
         return false;
