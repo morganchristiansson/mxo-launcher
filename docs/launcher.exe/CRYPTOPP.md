@@ -559,9 +559,11 @@ Source implementation note:
 - auth-bootstrap raw `0x08` no longer re-implements the packet-encryption chunk loop in source
 - source now routes the identified `0x4382c0 -> 0x438120 -> 0x438320` family through modern
   `CryptoPP::StringSource` + `CryptoPP::PK_EncryptorFilter` + `CryptoPP::VectorSink`
-- raw `0x0b` auth-reply validation now also uses the concrete verifier worker family directly:
-  `NewVerificationAccumulator()` + `InputSignature()` + `Update()` + `VerifyAndRestart()`
-  standing in for the older verifier-leaf digest convenience recovered at `0x44aec0`
+- raw `0x0b` auth-reply validation is still routed through the verifier leaf's direct
+  message-verify convenience in source because the modern public Crypto++ accumulator worker path
+  (`NewVerificationAccumulator()` + `InputSignature()` + `Update()` + `VerifyAndRestart()`) was
+  not runtime-safe in the current launcher replacement, despite the older launcher binary clearly
+  containing that worker family (`0x4472f0 / 0x468520 / 0x467ee0`)
 
 #### `0x004b4548` = `CryptoPP::PK_DefaultDecryptionFilter`
 

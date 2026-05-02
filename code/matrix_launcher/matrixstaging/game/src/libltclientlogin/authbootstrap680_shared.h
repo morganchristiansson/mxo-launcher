@@ -49,11 +49,10 @@ public:
 // - `launcher.exe:0x468520` loads the RSA-decoded signature bytes into the accumulator state
 // - `launcher.exe:0x467ee0` / `0x467f70` finalize against the outer verifier object
 //
-// Static RE now identifies child `+0xa4/+0xac` as old Crypto++ verifier-family objects. Source
-// therefore uses direct `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` leaves and, for the raw
-// `0x0b` auth-reply validation path, the concrete `NewVerificationAccumulator()` /
-// `InputSignature()` / `Update()` / `VerifyAndRestart()` worker family instead of a
-// source-owned RSA/PKCS#1-v1_5(MD5) restatement.
+// Static RE now identifies child `+0xa4/+0xac` as old Crypto++ verifier-family objects, so source
+// uses direct `CryptoPP::Weak::RSASSA_PKCS1v15_MD5_Verifier` leaves. The older temporary-worker /
+// accumulator family (`0x4472f0 / 0x468520 / 0x467ee0`) remains documented, but the current
+// runtime-safe validation path still uses the verifier leaf's direct message-verify convenience.
 
 // Launcher-owned wrapper around embedded Crypto++ RNG / BufferedTransformation slices.
 // This is not a standalone Crypto++ leaf type by itself; static RE of `0x4686e0` and `0x468640`
