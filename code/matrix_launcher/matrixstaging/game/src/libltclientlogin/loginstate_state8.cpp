@@ -780,21 +780,16 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                 g_State8Section10ChunkBitmap_0x4f79e4 = 0u;
             }
             if (g_CurrentLoginMediator->allocatedBuffer1454 != nullptr && loadCharacterReplyEnvelope.sectionData != nullptr) {
-                if (loadCharacterReplyEnvelope.expectedSectionCount0b == 0u) {
-                    spdlog::info(
-                        "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage section0x0a invariant failed: packet byte +0x0b chunk ordinal is zero");
-                } else {
-                    const uint32_t chunkIndex = static_cast<uint32_t>(loadCharacterReplyEnvelope.expectedSectionCount0b - 1u);
-                    const size_t chunkOffset = static_cast<size_t>(chunkIndex) * 1000u;
-                    if (chunkOffset + loadCharacterReplyEnvelope.sectionByteCount <= 0x7d00u) {
-                        std::memcpy(
-                            static_cast<uint8_t*>(g_CurrentLoginMediator->allocatedBuffer1454) + chunkOffset,
-                            loadCharacterReplyEnvelope.sectionData,
-                            loadCharacterReplyEnvelope.sectionByteCount);
-                        StateReplyChunkBitset_0x43c240(g_State8Section10ChunkBitmap_0x4f79e4).SetSeen(chunkIndex);
-                        g_CurrentLoginMediator->allocatedBufferLength1458 = static_cast<uint16_t>(
-                            g_CurrentLoginMediator->allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
-                    }
+                const uint32_t chunkIndex = static_cast<uint32_t>(loadCharacterReplyEnvelope.expectedSectionCount0b - 1u);
+                const size_t chunkOffset = static_cast<size_t>(chunkIndex) * 1000u;
+                if (chunkOffset + loadCharacterReplyEnvelope.sectionByteCount <= 0x7d00u) {
+                    std::memcpy(
+                        static_cast<uint8_t*>(g_CurrentLoginMediator->allocatedBuffer1454) + chunkOffset,
+                        loadCharacterReplyEnvelope.sectionData,
+                        loadCharacterReplyEnvelope.sectionByteCount);
+                    StateReplyChunkBitset_0x43c240(g_State8Section10ChunkBitmap_0x4f79e4).SetSeen(chunkIndex);
+                    g_CurrentLoginMediator->allocatedBufferLength1458 = static_cast<uint16_t>(
+                        g_CurrentLoginMediator->allocatedBufferLength1458 + loadCharacterReplyEnvelope.sectionByteCount);
                 }
             }
             g_CurrentLoginMediator->flag145a = 1u;
