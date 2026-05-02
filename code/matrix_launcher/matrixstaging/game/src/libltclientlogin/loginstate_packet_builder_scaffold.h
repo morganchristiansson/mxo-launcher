@@ -1176,7 +1176,10 @@ public:
    reservationHeader[1] = static_cast<uint8_t>((reserved >> 8u) & 0xffu);
    const uint16_t fieldOffset = static_cast<uint16_t>(reservationHeader - payloadBase);
    *reinterpret_cast<uint16_t*>(payloadBase + 0x15u) = fieldOffset;
-   worldId24 = fieldOffset + 2u;
+   // anchor: launcher.exe:0x4441f5
+   // The recovered builder stores an absolute payload pointer in inherited +0x24, not the raw
+   // offset word. This matches the first/second reservation helpers at 0x443fa0/0x4440a0.
+   worldId24 = reinterpret_cast<uint32_t>(payloadBase + fieldOffset + 2u);
    reservedFieldByteCount28 = reserved;
    return reserved;
  }
