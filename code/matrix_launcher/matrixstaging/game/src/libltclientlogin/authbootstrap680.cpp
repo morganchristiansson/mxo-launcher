@@ -1419,8 +1419,17 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 plaintextPacket.SetPadding(paddingBytes);
 
                 const uint16_t paddingLengthField = plaintextPacket.reservedFieldByteCount28;
-                uint8_t* const paddingFieldBytes = reinterpret_cast<uint8_t*>(
-                    static_cast<uintptr_t>(plaintextPacket.worldId24));
+                const uint8_t* const plaintextBuilderPayloadBytes =
+                    plaintextPacket.messageRef08 && plaintextPacket.messageRef08->messageStorage0c
+                        ? plaintextPacket.messageRef08->messageStorage0c->PayloadBase()
+                        : nullptr;
+                const uint16_t plaintextBuilderPayloadByteCount =
+                    plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
+                uint8_t* const paddingFieldBytes =
+                    (plaintextBuilderPayloadBytes != nullptr &&
+                     static_cast<size_t>(plaintextPacket.worldId24) <= plaintextBuilderPayloadByteCount)
+                        ? const_cast<uint8_t*>(plaintextBuilderPayloadBytes + plaintextPacket.worldId24)
+                        : nullptr;
                 if (paddingLengthField != 0u && paddingFieldBytes == nullptr) {
                     spdlog::error(
                         "launcher-owned auth lost recovered raw0x0a builder field storage while flattening plaintext");
@@ -1446,13 +1455,6 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                     feedbackSeedHelper54.nextBufferedOutputByte28 =
                         static_cast<uint32_t>(paddingLengthField);
                 }
-
-                const uint8_t* const plaintextBuilderPayloadBytes =
-                    plaintextPacket.messageRef08 && plaintextPacket.messageRef08->messageStorage0c
-                        ? plaintextPacket.messageRef08->messageStorage0c->PayloadBase()
-                        : nullptr;
-                const uint16_t plaintextBuilderPayloadByteCount =
-                    plaintextPacket.messageRef08 ? plaintextPacket.messageRef08->PayloadByteCount() : 0u;
                 if (plaintextBuilderPayloadBytes == nullptr || plaintextBuilderPayloadByteCount < 0x17u) {
                     spdlog::error(
                         "launcher-owned auth lost recovered raw0x0a builder payload while flattening plaintext");

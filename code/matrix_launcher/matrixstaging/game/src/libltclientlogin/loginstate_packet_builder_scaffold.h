@@ -1098,8 +1098,31 @@ public:
    // Already has content
    if (payloadSize18 != 0) return;
    size_t len = strlen(str);
-   // Reserve space for string + null terminator
-   uint16_t reserved = ReserveLengthPrefixedTail(static_cast<uint16_t>(len + 1));
+   // Reserve space for string + null terminator.
+   // anchor: launcher.exe:0x443fa0
+   // This is NOT the base Packet_0x4af2a4 tail-reservation contract. The auth challenge response
+   // builder has its own first-field reservation helper that stores the field offset at payload+0x11
+   // and mirrors the reserved content pointer/length into inherited +0x14/+0x18.
+   uint16_t reserved = 0u;
+   if (messageRef08 && messageRef08->messageStorage0c) {
+     auto* storage = messageRef08->messageStorage0c;
+     constexpr uint16_t kMaxPayloadSize = 0xffcu;
+     const uint16_t availableSpace = kMaxPayloadSize - storage->PayloadByteCount();
+     reserved = static_cast<uint16_t>(len + 1u);
+     if (reserved > availableSpace) {
+       reserved = availableSpace;
+     }
+
+     uint8_t* payloadBase = static_cast<uint8_t*>(GetPayloadBase());
+     uint8_t* reservationHeader = payloadBase + storage->PayloadByteCount();
+     storage->GrowPayloadByteCount(reserved + 2u);
+     reservationHeader[0] = static_cast<uint8_t>(reserved & 0xffu);
+     reservationHeader[1] = static_cast<uint8_t>((reserved >> 8u) & 0xffu);
+     const uint16_t fieldOffset = static_cast<uint16_t>(reservationHeader - payloadBase);
+     *reinterpret_cast<uint16_t*>(payloadBase + 0x11u) = fieldOffset;
+     debugString14 = reinterpret_cast<const char*>(payloadBase + fieldOffset + 2u);
+     payloadSize18 = reserved;
+   }
    if (reserved != 0 && debugString14) {
      char* dest = const_cast<char*>(debugString14);
      strncpy(dest, str, reserved - 1);
@@ -1176,10 +1199,7 @@ public:
    reservationHeader[1] = static_cast<uint8_t>((reserved >> 8u) & 0xffu);
    const uint16_t fieldOffset = static_cast<uint16_t>(reservationHeader - payloadBase);
    *reinterpret_cast<uint16_t*>(payloadBase + 0x15u) = fieldOffset;
-   // anchor: launcher.exe:0x4441f5
-   // The recovered builder stores an absolute payload pointer in inherited +0x24, not the raw
-   // offset word. This matches the first/second reservation helpers at 0x443fa0/0x4440a0.
-   worldId24 = reinterpret_cast<uint32_t>(payloadBase + fieldOffset + 2u);
+   worldId24 = static_cast<uint16_t>(fieldOffset + 2u);
    reservedFieldByteCount28 = reserved;
    return reserved;
  }

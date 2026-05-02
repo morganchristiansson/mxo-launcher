@@ -431,11 +431,11 @@ public:
     // Character slot fields (used by derived slot record):
     uint32_t characterIdLow1c = 0;         // +0x1c
     uint32_t characterIdHigh20 = 0;      // +0x20
-    uint32_t worldId24 = 0;              // +0x24
+    uint16_t worldId24 = 0;              // +0x24
     // Fidelity note: different packet families reuse inherited +0x24 with different semantics.
-    // For slot/world records it carries a small world-id value; for the raw0x0a auth-response
-    // builder (`0x4b6cf4`) static RE proves +0x24 holds an absolute payload pointer to the third
-    // reserved field's content bytes.
+    // Most packet families treat it like a small scalar/ID. The raw0x0a auth-response builder
+    // reuses it as a payload-relative field-content offset (`fieldOffset + 2`), not as a widened
+    // absolute pointer. Keep the base width/layout intact.
 
 public:
     // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
