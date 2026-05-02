@@ -192,6 +192,11 @@ RE note:
   `replyPublicKeyId09 || modulusBytes || publicExponentBytes || 0x00 || signature[0x100]`
 - this is not X.509/DER Crypto++ key serialization; the inner Crypto++ helper is still the verifier
   leaf `VerifyMessage(...)` convenience used over the launcher-shaped record body
+- the file-write path is nevertheless now identifiable as direct Crypto++ sink usage rather than a
+  launcher-private byte loop:
+  - id dword written through sink word-output helper
+  - modulus/public exponent written via old `CryptoPP::Integer::Encode(bt, len, UNSIGNED)` shape
+  - trailing zero and signature emitted through the FileSink / BufferedTransformation put path
 
 ### 2.6 Source implementation status
 

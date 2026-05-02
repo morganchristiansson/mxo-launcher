@@ -843,11 +843,6 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
         return 0u;
     }
 
-    std::vector<uint8_t> modulusBytes(modulusByteCount, 0u);
-    std::vector<uint8_t> publicExponentBytes(publicExponentByteCount, 0u);
-    modulusInteger.Encode(modulusBytes.data(), modulusBytes.size());
-    publicExponentInteger.Encode(publicExponentBytes.data(), publicExponentBytes.size());
-
     // `0x447dd0` constructs a Crypto++ FileSink-family object configured with:
     // - OutputFileName = "pubkey.dat"
     // - OutputBinaryMode = true
@@ -857,19 +852,20 @@ static uint32_t AuthBootstrap680_RecordReplyPublicKeyRecordToPubkeyDat(
     // - public exponent integer bytes
     // - one zero padding byte
     // - 0x100-byte signature over the sibling fixed record body used by `0x468f80`
-    const std::array<uint8_t, 4u> replyPublicKeyIdBytes = {
-        static_cast<uint8_t>(replyPublicKeyId09 & 0xffu),
-        static_cast<uint8_t>((replyPublicKeyId09 >> 8u) & 0xffu),
-        static_cast<uint8_t>((replyPublicKeyId09 >> 16u) & 0xffu),
-        static_cast<uint8_t>((replyPublicKeyId09 >> 24u) & 0xffu),
-    };
+    //
+    // Static RE now supports using the concrete Crypto++ integer-to-sink path directly here:
+    // - `0x447e28` writes the dword id through a sink helper
+    // - the next two virtual `+0x08` calls are the old `CryptoPP::Integer::Encode(bt, len, UNSIGNED)`
+    //   shape over the live FileSink
+    // - `0x447e50` appends the single zero byte
+    // - final sink `+0x14` emits the 0x100-byte signature block
     static constexpr uint8_t kPublicKeyRecordPaddingByte = 0u;
 
     try {
         CryptoPP::FileSink outputSink("pubkey.dat", true);
-        outputSink.Put(replyPublicKeyIdBytes.data(), replyPublicKeyIdBytes.size());
-        outputSink.Put(modulusBytes.data(), modulusBytes.size());
-        outputSink.Put(publicExponentBytes.data(), publicExponentBytes.size());
+        outputSink.PutWord32(replyPublicKeyId09, CryptoPP::LITTLE_ENDIAN_ORDER);
+        modulusInteger.Encode(outputSink, modulusByteCount, CryptoPP::Integer::UNSIGNED);
+        publicExponentInteger.Encode(outputSink, publicExponentByteCount, CryptoPP::Integer::UNSIGNED);
         outputSink.Put(&kPublicKeyRecordPaddingByte, 1u);
         outputSink.Put(signatureBytes, 0x100u);
         outputSink.MessageEnd();
