@@ -2,10 +2,16 @@ cmake_minimum_required(VERSION 3.28)
 
 project(matrix_launcher LANGUAGES CXX)
 
-if(MSVC OR MXO_CLANG_MSVC_ABI)
-    # Prefer the non-debug MSVC CRT even for Debug builds on Linux-hosted clang/lld setups.
-    # The xwin payload we use does not necessarily ship the debug CRT import libraries.
+if(MSVC)
+    # Native MSVC builds keep the usual DLL CRT default for now.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+
+if(MXO_CLANG_MSVC_ABI)
+    # For the experimental Clang/MSVC-ABI path under Wine, prefer the retail static MSVC runtime
+    # so the produced launcher does not depend on Wine's incomplete msvcp140/vcruntime/ucrt DLL
+    # implementation surface.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 endif()
 
 set(MXO_MINGW_LIBSTDCXX_ROOT "/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++" CACHE PATH
@@ -120,15 +126,19 @@ target_include_directories(resurrections PRIVATE
 )
 target_link_libraries(resurrections PRIVATE cryptopp version ws2_32)
 if(MXO_CLANG_MSVC_ABI)
-    # Linux-hosted clang/lld + xwin currently ships only the retail CRT import libraries in this
-    # environment. Keep the experimental MSVC-ABI Debug profile linkable by overriding the missing
-    # debug-default CRT selection that clang still bakes into object files.
+    # Keep the experimental MSVC-ABI build on the retail static runtime/STL set so Wine does not
+    # need to provide the full MSVCP140 runtime surface.
     target_link_options(resurrections PRIVATE
         LINKER:/nodefaultlib:msvcrtd
         LINKER:/nodefaultlib:msvcprtd
-        LINKER:/defaultlib:msvcrt
-        LINKER:/defaultlib:msvcprt
-        LINKER:/defaultlib:vcruntime
+        LINKER:/nodefaultlib:msvcrt
+        LINKER:/nodefaultlib:msvcprt
+        LINKER:/nodefaultlib:vcruntime
+        LINKER:/nodefaultlib:ucrt
+        LINKER:/defaultlib:libcmt
+        LINKER:/defaultlib:libcpmt
+        LINKER:/defaultlib:libvcruntime
+        LINKER:/defaultlib:libucrt
     )
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MINGW)
@@ -157,9 +167,14 @@ if(MXO_CLANG_MSVC_ABI)
     target_link_options(crashreporter_stub PRIVATE
         LINKER:/nodefaultlib:msvcrtd
         LINKER:/nodefaultlib:msvcprtd
-        LINKER:/defaultlib:msvcrt
-        LINKER:/defaultlib:msvcprt
-        LINKER:/defaultlib:vcruntime
+        LINKER:/nodefaultlib:msvcrt
+        LINKER:/nodefaultlib:msvcprt
+        LINKER:/nodefaultlib:vcruntime
+        LINKER:/nodefaultlib:ucrt
+        LINKER:/defaultlib:libcmt
+        LINKER:/defaultlib:libcpmt
+        LINKER:/defaultlib:libvcruntime
+        LINKER:/defaultlib:libucrt
     )
 endif()
 
