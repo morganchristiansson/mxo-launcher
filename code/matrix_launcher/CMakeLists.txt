@@ -150,6 +150,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MINGW)
     target_link_libraries(resurrections PRIVATE winpthread)
 endif()
 target_compile_definitions(resurrections PRIVATE
+    $<$<BOOL:${MXO_CLANG_MSVC_ABI}>:MXO_CLANG_MSVC_ABI>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_SECURE_NO_WARNINGS>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>

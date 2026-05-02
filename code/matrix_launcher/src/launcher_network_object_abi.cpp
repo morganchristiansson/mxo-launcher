@@ -45,16 +45,16 @@ static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object ABI shell
 
 enum class LauncherObjectPrimaryDispatchMode {
     kWrapperTable,
-    kMinGWNativeVptr,
+    kNativeObject,
 };
 
-#if defined(__MINGW32__) && !defined(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR)
-#define MXO_USE_MINGW_NATIVE_ARG5_VPTR 1
+#if ((defined(__MINGW32__) || defined(MXO_CLANG_MSVC_ABI)) && !defined(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR))
+#define MXO_USE_NATIVE_ARG5_OBJECT_STORAGE 1
 #else
-#define MXO_USE_MINGW_NATIVE_ARG5_VPTR 0
+#define MXO_USE_NATIVE_ARG5_OBJECT_STORAGE 0
 #endif
 
-#if !MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if !MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
 #warning "Detached arg5 wrapper-table mode is retained only as a future compiler-port seam; client.dll directly touches QueuePair/+0x5c/+0x60 subobjects, so this mode is not launcher-faithful today."
 #endif
 
@@ -62,22 +62,22 @@ static const char* LauncherObjectPrimaryDispatchModeName(LauncherObjectPrimaryDi
     switch (mode) {
         case LauncherObjectPrimaryDispatchMode::kWrapperTable:
             return "wrapper-table";
-        case LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr:
-            return "mingw-native-vptr";
+        case LauncherObjectPrimaryDispatchMode::kNativeObject:
+            return "native-object";
     }
     return "unknown";
 }
 
 static LauncherObjectPrimaryDispatchMode LauncherObjectPrimaryDispatchModeForBuild() {
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
-    return LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr;
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
+    return LauncherObjectPrimaryDispatchMode::kNativeObject;
 #else
     return LauncherObjectPrimaryDispatchMode::kWrapperTable;
 #endif
 }
 
 static void** LauncherObjectNativePrimaryAddressPointForBuild() {
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     static void** const kNativeAddressPoint = []() -> void** {
         mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768 probe;
         return *reinterpret_cast<void***>(&probe);
@@ -111,7 +111,7 @@ static void LogLauncherObjectPrimaryDispatchConfigOnce() {
 #endif
     );
 
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     void** const nativeAddressPoint = LauncherObjectNativePrimaryAddressPointForBuild();
     const uintptr_t* const vtableWords = reinterpret_cast<const uintptr_t*>(nativeAddressPoint);
     spdlog::info(
@@ -144,7 +144,7 @@ static void LogLauncherObjectPrimaryDispatchConfigOnce() {
 }
 
 static void** LauncherObjectSelectedPrimaryVtable() {
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     return LauncherObjectNativePrimaryAddressPointForBuild();
 #else
     return nullptr;
@@ -152,7 +152,7 @@ static void** LauncherObjectSelectedPrimaryVtable() {
 }
 
 bool LauncherNetworkEngineUsesNativeObjectStorage() {
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     return true;
 #else
     return false;
@@ -210,7 +210,7 @@ mxo::liblttcp::CBaseConnection* mxo::liblttcp::CBaseConnection_FromQueueContextS
     return queueContext->owner;
 }
 
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
 static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherObjectNativeEngineFromVisiblePtr(void* visiblePtr) {
     return static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(visiblePtr);
 }
@@ -289,7 +289,7 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* ResolveLauncherObjec
     LauncherObjectAbiShell* owner) {
     if (!owner) return NULL;
 
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     return LauncherObjectNativeEngineFromVisiblePtr(owner);
 #else
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& binding = LauncherObjectEngineBinding();
@@ -310,7 +310,7 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* LauncherNetworkEngineFromAb
         return NULL;
     }
 
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     return LauncherObjectNativeEngineFromVisiblePtr(owner);
 #else
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768Binding& binding = LauncherObjectEngineBinding();
@@ -821,7 +821,7 @@ void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking
 void* LauncherCreateNetworkEngineAbiShell() {
     LogLauncherObjectPrimaryDispatchConfigOnce();
 
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
     auto* engine = new mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768();
     if (!engine) {
         return NULL;
@@ -848,11 +848,11 @@ void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediat
     LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(*launcherObjectPtr);
     LauncherLogNetworkEngineAbiShellDispatchState(object, "pre-release");
 
-#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
-    if (LauncherObjectPrimaryDispatchModeForBuild() == LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr) {
+#if MXO_USE_NATIVE_ARG5_OBJECT_STORAGE
+    if (LauncherObjectPrimaryDispatchModeForBuild() == LauncherObjectPrimaryDispatchMode::kNativeObject) {
         auto* engine = LauncherObjectNativeEngineFromVisiblePtr(object);
         spdlog::info(
-            "launcher arg5 native-vptr mode deleting native engine storage {} via visible object {}",
+            "launcher arg5 native-object mode deleting native engine storage {} via visible object {}",
             fmt::ptr(engine),
             fmt::ptr(object));
         delete engine;
