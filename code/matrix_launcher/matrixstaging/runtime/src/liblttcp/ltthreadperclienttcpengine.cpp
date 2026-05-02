@@ -22,6 +22,10 @@ namespace mxo::liblttcp {
 
 namespace {
 
+static bool ShouldLogRepeatedQueueDiagnosticCount(uint32_t count) {
+    return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
+}
+
 static int CompareEndpointTreeKeys(
     const LTTCPEndpointKey_0x44b070& lhs,
     const LTTCPEndpointKey_0x44b070& rhs);
@@ -2772,6 +2776,20 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperation(
         fmt::ptr(context),
         queuePairWasEmpty ? 1u : 0u,
         0u);
+
+    static uint32_t s_enqueueDiagnosticCount = 0u;
+    ++s_enqueueDiagnosticCount;
+    if (ShouldLogRepeatedQueueDiagnosticCount(s_enqueueDiagnosticCount)) {
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperation raw queue state count={:08x} q0.read={} q0.write={} q34.read={} q34.write={} event={} field04=0x{:08x}",
+            s_enqueueDiagnosticCount,
+            fmt::ptr(activeQueue0C ? activeQueue0C->readCursor00 : nullptr),
+            fmt::ptr(activeQueue0C ? activeQueue0C->writeCursor10 : nullptr),
+            fmt::ptr(activeQueue34 ? activeQueue34->readCursor00 : nullptr),
+            fmt::ptr(activeQueue34 ? activeQueue34->writeCursor10 : nullptr),
+            fmt::ptr(ownedQueueSignalEvent7C_),
+            ctorFlagsField04_);
+    }
 }
 
 // anchor: launcher.exe:0x436b10

@@ -518,10 +518,46 @@ static LauncherObjectAbiShell* LauncherObjectFromSubobject(void* self, size_t of
     return self ? reinterpret_cast<LauncherObjectAbiShell*>(static_cast<unsigned char*>(self) - offset) : NULL;
 }
 
+static bool ShouldLogClientFacingArg5CallbackCount(uint32_t count) {
+    return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
+}
+
+static void LogClientFacingArg5QueueState(
+    const char* label,
+    LauncherObjectAbiShell* shell,
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine,
+    uint32_t callCount,
+    int waitReason) {
+    if (!ShouldLogClientFacingArg5CallbackCount(callCount)) {
+        return;
+    }
+
+    auto* layout = reinterpret_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(shell);
+    const auto* queue0C = layout ? &layout->queuePair0C.queue00 : nullptr;
+    const auto* queue34 = layout ? &layout->queuePair0C.queue28 : nullptr;
+    spdlog::debug(
+        "launcher arg5 client-facing helper label={} callCount={:08x} shell={} engine={} waitReason={} q0.read={} q0.write={} q34.read={} q34.write={} field04=0x{:08x} event={}",
+        label ? label : "<null>",
+        callCount,
+        fmt::ptr(shell),
+        fmt::ptr(engine),
+        waitReason,
+        fmt::ptr(queue0C ? queue0C->readCursor00 : static_cast<void*>(nullptr)),
+        fmt::ptr(queue0C ? queue0C->writeCursor10 : static_cast<void*>(nullptr)),
+        fmt::ptr(queue34 ? queue34->readCursor00 : static_cast<void*>(nullptr)),
+        fmt::ptr(queue34 ? queue34->writeCursor10 : static_cast<void*>(nullptr)),
+        layout ? layout->field04 : 0u,
+        fmt::ptr(layout ? layout->queueSignalEvent7C : static_cast<void*>(nullptr)));
+}
+
 // UNANCHORED: queue-lock helper enter for arg5 +0x60.
 static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot0(void* self) {
+    static uint32_t s_enterCount = 0u;
+    LauncherObjectAbiShell* shell = LauncherObjectFromSubobject(self, 0x60);
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
-            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x60))) {
+            ResolveLauncherObjectEngineSidecar(shell)) {
+        ++s_enterCount;
+        LogClientFacingArg5QueueState("queue-lock-enter", shell, engine, s_enterCount, 0);
         return engine->EnterQueueLockHelper();
     }
     return 1u;
@@ -529,8 +565,12 @@ static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot0(void* self) {
 
 // UNANCHORED: queue-lock helper leave for arg5 +0x60.
 static uint32_t __thiscall LauncherObject_QueueLockHelper_Slot1(void* self) {
+    static uint32_t s_leaveCount = 0u;
+    LauncherObjectAbiShell* shell = LauncherObjectFromSubobject(self, 0x60);
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
-            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x60))) {
+            ResolveLauncherObjectEngineSidecar(shell)) {
+        ++s_leaveCount;
+        LogClientFacingArg5QueueState("queue-lock-leave", shell, engine, s_leaveCount, 0);
         return engine->LeaveQueueLockHelper();
     }
     return 1u;
@@ -557,8 +597,12 @@ static uint32_t __thiscall LauncherObject_CleanupLockHelper_Slot1(void* self) {
 // anchor: launcher.exe:0x435f90
 // vtable: launcher.exe:arg5+0x5c helper slot +0x00
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
+    static uint32_t s_signalCount = 0u;
+    LauncherObjectAbiShell* shell = LauncherObjectFromSubobject(self, 0x5c);
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
-            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x5c))) {
+            ResolveLauncherObjectEngineSidecar(shell)) {
+        ++s_signalCount;
+        LogClientFacingArg5QueueState("queue-signal", shell, engine, s_signalCount, 0);
         return engine->SignalQueueEventHelper();
     }
     return 1u;
@@ -567,8 +611,12 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
 // anchor: launcher.exe:0x435fa0
 // vtable: launcher.exe:arg5+0x5c helper slot +0x04
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
+    static uint32_t s_waitCount = 0u;
+    LauncherObjectAbiShell* shell = LauncherObjectFromSubobject(self, 0x5c);
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine =
-            ResolveLauncherObjectEngineSidecar(LauncherObjectFromSubobject(self, 0x5c))) {
+            ResolveLauncherObjectEngineSidecar(shell)) {
+        ++s_waitCount;
+        LogClientFacingArg5QueueState("queue-wait", shell, engine, s_waitCount, reason);
         return engine->WaitQueueEventHelper(reason);
     }
     return 1u;

@@ -22,6 +22,8 @@ set(MXO_MINGW_LIBSTDCXX_TARGET_ROOT "/usr/lib/gcc/i686-w64-mingw32/13-win32/incl
 set(MXO_GAME_DIR "$ENV{HOME}/MxO_7.6005" CACHE PATH "Matrix Online game directory")
 set(MXO_DEPLOY_TO_GAME_DIR ON CACHE BOOL "Copy built launchers into MXO_GAME_DIR after build")
 set(MXO_BUILD_PROFILE "debug" CACHE STRING "Compatibility profile label used in output paths")
+set(MXO_OUTPUT_BASENAME "resurrections" CACHE STRING "Launcher executable basename without .exe")
+set(MXO_CRASHREPORTER_STUB_BASENAME "crashreporter.stub" CACHE STRING "Crash reporter stub basename without .exe")
 set_property(CACHE MXO_BUILD_PROFILE PROPERTY STRINGS debug release)
 set(MXO_DEBUG_LEVEL "slim" CACHE STRING "Debug info level: full, slim, or none")
 set_property(CACHE MXO_DEBUG_LEVEL PROPERTY STRINGS full slim none)
@@ -119,6 +121,7 @@ target_compile_features(cryptopp PUBLIC cxx_std_17)
 set_target_properties(cryptopp PROPERTIES OUTPUT_NAME cryptopp)
 
 add_executable(resurrections WIN32 ${MXO_LAUNCHER_SOURCES})
+set_target_properties(resurrections PROPERTIES OUTPUT_NAME "${MXO_OUTPUT_BASENAME}")
 target_compile_features(resurrections PRIVATE cxx_std_17)
 target_include_directories(resurrections PRIVATE
     third_party/cryptopp890
@@ -155,6 +158,7 @@ target_compile_definitions(resurrections PRIVATE
 )
 
 add_executable(crashreporter_stub WIN32 tools/crashreporter_stub.cpp)
+set_target_properties(crashreporter_stub PROPERTIES OUTPUT_NAME "${MXO_CRASHREPORTER_STUB_BASENAME}")
 target_compile_features(crashreporter_stub PRIVATE cxx_std_17)
 target_compile_definitions(crashreporter_stub PRIVATE
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH>
@@ -162,7 +166,6 @@ target_compile_definitions(crashreporter_stub PRIVATE
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_CRT_USE_BUILTIN_OFFSETOF>
     $<$<OR:$<BOOL:${MSVC}>,$<BOOL:${MXO_CLANG_MSVC_ABI}>>:_SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING>
 )
-set_target_properties(crashreporter_stub PROPERTIES OUTPUT_NAME crashreporter.stub)
 if(MXO_CLANG_MSVC_ABI)
     target_link_options(crashreporter_stub PRIVATE
         LINKER:/nodefaultlib:msvcrtd
@@ -208,8 +211,8 @@ target_compile_options(resurrections PRIVATE
 )
 target_compile_options(crashreporter_stub PRIVATE -Wall -Wextra -O2)
 
-set(MXO_DEPLOYED_EXE "${MXO_GAME_DIR}/resurrections.exe")
-set(MXO_DEPLOYED_CRASHREPORTER_STUB "${MXO_GAME_DIR}/crashreporter.stub.exe")
+set(MXO_DEPLOYED_EXE "${MXO_GAME_DIR}/${MXO_OUTPUT_BASENAME}.exe")
+set(MXO_DEPLOYED_CRASHREPORTER_STUB "${MXO_GAME_DIR}/${MXO_CRASHREPORTER_STUB_BASENAME}.exe")
 
 if(MXO_DEPLOY_TO_GAME_DIR)
     add_custom_command(
@@ -233,3 +236,5 @@ message(STATUS "MXO build profile: ${MXO_BUILD_PROFILE}")
 message(STATUS "MXO game dir: ${MXO_GAME_DIR}")
 message(STATUS "MXO deploy to game dir: ${MXO_DEPLOY_TO_GAME_DIR}")
 message(STATUS "MXO debug level: ${MXO_DEBUG_LEVEL}")
+message(STATUS "MXO output basename: ${MXO_OUTPUT_BASENAME}")
+message(STATUS "MXO crashreporter stub basename: ${MXO_CRASHREPORTER_STUB_BASENAME}")
