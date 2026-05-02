@@ -4,7 +4,7 @@
 
 #include "consolevar.h"
 
-#include <bits/stl_tree.h>
+#include "../../../../compat/sgi_tree_compat.h"
 
 #include <cctype>
 #include <cstdarg>
@@ -38,7 +38,7 @@ ConsoleRuntimeGlobals& RuntimeGlobals() {
 // - use direct `_Rb_tree` insert/erase mechanics
 // - keep only the case-insensitive (`_stricmp`) registry-wrapper logic and source-owned node
 //   ownership here
-using ConsoleVarRegistryNode = std::_Rb_tree_node<std::pair<const char*, CConsoleVar*>>;
+using ConsoleVarRegistryNode = mxo::sgi_tree::_Rb_tree_node<std::pair<const char*, CConsoleVar*>>;
 
 struct ConsoleVarRegistryTreeHead18 {
     unsigned char colorOrFlag;
@@ -84,23 +84,23 @@ ConsoleVarRegistryNodeStorage() {
 }
 
 template <typename Head>
-static std::_Rb_tree_node_base* ConsoleRegistryHeaderBase(Head* head) {
-    return reinterpret_cast<std::_Rb_tree_node_base*>(head);
+static mxo::sgi_tree::_Rb_tree_node_base* ConsoleRegistryHeaderBase(Head* head) {
+    return reinterpret_cast<mxo::sgi_tree::_Rb_tree_node_base*>(head);
 }
 
 template <typename Head>
-static const std::_Rb_tree_node_base* ConsoleRegistryHeaderBase(const Head* head) {
-    return reinterpret_cast<const std::_Rb_tree_node_base*>(head);
+static const mxo::sgi_tree::_Rb_tree_node_base* ConsoleRegistryHeaderBase(const Head* head) {
+    return reinterpret_cast<const mxo::sgi_tree::_Rb_tree_node_base*>(head);
 }
 
 static void InitializeConsoleVarRegistryTreeHead18(ConsoleVarRegistryTreeHead18* head) {
-    std::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(head);
+    mxo::sgi_tree::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(head);
     if (!header) {
         return;
     }
 
     std::memset(head, 0, sizeof(*head));
-    header->_M_color = std::_S_red;
+    header->_M_color = mxo::sgi_tree::_S_red;
     header->_M_parent = nullptr;
     header->_M_left = header;
     header->_M_right = header;
@@ -140,7 +140,7 @@ static ConsoleVarRegistryNode* ConsoleVarRegistryFindNode(const char* name) {
     }
 
     const ConsoleVarRegistryNode* candidate = nullptr;
-    const std::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(g_CConsoleVarRegistryTree->header);
+    const mxo::sgi_tree::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(g_CConsoleVarRegistryTree->header);
     const ConsoleVarRegistryNode* node =
         (header && header->_M_parent) ? static_cast<const ConsoleVarRegistryNode*>(header->_M_parent) : nullptr;
     while (node) {
@@ -179,8 +179,8 @@ static bool ConsoleVarRegistryInsert(CConsoleVar* var) {
     node->_M_valptr()->first = var->Name();
     node->_M_valptr()->second = var;
 
-    std::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(tree->header);
-    std::_Rb_tree_node_base* parent = header;
+    mxo::sgi_tree::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(tree->header);
+    mxo::sgi_tree::_Rb_tree_node_base* parent = header;
     ConsoleVarRegistryNode* current =
         (header && header->_M_parent) ? static_cast<ConsoleVarRegistryNode*>(header->_M_parent) : nullptr;
     bool insertLeft = true;
@@ -198,10 +198,10 @@ static bool ConsoleVarRegistryInsert(CConsoleVar* var) {
     node->_M_parent = nullptr;
     node->_M_left = nullptr;
     node->_M_right = nullptr;
-    node->_M_color = std::_S_red;
+    node->_M_color = mxo::sgi_tree::_S_red;
 
     ConsoleVarRegistryNode* insertedNode = node.get();
-    std::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
+    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
     ++tree->nodeCount;
     ConsoleVarRegistryNodeStorage().emplace(insertedNode, std::move(node));
     return true;
@@ -213,7 +213,7 @@ static bool ConsoleVarRegistryEraseByName(const char* name) {
         return false;
     }
 
-    (void)std::_Rb_tree_rebalance_for_erase(node, *ConsoleRegistryHeaderBase(g_CConsoleVarRegistryTree->header));
+    (void)mxo::sgi_tree::_Rb_tree_rebalance_for_erase(node, *ConsoleRegistryHeaderBase(g_CConsoleVarRegistryTree->header));
     ConsoleVarRegistryNodeStorage().erase(node);
     if (g_CConsoleVarRegistryTree->nodeCount > 0) {
         --g_CConsoleVarRegistryTree->nodeCount;

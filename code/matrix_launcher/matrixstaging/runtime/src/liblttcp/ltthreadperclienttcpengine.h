@@ -3,7 +3,7 @@
 #include <winsock2.h>
 #include <windows.h>
 
-#include <bits/stl_tree.h>
+#include "../../../../compat/sgi_tree_compat.h"
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -24,9 +24,9 @@ class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
 struct LTTCPEndpointKey_0x44b070;
 
 using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
+    mxo::sgi_tree::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
 using CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode =
-    std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
+    mxo::sgi_tree::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
 
 // Recovered repeated queue-record layout used inside the base completed-operation queue-pair
 // storage.

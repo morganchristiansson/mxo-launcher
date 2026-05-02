@@ -4,7 +4,7 @@
 #include "../libltnet/sys/pc/pcsocket.h"
 #include <spdlog/spdlog.h>
 
-#include <bits/stl_tree.h>
+#include "../../../../compat/sgi_tree_compat.h"
 
 #include <winsock2.h>
 #include <system_error>
@@ -101,11 +101,11 @@ static void CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemPool_Clear();
 // - recovered runtime payload families are tracked separately from source-only launcher ABI-shell
 //   baggage using node shapes that match the launcher tree families rather than source vectors
 
-static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
+static_assert(sizeof(mxo::sgi_tree::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
 using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
+    mxo::sgi_tree::_Rb_tree_node<std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>>;
 using CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode =
-    std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
+    mxo::sgi_tree::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>>;
 static_assert(sizeof(std::pair<LTTCPEndpointKey_0x44b070, CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread*>) == 0x14, "endpoint tree value size mismatch");
 static_assert(sizeof(std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread*>) == 0x8, "context tree value size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode) == 0x24, "endpoint tree node size mismatch");
@@ -179,24 +179,24 @@ static CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking& EnsureEngineC
 }
 
 template <typename Head>
-static std::_Rb_tree_node_base* TreeHeaderBase(Head* head) {
-    return reinterpret_cast<std::_Rb_tree_node_base*>(head);
+static mxo::sgi_tree::_Rb_tree_node_base* TreeHeaderBase(Head* head) {
+    return reinterpret_cast<mxo::sgi_tree::_Rb_tree_node_base*>(head);
 }
 
 template <typename Head>
-static const std::_Rb_tree_node_base* TreeHeaderBase(const Head* head) {
-    return reinterpret_cast<const std::_Rb_tree_node_base*>(head);
+static const mxo::sgi_tree::_Rb_tree_node_base* TreeHeaderBase(const Head* head) {
+    return reinterpret_cast<const mxo::sgi_tree::_Rb_tree_node_base*>(head);
 }
 
 template <typename Node, typename Head>
 static Node* TreeRootNode(Head* head) {
-    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
     return (header && header->_M_parent) ? static_cast<Node*>(header->_M_parent) : nullptr;
 }
 
 template <typename Node, typename Head>
 static const Node* TreeRootNode(const Head* head) {
-    const std::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    const mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
     return (header && header->_M_parent) ? static_cast<const Node*>(header->_M_parent) : nullptr;
 }
 
@@ -262,7 +262,7 @@ static bool LauncherTreeEraseOwnedNode(Backing* backing, Head* head, Node* node)
     if (!backing || !head || !node) {
         return false;
     }
-    std::_Rb_tree_node_base* erased = std::_Rb_tree_rebalance_for_erase(node, *TreeHeaderBase(head));
+    mxo::sgi_tree::_Rb_tree_node_base* erased = mxo::sgi_tree::_Rb_tree_rebalance_for_erase(node, *TreeHeaderBase(head));
     backing->entries.erase(static_cast<Node*>(erased));
     return true;
 }
@@ -323,8 +323,8 @@ static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeInsert
     entry->node._M_valptr()->first = key;
     entry->node._M_valptr()->second = nullptr;
 
-    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
-    std::_Rb_tree_node_base* parent = header;
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    mxo::sgi_tree::_Rb_tree_node_base* parent = header;
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* current =
         TreeRootNode<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode>(head);
     bool insertLeft = true;
@@ -346,9 +346,9 @@ static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeInsert
     insertedNode->_M_parent = nullptr;
     insertedNode->_M_left = nullptr;
     insertedNode->_M_right = nullptr;
-    insertedNode->_M_color = std::_S_red;
+    insertedNode->_M_color = mxo::sgi_tree::_S_red;
 
-    std::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
+    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
     backing.entries.emplace(insertedNode, std::move(entry));
     if (outInserted) {
         *outInserted = true;
@@ -444,8 +444,8 @@ static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeInsertUn
     entry->node._M_valptr()->first = key;
     entry->node._M_valptr()->second = nullptr;
 
-    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
-    std::_Rb_tree_node_base* parent = header;
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    mxo::sgi_tree::_Rb_tree_node_base* parent = header;
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* current =
         TreeRootNode<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode>(head);
     bool insertLeft = true;
@@ -467,9 +467,9 @@ static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeInsertUn
     insertedNode->_M_parent = nullptr;
     insertedNode->_M_left = nullptr;
     insertedNode->_M_right = nullptr;
-    insertedNode->_M_color = std::_S_red;
+    insertedNode->_M_color = mxo::sgi_tree::_S_red;
 
-    std::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
+    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
     backing.entries.emplace(insertedNode, std::move(entry));
     if (outInserted) {
         *outInserted = true;
@@ -1926,13 +1926,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::DeleteLockHelperScaffold(
 
 void CLTThreadPerClientTCPEngine_0x4b2768::InitializeEndpointTreeHead24(
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head) {
-    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
     if (!header) {
         return;
     }
 
     std::memset(head, 0, sizeof(*head));
-    header->_M_color = std::_S_red;
+    header->_M_color = mxo::sgi_tree::_S_red;
     header->_M_parent = nullptr;
     header->_M_left = header;
     header->_M_right = header;
@@ -1940,13 +1940,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::InitializeEndpointTreeHead24(
 
 void CLTThreadPerClientTCPEngine_0x4b2768::InitializeContextTreeHead18(
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head) {
-    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
     if (!header) {
         return;
     }
 
     std::memset(head, 0, sizeof(*head));
-    header->_M_color = std::_S_red;
+    header->_M_color = mxo::sgi_tree::_S_red;
     header->_M_parent = nullptr;
     header->_M_left = header;
     header->_M_right = header;

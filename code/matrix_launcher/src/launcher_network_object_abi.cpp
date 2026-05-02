@@ -800,6 +800,7 @@ void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediat
     LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(*launcherObjectPtr);
     LauncherLogNetworkEngineAbiShellDispatchState(object, "pre-release");
 
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
     if (LauncherObjectPrimaryDispatchModeForBuild() == LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr) {
         auto* engine = LauncherObjectNativeEngineFromVisiblePtr(object);
         spdlog::info(
@@ -808,6 +809,9 @@ void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediat
             fmt::ptr(object));
         delete engine;
     } else {
+#else
+    {
+#endif
         typedef int (__thiscall *ReleaseFn)(LauncherObjectAbiShell*, uint32_t);
         ReleaseFn release = object->vtable ? reinterpret_cast<ReleaseFn>(object->vtable[0]) : nullptr;
         if (release) {

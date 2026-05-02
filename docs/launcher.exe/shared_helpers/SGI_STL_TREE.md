@@ -9,11 +9,16 @@ This is **not** currently best understood as an engine-specific custom container
 It is reused by multiple launcher subsystems, including but not limited to
 `CLTThreadPerClientTCPEngine`.
 
-Current direct source usage:
-- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now includes
-  `<bits/stl_tree.h>` and calls the low-level `_Rb_tree` helpers directly
-- `matrixstaging/runtime/src/libltbase/consolevar.cpp` now also routes the console-variable
-  registry tree through direct `_Rb_tree` helpers instead of a source-owned `std::vector` registry
+Current source usage after the first MSVC-target-Clang portability pass:
+- GNU / MinGW-family builds still use the donor `<bits/stl_tree.h>` implementation directly, but
+  now only through `compat/sgi_tree_compat.h`
+- MSVC-target Clang now uses the same project-facing `mxo::sgi_tree::*` API surface, backed by a
+  narrow local compatibility implementation of just the recovered node layout and helper family we
+  actually depend on (`increment`, `insert_and_rebalance`, `rebalance_for_erase`)
+- current recovered users routed through that shim:
+  - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp`
+  - `matrixstaging/runtime/src/libltbase/consolevar.cpp`
+  - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
 
 Current local header provenance:
 - intended donor/reference: `/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++/bits/stl_tree.h`
@@ -155,6 +160,22 @@ Current duplicate-registration note from `0x4162c0`:
 This is strong evidence that the shared tree helper family is generic launcher infrastructure,
 not something unique to the TCP engine.
 
+## Current MSVC-target Clang build status
+
+The original MSVC-target Clang blocker from this area was the direct inclusion of
+`<bits/stl_tree.h>` into translation units that otherwise use the MSVC STL.
+That blocker is now removed.
+
+Current bounded status after the shim pass:
+- stable GCC / MinGW path still builds
+- GNU-target Clang still builds
+- MSVC-target Clang now compiles past the tree-header incompatibility and reaches link-stage CRT
+  selection issues instead
+- current next blocker is no longer the tree helper lineage itself; it is the Debug-profile
+  runtime-library mismatch in the experimental xwin/MSVC-ABI path (for example `cryptopp.lib`
+  objects still advertising `MDd_DynamicDebug` while only retail CRT import libraries are present
+  in this environment)
+
 ## C. Other integer-keyed tree users
 
 Further non-engine reuse currently evidenced by xrefs and wrapper helpers:
@@ -213,8 +234,11 @@ Current rationale:
   and `+0x80` / `+0x8c` sentinel heads remain explicit
 
 This means the current direction is now:
-- **use the MinGW SGI/libstdc++ `stl_tree.h` helper API directly**
-- **delete the old local `src/launcher_tree.*` mirror**
+- **keep one project-local compatibility façade** (`compat/sgi_tree_compat.h`)
+- **use the MinGW SGI/libstdc++ `stl_tree.h` helper API directly where that STL family is active**
+- **fall back to the narrow local compatibility implementation for MSVC-STL builds**
+- **do not reintroduce a second project-specific container wrapper layer on top of that façade unless
+  a future fidelity need forces it**
 
 ---
 
@@ -247,17 +271,22 @@ Project-owned wrapper families keep project/component-specific names in Ghidra:
 - `0x456a90` → `CConsoleVarRegistryTree_EraseNode`
 
 ### Current source usage
-`CLTThreadPerClientTCPEngine` and the console-variable registry now route their tree mechanics
-through MinGW libstdc++ `<bits/stl_tree.h>`.
+`CLTThreadPerClientTCPEngine`, the console-variable registry, and the login-mediator observer tree
+now route their tree mechanics through `compat/sgi_tree_compat.h`.
 
 The current source split is:
-- shared low-level RB-tree mechanics from MinGW `_Rb_tree` helpers
-- direct MinGW `_Rb_tree_node<std::pair<key,payload*>>` node types for recovered engine and
+- shared low-level RB-tree mechanics exposed as `mxo::sgi_tree::*`
+- GNU / MinGW builds: direct donor `_Rb_tree` helpers from `<bits/stl_tree.h>` behind that façade
+- MSVC-target Clang builds: narrow local implementation of the same helper subset behind that
+  façade
+- direct `_Rb_tree_node<std::pair<key,payload*>>`-style node types for recovered engine and
   console-registry node families
 - engine-specific comparison/search/container decisions in
   `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp`
 - console-registry-specific case-insensitive search/insert/erase decisions in
   `matrixstaging/runtime/src/libltbase/consolevar.cpp`
+- mediator-observer-specific pointer-keyed insert/erase/range helpers in
+  `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
 
 Current non-duplication boundary in source:
 - **kept**: launcher-specific key comparison, search shape, duplicate handling, payload/backing

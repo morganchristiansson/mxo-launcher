@@ -117,6 +117,18 @@ target_include_directories(resurrections PRIVATE
     third_party/spdlog-1.17.0/include
 )
 target_link_libraries(resurrections PRIVATE cryptopp version ws2_32)
+if(MXO_CLANG_MSVC_ABI)
+    # Linux-hosted clang/lld + xwin currently ships only the retail CRT import libraries in this
+    # environment. Keep the experimental MSVC-ABI Debug profile linkable by overriding the missing
+    # debug-default CRT selection that clang still bakes into object files.
+    target_link_options(resurrections PRIVATE
+        LINKER:/nodefaultlib:msvcrtd
+        LINKER:/nodefaultlib:msvcprtd
+        LINKER:/defaultlib:msvcrt
+        LINKER:/defaultlib:msvcprt
+        LINKER:/defaultlib:vcruntime
+    )
+endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MINGW)
     # GNU-target Clang needs the MinGW posix thread runtime explicitly once we
     # force the posix libstdc++ header/lib selection in the experimental toolchain.

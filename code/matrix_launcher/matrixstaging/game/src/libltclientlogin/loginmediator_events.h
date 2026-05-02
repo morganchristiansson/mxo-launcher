@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "../../../../compat/sgi_tree_compat.h"
+
 // Note: LoginObserverTreeNode674 is defined in loginmediator.h
 
 namespace mxo {
@@ -19,21 +21,21 @@ public:
 
     // anchor: launcher.exe:0x419510 / TreeNodeBase
     template <typename Node>
-    static std::_Rb_tree_node_base* TreeNodeBase(Node* node) {
-        return reinterpret_cast<std::_Rb_tree_node_base*>(node);
+    static mxo::sgi_tree::_Rb_tree_node_base* TreeNodeBase(Node* node) {
+        return reinterpret_cast<mxo::sgi_tree::_Rb_tree_node_base*>(node);
     }
 
     template <typename Node>
-    static const std::_Rb_tree_node_base* TreeNodeBase(const Node* node) {
-        return reinterpret_cast<const std::_Rb_tree_node_base*>(node);
+    static const mxo::sgi_tree::_Rb_tree_node_base* TreeNodeBase(const Node* node) {
+        return reinterpret_cast<const mxo::sgi_tree::_Rb_tree_node_base*>(node);
     }
 
     // anchor: launcher.exe:0x419510 / NodeFromBase
-    static LoginObserverTreeNode674* NodeFromBase(std::_Rb_tree_node_base* node) {
+    static LoginObserverTreeNode674* NodeFromBase(mxo::sgi_tree::_Rb_tree_node_base* node) {
         return reinterpret_cast<LoginObserverTreeNode674*>(node);
     }
 
-    static const LoginObserverTreeNode674* NodeFromBase(const std::_Rb_tree_node_base* node) {
+    static const LoginObserverTreeNode674* NodeFromBase(const mxo::sgi_tree::_Rb_tree_node_base* node) {
         return reinterpret_cast<const LoginObserverTreeNode674*>(node);
     }
 
@@ -59,7 +61,7 @@ public:
     static void EraseRange(
         LoginObserverTreeNode674* first,
         LoginObserverTreeNode674* last,
-        std::_Rb_tree_node_base* headerBase,
+        mxo::sgi_tree::_Rb_tree_node_base* headerBase,
         uint32_t* nodeCount);
 
     // anchor: launcher.exe:0x41d430 / EraseRangeFull

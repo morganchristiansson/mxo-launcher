@@ -5,13 +5,13 @@
 #include "loginstate.h"
 #include <spdlog/spdlog.h>
 
-#include <bits/stl_tree.h>
+#include "../../../../compat/sgi_tree_compat.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 
-static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "observer tree node-base size mismatch");
+static_assert(sizeof(mxo::sgi_tree::_Rb_tree_node_base) == 0x10, "observer tree node-base size mismatch");
 static_assert(sizeof(mxo::ltlogin::LoginObserverTreeNode674) == 0x14, "observer tree node size mismatch");
 
 namespace mxo::ltlogin {
@@ -72,7 +72,7 @@ uint32_t LoginObserverTreeHelper674::CountRange(
     LoginObserverTreeNode674* last) {
     uint32_t count = 0u;
     while (first != last) {
-        first = NodeFromBase(std::_Rb_tree_increment(TreeNodeBase(first)));
+        first = NodeFromBase(mxo::sgi_tree::_Rb_tree_increment(TreeNodeBase(first)));
         ++count;
     }
     return count;
@@ -82,11 +82,11 @@ uint32_t LoginObserverTreeHelper674::CountRange(
 void LoginObserverTreeHelper674::EraseRange(
     LoginObserverTreeNode674* first,
     LoginObserverTreeNode674* last,
-    std::_Rb_tree_node_base* headerBase,
+    mxo::sgi_tree::_Rb_tree_node_base* headerBase,
     uint32_t* nodeCount) {
     while (first != last) {
-        (void)std::_Rb_tree_rebalance_for_erase(TreeNodeBase(first), *headerBase);
-        LoginObserverTreeNode674* next = NodeFromBase(std::_Rb_tree_increment(TreeNodeBase(first)));
+        (void)mxo::sgi_tree::_Rb_tree_rebalance_for_erase(TreeNodeBase(first), *headerBase);
+        LoginObserverTreeNode674* next = NodeFromBase(mxo::sgi_tree::_Rb_tree_increment(TreeNodeBase(first)));
         std::free(first);
         first = next;
         --(*nodeCount);
@@ -99,7 +99,7 @@ void LoginObserverTreeHelper674::EraseRangeFull(
     LoginObserverTreeNode674* last,
     LoginObserverTreeNode674* header,
     uint32_t* nodeCount) {
-    std::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
+    mxo::sgi_tree::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
     LoginObserverTreeNode674* begin = NodeFromBase(headerBase->_M_left);
     LoginObserverTreeNode674* end = header;
 
@@ -121,8 +121,8 @@ bool LoginObserverTreeHelper674::InsertNode(
     LoginObserverTreeNode674* header,
     void* observer,
     uint32_t* nodeCount) {
-    std::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
-    std::_Rb_tree_node_base* parentBase = headerBase;
+    mxo::sgi_tree::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
+    mxo::sgi_tree::_Rb_tree_node_base* parentBase = headerBase;
     LoginObserverTreeNode674* current = header->parent04;
     const uintptr_t targetKey = TreeKey(observer);
     bool insertLeft = true;
@@ -145,13 +145,13 @@ bool LoginObserverTreeHelper674::InsertNode(
     if (!node) {
         return false;
     }
-    node->colorOrFlags00 = static_cast<uint32_t>(std::_S_red);
+    node->colorOrFlags00 = static_cast<uint32_t>(mxo::sgi_tree::_S_red);
     node->parent04 = nullptr;
     node->left08 = nullptr;
     node->right0c = nullptr;
     node->observerKey10 = observer;
 
-    std::_Rb_tree_insert_and_rebalance(insertLeft, TreeNodeBase(node), parentBase, *headerBase);
+    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(insertLeft, TreeNodeBase(node), parentBase, *headerBase);
     ++(*nodeCount);
     return true;
 }
@@ -167,20 +167,20 @@ using LoginObserverOnEventFn = void(__thiscall*)(void*, uint32_t);
 using LoginObserverOnErrorFn = void(__thiscall*)(void*, uint32_t);
 
 template <typename Node>
-static std::_Rb_tree_node_base* ObserverTreeNodeBase(Node* node) {
-    return reinterpret_cast<std::_Rb_tree_node_base*>(node);
+static mxo::sgi_tree::_Rb_tree_node_base* ObserverTreeNodeBase(Node* node) {
+    return reinterpret_cast<mxo::sgi_tree::_Rb_tree_node_base*>(node);
 }
 
 template <typename Node>
-static const std::_Rb_tree_node_base* ObserverTreeNodeBase(const Node* node) {
-    return reinterpret_cast<const std::_Rb_tree_node_base*>(node);
+static const mxo::sgi_tree::_Rb_tree_node_base* ObserverTreeNodeBase(const Node* node) {
+    return reinterpret_cast<const mxo::sgi_tree::_Rb_tree_node_base*>(node);
 }
 
-static LoginObserverTreeNode674* ObserverTreeNodeFromBase(std::_Rb_tree_node_base* node) {
+static LoginObserverTreeNode674* ObserverTreeNodeFromBase(mxo::sgi_tree::_Rb_tree_node_base* node) {
     return reinterpret_cast<LoginObserverTreeNode674*>(node);
 }
 
-static const LoginObserverTreeNode674* ObserverTreeNodeFromBase(const std::_Rb_tree_node_base* node) {
+static const LoginObserverTreeNode674* ObserverTreeNodeFromBase(const mxo::sgi_tree::_Rb_tree_node_base* node) {
     return reinterpret_cast<const LoginObserverTreeNode674*>(node);
 }
 
@@ -201,8 +201,8 @@ void CLTLoginMediator::InitializeObserverTree674() {
     observerTree674_.nodeCount04 = 0u;
 
     observerTreeHeader674_ = {};
-    std::_Rb_tree_node_base* headerBase = LoginObserverTreeHelper674::TreeNodeBase(&observerTreeHeader674_);
-    headerBase->_M_color = std::_S_red;
+    mxo::sgi_tree::_Rb_tree_node_base* headerBase = LoginObserverTreeHelper674::TreeNodeBase(&observerTreeHeader674_);
+    headerBase->_M_color = mxo::sgi_tree::_S_red;
     headerBase->_M_parent = nullptr;
     headerBase->_M_left = headerBase;
     headerBase->_M_right = headerBase;
@@ -346,7 +346,7 @@ void CLTLoginMediator::PostEvent(uint32_t eventId) {
             fmt::ptr(observer),
             static_cast<unsigned>(eventId & 0xffu));
         onLoginEvent(observer, eventId);
-        node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
+        node = ObserverTreeNodeFromBase(mxo::sgi_tree::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }
 
     // Fidelity note:
@@ -389,7 +389,7 @@ void CLTLoginMediator::PostError(uint32_t errorId) {
             static_cast<unsigned>(errorId & 0xffu),
             static_cast<unsigned>(worldListCountOrStatus80));
         onLoginError(observer, errorId);
-        node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
+        node = ObserverTreeNodeFromBase(mxo::sgi_tree::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }
 }
 
