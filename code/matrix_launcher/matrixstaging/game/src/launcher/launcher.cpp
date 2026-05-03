@@ -15,11 +15,11 @@
 #include "autodetectdialog.h"
 #include "../../../../src/diagnostics.h"
 #include "../../../../src/launcher_mediator_abi.h"
-#include "../../../../src/launcher_network_object_abi.h"
 #include "../../../../src/launcher_replacement_support.h"
 #include "../../../../src/server_config.h"
 #include "../libltclientlogin/loginmediator.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
+#include "../../../runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 // anchor: launcher.exe:0x40a55c..0x40a5a4 / caller-clean 8-argument export frame
 using InitClientDLLFunc = int (*)(
@@ -248,7 +248,7 @@ bool CLauncher::InitializeThreadPerClientTCPEngine() const {
     // anchor: launcher.exe:0x40a3e9..0x40a406
     // - call resolved mediator slot `+0x08` with that freshly built object
     // - preserve the original `result < 1` success test
-    g_pLauncherObject6304 = LauncherCreateNetworkEngineAbiShell();
+    g_pLauncherObject6304 = new mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768();
 
     void** mediatorVtable = *reinterpret_cast<void***>(&g_LoginMediatorStub);
     typedef int (__thiscall *RegisterEngineFn)(void*, void*);
@@ -470,7 +470,9 @@ bool CLauncher::RunAutodetectDialogWithoutGui() const {
 // anchor: launcher.exe:0x40a4d0
 void CLauncher::CleanupRecoveredInitClientState() const {
     if (g_pLauncherObject6304) {
-        LauncherReleaseNetworkEngineAbiShell(&g_pLauncherObject6304, &g_LoginMediatorStub);
+        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->ClearEngine();
+        delete static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(g_pLauncherObject6304);
+        g_pLauncherObject6304 = nullptr;
     }
 }
 

@@ -1,7 +1,7 @@
 #include "diagnostics.h"
 #include "launcher_mediator_abi.h"
-#include "launcher_network_object_abi.h"
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
+#include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -323,7 +323,7 @@ static int __thiscall Mediator_RegisterLauncherNetworkEngineObject08(
     (void)self;
 
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* const engine =
-        LauncherNetworkEngineFromAbiShell(object);
+        static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(object);
     mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->Initialize(engine);
     return object ? 0 : 1;
 }

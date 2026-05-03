@@ -51,7 +51,6 @@ set(MXO_LAUNCHER_SOURCES
     matrixstaging/runtime/src/libltbase/launchercommandline.cpp
     matrixstaging/runtime/src/libltbase/ltresult.cpp
     src/launcher_mediator_abi.cpp
-    src/launcher_network_object_abi.cpp
     matrixstaging/runtime/src/libltbase/consolevar.cpp
     matrixstaging/runtime/src/libltbase/consoleint.cpp
     matrixstaging/runtime/src/libltbase/consolestring.cpp

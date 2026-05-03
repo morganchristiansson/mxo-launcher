@@ -12,10 +12,10 @@
 
 #include <spdlog/spdlog.h>
 
-#include "launcher_network_object_abi.h"
 #include "launcher_replacement_support.h"
 #include "server_config.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
+#include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 #include "../matrixstaging/game/src/launcher/launcher.h"
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
@@ -209,7 +209,10 @@ public:
                 break;
             }
             CurrentLoginMediatorSurface()->HelperSlot13c_InvokeSessionHelperVtable4();
-            LauncherPumpNetworkEngineAbiShell(launcherNetworkObject04, /*nonBlocking=*/true);
+            if (launcherNetworkObject04 != nullptr) {
+                static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(launcherNetworkObject04)
+                    ->RunCompletedOperationQueue(/*nonBlocking=*/true);
+            }
             Sleep(10u);
         }
         Unregister();
