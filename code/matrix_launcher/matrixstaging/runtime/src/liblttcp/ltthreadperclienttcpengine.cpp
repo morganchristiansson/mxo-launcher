@@ -2886,10 +2886,13 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
+        CBaseConnection_QueueContextScaffold* queuedConnectionContext =
+            static_cast<CBaseConnection_QueueContextScaffold*>(context);
         CBaseConnection_0x4b8018* queuedConnectionOwner =
             context ? CBaseConnection_FromQueueContextScaffold(context) : nullptr;
         const bool shouldAutoReleaseContext =
-            isType1 && CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(context);
+            isType1 && queuedConnectionOwner != nullptr &&
+            queuedConnectionContext->autoReleaseFlag != 0u;
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
@@ -2926,7 +2929,12 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         }
 
         if (shouldAutoReleaseContext) {
-            (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
+            typedef uint32_t (__thiscall *ReleaseFn)(void*);
+            ReleaseFn releaseFn = queuedConnectionContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]
+                ? reinterpret_cast<ReleaseFn>(
+                      queuedConnectionContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex])
+                : nullptr;
+            (void)(releaseFn ? releaseFn(queuedConnectionContext) : 0u);
         }
         (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
     }
@@ -2944,6 +2952,8 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
+                CBaseConnection_QueueContextScaffold* queuedConnectionContext =
+                    static_cast<CBaseConnection_QueueContextScaffold*>(context);
                 CBaseConnection_0x4b8018* queuedConnectionOwner =
                     CBaseConnection_FromQueueContextScaffold(context);
                 LogQueuedContextForensics(
@@ -2973,10 +2983,15 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
                         workType);
                 }
                 const bool shouldAutoReleaseContext =
-                    workType == kWorkTypeClose &&
-                    CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(context);
+                    workType == kWorkTypeClose && queuedConnectionOwner != nullptr &&
+                    queuedConnectionContext->autoReleaseFlag != 0u;
                 if (shouldAutoReleaseContext) {
-                    (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
+                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+                    ReleaseFn releaseFn = queuedConnectionContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]
+                        ? reinterpret_cast<ReleaseFn>(
+                              queuedConnectionContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex])
+                        : nullptr;
+                    (void)(releaseFn ? releaseFn(queuedConnectionContext) : 0u);
                 }
                 (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
             }

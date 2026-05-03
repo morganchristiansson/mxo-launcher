@@ -422,12 +422,6 @@ void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
-bool CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(void* maybeQueueContext) {
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
-    return queueContext != nullptr && queueContext->autoReleaseFlag != 0u;
-}
-
 // UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
 // release calls.
 uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
@@ -444,26 +438,6 @@ uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
     ReleaseFn fn = reinterpret_cast<ReleaseFn>(
         vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]);
     return fn(object);
-}
-
-// UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
-uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext) {
-    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
-    if (!owner) {
-        spdlog::warn(
-            "DIAGNOSTIC: non-scaffold queued connection auto-release context={}",
-            fmt::ptr(maybeQueueContext));
-        return 0u;
-    }
-
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
-    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = queueContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]
-        ? reinterpret_cast<ReleaseFn>(
-              queueContext->vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex])
-        : nullptr;
-    return fn ? fn(queueContext) : 0u;
 }
 
 // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.

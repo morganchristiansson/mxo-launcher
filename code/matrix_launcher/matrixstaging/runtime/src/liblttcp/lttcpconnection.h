@@ -297,15 +297,9 @@ void InitializeBaseConnectionQueueContextScaffold(
 // UNANCHORED: launcher-owned helper that recognizes the queued connection-context ABI adapter
 // object and returns its owning `CBaseConnection_0x4b8018` when present.
 CBaseConnection_0x4b8018* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
-// UNANCHORED: source-owned helper that reads the queued-context `+0x04` auto-release byte through
-// the explicit scaffold shape instead of treating the context as an untyped blob.
-bool CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
 // release calls.
 uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object);
-// UNANCHORED: source-owned ABI-dispatch wrapper for queued connection-context auto-release calls.
-// Current source only supports the explicit queue-context adapter object here.
-uint32_t QueuedConnectionContext_InvokeAutoReleaseScaffold(void* maybeQueueContext);
 
 // Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
 // mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`

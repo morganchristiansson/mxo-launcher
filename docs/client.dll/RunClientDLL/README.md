@@ -216,6 +216,10 @@ little without changing the queued context object shape itself:
 - a further pruning pass then removed the now-redundant launcher-side cleanup/dispatch wrapper
   helpers entirely; queue consumers unwrap once and either call the owner directly or emit a
   diagnostic if some future non-scaffold context unexpectedly reaches that path
+- the last tiny source-owned scaffold helpers for reading the auto-release byte and invoking the
+  queued context release slot were then inlined back into the two queue-consumer bodies, keeping
+  the remaining ABI lie local to the recovered consumer logic instead of spreading it across shared
+  helper functions
 - only the explicit queue-context object still crosses the queue as `(workItem, context)` and only
   the optional type-1 auto-release still goes back through the scaffold slot surface
 - arg5 queue cursor comparisons at:
