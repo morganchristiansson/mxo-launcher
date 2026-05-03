@@ -204,6 +204,16 @@ This instrumentation is meant to answer two narrow questions before the next ABI
 1. does the active stalled path actually invoke the queued connection-context callback/release slots?
 2. if yes, is it doing so through the launcher-owned scaffold shape or through a native object whose
    field/vtable layout still diverges from the original MSVC2003 object family?
+
+Follow-up pruning after the successful game-entry run now tightens the launcher-side call sites a
+little without changing the queued context object shape itself:
+- launcher-side queue consumers no longer need to treat the context as a generic `context + 4`
+  byte blob when deciding type-1 auto-release; they now read the named scaffold field instead
+- when the context is recognized as the scaffold, launcher-side queue consumers now bypass the
+  scaffold callback helper and call the owning `CBaseConnection_0x4b8018` directly for
+  `CleanupConnection(...)` and `OnOperationCompleted(...)`
+- only the explicit queue-context object still crosses the queue as `(workItem, context)` and only
+  the optional type-1 auto-release still goes back through the scaffold slot surface
 - arg5 queue cursor comparisons at:
   - queue0C `current1` vs `current0`
   - queue34 `current1` vs `current0`

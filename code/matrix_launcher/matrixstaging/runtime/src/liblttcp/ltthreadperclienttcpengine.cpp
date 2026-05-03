@@ -2882,13 +2882,10 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
-
-        (void)(context
-            ? CBaseConnection_FromQueueContextScaffold(context)
-            : nullptr);
+        CBaseConnection_0x4b8018* queuedConnectionOwner =
+            context ? CBaseConnection_FromQueueContextScaffold(context) : nullptr;
         const bool shouldAutoReleaseContext =
-            isType1 && context != nullptr &&
-            (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
+            isType1 && CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(context);
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
@@ -2903,11 +2900,15 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             workItem,
             workType);
 
-        if (context && isType1) {
+        if (queuedConnectionOwner && isType1) {
+            CleanupConnection(queuedConnectionOwner);
+        } else if (context && isType1) {
             CleanupConnection(context);
         }
 
-        if (context) {
+        if (queuedConnectionOwner) {
+            (void)queuedConnectionOwner->OnOperationCompleted(workItem);
+        } else if (context) {
             (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
         }
 
@@ -2930,20 +2931,26 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
+                CBaseConnection_0x4b8018* queuedConnectionOwner =
+                    CBaseConnection_FromQueueContextScaffold(context);
                 LogQueuedContextForensics(
                     "StopQueueThreads",
                     context,
                     workItem,
                     workType);
                 if (workType == kWorkTypeClose) {
-                    CleanupConnection(context);
+                    CleanupConnection(queuedConnectionOwner
+                        ? static_cast<void*>(queuedConnectionOwner)
+                        : context);
                 }
-                if (context) {
+                if (queuedConnectionOwner) {
+                    (void)queuedConnectionOwner->OnOperationCompleted(workItem);
+                } else if (context) {
                     (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
                 }
                 const bool shouldAutoReleaseContext =
-                    workType == kWorkTypeClose && context != nullptr &&
-                    (*reinterpret_cast<const uint8_t*>(static_cast<const uint8_t*>(context) + 4) != 0u);
+                    workType == kWorkTypeClose &&
+                    CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(context);
                 if (shouldAutoReleaseContext) {
                     (void)QueuedConnectionContext_InvokeAutoReleaseScaffold(context);
                 }

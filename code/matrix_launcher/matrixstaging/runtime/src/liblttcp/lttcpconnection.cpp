@@ -428,6 +428,12 @@ void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueCont
     return owner ? static_cast<void*>(owner) : maybeQueueContext;
 }
 
+bool CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(void* maybeQueueContext) {
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
+    return queueContext != nullptr && queueContext->autoReleaseFlag != 0u;
+}
+
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
 uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem) {
     CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);

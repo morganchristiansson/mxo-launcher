@@ -301,6 +301,9 @@ CBaseConnection_0x4b8018* CBaseConnection_FromQueueContextScaffold(void* maybeQu
 // The active replacement still needs the explicit adapter object whenever queued contexts may cross
 // into raw client.dll queue consumers compiled against the original MSVC object ABI.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
+// UNANCHORED: source-owned helper that reads the queued-context `+0x04` auto-release byte through
+// the explicit scaffold shape instead of treating the context as an untyped blob.
+bool CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
 // Current source accepts either the queue-context adapter object or a direct CBaseConnection_0x4b8018-family
 // object pointer on this path.
