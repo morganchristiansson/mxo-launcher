@@ -2377,6 +2377,10 @@ uint32_t CAuthStartupConnection_0x4afef0::DispatchMessage(void* messageRef) {
 // - if work type == 1, tear down through the connection object
 // - there is no leaf-local type-2 split here; auth connect-status also flows through owner `+0x17c`
 uint32_t CAuthStartupConnection_0x4afef0::OnOperationCompleted(void* workItem) {
+    spdlog::info(
+        "DIAGNOSTIC: CAuthStartupConnection::OnOperationCompleted this={} workItem={}",
+        fmt::ptr(this),
+        fmt::ptr(workItem));
     if (!workItem) {
         return 0u;
     }
@@ -3659,6 +3663,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
 // - there is no separate type-2 connect-status split in this leaf; that work still flows through
 //   the same owner `+0x188` fallback path
 uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
+    spdlog::info(
+        "DIAGNOSTIC: CMarginConnection::OnOperationCompleted this={} workItem={}",
+        fmt::ptr(this),
+        fmt::ptr(workItem));
     if (!workItem) {
         return 0u;
     }

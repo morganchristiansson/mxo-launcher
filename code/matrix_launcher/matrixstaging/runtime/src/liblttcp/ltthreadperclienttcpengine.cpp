@@ -2224,6 +2224,19 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     }
 
     void* queuedConnectionContext = connection->QueueContextScaffold();
+    if (queuedConnectionContext) {
+        void** queuedContextVtable = *reinterpret_cast<void***>(queuedConnectionContext);
+        spdlog::info(
+            "DIAGNOSTIC: Connect queued context prepared connection={} queuedContext={} vtable={} slot1={} slot4={} autoReleaseByte={} usesTcpShape={} ownerContext={}",
+            fmt::ptr(connection),
+            fmt::ptr(queuedConnectionContext),
+            fmt::ptr(queuedContextVtable),
+            fmt::ptr(queuedContextVtable ? queuedContextVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] : nullptr),
+            fmt::ptr(queuedContextVtable ? queuedContextVtable[CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] : nullptr),
+            static_cast<unsigned>(*reinterpret_cast<uint8_t*>(static_cast<uint8_t*>(queuedConnectionContext) + 4)),
+            connection->UsesTcpConnectionVtableShape() ? 1u : 0u,
+            fmt::ptr(connection->OwnerContext()));
+    }
     const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
