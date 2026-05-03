@@ -226,9 +226,16 @@ little without changing the queued context object shape itself:
 Current next-step experiment narrows the flip further:
 - producers now pass the native `CBaseConnection_0x4b8018` object itself again via
   `QueueContextScaffold() -> this`
-- the scaffold storage/vtable code is intentionally left in place for now so the run can fail
-  loudly and diagnostically instead of silently if any remaining consumer still depends on the old
-  queued-context adapter shape
+- focused RE of `launcher.exe:0x436b10` now confirms why the first native-object attempt failed so
+  early: the original queue consumer does **not** unwrap a scaffold owner before dispatching
+  completion work
+  - it calls queued `context` vtable slot `+0x10` directly for `OnOperationCompleted(workItem)`
+  - on type-1 work it also reads the queued object `+0x04` auto-release byte directly
+  - then, when set, it calls queued `context` vtable slot `+0x04` directly for the optional
+    auto-release tail
+- launcher-side queue consumers are therefore adjusted to treat native queued connection objects as
+  the primary shape again, while still recognizing the older scaffold object if encountered during
+  the transition
 - arg5 queue cursor comparisons at:
   - queue0C `current1` vs `current0`
   - queue34 `current1` vs `current0`
