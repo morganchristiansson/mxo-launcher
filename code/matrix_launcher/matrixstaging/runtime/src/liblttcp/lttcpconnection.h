@@ -285,57 +285,40 @@ private:
 };
 
 class CBaseConnection_0x4b8018;
-struct CBaseConnection_QueueContextScaffold;
 
-// UNANCHORED: launcher-owned queued connection-context ABI wrapper initializer.
-// The active replacement still materializes a tiny MSVC2003-compatible queue callback surface for
-// client.dll consumers; ownership of that ABI lie lives in `src/launcher_network_object_abi.cpp`.
-void InitializeBaseConnectionQueueContextScaffold(
-    CBaseConnection_QueueContextScaffold* queueContext,
-    CBaseConnection_0x4b8018* owner,
-    uint8_t autoReleaseFlag);
-// UNANCHORED: launcher-owned helper that recognizes the queued connection-context ABI adapter
-// object and returns its owning `CBaseConnection_0x4b8018` when present.
-CBaseConnection_0x4b8018* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
-// UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
-// release calls.
-uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object);
-
-// Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
-// mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`
-// (`vtable[4]`) and the optional type-1 auto-release slot `+0x04`.
-// Current recovered slot contract at this seam:
+// Recovered queued-connection raw slot contract consumed by launcher.exe/client.dll queue
+// consumers (`0x436b10`, `client.dll:0x62531c10`):
 // - `vtable[1]` / slot `+0x04` = optional queued-context auto-release entry used only by type-1
 //   close work
 // - `vtable[4]` / slot `+0x10` = `OnOperationCompleted(void*)`
-// This is intentionally *not* the full `CBaseConnection_0x4b8018` native vtable family yet; it is
-// the minimum slot surface the queue consumer needs.
-struct CBaseConnection_QueueContextScaffold {
+// So the native connection-family vtable must include a dedicated slot-1 release shim ahead of
+// `UsesTcpConnectionVtableShape/Close/OnOperationCompleted`.
+struct CBaseConnection_QueuedContextAbi {
     static constexpr size_t kReleaseSlotIndex = 1;
     static constexpr size_t kOnOperationCompletedSlotIndex = 4;
-
-    void** vtable;           // +0x00
-    uint8_t autoReleaseFlag; // +0x04
-    uint8_t padding05[3];    // +0x05..+0x07
-    CBaseConnection_0x4b8018* owner;  // +0x08
 };
 
-static_assert(sizeof(CBaseConnection_QueueContextScaffold) == 0x0c, "queue-context scaffold size mismatch");
-static_assert(offsetof(CBaseConnection_QueueContextScaffold, autoReleaseFlag) == 0x04, "queue-context scaffold autoReleaseFlag offset mismatch");
-static_assert(offsetof(CBaseConnection_QueueContextScaffold, owner) == 0x08, "queue-context scaffold owner offset mismatch");
+// UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
+// release calls.
+uint32_t QueuedWorkItem_InvokeReleaseSlot(void* object);
 
 // Source-owned abstraction over the recovered connection family.
-// Recovered base vtable `0x004b8018` currently reads as 7 rows under the MSVC ABI:
-// - deleting-dtor pair synthesized from the virtual destructor
-// - slot `+0x08` = purecall in the base, `0x437860` / return-true in `CLTTCPConnection`
-// - slot `+0x0c` = `0x449ca0` Close(bool)
-// - slot `+0x10` = `0x443810` / return-false in `CLTTCPConnection`, later `0x4490c0`
-//   `OnOperationCompleted` in `CMessageConnection_0x4b7928`
-// - slot `+0x14` = purecall in the base, later `0x449d40` `CLTTCPConnection::OnReceive`
-// - slot `+0x18` = purecall in the base, later `0x449fd0` `CLTTCPConnection::OnClose`
+// Recovered queued-context raw ABI now needs one extra native virtual ahead of the old source
+// layout so cross-module consumers see:
+// - slot `+0x04` = `QueueRelease()`
+// - slot `+0x08` = `UsesTcpConnectionVtableShape()`
+// - slot `+0x0c` = `Close(bool)`
+// - slot `+0x10` = `OnOperationCompleted(void*)`
+// - slot `+0x14` = `OnReceive(...)`
+// - slot `+0x18` = `OnClose(...)`
 class CBaseConnection_0x4b8018 {
  public:
   virtual ~CBaseConnection_0x4b8018() = default;
+
+  // UNANCHORED: native queued-context release shim needed so raw client-facing queue consumers see
+  // `OnOperationCompleted` at slot `+0x10` (`vtable[4]`) on the real object instead of on a
+  // launcher-owned scaffold.
+  virtual uint32_t QueueRelease() { return 1u; }
 
   // anchor: launcher.exe:0x004b8020 / `0x437860` on the `0x004b8034` row
   virtual bool UsesTcpConnectionVtableShape() const = 0;
@@ -365,12 +348,10 @@ class CBaseConnection_0x4b8018 {
   // UNANCHORED: source-owned setter for the same recovered base `+0x04` byte.
   void SetAutoReleaseFlag04(uint8_t autoReleaseFlag) {
     autoReleaseFlag04_ = autoReleaseFlag;
-    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag;
   }
 
-  // UNANCHORED: source-owned queue-dispatch ABI adapter accessor used where queued contexts may be
-  // consumed by raw client.dll code that expects original MSVC vtable slot numbering.
-  void* QueueContextScaffold() { return &queueContextScaffold_; }
+  // UNANCHORED: queued client-facing consumers now receive the native connection object directly.
+  void* QueueContext() { return this; }
 
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {
@@ -389,7 +370,6 @@ class CBaseConnection_0x4b8018 {
   // Source-owned compatibility mirror of the recovered base connection `+0x10` engine field.
   CLTThreadPerClientTCPEngine_0x4b2768* engine_;
   LTTCPEngineConnectionState state_;
-  CBaseConnection_QueueContextScaffold queueContextScaffold_;
 };
 
 // Recovered CLTTCPConnection-family wrapper surface.

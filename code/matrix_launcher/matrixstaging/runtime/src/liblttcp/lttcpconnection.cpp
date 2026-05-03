@@ -1,5 +1,4 @@
 #include "lttcpconnection.h"
-#include "../../../../src/launcher_network_object_abi.h"
 
 #include "../libltbase/ltresult.h"
 #include "../libltmessaging/variablelengthprefixedtcpstreamparser.h"
@@ -397,10 +396,7 @@ CBaseConnection_0x4b8018::CBaseConnection_0x4b8018(LTTCPEngineConnectionState in
     : autoReleaseFlag04_(0u),
       padding05_07_{0u, 0u, 0u},
       engine_(nullptr),
-      state_(initialState),
-      queueContextScaffold_() {
-    InitializeBaseConnectionQueueContextScaffold(&queueContextScaffold_, this, autoReleaseFlag04_);
-}
+      state_(initialState) {}
 
 // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
 void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
@@ -424,19 +420,19 @@ void* CLTTCPConnection::OwnerContext() const {
 
 // UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
 // release calls.
-uint32_t QueuedWorkItem_InvokeReleaseSlotScaffold(void* object) {
+uint32_t QueuedWorkItem_InvokeReleaseSlot(void* object) {
     if (!object) {
         return 0u;
     }
 
     void** vtable = *reinterpret_cast<void***>(object);
-    if (!vtable || !vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]) {
+    if (!vtable || !vtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]) {
         return 0u;
     }
 
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
     ReleaseFn fn = reinterpret_cast<ReleaseFn>(
-        vtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]);
+        vtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]);
     return fn(object);
 }
 
@@ -699,7 +695,7 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
         if (engine) {
             engine->EnqueueCompletedOperation(
                 completedPacketWorkItem,
-                QueueContextScaffold(),
+                QueueContext(),
                 /*useQueue34=*/false,
                 "CLTTCPConnection::OnReceive");
         }

@@ -179,44 +179,23 @@ So the current active runtime path proves that all of these are now dynamically 
 - arg5 helper subobject at `+0x60`
 - the surrounding shared queue-consumer logic at `0x62531c10`
 
-### Queue-context ABI forensic logging
+### Resolved queued-context ABI shape
 
-To investigate the current native-object-vs-scaffold queue stall without immediately re-flipping the
-ABI seam again, source now logs the queue-context call boundary itself:
-- `InitializeBaseConnectionQueueContextScaffold ...` logs replacement-side scaffold creation with
-  `(queueContext, owner, ownerVtable, autoReleaseFlag)`
-- `DIAGNOSTIC: RunCompletedOperationQueue ...` / `DIAGNOSTIC: StopQueueThreads ...` log the raw
-  queued context bytes the consumer is about to use:
-  - context pointer / vtable
-  - slot `+0x04` / `vtable[1]`
-  - slot `+0x10` / `vtable[4]`
-  - byte `+0x04`
-  - decoded scaffold owner / owner vtable when the context matches the launcher-owned bridge
-- `DIAGNOSTIC: queue-context scaffold OnOperationCompleted ...` and
-  `DIAGNOSTIC: queue-context scaffold release ...` log the **return address of the caller** via
-  `_ReturnAddress()`, which should let us distinguish launcher.exe-side dispatch from live
-  `client.dll` queue-consumer traffic
-- after the successful game-entry run failed to show any direct/native queued-context use, the
-  launcher-side compatibility fallback for raw native `CBaseConnection_0x4b8018*` queue contexts
-  was pruned back; non-scaffold contexts now warn and no-op instead of attempting mixed-shape
-  dispatch
+This client-facing queue seam is now narrowed enough to state the core rule directly:
+- queued connection contexts are the native connection objects themselves
+- the client-facing/raw queue ABI expects:
+  - `vtable[1]` / slot `+0x04` = type-1 auto-release entry
+  - `vtable[4]` / slot `+0x10` = `OnOperationCompleted(void*)`
+- earlier launcher-owned scaffolding worked only because it manually presented that slot layout
+- the native launch fix was to give `CBaseConnection_0x4b8018` a real native virtual release slot
+  ahead of `UsesTcpConnectionVtableShape/Close/OnOperationCompleted`, so the emitted MSVC-clang
+  vftable now matches the raw consumer contract used by both `launcher.exe:0x436b10` and
+  `client.dll:0x62531c10`
 
-This instrumentation is meant to answer two narrow questions before the next ABI change:
-1. does the active stalled path actually invoke the queued connection-context callback/release slots?
-2. if yes, is it doing so through the launcher-owned scaffold shape or through a native object whose
-   field/vtable layout still diverges from the original MSVC2003 object family?
-
-Follow-up pruning after the successful game-entry run now tightens the launcher-side call sites a
-little without changing the queued context object shape itself:
-- launcher-side queue consumers no longer need to treat the context as a generic `context + 4`
-  byte blob when deciding type-1 auto-release; they now read the named scaffold field instead
-- when the context is recognized as the scaffold, launcher-side queue consumers now bypass the
-  scaffold callback helper and call the owning `CBaseConnection_0x4b8018` directly for
-  `CleanupConnection(...)` and `OnOperationCompleted(...)`
-- a further pruning pass then removed the now-redundant launcher-side cleanup/dispatch wrapper
-  helpers entirely; queue consumers unwrap once and either call the owner directly or emit a
-  diagnostic if some future non-scaffold context unexpectedly reaches that path
-- the last tiny source-owned scaffold helpers for reading the auto-release byte and invoking the
+That resolves the auth-vs-margin split observed during the failed native-context experiment:
+- launcher-side auth progress could still succeed through launcher-owned/native C++ dispatch
+- client.dll-facing margin completion needed the exact raw slot numbering and failed until the
+  native object layout exposed `OnOperationCompleted` at `vtable[4]`
   queued context release slot were then inlined back into the two queue-consumer bodies, keeping
   the remaining ABI lie local to the recovered consumer logic instead of spreading it across shared
   helper functions

@@ -62,20 +62,16 @@ static void LogQueuedContextForensics(
         return;
     }
 
-    auto* queueContext = static_cast<CBaseConnection_QueueContextScaffold*>(context);
+    CBaseConnection_0x4b8018* queueContext = static_cast<CBaseConnection_0x4b8018*>(context);
     void** contextVtable = *reinterpret_cast<void***>(context);
-    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(context);
-    void** ownerVtable = owner ? *reinterpret_cast<void***>(owner) : nullptr;
     spdlog::info(
-        "DIAGNOSTIC: {} context={} contextVtable={} slot1={} slot4={} autoReleaseByte={} owner={} ownerVtable={} workItem={} workType=0x{:08x}",
+        "DIAGNOSTIC: {} context={} contextVtable={} slot1={} slot4={} autoReleaseByte={} workItem={} workType=0x{:08x}",
         label ? label : "queued-context",
         fmt::ptr(context),
         fmt::ptr(contextVtable),
-        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] : nullptr),
-        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] : nullptr),
-        static_cast<unsigned>(queueContext->autoReleaseFlag),
-        fmt::ptr(owner),
-        fmt::ptr(ownerVtable),
+        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex] : nullptr),
+        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueuedContextAbi::kOnOperationCompletedSlotIndex] : nullptr),
+        static_cast<unsigned>(queueContext->AutoReleaseFlag04()),
         fmt::ptr(workItem),
         workType);
 }
@@ -1281,7 +1277,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             }
             engine->EnqueueCompletedOperation(
                 statusWorkItem,
-                connection->QueueContextScaffold(),
+                connection->QueueContext(),
                 /*useQueue34=*/false,
                 connectStatusLabel);
             connectStatusQueued = true;
@@ -1304,7 +1300,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
         }
         engine->EnqueueCompletedOperation(
             closeWorkItem,
-            connection->QueueContextScaffold(),
+            connection->QueueContext(),
             /*useQueue34=*/false,
             closeStatusLabel);
         closeQueued = true;
@@ -2223,20 +2219,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         return 0u;
     }
 
-    void* queuedConnectionContext = connection->QueueContextScaffold();
-    if (queuedConnectionContext) {
-        void** queuedContextVtable = *reinterpret_cast<void***>(queuedConnectionContext);
-        spdlog::info(
-            "DIAGNOSTIC: Connect queued context prepared connection={} queuedContext={} vtable={} slot1={} slot4={} autoReleaseByte={} usesTcpShape={} ownerContext={}",
-            fmt::ptr(connection),
-            fmt::ptr(queuedConnectionContext),
-            fmt::ptr(queuedContextVtable),
-            fmt::ptr(queuedContextVtable ? queuedContextVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex] : nullptr),
-            fmt::ptr(queuedContextVtable ? queuedContextVtable[CBaseConnection_QueueContextScaffold::kOnOperationCompletedSlotIndex] : nullptr),
-            static_cast<unsigned>(*reinterpret_cast<uint8_t*>(static_cast<uint8_t*>(queuedConnectionContext) + 4)),
-            connection->UsesTcpConnectionVtableShape() ? 1u : 0u,
-            fmt::ptr(connection->OwnerContext()));
-    }
+    void* queuedConnectionContext = connection->QueueContext();
     const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
@@ -2596,10 +2579,8 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     (void)EnterCleanupLockHelper();
 
     CBaseConnection_0x4b8018* queuedConnectionOwner =
-        CBaseConnection_FromQueueContextScaffold(contextKey);
-    void* cleanupContextKey = queuedConnectionOwner
-        ? static_cast<void*>(queuedConnectionOwner)
-        : contextKey;
+        static_cast<CBaseConnection_0x4b8018*>(contextKey);
+    void* cleanupContextKey = static_cast<void*>(queuedConnectionOwner);
     bool touchedConnectionState = false;
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> workerPayload;
@@ -2899,17 +2880,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
-        CBaseConnection_QueueContextScaffold* queuedConnectionContext =
-            static_cast<CBaseConnection_QueueContextScaffold*>(context);
-        CBaseConnection_0x4b8018* scaffoldOwner =
-            context ? CBaseConnection_FromQueueContextScaffold(context) : nullptr;
-        CBaseConnection_0x4b8018* queuedConnectionOwner = scaffoldOwner
-            ? scaffoldOwner
-            : static_cast<CBaseConnection_0x4b8018*>(context);
+        CBaseConnection_0x4b8018* queuedConnectionOwner =
+            static_cast<CBaseConnection_0x4b8018*>(context);
         const bool shouldAutoReleaseContext =
             isType1 && queuedConnectionOwner != nullptr &&
-            (scaffoldOwner ? (queuedConnectionContext->autoReleaseFlag != 0u)
-                           : (queuedConnectionOwner->AutoReleaseFlag04() != 0u));
+            (queuedConnectionOwner->AutoReleaseFlag04() != 0u);
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
@@ -2925,49 +2900,23 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             workType);
 
         if (queuedConnectionOwner && isType1) {
-            if (!scaffoldOwner) {
-                spdlog::info(
-                    "DIAGNOSTIC: RunCompletedOperationQueue using native queued connection context for CleanupConnection context={} workItem={} workType=0x{:08x}",
-                    fmt::ptr(context),
-                    fmt::ptr(workItem),
-                    workType);
-            }
             CleanupConnection(queuedConnectionOwner);
         }
 
         if (queuedConnectionOwner) {
-            if (!scaffoldOwner) {
-                spdlog::info(
-                    "DIAGNOSTIC: RunCompletedOperationQueue using native queued connection context for OnOperationCompleted context={} workItem={} workType=0x{:08x}",
-                    fmt::ptr(context),
-                    fmt::ptr(workItem),
-                    workType);
-            }
             (void)queuedConnectionOwner->OnOperationCompleted(workItem);
         }
 
         if (shouldAutoReleaseContext) {
             typedef uint32_t (__thiscall *ReleaseFn)(void*);
-            void** releaseVtable = scaffoldOwner
-                ? queuedConnectionContext->vtable
-                : *reinterpret_cast<void***>(queuedConnectionOwner);
-            void* releaseThis = scaffoldOwner
-                ? static_cast<void*>(queuedConnectionContext)
-                : static_cast<void*>(queuedConnectionOwner);
-            ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]
+            void** releaseVtable = *reinterpret_cast<void***>(queuedConnectionOwner);
+            ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]
                 ? reinterpret_cast<ReleaseFn>(
-                      releaseVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex])
+                      releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex])
                 : nullptr;
-            if (!scaffoldOwner) {
-                spdlog::info(
-                    "DIAGNOSTIC: RunCompletedOperationQueue using native queued connection context for auto-release context={} workItem={} workType=0x{:08x}",
-                    fmt::ptr(context),
-                    fmt::ptr(workItem),
-                    workType);
-            }
-            (void)(releaseFn ? releaseFn(releaseThis) : 0u);
+            (void)(releaseFn ? releaseFn(queuedConnectionOwner) : 0u);
         }
-        (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
+        (void)QueuedWorkItem_InvokeReleaseSlot(workItem);
     }
 }
 
@@ -2983,64 +2932,32 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
-                CBaseConnection_QueueContextScaffold* queuedConnectionContext =
-                    static_cast<CBaseConnection_QueueContextScaffold*>(context);
-                CBaseConnection_0x4b8018* scaffoldOwner =
-                    CBaseConnection_FromQueueContextScaffold(context);
-                CBaseConnection_0x4b8018* queuedConnectionOwner = scaffoldOwner
-                    ? scaffoldOwner
-                    : static_cast<CBaseConnection_0x4b8018*>(context);
+                CBaseConnection_0x4b8018* queuedConnectionOwner =
+                    static_cast<CBaseConnection_0x4b8018*>(context);
                 LogQueuedContextForensics(
                     "StopQueueThreads",
                     context,
                     workItem,
                     workType);
                 if (workType == kWorkTypeClose && queuedConnectionOwner) {
-                    if (!scaffoldOwner) {
-                        spdlog::info(
-                            "DIAGNOSTIC: StopQueueThreads using native queued connection context for CleanupConnection context={} workItem={} workType=0x{:08x}",
-                            fmt::ptr(context),
-                            fmt::ptr(workItem),
-                            workType);
-                    }
                     CleanupConnection(queuedConnectionOwner);
                 }
                 if (queuedConnectionOwner) {
-                    if (!scaffoldOwner) {
-                        spdlog::info(
-                            "DIAGNOSTIC: StopQueueThreads using native queued connection context for OnOperationCompleted context={} workItem={} workType=0x{:08x}",
-                            fmt::ptr(context),
-                            fmt::ptr(workItem),
-                            workType);
-                    }
                     (void)queuedConnectionOwner->OnOperationCompleted(workItem);
                 }
                 const bool shouldAutoReleaseContext =
                     workType == kWorkTypeClose && queuedConnectionOwner != nullptr &&
-                    (scaffoldOwner ? (queuedConnectionContext->autoReleaseFlag != 0u)
-                                   : (queuedConnectionOwner->AutoReleaseFlag04() != 0u));
+                    (queuedConnectionOwner->AutoReleaseFlag04() != 0u);
                 if (shouldAutoReleaseContext) {
                     typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    void** releaseVtable = scaffoldOwner
-                        ? queuedConnectionContext->vtable
-                        : *reinterpret_cast<void***>(queuedConnectionOwner);
-                    void* releaseThis = scaffoldOwner
-                        ? static_cast<void*>(queuedConnectionContext)
-                        : static_cast<void*>(queuedConnectionOwner);
-                    ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex]
+                    void** releaseVtable = *reinterpret_cast<void***>(queuedConnectionOwner);
+                    ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]
                         ? reinterpret_cast<ReleaseFn>(
-                              releaseVtable[CBaseConnection_QueueContextScaffold::kReleaseSlotIndex])
+                              releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex])
                         : nullptr;
-                    if (!scaffoldOwner) {
-                        spdlog::info(
-                            "DIAGNOSTIC: StopQueueThreads using native queued connection context for auto-release context={} workItem={} workType=0x{:08x}",
-                            fmt::ptr(context),
-                            fmt::ptr(workItem),
-                            workType);
-                    }
-                    (void)(releaseFn ? releaseFn(releaseThis) : 0u);
+                    (void)(releaseFn ? releaseFn(queuedConnectionOwner) : 0u);
                 }
-                (void)QueuedWorkItem_InvokeReleaseSlotScaffold(workItem);
+                (void)QueuedWorkItem_InvokeReleaseSlot(workItem);
             }
         }
         return;
