@@ -52,12 +52,6 @@ namespace mxo::liblttcp {
 
 namespace {
 
-static void** CMessageConnection_0x4b7928_CompletionHelperVtable() {
-    // anchor: launcher.exe vtable `0x004b3e20`
-    static void* vtable[1] = {nullptr};
-    return vtable;
-}
-
 // anchor: launcher.exe:0x44c750
 static bool CPacketEncryptor_EncryptPayloadScaffold(
     const uint8_t* payloadBytes,
@@ -190,29 +184,33 @@ static bool CPacketDecryptor_DecryptPayloadScaffold(
 
 }  // namespace
 
-CMessageConnectionCompletionHelperScaffold::CMessageConnectionCompletionHelperScaffold() {
-    vtable00 = CMessageConnection_0x4b7928_CompletionHelperVtable();
-    std::memset(&embeddedLockHelper04.crit, 0, sizeof(embeddedLockHelper04.crit));
-    InitializeCriticalSection(&embeddedLockHelper04.crit);
-    eventHandle20 = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+CLTCriticalSectionHelper_0x4add70::CLTCriticalSectionHelper_0x4add70() {
+    std::memset(&crit, 0, sizeof(crit));
+    InitializeCriticalSection(&crit);
 }
 
-CMessageConnectionCompletionHelperScaffold::~CMessageConnectionCompletionHelperScaffold() {
+CLTCriticalSectionHelper_0x4add70::~CLTCriticalSectionHelper_0x4add70() {
+    DeleteCriticalSection(&crit);
+}
+
+CMessageConnectionCompletionHelper_0x4b3e20::CMessageConnectionCompletionHelper_0x4b3e20()
+    : embeddedLockHelper04(),
+      eventHandle20(CreateEventA(nullptr, FALSE, FALSE, nullptr)) {}
+
+CMessageConnectionCompletionHelper_0x4b3e20::~CMessageConnectionCompletionHelper_0x4b3e20() {
     if (eventHandle20 != nullptr) {
         CloseHandle(eventHandle20);
         eventHandle20 = nullptr;
     }
-    DeleteCriticalSection(&embeddedLockHelper04.crit);
-    vtable00 = nullptr;
 }
 
-void CMessageConnectionCompletionHelperScaffold::Signal() {
+void CMessageConnectionCompletionHelper_0x4b3e20::Signal() {
     if (eventHandle20 != nullptr) {
         SetEvent(eventHandle20);
     }
 }
 
-DWORD CMessageConnectionCompletionHelperScaffold::Wait(uint32_t timeoutMs) const {
+DWORD CMessageConnectionCompletionHelper_0x4b3e20::Wait(uint32_t timeoutMs) const {
     return eventHandle20 != nullptr ? WaitForSingleObject(eventHandle20, timeoutMs) : WAIT_FAILED;
 }
 
@@ -239,9 +237,9 @@ CMessageConnection_0x4b7928::CMessageConnection_0x4b7928(
     CLTTCPConnection::SetEngine(engine);
     if (allocateCompletionHelpers) {
         connectCompletionHelper7c_ =
-            std::make_unique<CMessageConnectionCompletionHelperScaffold>();
+            std::make_unique<CMessageConnectionCompletionHelper_0x4b3e20>();
         closeCompletionHelper80_ =
-            std::make_unique<CMessageConnectionCompletionHelperScaffold>();
+            std::make_unique<CMessageConnectionCompletionHelper_0x4b3e20>();
     }
 }
 

@@ -330,24 +330,45 @@ struct CMessageConnectionMessageRefHandleScaffold {
 
 static_assert(sizeof(CMessageConnectionMessageRefHandleScaffold) == 0x04, "message-ref handle size mismatch");
 
-struct CMessageConnectionCompletionHelperScaffold {
+class CLTCriticalSectionHelper_0x4add70 {
+public:
+    // anchor family: launcher.exe:0x436080 / embedded helper vtable `0x004add70`
+    // Idiomatic replacement for the previously hand-seeded lock-helper vtable scaffold.
+    CLTCriticalSectionHelper_0x4add70();
+    virtual ~CLTCriticalSectionHelper_0x4add70();
+
+    CLTCriticalSectionHelper_0x4add70(const CLTCriticalSectionHelper_0x4add70&) = delete;
+    CLTCriticalSectionHelper_0x4add70& operator=(const CLTCriticalSectionHelper_0x4add70&) = delete;
+
+    CRITICAL_SECTION crit; // +0x04
+};
+
+// Note: this is intentionally a polymorphic class so `offsetof(...)` is noisy/non-portable here.
+// We keep the recovered `+0x04` field annotation on the member itself and only hard-assert size.
+static_assert(sizeof(CLTCriticalSectionHelper_0x4add70) == 0x1c, "critical-section helper size mismatch");
+
+class CMessageConnectionCompletionHelper_0x4b3e20 {
+public:
     // anchor family: launcher.exe:0x436080 / vtable `0x004b3e20`
     // Small event + embedded-lock helper reached by `CMessageConnection_0x4b7928::OnOperationCompleted`
     // on work types `1` and `2` through connection `+0x7c/+0x80`.
-    void** vtable00 = nullptr; // +0x00
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold embeddedLockHelper04{}; // +0x04
-    HANDLE eventHandle20 = nullptr; // +0x20
+    CMessageConnectionCompletionHelper_0x4b3e20();
+    virtual ~CMessageConnectionCompletionHelper_0x4b3e20();
 
-    CMessageConnectionCompletionHelperScaffold();
-    ~CMessageConnectionCompletionHelperScaffold();
+    CMessageConnectionCompletionHelper_0x4b3e20(const CMessageConnectionCompletionHelper_0x4b3e20&) = delete;
+    CMessageConnectionCompletionHelper_0x4b3e20& operator=(const CMessageConnectionCompletionHelper_0x4b3e20&) = delete;
 
     void Signal();
     DWORD Wait(uint32_t timeoutMs) const;
+
+    CLTCriticalSectionHelper_0x4add70 embeddedLockHelper04; // +0x04
+    HANDLE eventHandle20 = nullptr; // +0x20
 };
 
-static_assert(offsetof(CMessageConnectionCompletionHelperScaffold, embeddedLockHelper04) == 0x04, "completion helper lock offset mismatch");
-static_assert(offsetof(CMessageConnectionCompletionHelperScaffold, eventHandle20) == 0x20, "completion helper event offset mismatch");
-static_assert(sizeof(CMessageConnectionCompletionHelperScaffold) == 0x24, "completion helper size mismatch");
+// Note: this is intentionally a polymorphic class so `offsetof(...)` is noisy/non-portable here.
+// We keep the recovered `+0x04` / `+0x20` field annotations on the members themselves and only
+// hard-assert the total size.
+static_assert(sizeof(CMessageConnectionCompletionHelper_0x4b3e20) == 0x24, "completion helper size mismatch");
 
 enum class CMessageConnectionPacketNameFamily : uint8_t {
     kUnknown = 0,
@@ -1398,8 +1419,8 @@ public:
     CMessageConnectionPacketNameFamily packetNameFamily_ = CMessageConnectionPacketNameFamily::kUnknown;
     uintptr_t packetNameCallback_ = 0;
     bool packetizedMessagesEnabled_ = false;
-    std::unique_ptr<CMessageConnectionCompletionHelperScaffold> connectCompletionHelper7c_;
-    std::unique_ptr<CMessageConnectionCompletionHelperScaffold> closeCompletionHelper80_;
+    std::unique_ptr<CMessageConnectionCompletionHelper_0x4b3e20> connectCompletionHelper7c_;
+    std::unique_ptr<CMessageConnectionCompletionHelper_0x4b3e20> closeCompletionHelper80_;
     std::unique_ptr<PacketProcessingAgenda_0x469850> packetAgenda_;
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;

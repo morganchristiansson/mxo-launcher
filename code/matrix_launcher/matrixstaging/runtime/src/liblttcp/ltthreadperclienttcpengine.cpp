@@ -69,14 +69,17 @@ static void LogConnectionDispatchForensics(
     }
 
     CBaseConnection_0x4b8018* connection = static_cast<CBaseConnection_0x4b8018*>(connectionObject);
-    void** connectionVtable = *reinterpret_cast<void***>(connectionObject);
     spdlog::debug(
         "connection-dispatch forensic label={} object={} vtable={} slot1={} slot4={} autoReleaseByte={} workItem={} workType=0x{:08x} [count=0x{:08x}]",
         label ? label : "connection-dispatch",
         fmt::ptr(connectionObject),
-        fmt::ptr(connectionVtable),
-        fmt::ptr(connectionVtable ? connectionVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex] : nullptr),
-        fmt::ptr(connectionVtable ? connectionVtable[CBaseConnection_RawDispatchAbi::kOnOperationCompletedSlotIndex] : nullptr),
+        fmt::ptr(*reinterpret_cast<void***>(connectionObject)),
+        fmt::ptr(((*reinterpret_cast<void***>(connectionObject)) != nullptr)
+                     ? (*reinterpret_cast<void***>(connectionObject))[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]
+                     : nullptr),
+        fmt::ptr(((*reinterpret_cast<void***>(connectionObject)) != nullptr)
+                     ? (*reinterpret_cast<void***>(connectionObject))[CBaseConnection_RawDispatchAbi::kOnOperationCompletedSlotIndex]
+                     : nullptr),
         static_cast<unsigned>(connection->AutoReleaseFlag04()),
         fmt::ptr(workItem),
         workType,
@@ -2915,13 +2918,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         }
 
         if (shouldAutoReleaseConnection) {
-            typedef uint32_t (__thiscall *ReleaseFn)(void*);
-            void** releaseVtable = *reinterpret_cast<void***>(connection);
-            ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]
-                ? reinterpret_cast<ReleaseFn>(
-                      releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex])
-                : nullptr;
-            (void)(releaseFn ? releaseFn(connection) : 0u);
+            (void)connection->QueueRelease();
         }
         (void)QueuedWorkItem_InvokeReleaseSlot(workItem);
     }
@@ -2956,13 +2953,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
                     workType == kWorkTypeClose && connection != nullptr &&
                     (connection->AutoReleaseFlag04() != 0u);
                 if (shouldAutoReleaseConnection) {
-                    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    void** releaseVtable = *reinterpret_cast<void***>(connection);
-                    ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]
-                        ? reinterpret_cast<ReleaseFn>(
-                              releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex])
-                        : nullptr;
-                    (void)(releaseFn ? releaseFn(connection) : 0u);
+                    (void)connection->QueueRelease();
                 }
                 (void)QueuedWorkItem_InvokeReleaseSlot(workItem);
             }
