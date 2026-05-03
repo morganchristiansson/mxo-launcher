@@ -58,14 +58,20 @@ static void LogQueuedContextForensics(
     void* context,
     void* workItem,
     uint32_t workType) {
+    static uint32_t s_logCount = 0u;
     if (!context) {
+        return;
+    }
+
+    ++s_logCount;
+    if (!ShouldLogRepeatedQueueDiagnosticCount(s_logCount)) {
         return;
     }
 
     CBaseConnection_0x4b8018* queueContext = static_cast<CBaseConnection_0x4b8018*>(context);
     void** contextVtable = *reinterpret_cast<void***>(context);
-    spdlog::info(
-        "DIAGNOSTIC: {} context={} contextVtable={} slot1={} slot4={} autoReleaseByte={} workItem={} workType=0x{:08x}",
+    spdlog::debug(
+        "queued-context forensic label={} context={} contextVtable={} slot1={} slot4={} autoReleaseByte={} workItem={} workType=0x{:08x} [count=0x{:08x}]",
         label ? label : "queued-context",
         fmt::ptr(context),
         fmt::ptr(contextVtable),
@@ -73,7 +79,8 @@ static void LogQueuedContextForensics(
         fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueuedContextAbi::kOnOperationCompletedSlotIndex] : nullptr),
         static_cast<unsigned>(queueContext->AutoReleaseFlag04()),
         fmt::ptr(workItem),
-        workType);
+        workType,
+        s_logCount);
 }
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_SmallWorkItemPoolBackingBlock {

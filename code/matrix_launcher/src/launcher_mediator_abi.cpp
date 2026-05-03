@@ -171,16 +171,20 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
     const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* currentSlotRecord,
     uint32_t selectionIndex,
     uint32_t defaultSelectionIndex) {
+    static uint32_t s_logCount = 0u;
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
 
     if (!currentSlotRecord) {
-        spdlog::debug(
-            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x}]",
-            static_cast<unsigned>(selectionIndex),
-            static_cast<unsigned>(low24),
-            static_cast<unsigned>(high8),
-            static_cast<unsigned>(defaultSelectionIndex & 0xffu));
+        if (++s_logCount <= 4u) {
+            spdlog::debug(
+                "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x}] [count=0x{:08x}]",
+                static_cast<unsigned>(selectionIndex),
+                static_cast<unsigned>(low24),
+                static_cast<unsigned>(high8),
+                static_cast<unsigned>(defaultSelectionIndex & 0xffu),
+                s_logCount);
+        }
         return nullptr;
     }
 
@@ -189,15 +193,18 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
     g_MediatorSelectionDescriptor40.payload10 = const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
     g_MediatorSelectionDescriptor40.flag0c = 1u;
 
-    spdlog::debug(
-        "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}' payload={} charIdLow=0x{:08x} charIdHigh=0x{:08x}]",
-        static_cast<unsigned>(selectionIndex),
-        fmt::ptr(&g_MediatorSelectionDescriptor40),
-        static_cast<unsigned>(defaultSelectionIndex & 0xffu),
-        currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
-        fmt::ptr(g_MediatorSelectionDescriptor40.payload10),
-        static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
-        static_cast<unsigned>(currentSlotRecord->characterIdHigh20));
+    if (++s_logCount <= 4u) {
+        spdlog::debug(
+            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}' payload={} charIdLow=0x{:08x} charIdHigh=0x{:08x}] [count=0x{:08x}]",
+            static_cast<unsigned>(selectionIndex),
+            fmt::ptr(&g_MediatorSelectionDescriptor40),
+            static_cast<unsigned>(defaultSelectionIndex & 0xffu),
+            currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
+            fmt::ptr(g_MediatorSelectionDescriptor40.payload10),
+            static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
+            static_cast<unsigned>(currentSlotRecord->characterIdHigh20),
+            s_logCount);
+    }
     return &g_MediatorSelectionDescriptor40;
 }
 
