@@ -450,17 +450,17 @@ public:
     // +0x10
     virtual uint32_t IsReady() = 0;
     // +0x14
-    void UnknownSlot5();
+    virtual void UnknownSlot5() {}
     // +0x18 anchor: launcher.exe:0x41f050 = vtable slot +0x18
     virtual uint8_t GetUnknownByte05() const = 0;
     // +0x1c
     virtual void SetValue1(void* value) = 0;
     // +0x20
-    void UnknownSlot8();
+    virtual void UnknownSlot8() {}
     // +0x24
     virtual void SetValue2(void* value) = 0;
     // +0x28
-    void UnknownSlot10();
+    virtual void UnknownSlot10() {}
     // +0x2c
     virtual uint32_t IsConnected() = 0;
     // +0x30
@@ -580,51 +580,51 @@ public:
     // +0x10c
     virtual std::string_view GetRouteDescriptor30() const = 0;
     // +0x110
-    void UnknownSlot68();
+    virtual void UnknownSlot68() {}
     // +0x114
-    void UnknownSlot69();
+    virtual void UnknownSlot69() {}
     // +0x118
     virtual const std::vector<std::string>& GetLateEntryList1470() const = 0;
     // +0x11c
-    void UnknownSlot71();
+    virtual void UnknownSlot71() {}
     // +0x120
     virtual uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) = 0;
     // +0x124
     virtual void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) = 0;
     // +0x128
-    void UnknownSlot74();
+    virtual void UnknownSlot74() {}
     // +0x12c
-    void UnknownSlot75();
+    virtual void UnknownSlot75() {}
     // +0x130
     virtual LaunchPadClient_0x4b0e48* GetLaunchPadClient65c() const = 0;
     // +0x134
     virtual LaunchPadClient_0x4b0e48* EnsureLaunchPadClient65c() = 0;
     // +0x138
-    void UnknownSlot78();
+    virtual void UnknownSlot78() {}
     // +0x13c
     virtual void HelperSlot13c_InvokeSessionHelperVtable4() = 0;
     // +0x140
-    void UnknownSlot80();
+    virtual void UnknownSlot80() {}
     // +0x144
-    void UnknownSlot81();
+    virtual void UnknownSlot81() {}
     // +0x148
     virtual const char* GetGameSessionId() const = 0;
     // +0x14c
     virtual void SetSharedMarginPacketField660(uint32_t value) = 0;
     // +0x150
-    void UnknownSlot84();
+    virtual void UnknownSlot84() {}
     // +0x154
-    void UnknownSlot85();
+    virtual void UnknownSlot85() {}
     // +0x158
     virtual uint32_t SetState9OptionalField90AndSwitchToState13(uint32_t value) = 0;
     // +0x15c
-    void UnknownSlot87();
+    virtual void UnknownSlot87() {}
     // +0x160
-    void UnknownSlot88();
+    virtual void UnknownSlot88() {}
     // +0x164
     virtual bool RequestAuthConnectionCloseWaitEvent1() = 0;
     // +0x168
-    void UnknownSlot90();
+    virtual void UnknownSlot90() {}
     // +0x16c
     virtual bool RequestMarginConnectionCloseWaitEvent0f() = 0;
     // +0x170

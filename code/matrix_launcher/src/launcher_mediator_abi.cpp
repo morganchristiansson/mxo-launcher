@@ -380,6 +380,18 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->IsConnected();
 }
 
+// anchor: launcher.exe:0x41c0d0 / wrapper-facing arg6 slot +0x34
+static void __thiscall Mediator_RequestAuthCloseAndSwitchToState0(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RequestAuthCloseAndSwitchToState0();
+}
+
+// anchor: launcher.exe:0x41f050 / wrapper-facing arg6 slot +0x18
+static uint32_t __thiscall Mediator_GetUnknownByte05(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetUnknownByte05();
+}
+
 // anchor: client.dll profile-root formatting path uses arg6 +0x38 for Profiles\%s\... construction
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x38
 static const char* __thiscall Mediator_GetUsername38(MinimalLoginMediatorStub* self) {
@@ -831,6 +843,18 @@ static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalL
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState9CallbackSeedPointer85D4();
 }
 
+// anchor: launcher.exe:0x41f310 / wrapper-facing arg6 slot +0x130
+static mxo::ltlogin::LaunchPadClient_0x4b0e48* __thiscall Mediator_GetLaunchPadClient65c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLaunchPadClient65c();
+}
+
+// anchor: launcher.exe:0x420d00 / wrapper-facing arg6 slot +0x134
+static mxo::ltlogin::LaunchPadClient_0x4b0e48* __thiscall Mediator_EnsureLaunchPadClient65c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->EnsureLaunchPadClient65c();
+}
+
 // anchor: client.dll:0x62170b00 gates arg7 high-byte selection flow through arg6 +0xd8
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xd8
 // Tighter launcher page-`7` read now keeps this high byte aligned with the active selection-entry
@@ -1232,6 +1256,18 @@ static void* __thiscall Mediator_GetStartupDistrObjExecutive8c(MinimalLoginMedia
     return mediator ? mediator->GetStartupDistrObjExecutive8c() : nullptr;
 }
 
+// anchor: launcher.exe:0x41f330 / wrapper-facing arg6 slot +0x14c
+static void __thiscall Mediator_SetSharedMarginPacketField660(MinimalLoginMediatorStub* self, uint32_t value) {
+    (void)self;
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetSharedMarginPacketField660(value);
+}
+
+// anchor: launcher.exe:0x41c510 / wrapper-facing arg6 slot +0x158
+static uint32_t __thiscall Mediator_SetState9OptionalField90AndSwitchToState13(MinimalLoginMediatorStub* self, uint32_t value) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetState9OptionalField90AndSwitchToState13(value);
+}
+
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
 // Wrapper now forwards to CLTLoginMediator::UnregisterLoginObserver; owner keeps the tree state
 // while the ABI shell logs exact client callsites so paired view ctor/dtor observer lifetimes stay
@@ -1276,6 +1312,38 @@ __attribute__((naked)) static void Mediator_UnregisterLoginObserver174() {
 static uint32_t __thiscall Mediator_GetLastLoginStatus(MinimalLoginMediatorStub* self) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLastLoginStatus();
+}
+
+// anchor: launcher.exe:0x41af80 / wrapper-facing arg6 slot +0x17c
+static uint32_t __thiscall Mediator_HandleAuthConnectionCompletionFallback(
+    MinimalLoginMediatorStub* self,
+    void* connection,
+    void* workItem) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HandleAuthConnectionCompletionFallback(connection, workItem);
+}
+
+// anchor: launcher.exe:0x41f250 / wrapper-facing arg6 slot +0x180
+static uint32_t __thiscall Mediator_DispatchCurrentHelperAuthMessage(MinimalLoginMediatorStub* self, void* workItem) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->DispatchCurrentHelperAuthMessage(workItem);
+}
+
+// anchor: launcher.exe:0x41f260 / wrapper-facing arg6 slot +0x184
+static uint32_t __thiscall Mediator_DispatchCurrentHelperSlot6(
+    MinimalLoginMediatorStub* self,
+    mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->DispatchCurrentHelperSlot6(workItem);
+}
+
+// anchor: launcher.exe:0x41afc0 / wrapper-facing arg6 slot +0x188
+static uint32_t __thiscall Mediator_HandleMarginConnectionCompletionFallback(
+    MinimalLoginMediatorStub* self,
+    void* connection,
+    void* workItem) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HandleMarginConnectionCompletionFallback(connection, workItem);
 }
 
 // UNANCHORED: C helper behind the recovered +0x18c ABI wrapper.
@@ -1409,14 +1477,14 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
     g_LoginMediatorVtable[5] = (void*)Mediator_UnimplementedSlot14; // +0x14
-    g_LoginMediatorVtable[6] = (void*)Mediator_UnimplementedSlot18; // +0x18
+    g_LoginMediatorVtable[6] = (void*)Mediator_GetUnknownByte05; // +0x18
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
     g_LoginMediatorVtable[8] = (void*)Mediator_UnimplementedSlot20; // +0x20
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue2;        // +0x24
     g_LoginMediatorVtable[10] = (void*)Mediator_UnimplementedSlot28; // +0x28
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[12] = (void*)Mediator_ProcessLoginRequest30; // +0x30
-    g_LoginMediatorVtable[13] = (void*)Mediator_UnimplementedSlot34; // +0x34
+    g_LoginMediatorVtable[13] = (void*)Mediator_RequestAuthCloseAndSwitchToState0; // +0x34
     g_LoginMediatorVtable[14] = (void*)Mediator_GetUsername38;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
@@ -1479,17 +1547,17 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
     g_LoginMediatorVtable[74] = (void*)Mediator_UnimplementedSlot128; // +0x128
     g_LoginMediatorVtable[75] = (void*)Mediator_GetStartupDistrObjExecutive8c; // +0x12c
-    g_LoginMediatorVtable[76] = (void*)Mediator_UnimplementedSlot130; // +0x130 GetSessionCallbackHelper65c
-    g_LoginMediatorVtable[77] = (void*)Mediator_UnimplementedSlot134; // +0x134 EnsureSessionCallbackHelper65c
+    g_LoginMediatorVtable[76] = (void*)Mediator_GetLaunchPadClient65c; // +0x130
+    g_LoginMediatorVtable[77] = (void*)Mediator_EnsureLaunchPadClient65c; // +0x134
     g_LoginMediatorVtable[78] = (void*)Mediator_UnimplementedSlot138; // +0x138
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
     g_LoginMediatorVtable[80] = (void*)Mediator_UnimplementedSlot140; // +0x140
     g_LoginMediatorVtable[81] = (void*)Mediator_UnimplementedSlot144; // +0x144
     g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
-    g_LoginMediatorVtable[83] = (void*)Mediator_UnimplementedSlot14c; // +0x14c SetSharedMarginPacketField660
+    g_LoginMediatorVtable[83] = (void*)Mediator_SetSharedMarginPacketField660; // +0x14c
     g_LoginMediatorVtable[84] = (void*)Mediator_UnimplementedSlot150; // +0x150
     g_LoginMediatorVtable[85] = (void*)Mediator_UnimplementedSlot154; // +0x154
-    g_LoginMediatorVtable[86] = (void*)Mediator_UnimplementedSlot158; // +0x158 SetState9OptionalField90AndSwitchToState13
+    g_LoginMediatorVtable[86] = (void*)Mediator_SetState9OptionalField90AndSwitchToState13; // +0x158
     g_LoginMediatorVtable[87] = (void*)Mediator_UnimplementedSlot15c; // +0x15c
     g_LoginMediatorVtable[88] = (void*)Mediator_UnimplementedSlot160; // +0x160
     g_LoginMediatorVtable[89] = (void*)Mediator_RequestAuthConnectionCloseWaitEvent1;   // +0x164
@@ -1498,10 +1566,10 @@ void DiagnosticInitializeMediatorStub() {
     g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170
     g_LoginMediatorVtable[93] = (void*)Mediator_UnregisterLoginObserver174; // +0x174
     g_LoginMediatorVtable[94] = (void*)Mediator_GetLastLoginStatus; // +0x178
-    g_LoginMediatorVtable[95] = (void*)Mediator_UnimplementedSlot17c; // +0x17c
-    g_LoginMediatorVtable[96] = (void*)Mediator_UnimplementedSlot180; // +0x180
-    g_LoginMediatorVtable[97] = (void*)Mediator_UnimplementedSlot184; // +0x184
-    g_LoginMediatorVtable[98] = (void*)Mediator_UnimplementedSlot188; // +0x188
+    g_LoginMediatorVtable[95] = (void*)Mediator_HandleAuthConnectionCompletionFallback; // +0x17c
+    g_LoginMediatorVtable[96] = (void*)Mediator_DispatchCurrentHelperAuthMessage; // +0x180
+    g_LoginMediatorVtable[97] = (void*)Mediator_DispatchCurrentHelperSlot6; // +0x184
+    g_LoginMediatorVtable[98] = (void*)Mediator_HandleMarginConnectionCompletionFallback; // +0x188
     g_LoginMediatorVtable[99] = (void*)Mediator_FillState9CallbackBlob18c; // +0x18c
     g_LoginMediatorVtable[100] = (void*)Mediator_UnimplementedSlot190; // +0x190
     g_LoginMediatorVtable[101] = (void*)Mediator_UnimplementedSlot194; // +0x194
