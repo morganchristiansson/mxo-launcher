@@ -2582,7 +2582,11 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     // - this keeps new auth-connect worker creation from blocking on the same lock during retry
     (void)EnterCleanupLockHelper();
 
-    void* cleanupContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    CBaseConnection_0x4b8018* queuedConnectionOwner =
+        CBaseConnection_FromQueueContextScaffold(contextKey);
+    void* cleanupContextKey = queuedConnectionOwner
+        ? static_cast<void*>(queuedConnectionOwner)
+        : contextKey;
     bool touchedConnectionState = false;
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> workerPayload;
@@ -2903,13 +2907,22 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         if (queuedConnectionOwner && isType1) {
             CleanupConnection(queuedConnectionOwner);
         } else if (context && isType1) {
+            spdlog::warn(
+                "DIAGNOSTIC: non-scaffold queue context reached CleanupConnection context={} workItem={} workType=0x{:08x}",
+                fmt::ptr(context),
+                fmt::ptr(workItem),
+                workType);
             CleanupConnection(context);
         }
 
         if (queuedConnectionOwner) {
             (void)queuedConnectionOwner->OnOperationCompleted(workItem);
         } else if (context) {
-            (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
+            spdlog::warn(
+                "DIAGNOSTIC: non-scaffold queue context reached OnOperationCompleted dispatch context={} workItem={} workType=0x{:08x}",
+                fmt::ptr(context),
+                fmt::ptr(workItem),
+                workType);
         }
 
         if (shouldAutoReleaseContext) {
@@ -2939,14 +2952,25 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
                     workItem,
                     workType);
                 if (workType == kWorkTypeClose) {
-                    CleanupConnection(queuedConnectionOwner
-                        ? static_cast<void*>(queuedConnectionOwner)
-                        : context);
+                    if (queuedConnectionOwner) {
+                        CleanupConnection(queuedConnectionOwner);
+                    } else {
+                        spdlog::warn(
+                            "DIAGNOSTIC: non-scaffold stop-queue cleanup context={} workItem={} workType=0x{:08x}",
+                            fmt::ptr(context),
+                            fmt::ptr(workItem),
+                            workType);
+                        CleanupConnection(context);
+                    }
                 }
                 if (queuedConnectionOwner) {
                     (void)queuedConnectionOwner->OnOperationCompleted(workItem);
                 } else if (context) {
-                    (void)CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(context, workItem);
+                    spdlog::warn(
+                        "DIAGNOSTIC: non-scaffold stop-queue OnOperationCompleted dispatch context={} workItem={} workType=0x{:08x}",
+                        fmt::ptr(context),
+                        fmt::ptr(workItem),
+                        workType);
                 }
                 const bool shouldAutoReleaseContext =
                     workType == kWorkTypeClose &&

@@ -422,29 +422,10 @@ void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
-// UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
-void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext) {
-    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
-    return owner ? static_cast<void*>(owner) : maybeQueueContext;
-}
-
 bool CBaseConnection_ShouldAutoReleaseQueuedContextScaffold(void* maybeQueueContext) {
     CBaseConnection_QueueContextScaffold* queueContext =
         static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
     return queueContext != nullptr && queueContext->autoReleaseFlag != 0u;
-}
-
-// UNANCHORED: source-owned ABI-dispatch wrapper for queued context completion callbacks.
-uint32_t CBaseConnection_InvokeQueuedOnOperationCompletedScaffold(void* maybeQueueContext, void* workItem) {
-    CBaseConnection_0x4b8018* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
-    if (!owner) {
-        spdlog::warn(
-            "DIAGNOSTIC: non-scaffold queued connection dispatch context={} workItem={}",
-            fmt::ptr(maybeQueueContext),
-            fmt::ptr(workItem));
-        return 0u;
-    }
-    return owner->OnOperationCompleted(workItem);
 }
 
 // UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`

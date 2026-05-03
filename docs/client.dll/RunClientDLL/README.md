@@ -213,6 +213,9 @@ little without changing the queued context object shape itself:
 - when the context is recognized as the scaffold, launcher-side queue consumers now bypass the
   scaffold callback helper and call the owning `CBaseConnection_0x4b8018` directly for
   `CleanupConnection(...)` and `OnOperationCompleted(...)`
+- a further pruning pass then removed the now-redundant launcher-side cleanup/dispatch wrapper
+  helpers entirely; queue consumers unwrap once and either call the owner directly or emit a
+  diagnostic if some future non-scaffold context unexpectedly reaches that path
 - only the explicit queue-context object still crosses the queue as `(workItem, context)` and only
   the optional type-1 auto-release still goes back through the scaffold slot surface
 - arg5 queue cursor comparisons at:
