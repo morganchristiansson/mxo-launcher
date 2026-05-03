@@ -127,26 +127,44 @@ private:
 
 static_assert(sizeof(CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00) == 0x0c, "close work-item size mismatch");
 
-// Recovered launcher-visible arg5 helper root at +0x5c.
-// Current source note:
-// - original shell still has to materialize this helper root in-place for client-visible `ecx`
-//   identity
-// - the target class now also owns a first-class surrogate for the helper family so wrapper code
-//   can delegate helper semantics/mechanical mirror state into liblttcp instead of keeping all
-//   arg5-only state bookkeeping in `src/launcher_network_object_abi.cpp`
-struct CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold {
-    void** vtable;
+class CLTCriticalSectionHelper_0x4add70 {
+public:
+    // anchor family: launcher.exe embedded helper vtable `0x004add70`
+    // Small inline critical-section helper reused by launcher-visible engine helper subobjects and
+    // by the later message-connection completion helper family.
+    CLTCriticalSectionHelper_0x4add70();
+    ~CLTCriticalSectionHelper_0x4add70();
+
+    CLTCriticalSectionHelper_0x4add70(const CLTCriticalSectionHelper_0x4add70&) = delete;
+    CLTCriticalSectionHelper_0x4add70& operator=(const CLTCriticalSectionHelper_0x4add70&) = delete;
+
+    virtual uint32_t Enter();
+    virtual uint32_t Leave();
+
+    CRITICAL_SECTION crit; // +0x04
 };
 
-// Recovered launcher-visible lock-helper family at +0x60 / +0x98.
-// Faithfulness update:
-// - original embeds a `CRITICAL_SECTION` immediately after the vtable root
-// - keep that inline shape on the native class too so the class body can converge on the original
-//   `0xb4` arg5 layout instead of carrying heap-backed helper storage baggage
-struct CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold {
-    void** vtable;
-    CRITICAL_SECTION crit;
+static_assert(sizeof(CLTCriticalSectionHelper_0x4add70) == 0x1c, "critical-section helper size mismatch");
+
+class CLTEventCriticalSectionHelper_0x4b3e20 {
+public:
+    // anchor family: launcher.exe helper vtable `0x004b3e20`
+    // Small event + embedded-lock helper that materializes inline at engine `+0x5c` and also on
+    // the later connection completion-helper paths.
+    CLTEventCriticalSectionHelper_0x4b3e20();
+    ~CLTEventCriticalSectionHelper_0x4b3e20();
+
+    CLTEventCriticalSectionHelper_0x4b3e20(const CLTEventCriticalSectionHelper_0x4b3e20&) = delete;
+    CLTEventCriticalSectionHelper_0x4b3e20& operator=(const CLTEventCriticalSectionHelper_0x4b3e20&) = delete;
+
+    virtual uint32_t Signal();
+    virtual uint32_t Wait(int reasonMilliseconds);
+
+    CLTCriticalSectionHelper_0x4add70 embeddedLockHelper04; // +0x04
+    HANDLE eventHandle20 = nullptr; // +0x20
 };
+
+static_assert(sizeof(CLTEventCriticalSectionHelper_0x4b3e20) == 0x24, "event critical-section helper size mismatch");
 
 // Recovered allocated sentinel/tree head shape reached from arg5 +0x80.
 struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24 {
@@ -168,8 +186,6 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18 {
     unsigned char keyAndPayload[0x8];
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold) == 0x04, "wait helper size mismatch");
-static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold) == 0x1c, "lock helper size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18) == 0x18, "context head size mismatch");
 
@@ -380,9 +396,7 @@ protected:
     uint32_t field04_;
     void* field08_;
     CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 queuePair0c_;
-    CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold waitHelper5c_;
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold queueLockHelper60_;
-    HANDLE queueSignalEvent7c_;
+    CLTEventCriticalSectionHelper_0x4b3e20 queueWaitHelper5c_;
 };
 
 // Reimplementation note:
@@ -580,10 +594,6 @@ private:
         CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair,
         bool waitForSignal);
 
-protected:
-    static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
-    static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
-
 private:
     static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
     static void InitializeContextTreeHead18(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head);
@@ -594,7 +604,7 @@ private:
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* contextTreeHead8c_;
     uint32_t contextCount90_;
     uint32_t reserved94_;
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold cleanupLockHelper98_;
+    CLTCriticalSectionHelper_0x4add70 cleanupLockHelper98_;
 };
 
 struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
@@ -602,16 +612,14 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
     uint32_t field04;
     void* field08;
     CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 queuePair0C;
-    CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold waitHelper5C;
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold queueLockHelper60;
-    HANDLE queueSignalEvent7C;
+    CLTEventCriticalSectionHelper_0x4b3e20 queueWaitHelper5C;
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* endpointTreeHead80;
     uint32_t endpointCount84;
     uint32_t reserved88;
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* contextTreeHead8C;
     uint32_t contextCount90;
     uint32_t reserved94;
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold cleanupLockHelper98;
+    CLTCriticalSectionHelper_0x4add70 cleanupLockHelper98;
 };
 
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror) == 0xb4, "layout mirror size mismatch");
@@ -619,9 +627,7 @@ static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field0
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field08) == 0x08, "field08 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C) == 0x0c, "queuePair0C offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C.queue28) == 0x34, "queuePair0C.queue28 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, waitHelper5C) == 0x5c, "waitHelper5C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueLockHelper60) == 0x60, "queueLockHelper60 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueSignalEvent7C) == 0x7c, "queueSignalEvent7C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueWaitHelper5C) == 0x5c, "queueWaitHelper5C offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointTreeHead80) == 0x80, "endpointTreeHead80 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointCount84) == 0x84, "endpointCount84 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, reserved88) == 0x88, "reserved88 offset mismatch");

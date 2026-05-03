@@ -123,20 +123,18 @@ static void LogLauncherObjectPrimaryDispatchConfigOnce() {
         sizeof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768),
         sizeof(LauncherObjectAbiShell));
     spdlog::info(
-        "launcher arg5 native-vptr compile-time layout field04=0x{:x} field08=0x{:x} queuePair0C=0x{:x} queuePair0C.queue28=0x{:x} wait5C=0x{:x} lock60=0x{:x} event=0x{:x} list80=0x{:x} count84=0x{:x} list8C=0x{:x} count90=0x{:x} cleanup98=0x{:x} lockHelperSize=0x{:x}",
+        "launcher arg5 native-vptr compile-time layout field04=0x{:x} field08=0x{:x} queuePair0C=0x{:x} queuePair0C.queue28=0x{:x} queueWaitHelper5C=0x{:x} list80=0x{:x} count84=0x{:x} list8C=0x{:x} count90=0x{:x} cleanup98=0x{:x} criticalSectionHelperSize=0x{:x}",
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field04),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field08),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C.queue28),
-        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, waitHelper5C),
-        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueLockHelper60),
-        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueSignalEvent7C),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueWaitHelper5C),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointTreeHead80),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointCount84),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, contextTreeHead8C),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, contextCount90),
         offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, cleanupLockHelper98),
-        sizeof(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold));
+        sizeof(mxo::liblttcp::CLTCriticalSectionHelper_0x4add70));
     spdlog::info(
         "launcher arg5 native-vptr note: live shell keeps wrapper-owned helper vtables at +0x5c/+0x60/+0x98 for direct helper dispatch"
     );
@@ -175,15 +173,7 @@ static void* LauncherObjectVisiblePtrFromNativeEngine(
 
 static void InstallNativeEngineArg5HelperVtables(
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine) {
-    if (!engine) {
-        return;
-    }
-
-    auto* nativeLayout =
-        reinterpret_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(engine);
-    nativeLayout->waitHelper5C.vtable = LauncherObjectSubVtable5C();
-    nativeLayout->queueLockHelper60.vtable = LauncherObjectSubVtable60();
-    nativeLayout->cleanupLockHelper98.vtable = LauncherObjectSubVtable98();
+    (void)engine;
 }
 #endif
 
@@ -500,7 +490,7 @@ static void LogClientFacingArg5QueueState(
         fmt::ptr(queue34 ? queue34->readCursor00 : static_cast<void*>(nullptr)),
         fmt::ptr(queue34 ? queue34->writeCursor10 : static_cast<void*>(nullptr)),
         layout ? layout->field04 : 0u,
-        fmt::ptr(layout ? layout->queueSignalEvent7C : static_cast<void*>(nullptr)));
+        fmt::ptr(layout ? layout->queueWaitHelper5C.eventHandle20 : static_cast<void*>(nullptr)));
 }
 
 // UNANCHORED: queue-lock helper enter for arg5 +0x60.

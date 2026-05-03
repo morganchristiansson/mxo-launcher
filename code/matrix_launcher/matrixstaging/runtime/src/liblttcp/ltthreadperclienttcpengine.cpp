@@ -1831,24 +1831,54 @@ static uint32_t QueueWorkItem_GetType(const void* workItem) {
 // - CreateEventA result at `+0x7c`
 // - derived list heads at `+0x80` (0x24 bytes) and `+0x8c` (0x18 bytes)
 // - derived helper root at `+0x98`
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTThreadPerClientTCPEngine_0x4b2768::InitializeLockHelperScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper) {
-    if (!helper) {
-        return;
-    }
-
-    std::memset(&helper->crit, 0, sizeof(helper->crit));
-    InitializeCriticalSection(&helper->crit);
+CLTCriticalSectionHelper_0x4add70::CLTCriticalSectionHelper_0x4add70() {
+    std::memset(&crit, 0, sizeof(crit));
+    InitializeCriticalSection(&crit);
 }
 
-void CLTThreadPerClientTCPEngine_0x4b2768::DeleteLockHelperScaffold(
-    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper) {
-    if (!helper) {
-        return;
-    }
+CLTCriticalSectionHelper_0x4add70::~CLTCriticalSectionHelper_0x4add70() {
+    DeleteCriticalSection(&crit);
+}
 
-    DeleteCriticalSection(&helper->crit);
+uint32_t CLTCriticalSectionHelper_0x4add70::Enter() {
+    EnterCriticalSection(&crit);
+    return 0u;
+}
+
+uint32_t CLTCriticalSectionHelper_0x4add70::Leave() {
+    LeaveCriticalSection(&crit);
+    return 0u;
+}
+
+CLTEventCriticalSectionHelper_0x4b3e20::CLTEventCriticalSectionHelper_0x4b3e20()
+    : embeddedLockHelper04(),
+      eventHandle20(CreateEventA(nullptr, FALSE, FALSE, nullptr)) {}
+
+CLTEventCriticalSectionHelper_0x4b3e20::~CLTEventCriticalSectionHelper_0x4b3e20() {
+    if (eventHandle20 != nullptr) {
+        CloseHandle(eventHandle20);
+        eventHandle20 = nullptr;
+    }
+}
+
+uint32_t CLTEventCriticalSectionHelper_0x4b3e20::Signal() {
+    return (eventHandle20 && SetEvent(eventHandle20)) ? 0u : 1u;
+}
+
+uint32_t CLTEventCriticalSectionHelper_0x4b3e20::Wait(int reasonMilliseconds) {
+    embeddedLockHelper04.Leave();
+    const DWORD waitResult = eventHandle20
+        ? WaitForSingleObject(eventHandle20, static_cast<DWORD>(reasonMilliseconds))
+        : WAIT_FAILED;
+    if (waitResult == WAIT_OBJECT_0) {
+        embeddedLockHelper04.Enter();
+        return 0u;
+    }
+    if (waitResult == WAIT_TIMEOUT) {
+        embeddedLockHelper04.Enter();
+        return 3u;
+    }
+    return 1u;
 }
 
 void CLTThreadPerClientTCPEngine_0x4b2768::InitializeEndpointTreeHead24(
@@ -1883,27 +1913,16 @@ CLTBaseThreadPerClientTCPEngine_0x4b3e74::CLTBaseThreadPerClientTCPEngine_0x4b3e
     : field04_(0),
       field08_(nullptr),
       queuePair0c_(),
-      waitHelper5c_{nullptr},
-      queueLockHelper60_(),
-      queueSignalEvent7c_(NULL) {
+      queueWaitHelper5c_() {
     // anchor: launcher.exe:0x4366f0
-    queueLockHelper60_.vtable = nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&queuePair0c_.queue00, 0);
     CLTThreadPerClientTCPEngine_0x4b2768::Queue_Init(&queuePair0c_.queue28, 0);
-    queueSignalEvent7c_ = CreateEventA(NULL, FALSE, FALSE, NULL);
-    std::memset(&queueLockHelper60_.crit, 0, sizeof(queueLockHelper60_.crit));
-    InitializeCriticalSection(&queueLockHelper60_.crit);
 }
 
 // anchor: launcher.exe:0x436fd0 / deleting wrapper 0x437050
 CLTBaseThreadPerClientTCPEngine_0x4b3e74::~CLTBaseThreadPerClientTCPEngine_0x4b3e74() {
     CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&queuePair0c_.queue00);
     CLTThreadPerClientTCPEngine_0x4b2768::Queue_Free(&queuePair0c_.queue28);
-    DeleteCriticalSection(&queueLockHelper60_.crit);
-    if (queueSignalEvent7c_) {
-        CloseHandle(queueSignalEvent7c_);
-        queueSignalEvent7c_ = NULL;
-    }
 }
 
 CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
@@ -1918,8 +1937,7 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
     // Faithfulness restructuring:
     // - base now owns the recovered `+0x04..+0x7c` field family for real inheritance
     // - keep only the derived `+0x80..+0xb3` extension here
-    cleanupLockHelper98_.vtable = nullptr;
-    InitializeLockHelperScaffold(&cleanupLockHelper98_);
+    (void)cleanupLockHelper98_;
 
     endpointTreeHead80_ =
         static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24*>(
@@ -1981,7 +1999,6 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
         contextBacking->entries.clear();
     }
 
-    DeleteLockHelperScaffold(&cleanupLockHelper98_);
     if (endpointTreeHead80_) {
         std::free(endpointTreeHead80_);
         endpointTreeHead80_ = nullptr;
@@ -2653,24 +2670,12 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
 
 // anchor: launcher.exe:0x435f90
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::SignalQueueEventHelper() {
-    return (queueSignalEvent7c_ && SetEvent(queueSignalEvent7c_)) ? 0u : 1u;
+    return queueWaitHelper5c_.Signal();
 }
 
 // anchor: launcher.exe:0x435fa0
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMilliseconds) {
-    (void)LeaveQueueLockHelper();
-    const DWORD waitResult = queueSignalEvent7c_
-        ? WaitForSingleObject(queueSignalEvent7c_, static_cast<DWORD>(reasonMilliseconds))
-        : WAIT_FAILED;
-    if (waitResult == WAIT_OBJECT_0) {
-        (void)EnterQueueLockHelper();
-        return 0u;
-    }
-    if (waitResult == WAIT_TIMEOUT) {
-        (void)EnterQueueLockHelper();
-        return 3u;
-    }
-    return 1u;
+    return queueWaitHelper5c_.Wait(reasonMilliseconds);
 }
 
 // Shared helper-body evidence: launcher.exe:0x4147b0 / 0x4147c0.
@@ -2678,23 +2683,19 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::WaitQueueEventHelper(int reasonMi
 // - arg5 +0x60 remains as ABI helper surface only
 // - live queue-lock state now stays on the real engine object's recovered helper storage
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterQueueLockHelper() {
-    EnterCriticalSection(&queueLockHelper60_.crit);
-    return 0u;
+    return queueWaitHelper5c_.embeddedLockHelper04.Enter();
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveQueueLockHelper() {
-    LeaveCriticalSection(&queueLockHelper60_.crit);
-    return 0u;
+    return queueWaitHelper5c_.embeddedLockHelper04.Leave();
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::EnterCleanupLockHelper() {
-    EnterCriticalSection(&cleanupLockHelper98_.crit);
-    return 0u;
+    return cleanupLockHelper98_.Enter();
 }
 
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::LeaveCleanupLockHelper() {
-    LeaveCriticalSection(&cleanupLockHelper98_.crit);
-    return 0u;
+    return cleanupLockHelper98_.Leave();
 }
 
 // anchor: launcher.exe:0x4364d0
@@ -2716,7 +2717,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::TryPopCompletedOperation(
         activeQueuePair ? &activeQueuePair->queue00 : nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
-    HANDLE activeQueueSignalEvent = queueSignalEvent7c_;
+    HANDLE activeQueueSignalEvent = queueWaitHelper5c_.eventHandle20;
     (void)EnterQueueLockHelper();
 
     while (waitForSignal &&
@@ -2814,7 +2815,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperation(
             fmt::ptr(activeQueue0C ? activeQueue0C->writeCursor10 : nullptr),
             fmt::ptr(activeQueue34 ? activeQueue34->readCursor00 : nullptr),
             fmt::ptr(activeQueue34 ? activeQueue34->writeCursor10 : nullptr),
-            fmt::ptr(queueSignalEvent7c_),
+            fmt::ptr(queueWaitHelper5c_.eventHandle20),
             field04_);
     }
 }
@@ -2837,7 +2838,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
         activeQueuePair ? &activeQueuePair->queue00 : nullptr;
     CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* activeQueue34 =
         activeQueuePair ? &activeQueuePair->queue28 : nullptr;
-    HANDLE activeQueueSignalEvent = queueSignalEvent7c_;
+    HANDLE activeQueueSignalEvent = queueWaitHelper5c_.eventHandle20;
     while (true) {
         CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord* selectedQueue = nullptr;
         while (true) {

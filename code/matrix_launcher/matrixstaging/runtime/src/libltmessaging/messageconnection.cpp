@@ -184,35 +184,7 @@ static bool CPacketDecryptor_DecryptPayloadScaffold(
 
 }  // namespace
 
-CLTCriticalSectionHelper_0x4add70::CLTCriticalSectionHelper_0x4add70() {
-    std::memset(&crit, 0, sizeof(crit));
-    InitializeCriticalSection(&crit);
-}
 
-CLTCriticalSectionHelper_0x4add70::~CLTCriticalSectionHelper_0x4add70() {
-    DeleteCriticalSection(&crit);
-}
-
-CMessageConnectionCompletionHelper_0x4b3e20::CMessageConnectionCompletionHelper_0x4b3e20()
-    : embeddedLockHelper04(),
-      eventHandle20(CreateEventA(nullptr, FALSE, FALSE, nullptr)) {}
-
-CMessageConnectionCompletionHelper_0x4b3e20::~CMessageConnectionCompletionHelper_0x4b3e20() {
-    if (eventHandle20 != nullptr) {
-        CloseHandle(eventHandle20);
-        eventHandle20 = nullptr;
-    }
-}
-
-void CMessageConnectionCompletionHelper_0x4b3e20::Signal() {
-    if (eventHandle20 != nullptr) {
-        SetEvent(eventHandle20);
-    }
-}
-
-DWORD CMessageConnectionCompletionHelper_0x4b3e20::Wait(uint32_t timeoutMs) const {
-    return eventHandle20 != nullptr ? WaitForSingleObject(eventHandle20, timeoutMs) : WAIT_FAILED;
-}
 
 // UNANCHORED: source-owned narrow subset of `0x448b40` with a null engine and without the
 // optional completion-helper allocation path.
@@ -237,9 +209,9 @@ CMessageConnection_0x4b7928::CMessageConnection_0x4b7928(
     CLTTCPConnection::SetEngine(engine);
     if (allocateCompletionHelpers) {
         connectCompletionHelper7c_ =
-            std::make_unique<CMessageConnectionCompletionHelper_0x4b3e20>();
+            std::make_unique<CLTEventCriticalSectionHelper_0x4b3e20>();
         closeCompletionHelper80_ =
-            std::make_unique<CMessageConnectionCompletionHelper_0x4b3e20>();
+            std::make_unique<CLTEventCriticalSectionHelper_0x4b3e20>();
     }
 }
 
