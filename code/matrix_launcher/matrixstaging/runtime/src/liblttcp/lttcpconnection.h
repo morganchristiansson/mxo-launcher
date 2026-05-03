@@ -368,9 +368,9 @@ class CBaseConnection_0x4b8018 {
     queueContextScaffold_.autoReleaseFlag = autoReleaseFlag;
   }
 
-  // UNANCHORED: source-owned queue-dispatch ABI adapter accessor used where queued contexts may be
-  // consumed by raw client.dll code that expects original MSVC vtable slot numbering.
-  void* QueueContextScaffold() { return &queueContextScaffold_; }
+  // EXPERIMENTAL: queued contexts now cross this seam directly as native connection-family
+  // objects again so the current logs can show exactly where scaffold assumptions still survive.
+  void* QueueContextScaffold() { return this; }
 
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {

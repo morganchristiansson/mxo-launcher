@@ -222,6 +222,13 @@ little without changing the queued context object shape itself:
   helper functions
 - only the explicit queue-context object still crosses the queue as `(workItem, context)` and only
   the optional type-1 auto-release still goes back through the scaffold slot surface
+
+Current next-step experiment narrows the flip further:
+- producers now pass the native `CBaseConnection_0x4b8018` object itself again via
+  `QueueContextScaffold() -> this`
+- the scaffold storage/vtable code is intentionally left in place for now so the run can fail
+  loudly and diagnostically instead of silently if any remaining consumer still depends on the old
+  queued-context adapter shape
 - arg5 queue cursor comparisons at:
   - queue0C `current1` vs `current0`
   - queue34 `current1` vs `current0`
