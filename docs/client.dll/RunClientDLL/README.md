@@ -196,9 +196,10 @@ ABI seam again, source now logs the queue-context call boundary itself:
   `DIAGNOSTIC: queue-context scaffold release ...` log the **return address of the caller** via
   `_ReturnAddress()`, which should let us distinguish launcher.exe-side dispatch from live
   `client.dll` queue-consumer traffic
-- if a direct native `CBaseConnection_0x4b8018*` ever crosses the seam again, source now emits
-  `DIAGNOSTIC: direct/native queued connection dispatch ...` or
-  `DIAGNOSTIC: direct/native queued connection auto-release bypass ...`
+- after the successful game-entry run failed to show any direct/native queued-context use, the
+  launcher-side compatibility fallback for raw native `CBaseConnection_0x4b8018*` queue contexts
+  was pruned back; non-scaffold contexts now warn and no-op instead of attempting mixed-shape
+  dispatch
 
 This instrumentation is meant to answer two narrow questions before the next ABI change:
 1. does the active stalled path actually invoke the queued connection-context callback/release slots?
