@@ -223,19 +223,18 @@ little without changing the queued context object shape itself:
 - only the explicit queue-context object still crosses the queue as `(workItem, context)` and only
   the optional type-1 auto-release still goes back through the scaffold slot surface
 
-Current next-step experiment narrows the flip further:
-- producers now pass the native `CBaseConnection_0x4b8018` object itself again via
-  `QueueContextScaffold() -> this`
-- focused RE of `launcher.exe:0x436b10` now confirms why the first native-object attempt failed so
-  early: the original queue consumer does **not** unwrap a scaffold owner before dispatching
-  completion work
-  - it calls queued `context` vtable slot `+0x10` directly for `OnOperationCompleted(workItem)`
-  - on type-1 work it also reads the queued object `+0x04` auto-release byte directly
-  - then, when set, it calls queued `context` vtable slot `+0x04` directly for the optional
-    auto-release tail
-- launcher-side queue consumers are therefore adjusted to treat native queued connection objects as
-  the primary shape again, while still recognizing the older scaffold object if encountered during
-  the transition
+Current status after the native-context experiment:
+- focused RE of `launcher.exe:0x436b10` confirms the original queue consumer dispatches directly
+  through the queued context object:
+  - queued `context` vtable slot `+0x10` for `OnOperationCompleted(workItem)`
+  - queued object byte `+0x04` as the type-1 auto-release flag
+  - queued `context` vtable slot `+0x04` for the optional type-1 auto-release tail
+- source-side launcher queue consumers were updated accordingly and native auth queued contexts now
+  complete successfully under launcher-owned consumption
+- however, the later `client.dll`-driven margin connect-status path still stalls when producers pass
+  native connection objects directly, so the working launcher path is restored for now by queuing the
+  explicit scaffold object again on the client-facing seam while investigation continues on the exact
+  native raw-vtable/address-point mismatch seen by `client.dll`
 - arg5 queue cursor comparisons at:
   - queue0C `current1` vs `current0`
   - queue34 `current1` vs `current0`
