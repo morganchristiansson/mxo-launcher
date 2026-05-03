@@ -192,28 +192,17 @@ This client-facing queue seam is now narrowed enough to state the core rule dire
   vftable now matches the raw consumer contract used by both `launcher.exe:0x436b10` and
   `client.dll:0x62531c10`
 
-That resolves the auth-vs-margin split observed during the failed native-context experiment:
+That resolves the auth-vs-margin split observed during the failed direct-object experiment:
 - launcher-side auth progress could still succeed through launcher-owned/native C++ dispatch
 - client.dll-facing margin completion needed the exact raw slot numbering and failed until the
   native object layout exposed `OnOperationCompleted` at `vtable[4]`
-  queued context release slot were then inlined back into the two queue-consumer bodies, keeping
-  the remaining ABI lie local to the recovered consumer logic instead of spreading it across shared
-  helper functions
-- only the explicit queue-context object still crosses the queue as `(workItem, context)` and only
-  the optional type-1 auto-release still goes back through the scaffold slot surface
 
-Current status after the native-context experiment:
+Current status:
 - focused RE of `launcher.exe:0x436b10` confirms the original queue consumer dispatches directly
-  through the queued context object:
-  - queued `context` vtable slot `+0x10` for `OnOperationCompleted(workItem)`
-  - queued object byte `+0x04` as the type-1 auto-release flag
-  - queued `context` vtable slot `+0x04` for the optional type-1 auto-release tail
-- source-side launcher queue consumers were updated accordingly and native auth queued contexts now
-  complete successfully under launcher-owned consumption
-- however, the later `client.dll`-driven margin connect-status path still stalls when producers pass
-  native connection objects directly, so the working launcher path is restored for now by queuing the
-  explicit scaffold object again on the client-facing seam while investigation continues on the exact
-  native raw-vtable/address-point mismatch seen by `client.dll`
+  through the connection object pointer popped from the queue
+- source-side launcher consumers now do the same
+- the client-facing path now also passes the native connection object directly and game launch is
+  confirmed working again under that direct-object ABI
 - arg5 queue cursor comparisons at:
   - queue0C `current1` vs `current0`
   - queue34 `current1` vs `current0`

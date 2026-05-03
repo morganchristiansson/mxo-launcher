@@ -872,7 +872,7 @@ Recovered behavior:
   - still calls `0x44ab60(arg)` before releasing the helper lock
 - current best interpretation of `0x44ab60` is **not** a trustworthy standalone OOAnalyzer-discovered
   class boundary; it reads better as a helper operating on the existing connection/send-queue
-  family rooted at the queued context object
+  family rooted at the direct connection object dispatch seam
 - source now mirrors that more narrowly by mapping the side effect onto pending-send-queue cleanup on
   `CMessageConnection`, rather than inventing a new stand-alone helper object model
 - worker teardown is also being tightened in the same area:
@@ -1597,7 +1597,7 @@ Important limitation:
     - `LauncherObject_Subobject60_Slot0(...)` no longer calls a mediator polling helper directly
     - arg5 helper `+0x60` slot `0` now resolves the sidecar `CLTThreadPerClientTCPEngine` and calls an engine-owned `PumpLauncherConnectionsFromArg5HelperScaffold()` helper
     - the queue push shaped after original `0x436820` and the synthetic launcher-bridge work-item allocation now also live on the liblttcp engine side rather than in `loginmediator.cpp` or the ABI shell
-    - `CLTLoginMediator` still owns only the queued context callback surface and the narrow auth/margin begin wrappers that seed those contexts into the engine
+    - `CLTLoginMediator` still owns only the narrow auth/margin begin wrappers that seed direct connection objects into the engine
 - they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders
 
 New practical rerun result after that partial wiring:

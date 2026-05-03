@@ -286,14 +286,13 @@ private:
 
 class CBaseConnection_0x4b8018;
 
-// Recovered queued-connection raw slot contract consumed by launcher.exe/client.dll queue
-// consumers (`0x436b10`, `client.dll:0x62531c10`):
-// - `vtable[1]` / slot `+0x04` = optional queued-context auto-release entry used only by type-1
-//   close work
+// Recovered raw connection-object slot contract consumed by launcher.exe/client.dll completion
+// queue consumers (`0x436b10`, `client.dll:0x62531c10`):
+// - `vtable[1]` / slot `+0x04` = optional type-1 auto-release entry
 // - `vtable[4]` / slot `+0x10` = `OnOperationCompleted(void*)`
 // So the native connection-family vtable must include a dedicated slot-1 release shim ahead of
 // `UsesTcpConnectionVtableShape/Close/OnOperationCompleted`.
-struct CBaseConnection_QueuedContextAbi {
+struct CBaseConnection_RawDispatchAbi {
     static constexpr size_t kReleaseSlotIndex = 1;
     static constexpr size_t kOnOperationCompletedSlotIndex = 4;
 };
@@ -303,7 +302,7 @@ struct CBaseConnection_QueuedContextAbi {
 uint32_t QueuedWorkItem_InvokeReleaseSlot(void* object);
 
 // Source-owned abstraction over the recovered connection family.
-// Recovered queued-context raw ABI now needs one extra native virtual ahead of the old source
+// Recovered raw client-facing ABI now needs one extra native virtual ahead of the old source
 // layout so cross-module consumers see:
 // - slot `+0x04` = `QueueRelease()`
 // - slot `+0x08` = `UsesTcpConnectionVtableShape()`
@@ -315,7 +314,7 @@ class CBaseConnection_0x4b8018 {
  public:
   virtual ~CBaseConnection_0x4b8018() = default;
 
-  // UNANCHORED: native queued-context release shim needed so raw client-facing queue consumers see
+  // UNANCHORED: native release shim needed so raw client-facing queue consumers see
   // `OnOperationCompleted` at slot `+0x10` (`vtable[4]`) on the real object instead of on a
   // launcher-owned scaffold.
   virtual uint32_t QueueRelease() { return 1u; }
@@ -350,8 +349,8 @@ class CBaseConnection_0x4b8018 {
     autoReleaseFlag04_ = autoReleaseFlag;
   }
 
-  // UNANCHORED: queued client-facing consumers now receive the native connection object directly.
-  void* QueueContext() { return this; }
+  // UNANCHORED: client-facing completion consumers receive the native connection object directly.
+  void* RawDispatchObject() { return this; }
 
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {

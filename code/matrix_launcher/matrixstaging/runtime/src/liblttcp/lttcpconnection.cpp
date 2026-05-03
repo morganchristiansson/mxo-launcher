@@ -418,7 +418,7 @@ void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
-// UNANCHORED: source-owned ABI-dispatch wrapper for generic queued work-item slot-`+0x04`
+// UNANCHORED: source-owned ABI-dispatch wrapper for generic work-item slot-`+0x04`
 // release calls.
 uint32_t QueuedWorkItem_InvokeReleaseSlot(void* object) {
     if (!object) {
@@ -426,13 +426,13 @@ uint32_t QueuedWorkItem_InvokeReleaseSlot(void* object) {
     }
 
     void** vtable = *reinterpret_cast<void***>(object);
-    if (!vtable || !vtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]) {
+    if (!vtable || !vtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]) {
         return 0u;
     }
 
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
     ReleaseFn fn = reinterpret_cast<ReleaseFn>(
-        vtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]);
+        vtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]);
     return fn(object);
 }
 
@@ -695,7 +695,7 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
         if (engine) {
             engine->EnqueueCompletedOperation(
                 completedPacketWorkItem,
-                QueueContext(),
+                RawDispatchObject(),
                 /*useQueue34=*/false,
                 "CLTTCPConnection::OnReceive");
         }

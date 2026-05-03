@@ -53,13 +53,13 @@ static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
 static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
-static void LogQueuedContextForensics(
+static void LogConnectionDispatchForensics(
     const char* label,
-    void* context,
+    void* connectionObject,
     void* workItem,
     uint32_t workType) {
     static uint32_t s_logCount = 0u;
-    if (!context) {
+    if (!connectionObject) {
         return;
     }
 
@@ -68,16 +68,16 @@ static void LogQueuedContextForensics(
         return;
     }
 
-    CBaseConnection_0x4b8018* queueContext = static_cast<CBaseConnection_0x4b8018*>(context);
-    void** contextVtable = *reinterpret_cast<void***>(context);
+    CBaseConnection_0x4b8018* connection = static_cast<CBaseConnection_0x4b8018*>(connectionObject);
+    void** connectionVtable = *reinterpret_cast<void***>(connectionObject);
     spdlog::debug(
-        "queued-context forensic label={} context={} contextVtable={} slot1={} slot4={} autoReleaseByte={} workItem={} workType=0x{:08x} [count=0x{:08x}]",
-        label ? label : "queued-context",
-        fmt::ptr(context),
-        fmt::ptr(contextVtable),
-        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex] : nullptr),
-        fmt::ptr(contextVtable ? contextVtable[CBaseConnection_QueuedContextAbi::kOnOperationCompletedSlotIndex] : nullptr),
-        static_cast<unsigned>(queueContext->AutoReleaseFlag04()),
+        "connection-dispatch forensic label={} object={} vtable={} slot1={} slot4={} autoReleaseByte={} workItem={} workType=0x{:08x} [count=0x{:08x}]",
+        label ? label : "connection-dispatch",
+        fmt::ptr(connectionObject),
+        fmt::ptr(connectionVtable),
+        fmt::ptr(connectionVtable ? connectionVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex] : nullptr),
+        fmt::ptr(connectionVtable ? connectionVtable[CBaseConnection_RawDispatchAbi::kOnOperationCompletedSlotIndex] : nullptr),
+        static_cast<unsigned>(connection->AutoReleaseFlag04()),
         fmt::ptr(workItem),
         workType,
         s_logCount);
@@ -1284,7 +1284,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
             }
             engine->EnqueueCompletedOperation(
                 statusWorkItem,
-                connection->QueueContext(),
+                connection->RawDispatchObject(),
                 /*useQueue34=*/false,
                 connectStatusLabel);
             connectStatusQueued = true;
@@ -1307,7 +1307,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
         }
         engine->EnqueueCompletedOperation(
             closeWorkItem,
-            connection->QueueContext(),
+            connection->RawDispatchObject(),
             /*useQueue34=*/false,
             closeStatusLabel);
         closeQueued = true;
@@ -2226,7 +2226,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         return 0u;
     }
 
-    void* queuedConnectionContext = connection->QueueContext();
+    void* connectionDispatchObject = connection->RawDispatchObject();
     const LTTCPEndpointKey_0x44b070& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
@@ -2242,7 +2242,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 kConnectRejectedNotClosedPayload);
         (void)EnqueueCompletedOperation(
             connectionStatusWorkItem,
-            queuedConnectionContext,
+            connectionDispatchObject,
             /*useQueue34=*/false,
             "connect:not-closed");
         return 0u;
@@ -2269,7 +2269,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 kConnectImmediateFailurePayload);
         (void)EnqueueCompletedOperation(
             connectionStatusWorkItem,
-            queuedConnectionContext,
+            connectionDispatchObject,
             /*useQueue34=*/false,
             "connect:socket-failed");
         return 0u;
@@ -2302,7 +2302,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                 kConnectImmediateFailurePayload);
         (void)EnqueueCompletedOperation(
             connectionStatusWorkItem,
-            queuedConnectionContext,
+            connectionDispatchObject,
             /*useQueue34=*/false,
             "connect:bind-failed");
         return 0u;
@@ -2336,7 +2336,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                     CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_Allocate());
             (void)EnqueueCompletedOperation(
                 closeWorkItem,
-                queuedConnectionContext,
+                connectionDispatchObject,
                 /*useQueue34=*/false,
                 "connect:immediate-close");
 
@@ -2346,7 +2346,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
                     kConnectImmediateFailurePayload);
             (void)EnqueueCompletedOperation(
                 connectionStatusWorkItem,
-                queuedConnectionContext,
+                connectionDispatchObject,
                 /*useQueue34=*/false,
                 "connect:immediate-status");
             return 0u;
@@ -2585,9 +2585,9 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     // - this keeps new auth-connect worker creation from blocking on the same lock during retry
     (void)EnterCleanupLockHelper();
 
-    CBaseConnection_0x4b8018* queuedConnectionOwner =
+    CBaseConnection_0x4b8018* connection =
         static_cast<CBaseConnection_0x4b8018*>(contextKey);
-    void* cleanupContextKey = static_cast<void*>(queuedConnectionOwner);
+    void* cleanupContextKey = static_cast<void*>(connection);
     bool touchedConnectionState = false;
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> workerPayload;
@@ -2887,11 +2887,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
 
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
-        CBaseConnection_0x4b8018* queuedConnectionOwner =
+        CBaseConnection_0x4b8018* connection =
             static_cast<CBaseConnection_0x4b8018*>(context);
-        const bool shouldAutoReleaseContext =
-            isType1 && queuedConnectionOwner != nullptr &&
-            (queuedConnectionOwner->AutoReleaseFlag04() != 0u);
+        const bool shouldAutoReleaseConnection =
+            isType1 && connection != nullptr &&
+            (connection->AutoReleaseFlag04() != 0u);
 
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
@@ -2899,29 +2899,29 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),
-            shouldAutoReleaseContext ? 1u : 0u);
-        LogQueuedContextForensics(
+            shouldAutoReleaseConnection ? 1u : 0u);
+        LogConnectionDispatchForensics(
             "RunCompletedOperationQueue",
             context,
             workItem,
             workType);
 
-        if (queuedConnectionOwner && isType1) {
-            CleanupConnection(queuedConnectionOwner);
+        if (connection && isType1) {
+            CleanupConnection(connection);
         }
 
-        if (queuedConnectionOwner) {
-            (void)queuedConnectionOwner->OnOperationCompleted(workItem);
+        if (connection) {
+            (void)connection->OnOperationCompleted(workItem);
         }
 
-        if (shouldAutoReleaseContext) {
+        if (shouldAutoReleaseConnection) {
             typedef uint32_t (__thiscall *ReleaseFn)(void*);
-            void** releaseVtable = *reinterpret_cast<void***>(queuedConnectionOwner);
-            ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]
+            void** releaseVtable = *reinterpret_cast<void***>(connection);
+            ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]
                 ? reinterpret_cast<ReleaseFn>(
-                      releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex])
+                      releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex])
                 : nullptr;
-            (void)(releaseFn ? releaseFn(queuedConnectionOwner) : 0u);
+            (void)(releaseFn ? releaseFn(connection) : 0u);
         }
         (void)QueuedWorkItem_InvokeReleaseSlot(workItem);
     }
@@ -2939,30 +2939,30 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopQueueThreads() {
             void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
             if (workItem != nullptr && context != nullptr) {
                 const uint32_t workType = QueueWorkItem_GetType(workItem);
-                CBaseConnection_0x4b8018* queuedConnectionOwner =
+                CBaseConnection_0x4b8018* connection =
                     static_cast<CBaseConnection_0x4b8018*>(context);
-                LogQueuedContextForensics(
+                LogConnectionDispatchForensics(
                     "StopQueueThreads",
                     context,
                     workItem,
                     workType);
-                if (workType == kWorkTypeClose && queuedConnectionOwner) {
-                    CleanupConnection(queuedConnectionOwner);
+                if (workType == kWorkTypeClose && connection) {
+                    CleanupConnection(connection);
                 }
-                if (queuedConnectionOwner) {
-                    (void)queuedConnectionOwner->OnOperationCompleted(workItem);
+                if (connection) {
+                    (void)connection->OnOperationCompleted(workItem);
                 }
-                const bool shouldAutoReleaseContext =
-                    workType == kWorkTypeClose && queuedConnectionOwner != nullptr &&
-                    (queuedConnectionOwner->AutoReleaseFlag04() != 0u);
-                if (shouldAutoReleaseContext) {
+                const bool shouldAutoReleaseConnection =
+                    workType == kWorkTypeClose && connection != nullptr &&
+                    (connection->AutoReleaseFlag04() != 0u);
+                if (shouldAutoReleaseConnection) {
                     typedef uint32_t (__thiscall *ReleaseFn)(void*);
-                    void** releaseVtable = *reinterpret_cast<void***>(queuedConnectionOwner);
-                    ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex]
+                    void** releaseVtable = *reinterpret_cast<void***>(connection);
+                    ReleaseFn releaseFn = releaseVtable && releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex]
                         ? reinterpret_cast<ReleaseFn>(
-                              releaseVtable[CBaseConnection_QueuedContextAbi::kReleaseSlotIndex])
+                              releaseVtable[CBaseConnection_RawDispatchAbi::kReleaseSlotIndex])
                         : nullptr;
-                    (void)(releaseFn ? releaseFn(queuedConnectionOwner) : 0u);
+                    (void)(releaseFn ? releaseFn(connection) : 0u);
                 }
                 (void)QueuedWorkItem_InvokeReleaseSlot(workItem);
             }

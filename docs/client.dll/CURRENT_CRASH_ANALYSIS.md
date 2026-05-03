@@ -109,17 +109,13 @@ Current best read:
 
 ## Practical consequence
 
-The earlier A/B note on the producer-side queue-context correction from commit `ab28b26` is now
+The earlier A/B note on the producer-side direct-object correction from commit `ab28b26` is now
 superseded:
-- user confirmation now pins `ab28b26` itself as the regression point for the late launcher-into-
-  game instability family
-- the last commit before `ab28b26` is currently confirmed good, while `ab28b26` and descendants on
-  that path show intermittent `std::bad_alloc`, shader corruption, and crash behavior after
-  successful game entry
-- source is therefore being rolled back from the higher-fidelity/original-backed direct-connection
-  queue context to the older source-owned queue-context bridge on parsed-packet / status / close
-  producers until the remaining direct-`context=this` ABI/layout gaps are recovered
-- newer queue-hardening on top of that rollback now also removes the source-owned immediate drain of
+- the later focused ABI pass recovered the missing raw vftable slot layout requirement instead of
+  rolling back to any bridge object
+- source now keeps the original-backed direct `context=this` producer behavior on parsed-packet /
+  status / close producers
+- newer queue-hardening on top of that direct-object fix also removes the source-owned immediate drain of
   queued type `1/2/3` work items on the producer thread
   - the replacement again leaves those completions for the normal queue-consumer path instead of
     synchronously re-entering auth/margin completion logic from the worker/connect thread
