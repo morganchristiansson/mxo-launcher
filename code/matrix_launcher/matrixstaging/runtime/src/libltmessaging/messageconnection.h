@@ -518,10 +518,12 @@ public:
  */
 class Packet_CertChallenge_0x4b6538 : public Packet_0x4af2a4 {
 public:
-    // Additional field for challenge response extraction (follows base class fields)
-    // packetPayloadPtr points to payload for extracting SessionKey/Secret bytes
-    // at offsets +0x11/+0x15/+0x19/+0x1d for response packet construction
-    uint8_t* packetPayloadPtr = nullptr;  // +0x28 (after base's worldId24 at +0x24)
+    // Proven constructor layout from `0x441920`:
+    // - no child-only tail field is written
+    // - ctor stores the effective payload pointer into inherited `payloadAlias10` at `+0x10`
+    // - `param_2 == 0` then grows 0x21 bytes and writes opcode 0x00 through that inherited pointer
+    // Therefore this concrete builder reuses the shared `Packet_0x4af2a4` storage rather than
+    // appending a separate `packetPayloadPtr` member.
 
     // anchor: launcher.exe:0x443aa0 / vtable slot 0 (inherited destructor)
     ~Packet_CertChallenge_0x4b6538() override = default;
@@ -558,9 +560,8 @@ public:
     void InitializePayloadSize() override {
         if (messageRef08 && messageRef08->messageStorage0c) {
             messageRef08->messageStorage0c->ResetPayloadByteCount(0x21);
-            packetPayloadPtr = static_cast<uint8_t*>(payloadAlias10);
-            if (packetPayloadPtr) {
-                *packetPayloadPtr = 0x00;  // Opcode byte
+            if (payloadAlias10) {
+                *static_cast<uint8_t*>(payloadAlias10) = 0x00;  // Opcode byte
             }
         }
     }
@@ -589,11 +590,10 @@ public:
 
 };
 
-// Proven size after tightening the shared Packet_0x4af2a4 ABI back to its launcher.exe raw 0x1c-byte base:
-// - base `Packet_0x4af2a4` = 0x1c bytes
-// - derived `packetPayloadPtr` tail = +0x1c..+0x1f
-// => `Packet_CertChallenge_0x4b6538` = 0x20 bytes in source ABI
-static_assert(sizeof(Packet_CertChallenge_0x4b6538) == 0x20,
+// Constructor `0x441920` only writes inherited slots through `+0x18`; the effective packet-body
+// pointer is stored in inherited `payloadAlias10` (`+0x10`), not in a child tail member.
+// So this concrete builder remains base-sized.
+static_assert(sizeof(Packet_CertChallenge_0x4b6538) == 0x1c,
               "Packet_CertChallenge_0x4b6538 size mismatch");
 
 // Default constructor is inherited from base Packet_0x4af2a4 (anchor: launcher.exe:0x439840)
@@ -609,21 +609,35 @@ static_assert(sizeof(Packet_CertChallenge_0x4b6538) == 0x20,
 inline Packet_CertChallenge_0x4b6538::Packet_CertChallenge_0x4b6538(
     CMessageConnectionMessageRef_0x4ba23c* messageRef,
     uint8_t flag) {
-    (void)flag;  // Flag affects offset calculation in original
     messageRef08 = messageRef;
+    if (messageRef08) {
+        messageRef08->AddRef();
+    }
 
-    if (messageRef && messageRef->messageStorage0c) {
-        const uint8_t* payload = messageRef->messageStorage0c->payloadBytes0c.data();
-        // Simple offset: packetPayloadPtr points to payload base
-        // For full fidelity, would use lookup table per original decompile
-        payloadPtr04 = reinterpret_cast<uint32_t>(payload);
-        packetPayloadPtr = const_cast<uint8_t*>(payload);
+    if (messageRef08 && messageRef08->messageStorage0c) {
+        uint8_t* payloadBase = messageRef08->messageStorage0c->PayloadBase();
+        if (!messageRef08->headerless10) {
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase);
+        } else {
+            const uint8_t descriptor = *(payloadBase + 1);
+            payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase) +
+                g_MessageOffsetLookupTable[(descriptor >> 4) & 7] +
+                g_MessageOffsetLookupTable[descriptor & 7] + 0x12u;
+            messageRef08->headerless10 = 1u;
+        }
     } else {
-        payloadPtr04 = 0;
-        packetPayloadPtr = nullptr;
+        payloadPtr04 = 0u;
     }
 
     createRefParam0c = flag;
+    payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+
+    if (flag == 0 && messageRef08) {
+        messageRef08->GrowPayloadByteCount(0x21u);
+        if (payloadAlias10) {
+            *static_cast<uint8_t*>(payloadAlias10) = 0u;
+        }
+    }
 }
 
 // anchor: launcher.exe:0x443aa0 -> PacketBuilder_CertChallengeResponse_Dtor (shared dtor)
@@ -632,7 +646,8 @@ inline Packet_CertChallenge_0x4b6538::Packet_CertChallenge_0x4b6538(
     const std::array<uint8_t, 16>& decryptedBytes) {
     // Not used in main flow - the messageRef constructor is used instead
     (void)decryptedBytes;
-    packetPayloadPtr = nullptr;
+    payloadPtr04 = 0u;
+    payloadAlias10 = nullptr;
 }
 
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");

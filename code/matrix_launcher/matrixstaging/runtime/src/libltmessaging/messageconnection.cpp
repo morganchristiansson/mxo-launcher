@@ -3279,16 +3279,17 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[2] : 0,
         localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[3] : 0);
 
-    spdlog::debug("HandleCode2ForBootstrap: envelope.packetPayloadPtr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
-        reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr),
-        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[0] : 0,
-        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[1] : 0,
-        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[2] : 0,
-        envelope.packetPayloadPtr ? envelope.packetPayloadPtr[3] : 0);
+    uint8_t* const envelopePayload = static_cast<uint8_t*>(envelope.payloadAlias10);
+    spdlog::debug("HandleCode2ForBootstrap: envelope.payloadAlias10={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
+        reinterpret_cast<uintptr_t>(envelopePayload),
+        envelopePayload ? envelopePayload[0] : 0,
+        envelopePayload ? envelopePayload[1] : 0,
+        envelopePayload ? envelopePayload[2] : 0,
+        envelopePayload ? envelopePayload[3] : 0);
 
     // anchor: launcher.exe:0x442ac6-0x442ae0 -> Extract seed bytes inline to this+0x85/0x89/0x8d/0x91
     // Original disassembly:
-    //   0x442ac6: MOV EDX,dword ptr [EDI + 0x1]  ; EDI = envelope.packetPayloadPtr
+    //   0x442ac6: MOV EDX,dword ptr [EDI + 0x1]  ; EDI = envelope.payloadAlias10
     //   0x442acf: MOV dword ptr [ECX],EDX        ; ECX = this+0x85
     //   0x442ad1: MOV EAX,dword ptr [EDI + 0x5]
     //   0x442ad4: MOV dword ptr [ECX + 0x4],EAX
@@ -3297,32 +3298,32 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442add: MOV EAX,dword ptr [EDI + 0xd]
     //   0x442ae0: MOV dword ptr [ECX + 0xc],EAX
     // FIDELITY: No ExtractChallengeBytes() helper - all inline dword copies
-    // The original extracts from envelope.packetPayloadPtr at offsets 1-16
-    if (envelope.packetPayloadPtr) {
+    // The original extracts from envelope.payloadAlias10 at offsets 1-16
+    if (envelopePayload) {
         // FIDELITY VERIFICATION: Log source bytes before extraction
-        spdlog::debug("HandleCode2ForBootstrap: seed extraction source envelope.packetPayloadPtr[0-20]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            envelope.packetPayloadPtr[0], envelope.packetPayloadPtr[1], envelope.packetPayloadPtr[2], envelope.packetPayloadPtr[3],
-            envelope.packetPayloadPtr[4], envelope.packetPayloadPtr[5], envelope.packetPayloadPtr[6], envelope.packetPayloadPtr[7],
-            envelope.packetPayloadPtr[8], envelope.packetPayloadPtr[9], envelope.packetPayloadPtr[10], envelope.packetPayloadPtr[11],
-            envelope.packetPayloadPtr[12], envelope.packetPayloadPtr[13], envelope.packetPayloadPtr[14], envelope.packetPayloadPtr[15],
-            envelope.packetPayloadPtr[16], envelope.packetPayloadPtr[17], envelope.packetPayloadPtr[18], envelope.packetPayloadPtr[19]);
+        spdlog::debug("HandleCode2ForBootstrap: seed extraction source envelope.payloadAlias10[0-20]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            envelopePayload[0], envelopePayload[1], envelopePayload[2], envelopePayload[3],
+            envelopePayload[4], envelopePayload[5], envelopePayload[6], envelopePayload[7],
+            envelopePayload[8], envelopePayload[9], envelopePayload[10], envelopePayload[11],
+            envelopePayload[12], envelopePayload[13], envelopePayload[14], envelopePayload[15],
+            envelopePayload[16], envelopePayload[17], envelopePayload[18], envelopePayload[19]);
 
-        messageCode5SeedBytes85_[0] = envelope.packetPayloadPtr[1];
-        messageCode5SeedBytes85_[1] = envelope.packetPayloadPtr[2];
-        messageCode5SeedBytes85_[2] = envelope.packetPayloadPtr[3];
-        messageCode5SeedBytes85_[3] = envelope.packetPayloadPtr[4];
-        messageCode5SeedBytes85_[4] = envelope.packetPayloadPtr[5];
-        messageCode5SeedBytes85_[5] = envelope.packetPayloadPtr[6];
-        messageCode5SeedBytes85_[6] = envelope.packetPayloadPtr[7];
-        messageCode5SeedBytes85_[7] = envelope.packetPayloadPtr[8];
-        messageCode5SeedBytes85_[8] = envelope.packetPayloadPtr[9];
-        messageCode5SeedBytes85_[9] = envelope.packetPayloadPtr[10];
-        messageCode5SeedBytes85_[10] = envelope.packetPayloadPtr[11];
-        messageCode5SeedBytes85_[11] = envelope.packetPayloadPtr[12];
-        messageCode5SeedBytes85_[12] = envelope.packetPayloadPtr[13];
-        messageCode5SeedBytes85_[13] = envelope.packetPayloadPtr[14];
-        messageCode5SeedBytes85_[14] = envelope.packetPayloadPtr[15];
-        messageCode5SeedBytes85_[15] = envelope.packetPayloadPtr[16];
+        messageCode5SeedBytes85_[0] = envelopePayload[1];
+        messageCode5SeedBytes85_[1] = envelopePayload[2];
+        messageCode5SeedBytes85_[2] = envelopePayload[3];
+        messageCode5SeedBytes85_[3] = envelopePayload[4];
+        messageCode5SeedBytes85_[4] = envelopePayload[5];
+        messageCode5SeedBytes85_[5] = envelopePayload[6];
+        messageCode5SeedBytes85_[6] = envelopePayload[7];
+        messageCode5SeedBytes85_[7] = envelopePayload[8];
+        messageCode5SeedBytes85_[8] = envelopePayload[9];
+        messageCode5SeedBytes85_[9] = envelopePayload[10];
+        messageCode5SeedBytes85_[10] = envelopePayload[11];
+        messageCode5SeedBytes85_[11] = envelopePayload[12];
+        messageCode5SeedBytes85_[12] = envelopePayload[13];
+        messageCode5SeedBytes85_[13] = envelopePayload[14];
+        messageCode5SeedBytes85_[14] = envelopePayload[15];
+        messageCode5SeedBytes85_[15] = envelopePayload[16];
 
         // FIDELITY: Log extracted seed bytes (will be used for this+0x85, 0x89, 0x8d, 0x91)
         spdlog::info("HandleCode2ForBootstrap: extracted seed bytes for this+0x85 [0-15]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
@@ -3376,7 +3377,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   0x442b0f: MOV EAX,dword ptr [EBP + -0x10]  ; EAX = responseEnvelope.packetPayloadPtr
     //   0x442b12: MOV byte ptr [EAX],0x3           ; frame byte = 3
     //   0x442b15: MOV ECX,dword ptr [EBP + -0x10]  ; ECX = responsePayload base
-    //   0x442b18: ADD EDI,0x11                      ; EDI = seedEnvelope.packetPayloadPtr + 0x11
+    //   0x442b18: ADD EDI,0x11                      ; EDI = seedEnvelope.payloadAlias10 + 0x11
     //   0x442b1b: MOV EDX,dword ptr [EDI]          ; first dword from seed+0x11
     //   0x442b1d: INC ECX                           ; ECX = responsePayload + 1
     //   0x442b1e: MOV dword ptr [ECX],EDX          ; copy to response+1
@@ -3391,17 +3392,17 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // Note: The 2-byte Protocol/Opcode field at offset 1 is NOT present in this packet type.
     // The challenge data starts immediately at offset 1, matching the original binary.
     uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
-    if (envelope.packetPayloadPtr && responsePayload) {
+    if (envelopePayload && responsePayload) {
         responsePayload[0] = 0x03;  // frame byte
-        // Copy 16 bytes (4 dwords) from envelope.packetPayloadPtr+0x11/0x15/0x19/0x1d
+        // Copy 16 bytes (4 dwords) from envelope.payloadAlias10+0x11/0x15/0x19/0x1d
         // to responsePayload+1/5/9/0xd (immediately after frame byte, NO 2-byte opcode field)
-        *reinterpret_cast<uint32_t*>(responsePayload + 1) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x11);
-        *reinterpret_cast<uint32_t*>(responsePayload + 5) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x15);
-        *reinterpret_cast<uint32_t*>(responsePayload + 9) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x19);
-        *reinterpret_cast<uint32_t*>(responsePayload + 13) = *reinterpret_cast<const uint32_t*>(envelope.packetPayloadPtr + 0x1d);
+        *reinterpret_cast<uint32_t*>(responsePayload + 1) = *reinterpret_cast<const uint32_t*>(envelopePayload + 0x11);
+        *reinterpret_cast<uint32_t*>(responsePayload + 5) = *reinterpret_cast<const uint32_t*>(envelopePayload + 0x15);
+        *reinterpret_cast<uint32_t*>(responsePayload + 9) = *reinterpret_cast<const uint32_t*>(envelopePayload + 0x19);
+        *reinterpret_cast<uint32_t*>(responsePayload + 13) = *reinterpret_cast<const uint32_t*>(envelopePayload + 0x1d);
         responseMessageRef->GrowPayloadByteCount(17);  // 1 frame + 16 response bytes = 0x11
     } else {
-        spdlog::warn("HandleCode2ForBootstrap: missing envelope.packetPayloadPtr or responsePayload for response packet");
+        spdlog::warn("HandleCode2ForBootstrap: missing envelope.payloadAlias10 or responsePayload for response packet");
         return 0u;
     }
 
