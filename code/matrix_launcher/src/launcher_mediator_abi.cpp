@@ -788,40 +788,18 @@ static void* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* s
     return const_cast<std::vector<std::vector<char>>*>(&mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470());
 }
 
-// anchor: launcher.exe:0x41c1f0 / arg6 vtable +0xec
-// Thin ABI thunk only: preserve the wrapper-facing entry/return shape, but let the owner-side
-// body own the full state3(wait)->state8 transition logic directly.
-extern "C" void Mediator_PersistSelectionContextForState8_Impl(
-    MinimalLoginMediatorStub* self,
-    void* selectionContext,
-    void* returnAddress) {
-  (void)self;
-  (void)returnAddress;
-
-  if (selectionContext == nullptr) {
-    return;
-  }
-
-  (void)mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->PersistSelectionContextForState8(
-      *static_cast<const mxo::ltlogin::State3SelectionContextInputSketch*>(selectionContext));
-}
-
 // anchor: client.dll:0x62170f48 consumes the assembled 0xb4 selection/config handoff through arg6 +0xec
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xec
-__attribute__((naked)) static void Mediator_PersistSelectionContextForState8() {
-  __asm__ volatile(
-      "mov 4(%%esp), %%eax\n\t"
-      "mov 0(%%esp), %%edx\n\t"
-      "push %%edx\n\t"
-      "push %%eax\n\t"
-      "push %%ecx\n\t"
-      "mov %0, %%eax\n\t"
-      "call *%%eax\n\t"
-      "add $12, %%esp\n\t"
-      "ret $4\n\t"
-      :
-      : "i"(Mediator_PersistSelectionContextForState8_Impl)
-      : "eax", "edx");
+// Direction-A attempt: plain wrapper-facing member-call shape with direct owner forwarding.
+static uint32_t __thiscall Mediator_PersistSelectionContextForState8(
+    MinimalLoginMediatorStub* self,
+    void* selectionContext) {
+  (void)self;
+  if (selectionContext == nullptr) {
+    return 0u;
+  }
+  return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->PersistSelectionContextForState8(
+      *static_cast<const mxo::ltlogin::State3SelectionContextInputSketch*>(selectionContext));
 }
 
 // anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
