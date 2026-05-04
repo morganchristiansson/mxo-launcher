@@ -677,31 +677,6 @@ public:
     const uint8_t* sectionData = nullptr;
 
 private:
-
-    uint8_t* messageBase04() const {
-        return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(payloadPtr04));
-    }
-
-    void setMessageBase04(uint8_t* messageBase) {
-        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(messageBase));
-    }
-
-    uint8_t* currentMessage10() const {
-        return static_cast<uint8_t*>(payloadAlias10);
-    }
-
-    void setCurrentMessage10(uint8_t* currentMessage) {
-        payloadAlias10 = currentMessage;
-    }
-
-    const uint8_t* dataSectionBytes14() const {
-        return reinterpret_cast<const uint8_t*>(debugString14);
-    }
-
-    void setDataSectionBytes14(const uint8_t* dataSectionBytes) {
-        debugString14 = reinterpret_cast<const char*>(dataSectionBytes);
-    }
-
 };
 
 }  // namespace mxo::ltlogin

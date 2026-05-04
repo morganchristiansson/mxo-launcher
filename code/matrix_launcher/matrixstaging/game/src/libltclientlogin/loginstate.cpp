@@ -325,58 +325,61 @@ Packet_MsLoadCharacterReply_0x4b542c::Packet_MsLoadCharacterReply_0x4b542c(
     }
 
     if (incomingMessageRef != nullptr && incomingMessageRef->headerless10 == 0) {
-        setMessageBase04(incomingMessageRef->messageStorage0c
-            ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
-            : nullptr);
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+            incomingMessageRef->messageStorage0c
+                ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
+                : nullptr));
     } else if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c != nullptr) {
         uint8_t* const payloadBase = incomingMessageRef->messageStorage0c->payloadBytes0c.data();
         const uint8_t encodedHeaderByte = payloadBase[0x01u];
         const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
         const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
-        setMessageBase04(payloadBase + lookupHigh + lookupLow + 0x12u);
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadBase + lookupHigh + lookupLow + 0x12u));
         incomingMessageRef->headerless10 = 1;
     } else {
-        setMessageBase04(nullptr);
+        payloadPtr04 = 0u;
     }
 
     RefreshDataSectionView(initializeEmptyReply);
     if (initializeEmptyReply == '\0') {
-        currentMessage10()[0x00] = 0x10u;
-        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x01u) = 0u;
-        *reinterpret_cast<uint32_t*>(currentMessage10() + 0x05u) = 0u;
-        *reinterpret_cast<uint16_t*>(currentMessage10() + 0x09u) = 0u;
-        currentMessage10()[0x0b] = 1u;
-        currentMessage10()[0x0c] = 0u;
-        currentMessage10()[0x0d] = 0u;
-        *reinterpret_cast<uint16_t*>(currentMessage10() + 0x0eu) = 0u;
-        setDataSectionBytes14(nullptr);
+        uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+        currentMessage[0x00] = 0x10u;
+        *reinterpret_cast<uint32_t*>(currentMessage + 0x01u) = 0u;
+        *reinterpret_cast<uint32_t*>(currentMessage + 0x05u) = 0u;
+        *reinterpret_cast<uint16_t*>(currentMessage + 0x09u) = 0u;
+        currentMessage[0x0b] = 1u;
+        currentMessage[0x0c] = 0u;
+        currentMessage[0x0d] = 0u;
+        *reinterpret_cast<uint16_t*>(currentMessage + 0x0eu) = 0u;
+        debugString14 = nullptr;
         payloadSize18 = 0u;
     }
 
-    valid = currentMessage10() != nullptr;
+    valid = payloadAlias10 != nullptr;
     if (!valid) {
         return;
     }
-    if (currentMessage10()[0] != 0x10u) {
+    uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+    if (currentMessage[0] != 0x10u) {
         valid = false;
-        spdlog::debug("Packet_MsLoadCharacterReply: expected msgType=0x10 but got 0x{:02x}, will fallback to callback84", currentMessage10()[0]);
+        spdlog::debug("Packet_MsLoadCharacterReply: expected msgType=0x10 but got 0x{:02x}, will fallback to callback84", currentMessage[0]);
         return;
     }
 
-    status = ReadU32LE(currentMessage10() + 1u);
-    field05 = ReadU32LE(currentMessage10() + 5u);
-    handoffWord09 = ReadU16LE(currentMessage10() + 9u);
+    status = ReadU32LE(currentMessage + 1u);
+    field05 = ReadU32LE(currentMessage + 5u);
+    handoffWord09 = ReadU16LE(currentMessage + 9u);
     spdlog::debug("Packet_MsLoadCharacterReply parsed: msgType=0x{:02x} handoffWord=0x{:04x} bytes[8..15]=[0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x} 0x{:02x}]",
-        currentMessage10()[0],
+        currentMessage[0],
         handoffWord09,
-        currentMessage10()[8], currentMessage10()[9], currentMessage10()[10], currentMessage10()[11],
-        currentMessage10()[12], currentMessage10()[13], currentMessage10()[14], currentMessage10()[15]);
-    expectedSectionCount0b = currentMessage10()[0x0b];
-    shouldSeedExpectedSectionCount = (currentMessage10()[0x0c] == 0x01u);
-    sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage10()[0x0d] - 2u);
-    sectionOffset0e = ReadU16LE(currentMessage10() + 0x0eu);
+        currentMessage[8], currentMessage[9], currentMessage[10], currentMessage[11],
+        currentMessage[12], currentMessage[13], currentMessage[14], currentMessage[15]);
+    expectedSectionCount0b = currentMessage[0x0b];
+    shouldSeedExpectedSectionCount = (currentMessage[0x0c] == 0x01u);
+    sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage[0x0d] - 2u);
+    sectionOffset0e = ReadU16LE(currentMessage + 0x0eu);
     sectionByteCount = payloadSize18;
-    sectionData = dataSectionBytes14();
+    sectionData = reinterpret_cast<const uint8_t*>(debugString14);
 }
 
 // anchor: launcher.exe:0x43cca0 / vtable +0x08
@@ -395,21 +398,22 @@ void Packet_MsLoadCharacterReply_0x4b542c::InitializePayloadSize() {
 
 // anchor: launcher.exe:0x43ae00
 void Packet_MsLoadCharacterReply_0x4b542c::RefreshDataSectionView(char initializeEmptyReply) {
-    setCurrentMessage10(messageBase04());
+    payloadAlias10 = reinterpret_cast<void*>(static_cast<uintptr_t>(payloadPtr04));
     if (initializeEmptyReply == '\0') {
         messageRef08->GrowPayloadByteCount(0x10u);
         return;
     }
 
-    const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10() + 0x0eu);
+    uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+    const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage + 0x0eu);
     if (sectionOffset0eLocal != 0u) {
-        payloadSize18 = ReadU16LE(currentMessage10() + sectionOffset0eLocal);
-        setDataSectionBytes14(currentMessage10() + sectionOffset0eLocal + 2u);
+        payloadSize18 = ReadU16LE(currentMessage + sectionOffset0eLocal);
+        debugString14 = reinterpret_cast<const char*>(currentMessage + sectionOffset0eLocal + 2u);
         return;
     }
 
     payloadSize18 = 0u;
-    setDataSectionBytes14(nullptr);
+    debugString14 = nullptr;
 }
 
 // anchor: launcher.exe:0x43af20
@@ -419,12 +423,13 @@ void Packet_MsLoadCharacterReply_0x4b542c::ResetToDefaultMessage() {
         const uint8_t encodedHeaderByte = payloadBase[0x01u];
         const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
         const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
-        setMessageBase04(payloadBase + lookupHigh + lookupLow + 0x12u);
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadBase + lookupHigh + lookupLow + 0x12u));
     }
-    setCurrentMessage10(messageBase04());
-    currentMessage10()[0x00] = 0x10u;
-    currentMessage10()[0x0b] = 1u;
-    setDataSectionBytes14(nullptr);
+    payloadAlias10 = reinterpret_cast<void*>(static_cast<uintptr_t>(payloadPtr04));
+    uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
+    currentMessage[0x00] = 0x10u;
+    currentMessage[0x0b] = 1u;
+    debugString14 = nullptr;
     payloadSize18 = 0u;
 
     valid = true;
