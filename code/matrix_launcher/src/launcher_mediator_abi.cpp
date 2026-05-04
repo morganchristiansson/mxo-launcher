@@ -257,36 +257,14 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
 }
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
-// Thin the wrapper to the raw owner-side slot-record pointer.
-// Keep only the ABI thunk here: the body now forwards directly to the live arg6 owner-side
-// implementation and avoids extra wrapper-local logging/state shaping.
-extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
-    MinimalLoginMediatorStub* self,
-    uint32_t selectionIndex,
-    void* returnAddress) {
-    (void)self;
-    (void)returnAddress;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetAuthReplyPacketByIndex40(selectionIndex);
-}
-
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x40
-// This slot now takes the same thinning approach as +0x44: preserve the custom ABI entry, but
-// return the raw owner-side `0x004b5328` slot record instead of a wrapper sketch object.
-__attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
-    __asm__ volatile(
-        "mov (%%esp), %%edx\n\t"
-        "mov 4(%%esp), %%eax\n\t"
-        "push %%edx\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $12, %%esp\n\t"
-        "ret $4\n\t"
-        :
-        : "i"(Mediator_GetSelectionDescriptor40_Impl)
-        : "eax", "edx");
+// Direction-A attempt: plain wrapper-facing member-call shape with direct owner forwarding.
+static void* __thiscall Mediator_GetSelectionDescriptor40(
+    MinimalLoginMediatorStub* self,
+    uint32_t selectionIndex) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetAuthReplyPacketByIndex40(selectionIndex);
 }
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
