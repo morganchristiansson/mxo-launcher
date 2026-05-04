@@ -144,11 +144,10 @@ bool PreloadDependencies() {
 
 void LogKnownStartupState(const CLauncher& launcher) {
     const uint32_t packedArg7Selection = launcher.BuildPackedArg7Selection();
-    void* const initClientMediator = static_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default);
     spdlog::info(
-        "InitClientDLL startup state networkObject={} mediatorArg6={} arg7=0x{:08x} lastWorld='{}' initFlag=0x{:02x}",
+        "InitClientDLL startup state networkObject={} mediatorStub={} arg7=0x{:08x} lastWorld='{}' initFlag=0x{:02x}",
         fmt::ptr(g_pLauncherObject6304),
-        fmt::ptr(initClientMediator),
+        fmt::ptr(&g_LoginMediatorStub),
         packedArg7Selection,
         g_LastWorldName[0] ? g_LastWorldName : "<unavailable>",
         static_cast<unsigned>(g_LauncherInitClientFlagByte));
@@ -524,19 +523,15 @@ bool CLauncher::RunClientDllLifecycle() const {
     // - arg1/arg2 come from launcher globals `0x4d2c5c/0x4d2c60`, not from a helper object call
     // - arg8 is a byte global at `0x4d2c69` zero-extended through `EDX` before the push
     // Current replacement tightening:
-    // - arg6 now passes the live unwrapped `CLTLoginMediator` object through the historical
-    //   `ILTLoginMediator_0x4af2b8::Default` alias instead of the older detached ABI stub shell
-    // - remaining wrapper code in `src/launcher_mediator_abi.cpp` is retained for comparison /
-    //   fallback work, but this startup path now tests whether client.dll is happy with the raw
-    //   owner object directly
-    void* const initClientMediator = static_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default);
+    // - keep passing the wrapper-facing arg6 shell here because several high-risk slots still need
+    //   custom entry/return shims even when their bodies have been thinned to direct owner calls
     const int initResult = initClientDLL(
         g_LauncherFilteredArgCount,
         g_LauncherFilteredArgv,
         g_hClient,
         g_hCres,
         g_pLauncherObject6304,
-        initClientMediator,
+        &g_LoginMediatorStub,
         packedArg7Selection,
         g_LauncherInitClientFlagByte);
     spdlog::info("InitClientDLL returned: {}", initResult);

@@ -333,23 +333,15 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
 // Thin the wrapper to the raw owner-side slot-record pointer.
-// Like +0x44, keep only the ABI thunk and let the owner-side direct slot-index reader decide the
-// returned `Packet_AsAuthReply_0x4b5328*`.
+// Keep only the ABI thunk here: the body now forwards directly to the live arg6 owner-side
+// implementation and avoids extra wrapper-local logging/state shaping.
 extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     MinimalLoginMediatorStub* self,
     uint32_t selectionIndex,
     void* returnAddress) {
     (void)self;
     (void)returnAddress;
-    mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator) {
-        return nullptr;
-    }
-
-    return LogMediatorSelectionDescriptor40Result(
-        mediator->GetAuthReplyPacketByIndex40(selectionIndex),
-        selectionIndex,
-        mediator->GetDefaultSelectionIndex());
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetAuthReplyPacketByIndex40(selectionIndex);
 }
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
@@ -960,34 +952,15 @@ extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
     void* input120,
     void* returnAddress) {
     (void)self;
-
-    if (input120 == nullptr) {
-        spdlog::info(
-            "MediatorStub::ProcessCreateCharacterInput120 caller={} [{}] input=<null>",
-            fmt::ptr(returnAddress),
-            DescribeMediatorCaller(returnAddress));
-        return 1u;
-    }
+    (void)returnAddress;
 
     mxo::ltlogin::CLTLoginMediator* const mediator = mxo::ltlogin::g_CurrentLoginMediator;
-    if (mediator == nullptr) {
-        spdlog::info(
-            "MediatorStub::ProcessCreateCharacterInput120 caller={} [{}] activeMediator=<null>",
-            fmt::ptr(returnAddress),
-            DescribeMediatorCaller(returnAddress));
+    if (mediator == nullptr || input120 == nullptr) {
         return 1u;
     }
 
-    const auto& input = *static_cast<const mxo::ltlogin::ProcessCreateCharacterInput120Sketch*>(input120);
-    const uint32_t result = mediator->ProcessCreateCharacterInput120(input);
-    spdlog::info(
-        "MediatorStub::ProcessCreateCharacterInput120 caller={} [{}] activeMediator={} field12c=0x{:08x} result=0x{:08x}",
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
-        fmt::ptr(mediator),
-        static_cast<unsigned>(input.field24),
-        static_cast<unsigned>(result));
-    return result;
+    return mediator->ProcessCreateCharacterInput120(
+        *static_cast<const mxo::ltlogin::ProcessCreateCharacterInput120Sketch*>(input120));
 }
 
 // anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
@@ -1018,7 +991,8 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
     void* returnAddress) {
     (void)self;
     (void)returnAddress;
-    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+    mxo::ltlogin::CLTLoginMediator* const mediator = mxo::ltlogin::g_CurrentLoginMediator;
+    if (mediator != nullptr) {
         mediator->ProvideStartupTriple(pNetShell, pNetMgr, pDistrObjExecutive);
     }
 }
