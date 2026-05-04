@@ -659,11 +659,11 @@ uint32_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
 // - launcher crashreporter seeding calls both slots with no stack argument
 // - client `InitClientDLL` uses caller-clean wrappers and threads the previous return value
 //   through the next call
-// Keep the incoming value opaque here instead of forcing a false `const char*` semantic.
-// The recovered launcher implementation does not actually consume that token; it reads the
-// crash-reporter seed directly from the auth bootstrap child.
+// - launcher.exe `0x41f3a0/0x41f3c0` do not read that stack value at all
+// Keep the semantic class signature faithful to the real callee body and let the ABI wrapper own
+// any caller-shape adaptation.
 // anchor: launcher.exe:0x41f3a0 / vtable +0x5c
-const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValueToken) {
+const char* CLTLoginMediator::GetCrashReporterUsername5c() const {
     // Original body ignores caller state and returns:
     //   owner+0x680->authReplyCopyShadowF4(+0xf4)->field_0x85 when +0xf4 is non-null,
     //   otherwise a static fallback object at launcher.exe:this_004aafbb.
@@ -671,30 +671,25 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
     // pooled empty C-string in .rdata: code can pass it anywhere a non-null "" pointer is needed.
     // Source mirrors that role with a local static empty string instead of hardcoding an original
     // image address.
-    // The public ABI wrapper may still pass a caller-clean chained token on the client path; keep
-    // it only for diagnostics because launcher.exe:0x41f3a0 does not read a stack argument.
     static constexpr char kRdataEmptyStringMirror[] = "";
     const auto* copyShadow = authBootstrapChild680_->authReplyCopyShadowF4;
     const char* usernameSeed = copyShadow
                                    ? reinterpret_cast<const char*>(copyShadow->signedData80.data() + 0x5u)
                                    : kRdataEmptyStringMirror;
     spdlog::info(
-        "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c chainedValueToken={}) -> {} [source={}]",
-        fmt::ptr(chainedValueToken),
+        "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c) -> {} [source={}]",
         fmt::ptr(usernameSeed),
         copyShadow ? "owner+0x680+0xf4+0x85" : "local-mirror-of-g_rdataEmptyString");
     return usernameSeed;
 }
 
 // anchor: launcher.exe:0x41f3c0 / vtable +0x60
-const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
+const char* CLTLoginMediator::GetCrashReporterPassword60() const {
     // Exact tiny body: load owner `+0x680`, then return child `+0xf8` begin pointer.
-    // Keep the chained token for wrapper-signature compatibility only; the original body does not
-    // read it.
+    // The original callee body does not read a stack argument.
     const char* passwordSeed = authBootstrapChild680_->stringF8.c_str();
     spdlog::info(
-        "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {} [source={}]",
-        fmt::ptr(chainedValueToken),
+        "CLTLoginMediator::GetCrashReporterPassword60(+0x60) -> {} [source={}]",
         MaskedSensitiveValue(passwordSeed),
         "owner+0x680+0xf8.begin");
     return passwordSeed;

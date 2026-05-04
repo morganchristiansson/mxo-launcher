@@ -491,9 +491,17 @@ public:
     // +0x58
     virtual uint32_t GetCrashReporterPromptForSecurId58() const = 0;
     // +0x5c
-    virtual const char* GetCrashReporterUsername5c(const void* chainedValueToken) = 0;
+    // Fidelity correction from launcher.exe:0x41f3a0:
+    // - callee body reads only ECX, ignores stack arguments, and returns with plain RET
+    // - the earlier `chainedValueToken` parameter belonged to wrapper/callsite baggage, not to the
+    //   real semantic virtual signature
+    virtual const char* GetCrashReporterUsername5c() const = 0;
     // +0x60
-    virtual const char* GetCrashReporterPassword60(const void* chainedValueToken) = 0;
+    // Fidelity correction from launcher.exe:0x41f3c0:
+    // - callee body reads only ECX, ignores stack arguments, and returns with plain RET
+    // - the earlier `chainedValueToken` parameter belonged to wrapper/callsite baggage, not to the
+    //   real semantic virtual signature
+    virtual const char* GetCrashReporterPassword60() const = 0;
     // +0x64
     virtual uint32_t GetBootstrapSuccessHeaderDword64() const = 0;
     // +0x68

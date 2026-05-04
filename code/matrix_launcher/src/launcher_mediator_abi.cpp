@@ -30,11 +30,6 @@ const char* MaskedSensitiveValue(const char* value) {
     return "<provided>";
 }
 
-// UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
-mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
-    return mxo::ltlogin::g_CurrentLoginMediator;
-}
-
 bool IsProfilePathBuilderCaller(void* returnAddress) {
     const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
     return address >= 0x62195ff0u && address <= 0x62196121u;
@@ -94,16 +89,6 @@ static const char* DescribeLateMediatorAbiCaller(void* returnAddress) {
     return DescribeMediatorCaller(returnAddress);
 }
 
-struct LateMediatorAbiCallLogState {
-    void* caller = nullptr;
-    uint32_t selectionIndex = 0xffffffffu;
-    uint32_t result32 = 0xffffffffu;
-    void* resultPtr = nullptr;
-    std::string resultText;
-    bool valid = false;
-};
-
-
 static void DiagnosticLogPacketAbiValidationOnce() {
     static bool logged = false;
     if (logged) {
@@ -141,52 +126,6 @@ static void DiagnosticLogPacketAbiValidationOnce() {
     }
 }
 
-static mxo::ltlogin::Packet_AsAuthReply_0x4b5328* LogMediatorSelectionDescriptor40Result(
-    const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* currentSlotRecord,
-    uint32_t selectionIndex,
-    uint32_t defaultSelectionIndex) {
-    static uint32_t s_logCount = 0u;
-    const uint32_t low24 = selectionIndex & 0x00ffffffu;
-    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
-
-    if (!currentSlotRecord) {
-        if (++s_logCount <= 4u) {
-            spdlog::debug(
-                "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL [currentSlotIndex=0x{:02x}] [count=0x{:08x}]",
-                static_cast<unsigned>(selectionIndex),
-                static_cast<unsigned>(low24),
-                static_cast<unsigned>(high8),
-                static_cast<unsigned>(defaultSelectionIndex & 0xffu),
-                s_logCount);
-        }
-        return nullptr;
-    }
-
-    if (++s_logCount <= 4u) {
-        spdlog::debug(
-            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}'] [count=0x{:08x}]",
-            static_cast<unsigned>(selectionIndex),
-            fmt::ptr(currentSlotRecord),
-            static_cast<unsigned>(defaultSelectionIndex & 0xffu),
-            currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
-            s_logCount);
-    }
-    return const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
-}
-
-
-static const char* DescribeKnownMediatorObserver(void* observer) {
-    switch (reinterpret_cast<uintptr_t>(observer)) {
-        case 0x629ddfc8u:
-            return "ClientShell login-mediator observer";
-        case 0x6298a5e8u:
-            return "LoadingAreaCommonLayoutView forwarder";
-        case 0x6298a760u:
-            return "RsiLayoutsView forwarder";
-        default:
-            return "unknown/static observer";
-    }
-}
 
 namespace {
 static_assert(sizeof(std::vector<char>) == sizeof(void*) * 3,
@@ -194,20 +133,6 @@ static_assert(sizeof(std::vector<char>) == sizeof(void*) * 3,
 static_assert(sizeof(std::vector<std::vector<char>>) == sizeof(void*) * 3,
               "std::vector<std::vector<char>> must stay a 3-pointer ABI shell on this bridge");
 
-static std::string DescribeAbiCharVectorText(const std::vector<char>& textStorage) {
-    if (textStorage.empty()) {
-        return "<empty>";
-    }
-    const char* begin = textStorage.data();
-    const char* textEnd = begin + textStorage.size();
-    if (textEnd > begin && textEnd[-1] == '\0') {
-        --textEnd;
-    }
-    if (textEnd == begin) {
-        return "<empty>";
-    }
-    return std::string(begin, textEnd);
-}
 }  // namespace
 
 // anchor: launcher.exe dynamic initializer uses the registration string at 0x4ab34c for ILTLoginMediator_0x4af2b8.Default
@@ -426,11 +351,14 @@ extern "C" const char* Mediator_GetCrashReporterPassword60_Impl(
     MinimalLoginMediatorStub* self,
     const void* chainedValueToken) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPassword60(chainedValueToken);
+    (void)chainedValueToken;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPassword60();
 }
 
 // anchor: client.dll early auth-name chain proves arg6 +0x60 is caller-clean on this path
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x60
+// Bisect step: restore +0x60 too; if stability returns, both early chained getters still depend on
+// the older thunk path or on being restored as a pair.
 __attribute__((naked)) static void Mediator_GetCrashReporterPassword60() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -458,11 +386,13 @@ extern "C" const char* Mediator_GetCrashReporterUsername5c_Impl(
     MinimalLoginMediatorStub* self,
     const void* chainedValueToken) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterUsername5c(chainedValueToken);
+    (void)chainedValueToken;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterUsername5c();
 }
 
 // anchor: client.dll early auth-name chain proves arg6 +0x5c is caller-clean on this path
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x5c
+// Bisect step: restore only +0x5c to the old thunk path while leaving +0x60 plain.
 __attribute__((naked)) static void Mediator_GetCrashReporterUsername5c() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"

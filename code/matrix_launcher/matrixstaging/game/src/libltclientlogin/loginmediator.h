@@ -442,10 +442,12 @@ public:
     uint32_t GetCrashReporterPromptForSecurId58() const override;
     // +0x5c
     // anchor: launcher.exe:0x41f3a0 / tiny getter returns child `+0xf4+0x85` or pooled empty string
-    const char* GetCrashReporterUsername5c(const void* chainedValueToken) override;
+    // Static-RE correction: the real callee ignores stack arguments and just reads owner state.
+    const char* GetCrashReporterUsername5c() const override;
     // +0x60
     // anchor: launcher.exe:0x41f3c0 / exact tiny body returns child `+0xf8` begin pointer
-    const char* GetCrashReporterPassword60(const void* chainedValueToken) override;
+    // Static-RE correction: the real callee ignores stack arguments and just reads owner state.
+    const char* GetCrashReporterPassword60() const override;
     // +0x64
     // anchor: launcher.exe:0x41f2b0 / exact tiny body returns owner+0x680+0x110
     uint32_t GetBootstrapSuccessHeaderDword64() const override;
