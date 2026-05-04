@@ -102,25 +102,6 @@ struct LateMediatorAbiCallLogState {
     bool valid = false;
 };
 
-namespace mxo::ltlogin {
-struct CurrentSlotRecord44ObjectSketch {
-    void** vtable;
-    void* bufferBase04;
-    void* backingObject08;
-    uint8_t flag0c;
-    uint8_t padding0d[3];
-    Packet_AsAuthReply_0x4b5328* payload10;
-    const char* debugString14;
-    uint16_t debugStringLen18;
-    uint8_t padding1a[2];
-};
-static_assert(offsetof(CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
-static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugString14) == 0x14);
-static_assert(offsetof(CurrentSlotRecord44ObjectSketch, debugStringLen18) == 0x18);
-static_assert(sizeof(CurrentSlotRecord44ObjectSketch) == 0x1c);
-}  // namespace mxo::ltlogin
-
-static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorSelectionDescriptor40{};
 
 static void DiagnosticLogPacketAbiValidationOnce() {
     static bool logged = false;
@@ -131,11 +112,9 @@ static void DiagnosticLogPacketAbiValidationOnce() {
 
     using mxo::liblttcp::Packet_0x4af2a4;
     using mxo::ltlogin::Packet_AsAuthReply_0x4b5328;
-    using mxo::ltlogin::CurrentSlotRecord44ObjectSketch;
 
     const size_t packetBaseSize = sizeof(Packet_0x4af2a4);
     const size_t authReplySize = sizeof(Packet_AsAuthReply_0x4b5328);
-    const size_t currentSlotViewSize = sizeof(CurrentSlotRecord44ObjectSketch);
 
     spdlog::info(
         "DIAGNOSTIC: packet ABI validation Packet_0x4af2a4 sizeof=0x{:x} payloadPtr04=0x{:x} messageRef08=0x{:x} createRefParam0c=0x{:x} payloadAlias10=0x{:x} debugString14=0x{:x} payloadSize18=0x{:x}",
@@ -153,13 +132,6 @@ static void DiagnosticLogPacketAbiValidationOnce() {
         static_cast<unsigned>(offsetof(Packet_AsAuthReply_0x4b5328, debugString14)),
         static_cast<unsigned>(offsetof(Packet_AsAuthReply_0x4b5328, payloadSize18)));
 
-    spdlog::info(
-        "DIAGNOSTIC: packet ABI validation CurrentSlotRecord44ObjectSketch sizeof=0x{:x} payload10=0x{:x} debugString14=0x{:x} debugStringLen18=0x{:x}",
-        static_cast<unsigned>(currentSlotViewSize),
-        static_cast<unsigned>(offsetof(CurrentSlotRecord44ObjectSketch, payload10)),
-        static_cast<unsigned>(offsetof(CurrentSlotRecord44ObjectSketch, debugString14)),
-        static_cast<unsigned>(offsetof(CurrentSlotRecord44ObjectSketch, debugStringLen18)));
-
     if (packetBaseSize != 0x1cu || authReplySize != 0x1cu) {
         spdlog::critical(
             "DIAGNOSTIC: packet ABI mismatch vs launcher.exe/client.dll expectation: Packet_0x4af2a4 sizeof=0x{:x}, Packet_AsAuthReply_0x4b5328 sizeof=0x{:x}, expected both 0x1c from launcher.exe 0x4398b0/0x4401ec TrackedMalloc(0x1c)",
@@ -168,50 +140,7 @@ static void DiagnosticLogPacketAbiValidationOnce() {
     }
 }
 
-static uint32_t __thiscall MediatorSelectionObject_Destroy(
-    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
-    return self ? 1u : 0u;
-}
-
-static uint32_t __thiscall MediatorSelectionObject_GetStateId(
-    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 0u;
-}
-
-static uint32_t __thiscall MediatorSelectionObject_AppendDebugString(
-    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 1u;
-}
-
-static uint32_t __thiscall MediatorSelectionObject_ResetPayloadForSourceDescriptor(
-    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
-    if (!self) {
-        return 0u;
-    }
-    self->backingObject08 = nullptr;
-    self->flag0c = (self->payload10 != nullptr) ? 1u : 0u;
-    return 1u;
-}
-
-static uint32_t __thiscall MediatorSelectionObject_GetPayload10(
-    mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
-    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
-}
-
-static void** MediatorSelectionObjectVtable() {
-    static void* vtable[5] = {
-        reinterpret_cast<void*>(MediatorSelectionObject_Destroy),
-        reinterpret_cast<void*>(MediatorSelectionObject_GetStateId),
-        reinterpret_cast<void*>(MediatorSelectionObject_AppendDebugString),
-        reinterpret_cast<void*>(MediatorSelectionObject_ResetPayloadForSourceDescriptor),
-        reinterpret_cast<void*>(MediatorSelectionObject_GetPayload10),
-    };
-    return vtable;
-}
-
-static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDescriptorObject40AbiShim(
+static mxo::ltlogin::Packet_AsAuthReply_0x4b5328* LogMediatorSelectionDescriptor40Result(
     const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* currentSlotRecord,
     uint32_t selectionIndex,
     uint32_t defaultSelectionIndex) {
@@ -232,22 +161,16 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
         return nullptr;
     }
 
-    g_MediatorSelectionDescriptor40 = {};
-    g_MediatorSelectionDescriptor40.vtable = MediatorSelectionObjectVtable();
-    g_MediatorSelectionDescriptor40.payload10 = const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
-    g_MediatorSelectionDescriptor40.flag0c = 1u;
-
     if (++s_logCount <= 4u) {
         spdlog::debug(
-            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}' payload={}] [count=0x{:08x}]",
+            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}'] [count=0x{:08x}]",
             static_cast<unsigned>(selectionIndex),
-            fmt::ptr(&g_MediatorSelectionDescriptor40),
+            fmt::ptr(currentSlotRecord),
             static_cast<unsigned>(defaultSelectionIndex & 0xffu),
             currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
-            fmt::ptr(g_MediatorSelectionDescriptor40.payload10),
             s_logCount);
     }
-    return &g_MediatorSelectionDescriptor40;
+    return const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
 }
 
 
@@ -412,8 +335,9 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
 }
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
-// Wrapper-facing bridge: preserve the fake outer object shape the client expects, but keep the
-// owner-side lookup faithful to the direct slot-index reader.
+// Thin the wrapper to the raw owner-side slot-record pointer.
+// Like +0x44, keep only the ABI thunk and let the owner-side direct slot-index reader decide the
+// returned `Packet_AsAuthReply_0x4b5328*`.
 extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     MinimalLoginMediatorStub* self,
     uint32_t selectionIndex,
@@ -425,7 +349,7 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
         return nullptr;
     }
 
-    return BuildMediatorSelectionDescriptorObject40AbiShim(
+    return LogMediatorSelectionDescriptor40Result(
         mediator->GetAuthReplyPacketByIndex40(selectionIndex),
         selectionIndex,
         mediator->GetDefaultSelectionIndex());
@@ -433,8 +357,8 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x40
-// Keep this wrapper-facing selection-descriptor family explicit instead of forcing the owner-side
-// `0x004b01c8 +0x40/+0x44` slot-record accessor names onto it.
+// This slot now takes the same thinning approach as +0x44: preserve the custom ABI entry, but
+// return the raw owner-side `0x004b5328` slot record instead of a wrapper sketch object.
 __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
     __asm__ volatile(
         "mov (%%esp), %%edx\n\t"
@@ -466,7 +390,7 @@ extern "C" void* Mediator_GetCurrentAuthReplyPacket44_Impl(MinimalLoginMediatorS
 // Current wrapper-facing read from `0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md`:
 // - returns the current slot record on the later profile/save path
 // - this slot is now intentionally thinner than +0x40: we publish the raw `0x004b5328`
-//   packet/view directly instead of re-wrapping it into `CurrentSlotRecord44ObjectSketch`
+//   packet/view directly instead of re-wrapping it into an extra ABI sketch layer
 // - keep that split explicit from +0x40, which still preserves the separate wrapper-facing
 //   descriptor sketch for the scratch-shaped selection request path
 __attribute__((naked)) static void Mediator_GetCurrentAuthReplyPacket44() {
