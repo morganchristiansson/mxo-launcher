@@ -121,8 +121,6 @@ static_assert(sizeof(CurrentSlotRecord44ObjectSketch) == 0x1c);
 }  // namespace mxo::ltlogin
 
 static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorSelectionDescriptor40{};
-static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorCurrentSlotRecord44{};
-static std::string g_MediatorCurrentSlotRecord44NameOwned;
 
 static void DiagnosticLogPacketAbiValidationOnce() {
     static bool logged = false;
@@ -252,41 +250,6 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
     return &g_MediatorSelectionDescriptor40;
 }
 
-static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorCurrentSlotRecordObject44AbiShim(
-    const mxo::ltlogin::Packet_AsAuthReply_0x4b5328* currentSlotRecord,
-    uint32_t defaultSelectionIndex) {
-    g_MediatorCurrentSlotRecord44 = {};
-    g_MediatorCurrentSlotRecord44NameOwned.clear();
-
-    if (!currentSlotRecord) {
-        spdlog::info(
-            "ILTLoginMediator_0x4af2b8.Default(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
-            static_cast<unsigned>(defaultSelectionIndex & 0xffu));
-        return nullptr;
-    }
-
-    g_MediatorCurrentSlotRecord44.vtable = MediatorSelectionObjectVtable();
-    g_MediatorCurrentSlotRecord44.payload10 = const_cast<mxo::ltlogin::Packet_AsAuthReply_0x4b5328*>(currentSlotRecord);
-    g_MediatorCurrentSlotRecord44.flag0c = 1u;
-    g_MediatorCurrentSlotRecord44NameOwned = currentSlotRecord->debugString14
-        ? currentSlotRecord->debugString14
-        : "";
-
-    if (!g_MediatorCurrentSlotRecord44NameOwned.empty()) {
-        g_MediatorCurrentSlotRecord44.debugString14 = g_MediatorCurrentSlotRecord44NameOwned.c_str();
-        const size_t nameLength = g_MediatorCurrentSlotRecord44NameOwned.size();
-        g_MediatorCurrentSlotRecord44.debugStringLen18 =
-            static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
-    }
-
-    spdlog::info(
-        "ILTLoginMediator_0x4af2b8.Default(+0x44) -> {} [name='{}' payload={} debugStringLen=0x{:04x}]",
-        fmt::ptr(&g_MediatorCurrentSlotRecord44),
-        g_MediatorCurrentSlotRecord44.debugString14 ? g_MediatorCurrentSlotRecord44.debugString14 : "<empty>",
-        fmt::ptr(g_MediatorCurrentSlotRecord44.payload10),
-        static_cast<unsigned>(g_MediatorCurrentSlotRecord44.debugStringLen18));
-    return &g_MediatorCurrentSlotRecord44;
-}
 
 static const char* DescribeKnownMediatorObserver(void* observer) {
     switch (reinterpret_cast<uintptr_t>(observer)) {
@@ -488,24 +451,24 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
         : "eax", "edx");
 }
 
-// UNANCHORED: C helper behind the recovered +0x44 ABI wrapper.
+// anchor: launcher.exe:0x41f300 / owner vtable +0x44
+// Thin the wrapper to the raw owner-side packet pointer.
+// The previous sketch layer copied packet-facing fields into a fake outer object, but the
+// recovered owner body is already just a direct slot-record read and the interface prototype is
+// `Packet_AsAuthReply_0x4b5328*`. Keep the wrapper only as an ABI thunk.
 extern "C" void* Mediator_GetCurrentAuthReplyPacket44_Impl(MinimalLoginMediatorStub* self) {
     (void)self;
     mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
-    return mediator
-        ? BuildMediatorCurrentSlotRecordObject44AbiShim(
-              mediator->GetCurrentAuthReplyPacket44(),
-              mediator->GetDefaultSelectionIndex())
-        : nullptr;
+    return mediator ? mediator->GetCurrentAuthReplyPacket44() : nullptr;
 }
 
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x44
 // Current wrapper-facing read from `0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md`:
-// - returns a current-slot record object on the later profile/save path
-// - that wrapper-facing object shape now best matches the concrete `0x004b5328` slot-record outer
-//   layout
-// - keep that split explicit from the owner-side `0x004b01c8 +0x44 = 0x41f300`
-//   `CLTLoginMediator_GetCurrentSlotRecord` thunk
+// - returns the current slot record on the later profile/save path
+// - this slot is now intentionally thinner than +0x40: we publish the raw `0x004b5328`
+//   packet/view directly instead of re-wrapping it into `CurrentSlotRecord44ObjectSketch`
+// - keep that split explicit from +0x40, which still preserves the separate wrapper-facing
+//   descriptor sketch for the scratch-shaped selection request path
 __attribute__((naked)) static void Mediator_GetCurrentAuthReplyPacket44() {
     __asm__ volatile(
         "push %%ecx\n\t"
