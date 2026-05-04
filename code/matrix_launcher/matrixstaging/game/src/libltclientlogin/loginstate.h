@@ -665,6 +665,8 @@ public:
     const uint8_t* sectionData = nullptr;
 
 private:
+    uint32_t defaultMessageStorageHead1c_ = 0;
+
     uint8_t* messageBase04() const {
         return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(payloadPtr04));
     }
@@ -690,7 +692,7 @@ private:
     }
 
     uint8_t* defaultMessageStorage1c() {
-        return reinterpret_cast<uint8_t*>(&characterIdLow1c);
+        return reinterpret_cast<uint8_t*>(&defaultMessageStorageHead1c_);
     }
 
     // Extends the inherited +0x1c..+0x27 packet tail into the full 0x10-byte inline

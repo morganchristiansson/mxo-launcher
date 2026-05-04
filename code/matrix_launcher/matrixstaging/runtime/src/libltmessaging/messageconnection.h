@@ -388,6 +388,16 @@ static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, messageRe
 // for internal message storage. This is the shared base pattern used by
 // CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
 // Note: Ghidra decompiler shows this as a component within Packet_AsAuthReply_0x4b5328.
+//
+// Raw launcher.exe ABI proof summary:
+// - `0x439840` initializes only the front matter through `this+0x18`
+// - `0x4398b0` (`Packet_AsAuthReply_0x4b5328` ctor) allocates/constructs a `TrackedMalloc(0x1c)`
+//   object and still only writes object fields through `this+0x18`; later writes at payload+3/+7/+b/+c
+//   are packet-body bytes, not object-tail members
+// - therefore the proven binary base object is 0x1c bytes (`+0x00..+0x1b`)
+// - subclass- or parse-shell-specific state beyond `+0x1b` must be proven per concrete vtable family;
+//   it is not evidence for enlarging the shared base
+//
 // VTable methods (inherited by derived classes):
 // - +0x00: dtor / release retained outer message-ref (0x00443aa0)
 // - +0x04: stub returns 0 (0x00437b50)
@@ -396,28 +406,29 @@ static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, messageRe
 // - +0x10: return builder +0x10 packet-payload base (0x00481760)
 class Packet_0x4af2a4 {
 public:
-    // Shared packet builder front-matter fields (no raw vtable ptr - uses C++ virtual):
-    // +0x00: vtable pointer (C++ implicit)
+    static constexpr size_t kBinaryRawSize = 0x1c;
+
+    // Proven shared packet-builder front matter (no raw vtable ptr field here - C++ virtual owns it):
+    // +0x00: vtable pointer (implicit)
+    // +0x04: payload base pointer / cached effective packet-body start
+    // +0x08: retained message-ref
+    // +0x0c: small ctor/reset flag byte
+    // +0x10: payload alias / effective packet-body pointer
+    // +0x14: length-prefixed tail pointer or family-specific pointer slot
+    // +0x18: length/state word followed by two small family-specific bytes
     uint32_t payloadPtr04 = 0;           // +0x04: payload base pointer (was: nopatchLauncherVersionValue04)
     CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint8_t createRefParam0c = 0;         // +0x0c: param to CreateRef (was: ownerReadyFlag0c)
     uint8_t padding0d_0f[3] = {0, 0, 0};  // +0x0d .. +0x0f
-
-    // Payload pointers (set by derived classes):
     void* payloadAlias10 = nullptr;       // +0x10: alias of payloadPtr04 in some contexts (was: payloadBegin10)
     const char* debugString14 = nullptr;  // +0x14: heap-allocated string pointer (was: heapString14)
-    uint16_t payloadSize18 = 0;           // +0x18: payload length in bytes (was: payloadLength18)
-    uint8_t packetType1a = 0;             // +0x1a: status/packet type byte (was: statusByte1a)
-    uint8_t padding1b = 0;                // +0x1b: alignment padding
+    uint16_t payloadSize18 = 0;           // +0x18: payload length/state word (was: payloadLength18)
+    uint8_t packetType1a = 0;             // +0x1a: family-specific byte; not proven to have one semantic across subclasses
+    uint8_t padding1b = 0;                // +0x1b: family-specific byte/padding
 
-    // Character slot fields (used by derived slot record):
-    uint32_t characterIdLow1c = 0;         // +0x1c
-    uint32_t characterIdHigh20 = 0;      // +0x20
-    uint16_t worldId24 = 0;              // +0x24
-    // Fidelity note: different packet families reuse inherited +0x24 with different semantics.
-    // Most packet families treat it like a small scalar/ID. The raw0x0a auth-response builder
-    // reuses it as a payload-relative field-content offset (`fieldOffset + 2`), not as a widened
-    // absolute pointer. Keep the base width/layout intact.
+    // IMPORTANT:
+    // Anything semantically described at `+0x1c` and beyond belongs to a particular subclass or to a
+    // source-owned overlay model, not to the proven `Packet_0x4af2a4` raw base ABI.
 
 public:
     // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
@@ -578,9 +589,12 @@ public:
 
 };
 
-// Size: 0x18 (24 bytes) - vftptr(4) + nopatchLauncherVersionValue04(4) + messageRef08(4) + ownerReadyFlag0c(1) + padding(3) + packetPayloadPtr(4) = 20 bytes (actual may be padded to 24)
-static_assert(sizeof(Packet_CertChallenge_0x4b6538) == 0x2c,
-              "CLTLoginMediatorPacketBuilderEnvelope size mismatch");
+// Proven size after tightening the shared Packet_0x4af2a4 ABI back to its launcher.exe raw 0x1c-byte base:
+// - base `Packet_0x4af2a4` = 0x1c bytes
+// - derived `packetPayloadPtr` tail = +0x1c..+0x1f
+// => `Packet_CertChallenge_0x4b6538` = 0x20 bytes in source ABI
+static_assert(sizeof(Packet_CertChallenge_0x4b6538) == 0x20,
+              "Packet_CertChallenge_0x4b6538 size mismatch");
 
 // Default constructor is inherited from base Packet_0x4af2a4 (anchor: launcher.exe:0x439840)
 
@@ -791,11 +805,11 @@ public:
     // GetPayloadBase() inherited from base, returns payloadAlias10
 };
 
-// Note: Modern C++ adds vptr (4 bytes). Packet_CertConnectRequest_0x4b6524 has no additional
-// fields - it repurposes base class debugString14/payloadSize18 for reservation state.
-// Size: 4 (vptr) + base fields (0x24) = 0x28 (40 bytes) on i686.
-static_assert(sizeof(Packet_CertConnectRequest_0x4b6524) == 0x28,
-              "Packet_CertConnectRequest_0x4b6524 size mismatch (expected 0x28 with vptr)");
+// `Packet_CertConnectRequest_0x4b6524` does not add raw members beyond the tightened shared
+// `Packet_0x4af2a4` prefix; it only reuses inherited slots at +0x14/+0x18 for reservation state.
+// Therefore its concrete object size matches the raw 0x1c-byte base.
+static_assert(sizeof(Packet_CertConnectRequest_0x4b6524) == 0x1c,
+              "Packet_CertConnectRequest_0x4b6524 size mismatch");
 
 class CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:

@@ -124,6 +124,52 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorSelectionDescript
 static mxo::ltlogin::CurrentSlotRecord44ObjectSketch g_MediatorCurrentSlotRecord44{};
 static std::string g_MediatorCurrentSlotRecord44NameOwned;
 
+static void DiagnosticLogPacketAbiValidationOnce() {
+    static bool logged = false;
+    if (logged) {
+        return;
+    }
+    logged = true;
+
+    using mxo::liblttcp::Packet_0x4af2a4;
+    using mxo::ltlogin::Packet_AsAuthReply_0x4b5328;
+    using mxo::ltlogin::CurrentSlotRecord44ObjectSketch;
+
+    const size_t packetBaseSize = sizeof(Packet_0x4af2a4);
+    const size_t authReplySize = sizeof(Packet_AsAuthReply_0x4b5328);
+    const size_t currentSlotViewSize = sizeof(CurrentSlotRecord44ObjectSketch);
+
+    spdlog::info(
+        "DIAGNOSTIC: packet ABI validation Packet_0x4af2a4 sizeof=0x{:x} payloadPtr04=0x{:x} messageRef08=0x{:x} createRefParam0c=0x{:x} payloadAlias10=0x{:x} debugString14=0x{:x} payloadSize18=0x{:x}",
+        static_cast<unsigned>(packetBaseSize),
+        static_cast<unsigned>(offsetof(Packet_0x4af2a4, payloadPtr04)),
+        static_cast<unsigned>(offsetof(Packet_0x4af2a4, messageRef08)),
+        static_cast<unsigned>(offsetof(Packet_0x4af2a4, createRefParam0c)),
+        static_cast<unsigned>(offsetof(Packet_0x4af2a4, payloadAlias10)),
+        static_cast<unsigned>(offsetof(Packet_0x4af2a4, debugString14)),
+        static_cast<unsigned>(offsetof(Packet_0x4af2a4, payloadSize18)));
+
+    spdlog::info(
+        "DIAGNOSTIC: packet ABI validation Packet_AsAuthReply_0x4b5328 sizeof=0x{:x} debugString14=0x{:x} payloadSize18=0x{:x}",
+        static_cast<unsigned>(authReplySize),
+        static_cast<unsigned>(offsetof(Packet_AsAuthReply_0x4b5328, debugString14)),
+        static_cast<unsigned>(offsetof(Packet_AsAuthReply_0x4b5328, payloadSize18)));
+
+    spdlog::info(
+        "DIAGNOSTIC: packet ABI validation CurrentSlotRecord44ObjectSketch sizeof=0x{:x} payload10=0x{:x} debugString14=0x{:x} debugStringLen18=0x{:x}",
+        static_cast<unsigned>(currentSlotViewSize),
+        static_cast<unsigned>(offsetof(CurrentSlotRecord44ObjectSketch, payload10)),
+        static_cast<unsigned>(offsetof(CurrentSlotRecord44ObjectSketch, debugString14)),
+        static_cast<unsigned>(offsetof(CurrentSlotRecord44ObjectSketch, debugStringLen18)));
+
+    if (packetBaseSize != 0x1cu || authReplySize != 0x1cu) {
+        spdlog::critical(
+            "DIAGNOSTIC: packet ABI mismatch vs launcher.exe/client.dll expectation: Packet_0x4af2a4 sizeof=0x{:x}, Packet_AsAuthReply_0x4b5328 sizeof=0x{:x}, expected both 0x1c from launcher.exe 0x4398b0/0x4401ec TrackedMalloc(0x1c)",
+            static_cast<unsigned>(packetBaseSize),
+            static_cast<unsigned>(authReplySize));
+    }
+}
+
 static uint32_t __thiscall MediatorSelectionObject_Destroy(
     mxo::ltlogin::CurrentSlotRecord44ObjectSketch* self) {
     return self ? 1u : 0u;
@@ -195,14 +241,12 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorSelectionDesc
 
     if (++s_logCount <= 4u) {
         spdlog::debug(
-            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}' payload={} charIdLow=0x{:08x} charIdHigh=0x{:08x}] [count=0x{:08x}]",
+            "ILTLoginMediator_0x4af2b8.Default(+0x40 selectionIndex=0x{:08x}) -> {} [currentSlotIndex=0x{:02x} slotName='{}' payload={}] [count=0x{:08x}]",
             static_cast<unsigned>(selectionIndex),
             fmt::ptr(&g_MediatorSelectionDescriptor40),
             static_cast<unsigned>(defaultSelectionIndex & 0xffu),
             currentSlotRecord->debugString14 ? currentSlotRecord->debugString14 : "<empty>",
             fmt::ptr(g_MediatorSelectionDescriptor40.payload10),
-            static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
-            static_cast<unsigned>(currentSlotRecord->characterIdHigh20),
             s_logCount);
     }
     return &g_MediatorSelectionDescriptor40;
@@ -236,13 +280,11 @@ static mxo::ltlogin::CurrentSlotRecord44ObjectSketch* BuildMediatorCurrentSlotRe
     }
 
     spdlog::info(
-        "ILTLoginMediator_0x4af2b8.Default(+0x44) -> {} [name='{}' charIdLow=0x{:08x} charIdHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
+        "ILTLoginMediator_0x4af2b8.Default(+0x44) -> {} [name='{}' payload={} debugStringLen=0x{:04x}]",
         fmt::ptr(&g_MediatorCurrentSlotRecord44),
         g_MediatorCurrentSlotRecord44.debugString14 ? g_MediatorCurrentSlotRecord44.debugString14 : "<empty>",
-        static_cast<unsigned>(currentSlotRecord->characterIdLow1c),
-        static_cast<unsigned>(currentSlotRecord->characterIdHigh20),
-        static_cast<unsigned>(currentSlotRecord->packetType1a),
-        static_cast<unsigned>(currentSlotRecord->worldId24));
+        fmt::ptr(g_MediatorCurrentSlotRecord44.payload10),
+        static_cast<unsigned>(g_MediatorCurrentSlotRecord44.debugStringLen18));
     return &g_MediatorCurrentSlotRecord44;
 }
 
@@ -1468,6 +1510,8 @@ void DiagnosticInitializeMediatorStub() {
     static bool initialized = false;
     if (initialized) return;
     initialized = true;
+
+    DiagnosticLogPacketAbiValidationOnce();
 
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
     // Forward to ILTLoginMediator_0x4af2b8::Default vtable slot 0 (original Mediator_GetName)

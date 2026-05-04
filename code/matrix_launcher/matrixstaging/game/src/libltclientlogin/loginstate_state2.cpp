@@ -131,10 +131,13 @@ static Packet_AsAuthReply_0x4b5328* AuthBootstrap680InitializeSlotRecordFromSele
     slotRecord->payloadSize18 = parseObject->currentCharacterHandleByteLength88;
 
     const uint8_t* const record = parseObject->currentCharacterTempRecord80;
-    slotRecord->characterIdLow1c = ReadU32LEState2(record + 0x03u);
-    slotRecord->characterIdHigh20 = ReadU32LEState2(record + 0x07u);
-    slotRecord->packetType1a = record[0x0bu];
-    slotRecord->worldId24 = ReadU16LEState2(record + 0x0cu);
+    if (slotRecord->payloadAlias10 != nullptr) {
+        uint8_t* const slotPayload = static_cast<uint8_t*>(slotRecord->payloadAlias10);
+        *reinterpret_cast<uint32_t*>(slotPayload + 0x03u) = ReadU32LEState2(record + 0x03u);
+        *reinterpret_cast<uint32_t*>(slotPayload + 0x07u) = ReadU32LEState2(record + 0x07u);
+        slotPayload[0x0bu] = record[0x0bu];
+        *reinterpret_cast<uint16_t*>(slotPayload + 0x0cu) = ReadU16LEState2(record + 0x0cu);
+    }
     return slotRecord;
 }
 
@@ -443,7 +446,9 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                                 const_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(parseObject))) {
                             break;
                         }
-                        slotRecord.packetType1a = normalizedStatus;
+                        if (slotRecord.payloadAlias10 != nullptr) {
+                            static_cast<uint8_t*>(slotRecord.payloadAlias10)[0x0bu] = normalizedStatus;
+                        }
                         g_CurrentLoginMediator->selectionRouteState684_.slotRecordValid04_[i] = true;
 
                         int matchedWorldIndex = -1;
@@ -454,7 +459,10 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                             Packet_WorldList_0x4b533c* const worldPacket =
                                 g_CurrentLoginMediator->worldListPacketsD84_[worldIndex];
                             if (worldPacket != nullptr &&
-                                worldPacket->worldId01 == slotRecord.worldId24) {
+                                worldPacket->worldId01 ==
+                                    (slotRecord.payloadAlias10 != nullptr
+                                        ? *reinterpret_cast<const uint16_t*>(static_cast<const uint8_t*>(slotRecord.payloadAlias10) + 0x0cu)
+                                        : 0u)) {
                                 matchedWorldIndex = static_cast<int>(worldIndex);
                                 break;
                             }

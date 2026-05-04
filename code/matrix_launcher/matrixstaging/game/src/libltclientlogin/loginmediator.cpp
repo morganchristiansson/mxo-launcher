@@ -1225,7 +1225,9 @@ uint8_t CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(int32_t selectionI
     }
     const Packet_AsAuthReply_0x4b5328* record =
         const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(unsignedSelectionIndex);
-    return record ? record->packetType1a : 7u;
+    return (record && record->payloadAlias10)
+        ? static_cast<const uint8_t*>(record->payloadAlias10)[0x0bu]
+        : 7u;
 }
 
 // anchor: launcher.exe:0x41ec00 +0xe8
@@ -1891,8 +1893,12 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 1u;
     }
 
-    outDwords[0] = currentSlotRecord->characterIdLow1c;
-    outDwords[1] = currentSlotRecord->characterIdHigh20;
+    outDwords[0] = currentSlotRecord->payloadAlias10
+        ? *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(currentSlotRecord->payloadAlias10) + 0x03u)
+        : 0u;
+    outDwords[1] = currentSlotRecord->payloadAlias10
+        ? *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(currentSlotRecord->payloadAlias10) + 0x07u)
+        : 0u;
     outDwords[2] = arg2;
     outDwords[3] = arg3;
 

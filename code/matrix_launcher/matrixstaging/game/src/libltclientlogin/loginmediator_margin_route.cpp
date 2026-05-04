@@ -198,7 +198,9 @@ uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
     const Packet_AsAuthReply_0x4b5328* record =
         const_cast<CLTLoginMediator*>(this)->GetAuthReplyPacketByIndex40(
             static_cast<uint32_t>(slotIndex));
-    return record ? record->packetType1a : 7u;
+    return (record && record->payloadAlias10)
+        ? static_cast<const uint8_t*>(record->payloadAlias10)[0x0bu]
+        : 7u;
 }
 
 // anchor: launcher.exe:0x41b2e0

@@ -248,10 +248,13 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // anchor: launcher.exe:0x440288-0x4402ab
     // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
     // [EDI+0x10]+0xb = 0 (status), [EDI+0x10]+0xc = worldId (word from descriptor)
-    appendedSlotRecord.characterIdLow1c = parsed.characterIdLow;
-    appendedSlotRecord.characterIdHigh20 = parsed.characterIdHigh;
-    appendedSlotRecord.packetType1a = 0u;
-    appendedSlotRecord.worldId24 = selectedWorldDescriptor.worldId01;
+    if (appendedSlotRecord.payloadAlias10 != nullptr) {
+        uint8_t* const slotPayload = static_cast<uint8_t*>(appendedSlotRecord.payloadAlias10);
+        *reinterpret_cast<uint32_t*>(slotPayload + 0x03u) = parsed.characterIdLow;
+        *reinterpret_cast<uint32_t*>(slotPayload + 0x07u) = parsed.characterIdHigh;
+        slotPayload[0x0bu] = 0u;
+        *reinterpret_cast<uint16_t*>(slotPayload + 0x0cu) = selectedWorldDescriptor.worldId01;
+    }
 
     // anchor: launcher.exe:0x4402af-0x4402c4
     // Original: SetCurrentState(g_Mediator, 0xb) then PostEvent(g_Mediator, 0x14).

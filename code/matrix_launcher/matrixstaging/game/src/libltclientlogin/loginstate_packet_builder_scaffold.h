@@ -244,9 +244,9 @@ public:
 };
 
 // Packet_MsLoadCharacterRequest_0x4b5418 layout:
-//   Packet_0x4af2a4 base: 0x28 bytes (+0x00..+0x27)
-// Total: 0x28 bytes
-static_assert(sizeof(Packet_MsLoadCharacterRequest_0x4b5418) == 0x28, "Packet_MsLoadCharacterRequest_0x4b5418 size mismatch");
+//   Packet_0x4af2a4 base: 0x1c bytes (+0x00..+0x1b)
+// Total: 0x1c bytes
+static_assert(sizeof(Packet_MsLoadCharacterRequest_0x4b5418) == 0x1c, "Packet_MsLoadCharacterRequest_0x4b5418 size mismatch");
 
 }  // namespace mxo::ltlogin
 
@@ -611,9 +611,9 @@ public:
  // - debugString14     <-> stringField05Bytes14
  // - payloadSize18     <-> stringField05Length18
  // - packetType1a/1b   <-> padding1a
- // - characterIdLow1c  <-> authDataBytes1c
- // - characterIdHigh20 <-> authDataByteLength20/padding22
- // The parse-shell-only tail begins after that overlapped prefix.
+ // The parse-shell-only tail begins after the shared 0x1c-byte packet prefix.
+ uint32_t characterIdLow1c = 0u;
+ uint32_t characterIdHigh20 = 0u;
  const uint8_t* PacketBody04() const { return reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(payloadPtr04)); }
  void SetPacketBody04(const uint8_t* packetBody) { payloadPtr04 = reinterpret_cast<uint32_t>(packetBody); }
 
@@ -743,6 +743,8 @@ struct State6Packet0x07FixedPayload {
 // - slot 4 (+0x10): inherited GetPayloadBase
 class Packet_AsGetPublicKeyReply_0x4b6ca4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+ uint32_t characterIdLow1c = 0u;
+ uint32_t characterIdHigh20 = 0u;
  // anchor: launcher.exe:0x443910
  // `resolveVariableTailViews=false` mirrors the local build path that grows the retained
  // message-ref by 0x12 bytes and stamps opcode 0x07 plus zeroed trailing fields.
@@ -883,7 +885,7 @@ public:
  }
 };
 
-static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == sizeof(mxo::liblttcp::Packet_0x4af2a4), "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
+static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == 0x24, "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
 
 // =============================================================================
 // Packet_AsAuthChallenge_0x4b6ce0 - Parse accessor for AS_AuthChallenge (opcode 0x09)
@@ -1049,6 +1051,9 @@ static_assert(sizeof(Packet_AsAuthChallengeResponse_0x4b6d08) == sizeof(mxo::lib
 // Margin opcode 0x0a = MS_ClaimCharacterNameRequest (but used generically for auth responses)
 class Packet_AsAuthChallengeResponse_0x4b6cf4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+ uint32_t characterIdLow1c = 0u;
+ uint32_t characterIdHigh20 = 0u;
+ uint16_t worldId24 = 0u;
  // anchor: launcher.exe:0x443ea0 = Packet_AsAuthChallengeResponse_0x4b6cf4::ctor
  // anchor: launcher.exe:0x443f00 = Packet_AsAuthChallengeResponse_0x4b6cf4::ResetAndInitialize
  // Original implementation pattern:
