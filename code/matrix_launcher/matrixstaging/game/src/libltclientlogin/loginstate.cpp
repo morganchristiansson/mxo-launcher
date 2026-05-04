@@ -324,20 +324,15 @@ Packet_MsLoadCharacterReply_0x4b542c::Packet_MsLoadCharacterReply_0x4b542c(
         incomingMessageRef->AddRef();
     }
 
-    if (incomingMessageRef != nullptr && incomingMessageRef->headerless10 == 0) {
-        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
-            incomingMessageRef->messageStorage0c
-                ? incomingMessageRef->messageStorage0c->payloadBytes0c.data()
-                : nullptr));
-    } else if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c != nullptr) {
+    if (incomingMessageRef->headerless10 == 0) {
+        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(incomingMessageRef->messageStorage0c->payloadBytes0c.data()));
+    } else {
         uint8_t* const payloadBase = incomingMessageRef->messageStorage0c->payloadBytes0c.data();
         const uint8_t encodedHeaderByte = payloadBase[0x01u];
         const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
         const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
         payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadBase + lookupHigh + lookupLow + 0x12u));
         incomingMessageRef->headerless10 = 1;
-    } else {
-        payloadPtr04 = 0u;
     }
 
     RefreshDataSectionView(initializeEmptyReply);
@@ -418,17 +413,24 @@ void Packet_MsLoadCharacterReply_0x4b542c::RefreshDataSectionView(char initializ
 
 // anchor: launcher.exe:0x43af20
 void Packet_MsLoadCharacterReply_0x4b542c::ResetToDefaultMessage() {
-    if (messageRef08 != nullptr && messageRef08->messageStorage0c != nullptr) {
-        uint8_t* const payloadBase = messageRef08->messageStorage0c->payloadBytes0c.data();
-        const uint8_t encodedHeaderByte = payloadBase[0x01u];
-        const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
-        const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
-        payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadBase + lookupHigh + lookupLow + 0x12u));
-    }
+    uint8_t* const payloadBase = messageRef08->messageStorage0c->payloadBytes0c.data();
+    const uint8_t encodedHeaderByte = payloadBase[0x01u];
+    const uint32_t payloadOffset =
+        g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u] +
+        g_MessageOffsetLookupTable[encodedHeaderByte & 7u] + 0x12u;
+    payloadPtr04 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(payloadBase + payloadOffset));
+    messageRef08->SetPayloadByteCount(payloadOffset);
+    messageRef08->GrowPayloadByteCount(0x10u);
     payloadAlias10 = reinterpret_cast<void*>(static_cast<uintptr_t>(payloadPtr04));
     uint8_t* const currentMessage = static_cast<uint8_t*>(payloadAlias10);
     currentMessage[0x00] = 0x10u;
+    *reinterpret_cast<uint32_t*>(currentMessage + 0x01u) = 0u;
+    *reinterpret_cast<uint32_t*>(currentMessage + 0x05u) = 0u;
+    *reinterpret_cast<uint16_t*>(currentMessage + 0x09u) = 0u;
     currentMessage[0x0b] = 1u;
+    currentMessage[0x0c] = 0u;
+    currentMessage[0x0d] = 0u;
+    *reinterpret_cast<uint16_t*>(currentMessage + 0x0eu) = 0u;
     debugString14 = nullptr;
     payloadSize18 = 0u;
 
