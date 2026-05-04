@@ -439,7 +439,12 @@ public:
     // +0x00
     virtual const char* GetName() = 0;
     // +0x04
-    // virtual ~ILTLoginMediator_0x4af2b8();
+    // Fidelity note:
+    // - keep this as an explicit placeholder slot so the source-side abstract surface matches the
+    //   recovered arg6 ABI order used by launcher.exe/client.dll and by `g_LoginMediatorVtable`
+    // - do not collapse this to a commented-out destructor entry; when omitted entirely, every
+    //   later virtual shifts relative to the wrapper-facing table
+    virtual void UnknownSlot04() {}
     // +0x08
     // anchor: launcher.exe:0x41b160
     // Return: status dword (0x12000001 if auth address list empty, 0 if has entries)
@@ -593,7 +598,7 @@ public:
     // +0x128
     virtual void UnknownSlot74() {}
     // +0x12c
-    virtual void UnknownSlot75() {}
+    virtual void* GetStartupDistrObjExecutive8c() const = 0;
     // +0x130
     virtual LaunchPadClient_0x4b0e48* GetLaunchPadClient65c() const = 0;
     // +0x134

@@ -647,7 +647,7 @@ public:
     // anchor: launcher.exe:0x41f210 / mediator vtable +0x12c
     // Current best type recovery: returns the owner `+0x8c` collaborator copied from the client
     // startup triple's third argument, matching the client-side `g_StartupDistrObjExecutive124`.
-    void* GetStartupDistrObjExecutive8c() const;
+    void* GetStartupDistrObjExecutive8c() const override;
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
 
