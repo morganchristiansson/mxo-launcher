@@ -8,6 +8,7 @@
 #include <cstring>
 #include <set>
 #include <string>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -188,28 +189,24 @@ static const char* DescribeKnownMediatorObserver(void* observer) {
 }
 
 namespace {
-struct Msvc2003StdStringView {
-    const char* begin = nullptr;
-    const char* current = nullptr;
-    const char* capacity = nullptr;
-};
+static_assert(sizeof(std::vector<char>) == sizeof(void*) * 3,
+              "std::vector<char> must stay a 3-pointer ABI shell on this bridge");
+static_assert(sizeof(std::vector<std::vector<char>>) == sizeof(void*) * 3,
+              "std::vector<std::vector<char>> must stay a 3-pointer ABI shell on this bridge");
 
-static Msvc2003StdStringView BuildMsvc2003StdStringView(std::string_view text) {
-    Msvc2003StdStringView view{};
-    view.begin = text.data();
-    view.current = text.data() + text.size();
-    view.capacity = view.current;
-    return view;
-}
-
-static std::string DescribeRouteDescriptorText(const Msvc2003StdStringView* descriptor) {
-    if (!descriptor || !descriptor->begin || !descriptor->current || descriptor->current < descriptor->begin) {
+static std::string DescribeAbiCharVectorText(const std::vector<char>& textStorage) {
+    if (textStorage.empty()) {
         return "<empty>";
     }
-    if (descriptor->current == descriptor->begin) {
+    const char* begin = textStorage.data();
+    const char* textEnd = begin + textStorage.size();
+    if (textEnd > begin && textEnd[-1] == '\0') {
+        --textEnd;
+    }
+    if (textEnd == begin) {
         return "<empty>";
     }
-    return std::string(descriptor->begin, descriptor->current);
+    return std::string(begin, textEnd);
 }
 }  // namespace
 
@@ -756,11 +753,20 @@ static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediat
 
 // anchor: launcher.exe:0x41f1b0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xd0
-static Msvc2003StdStringView* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
+// This is the second local proof of the thinner ABI strategy used at +0x10c:
+// - keep the owner/native string source as-is
+// - publish a `std::vector<char>` storage object directly to the client-facing old-MSVC2003
+//   small-string consumer
+// - do not add mediator-owned ABI helpers yet; keep the proof local to the wrapper
+static void* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
-    static thread_local Msvc2003StdStringView view;
-    view = BuildMsvc2003StdStringView(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460());
-    return &view;
+    static thread_local std::vector<char> section11Storage;
+
+    const std::string_view section11Text = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460();
+    section11Storage.assign(section11Text.begin(), section11Text.end());
+    section11Storage.push_back('\0');
+
+    return &section11Storage;
 }
 
 // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
@@ -872,24 +878,33 @@ static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLogin
 // Current best late-runtime read from the event-0x18 observer callback:
 // - returns owner `+0x30`
 // - client immediately consumes the first two dwords there as a small-string begin/current pair
+// - this slot now proves the thinner ABI strategy: publish a `std::vector<char>` storage object
+//   directly because its three-pointer layout matches the client.dll MSVC2003 `std::string`
+//   surface closely enough for this read-only boundary
 // - wrapper also logs the exact client return address so the successful post-0x18 route can prove
 //   whether the current run actually executed the event-0x18 body or skipped it on observer byte
 //   `this+0xcc`
-static Msvc2003StdStringView* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
+static void* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    static thread_local Msvc2003StdStringView descriptorView;
-    descriptorView = BuildMsvc2003StdStringView(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30());
-    const std::string descriptorText = DescribeRouteDescriptorText(&descriptorView);
+    static thread_local std::vector<char> routeDescriptorStorage;
+
+    const std::string_view routeDescriptor = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30();
+    routeDescriptorStorage.assign(routeDescriptor.begin(), routeDescriptor.end());
+    routeDescriptorStorage.push_back('\0');
+
+    const char* const begin = routeDescriptorStorage.empty() ? nullptr : routeDescriptorStorage.data();
+    const char* const current = routeDescriptorStorage.empty() ? nullptr : routeDescriptorStorage.data() + routeDescriptorStorage.size();
+    const std::string descriptorText = DescribeAbiCharVectorText(routeDescriptorStorage);
     spdlog::info(
         "MediatorStub::GetRouteDescriptor10c caller={} [{}] result={} begin={} current={} text='{}'",
         fmt::ptr(returnAddress),
         DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(&descriptorView),
-        fmt::ptr(descriptorView.begin),
-        fmt::ptr(descriptorView.current),
+        fmt::ptr(&routeDescriptorStorage),
+        fmt::ptr(begin),
+        fmt::ptr(current),
         descriptorText);
-    return &descriptorView;
+    return &routeDescriptorStorage;
 }
 
 // anchor: launcher.exe:0x41af50
@@ -900,41 +915,31 @@ static Msvc2003StdStringView* __thiscall Mediator_GetRouteDescriptor10c(MinimalL
 // - immediate event-0x18 helper `0x621c6d90` and later consumer `0x62017150` both use this slot
 // - wrapper logs the exact client return address so successful runs can show whether only the
 //   immediate event-0x18 helper fired or the later metric-matcher path also ran
-struct Msvc2003StdStringVectorView {
-    Msvc2003StdStringView* begin = nullptr;
-    Msvc2003StdStringView* current = nullptr;
-    Msvc2003StdStringView* capacity = nullptr;
-};
-
-static Msvc2003StdStringVectorView* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
+static void* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    static thread_local std::vector<Msvc2003StdStringView> entryViews;
-    static thread_local Msvc2003StdStringVectorView vectorView;
+    static thread_local std::vector<std::vector<char>> entryStorage;
 
     const std::vector<std::string>& list = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
-    entryViews.clear();
-    entryViews.reserve(list.size());
+    entryStorage.clear();
+    entryStorage.reserve(list.size());
     for (const std::string& entry : list) {
-        entryViews.push_back(BuildMsvc2003StdStringView(entry));
+        std::vector<char>& abiEntry = entryStorage.emplace_back(entry.begin(), entry.end());
+        abiEntry.push_back('\0');
     }
 
-    vectorView.begin = entryViews.empty() ? nullptr : entryViews.data();
-    vectorView.current = entryViews.empty() ? nullptr : entryViews.data() + entryViews.size();
-    vectorView.capacity = entryViews.empty() ? nullptr : entryViews.data() + entryViews.capacity();
-
-    const char* firstEntry = (!list.empty() && !list.front().empty()) ? list.front().c_str() : "<empty>";
+    const std::string firstEntryText = entryStorage.empty() ? std::string("<empty>") : DescribeAbiCharVectorText(entryStorage.front());
     spdlog::info(
         "MediatorStub::GetLateEntryList118 caller={} [{}] result={} begin={} current={} capacity={} entryCount={} firstEntry='{}'",
         fmt::ptr(returnAddress),
         DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(&vectorView),
-        fmt::ptr(vectorView.begin),
-        fmt::ptr(vectorView.current),
-        fmt::ptr(vectorView.capacity),
+        fmt::ptr(&entryStorage),
+        fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data()),
+        fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data() + entryStorage.size()),
+        fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data() + entryStorage.capacity()),
         list.size(),
-        firstEntry);
-    return &vectorView;
+        firstEntryText);
+    return &entryStorage;
 }
 
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.
