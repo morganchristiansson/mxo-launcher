@@ -1464,7 +1464,7 @@ const std::vector<char>& CLTLoginMediator::GetRouteDescriptor30() const {
 }
 
 // anchor: launcher.exe:0x41af50 +0x118
-const std::vector<std::string>& CLTLoginMediator::GetLateEntryList1470() const {
+const std::vector<std::vector<char>>& CLTLoginMediator::GetLateEntryList1470() const {
     return lateEntryList1470_;
 }
 
@@ -2008,7 +2008,8 @@ void CLTLoginMediator::ClearLateEntryList1470Scaffold() {
 
 // anchor: launcher.exe:0x41f840 / owner vtable +0x190
 void CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold(std::string_view sourceEntry) {
-    lateEntryList1470_.emplace_back(sourceEntry);
+    std::vector<char>& entry = lateEntryList1470_.emplace_back(sourceEntry.begin(), sourceEntry.end());
+    entry.push_back('\0');
 }
 
 // anchor: launcher.exe:0x41af70

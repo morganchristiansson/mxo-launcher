@@ -903,20 +903,14 @@ static void* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub*
 // - returns owner `+0x1470`
 // - client reads it as a vector-like begin/current/capacity triple of 12-byte string-triple entries
 // - immediate event-0x18 helper `0x621c6d90` and later consumer `0x62017150` both use this slot
+// - this slot is now thinner than the earlier proof version: the wrapper forwards the existing
+//   mediator-owned `std::vector<std::vector<char>>` storage directly
 // - wrapper logs the exact client return address so successful runs can show whether only the
 //   immediate event-0x18 helper fired or the later metric-matcher path also ran
 static void* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    static thread_local std::vector<std::vector<char>> entryStorage;
-
-    const std::vector<std::string>& list = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
-    entryStorage.clear();
-    entryStorage.reserve(list.size());
-    for (const std::string& entry : list) {
-        std::vector<char>& abiEntry = entryStorage.emplace_back(entry.begin(), entry.end());
-        abiEntry.push_back('\0');
-    }
+    const std::vector<std::vector<char>>& entryStorage = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
 
     const std::string firstEntryText = entryStorage.empty() ? std::string("<empty>") : DescribeAbiCharVectorText(entryStorage.front());
     spdlog::info(
@@ -927,9 +921,9 @@ static void* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* s
         fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data()),
         fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data() + entryStorage.size()),
         fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data() + entryStorage.capacity()),
-        list.size(),
+        entryStorage.size(),
         firstEntryText);
-    return &entryStorage;
+    return const_cast<std::vector<std::vector<char>>*>(&entryStorage);
 }
 
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.

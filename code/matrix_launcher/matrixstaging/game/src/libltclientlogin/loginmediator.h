@@ -794,7 +794,7 @@ public:
     // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape lives directly
     // on the owner at `+0x1470/+0x1474/+0x1478`, so this getter can stay close to the original
     // tiny `lea eax,[ecx+0x1470]; ret`.
-    const std::vector<std::string>& GetLateEntryList1470() const override;
+    const std::vector<std::vector<char>>& GetLateEntryList1470() const override;
     // anchor: launcher.exe:0x41f5f0 / owner helper clearing owner `+0x1470`
     void ClearLateEntryList1470Scaffold();
     // anchor: launcher.exe:0x41f840 / owner vtable +0x190
@@ -1097,9 +1097,9 @@ public:
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     std::vector<char> routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
-    // semantic model is `std::vector<std::string>`; the old-MSVC vector/string layout view is now
-    // synthesized only inside `src/launcher_mediator_abi.cpp`.
-    std::vector<std::string> lateEntryList1470_{};
+    // now kept directly as `std::vector<std::vector<char>>`, with each entry nul-terminated so
+    // the same storage can satisfy both native code and the wrapper ABI.
+    std::vector<std::vector<char>> lateEntryList1470_{};
     // Narrow source-owned post-state9 / post-state12 owner collaborators from
     // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.
     // Strongest current origin: deeper client init owner/arg6 vtable `+0x124`

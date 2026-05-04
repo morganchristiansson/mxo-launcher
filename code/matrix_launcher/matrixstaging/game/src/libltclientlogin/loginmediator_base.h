@@ -583,7 +583,7 @@ public:
     // +0x114
     virtual void UnknownSlot69() {}
     // +0x118
-    virtual const std::vector<std::string>& GetLateEntryList1470() const = 0;
+    virtual const std::vector<std::vector<char>>& GetLateEntryList1470() const = 0;
     // +0x11c
     virtual void UnknownSlot71() {}
     // +0x120
