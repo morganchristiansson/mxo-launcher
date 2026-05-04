@@ -159,7 +159,11 @@ class Packet_MsConnectChallengeResponse_0x4b5378 : public mxo::liblttcp::Packet_
 // - Slot 3 (+0x0c): 0x43ac10 - ResetAndInitialize (OVERRIDDEN - packet 0x0f setup)
 // - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
 //
-// Object layout: inherits Packet_0x4af2a4 base at +0x00, size = 0x28 bytes
+// Proven object layout from `0x43ac10` / `0x43ac60`:
+// - only inherited packet fields are written (`+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18`)
+// - the large `0xbb` body and `payload+0xb9` GameSessionID-offset word are payload bytes, not
+//   object-tail members
+// - therefore this concrete builder is base-sized (`0x1c`), not an extended child
 // Note: The original 0x43acf0/0x43ada0 helpers operate on CLTLoginMediator fields,
 // NOT on the packet builder. The mediator has its own caching fields for the
 // GameSessionID reservation write pointer and length.
@@ -278,7 +282,11 @@ struct State7Packet0x0dFixedPayload {
 // anchor: launcher.exe:0x43a9a0 = ResetAndInitialize
 // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper, not class method)
 //
-// Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
+// Proven binary object layout from `0x43a9a0` / `0x43a9f0`:
+// - writes stay within inherited packet slots only (`+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18`)
+// - payload `0x0b` bytes and the character-name reservation live in message bytes, not in a child
+//   object tail
+// - therefore the launcher.exe child object is base-sized `0x1c`
 //
 // Margin opcode 0x0d = MS_DeleteCharacterRequest (used by state7 for character selection probe)
 class Packet_MsDeleteCharacterRequest_0x4b53f0 : public mxo::liblttcp::Packet_0x4af2a4 {
@@ -314,10 +322,15 @@ public:
         reservation14_.reservedPadding06 = 0u;
     }
 
-    // Reservation scaffold for character name (follows base class fields).
-    // anchor: launcher.exe:0x43a9a0 decompilation shows this field pattern.
+    // Source-only scratch mirror for the payload reservation side effects performed by
+    // `Packet_0x4af2a4::ReserveLengthPrefixedTail`; not ABI proof of a launcher.exe child tail.
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
 };
+
+// Source note: this C++ type intentionally carries a source-only reservation scratch member,
+// so `sizeof(Packet_MsDeleteCharacterRequest_0x4b53f0)` is larger than the proven launcher.exe
+// child-object ABI (`0x1c`). Treat the binary size proof as documentation, not as a C++ sizeof
+// contract for this source-owned helper type.
 
 // Note: keep the `_14_` suffix as the source-of-truth offset cue here.
 // `offsetof` on these virtual packet builders triggers noisy non-standard-layout warnings.
@@ -325,7 +338,10 @@ public:
 // anchor: launcher.exe vtable 0x004b5404 / packet 0x0e reply parser
 // anchor: launcher.exe:0x43aae0 = ctor / parse wrapper
 //
-// Object layout: inherits Packet_0x4af2a4 at +0x00, no additional raw fields.
+// Proven binary object layout from `0x43aae0`:
+// - inherited packet slots only (`+0x04/+0x08/+0x0c/+0x10` plus inherited base tail reuse)
+// - builder mode grows a 0x0d-byte payload and writes opcode/result dwords into payload bytes
+// - no child-only tail writes are present, so this family is base-sized `0x1c`
 // Static-RE field mapping for the decompiler view:
 // - mbr_0x4  -> payloadPtr04
 // - mbr_0x8  -> messageRef08
@@ -384,6 +400,9 @@ public:
     }
 };
 
+static_assert(sizeof(Packet_MsDeleteCharacterReply_0x4b5404) == 0x1c,
+              "Packet_MsDeleteCharacterReply_0x4b5404 size mismatch");
+
 struct State10Packet0x0aFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
     // raw margin opcode `0x0a` = `MS_ClaimCharacterNameRequest`
@@ -396,7 +415,11 @@ struct State10Packet0x0aFixedPayload {
 // anchor: launcher.exe:0x43a1f0 = ResetAndInitialize
 // anchor: launcher.exe:0x43aa80 = SetCharacterName (mediator helper)
 //
-// Object layout: inherits Packet_0x4af2a4 at +0x00, reservation14_ at +0x28
+// Proven binary object layout from `0x43a1f0`:
+// - writes stay within inherited packet slots only (`+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18`)
+// - the 3-byte payload and the later character-name reservation belong to message bytes, not a
+//   child tail object layout
+// - therefore this launcher.exe child object is base-sized `0x1c`
 //
 // Margin opcode 0x0a = MS_ClaimCharacterNameRequest (used by state10)
 class Packet_AsAuthChallengeResponse_0x4b53b4 : public mxo::liblttcp::Packet_0x4af2a4 {
@@ -429,8 +452,15 @@ public:
         reservation14_.reservedPadding06 = 0u;
     }
 
+    // Source-only scratch mirror for the payload reservation side effects performed by
+    // `Packet_0x4af2a4::ReserveLengthPrefixedTail`; not ABI proof of a launcher.exe child tail.
     ::mxo::liblttcp::CMessageConnectionPacketBuilderReservationScaffold reservation14_{};
 };
+
+// Source note: this C++ type intentionally carries a source-only reservation scratch member,
+// so `sizeof(Packet_AsAuthChallengeResponse_0x4b53b4)` is larger than the proven launcher.exe
+// child-object ABI (`0x1c`). Treat the binary size proof as documentation, not as a C++ sizeof
+// contract for this source-owned helper type.
 
 // Note: keep the `_14_` suffix as the source-of-truth offset cue here.
 // `offsetof` on these virtual packet builders triggers noisy non-standard-layout warnings.
@@ -439,7 +469,12 @@ public:
 // anchor: launcher.exe:0x43a470 = ResetAndInitialize
 // anchor: launcher.exe:0x43a640/0x43a740/0x43a840/0x43a940 = Set* helpers (mediator methods)
 //
-// Object layout: inherits Packet_0x4af2a4 at +0x00, then 4 reservation scaffolds at +0x28/+0x30/+0x38/+0x40
+// Current fidelity status:
+// - `0x43a470` reset/init clearly writes inherited packet slots and stages four payload field-offset
+//   words, but a full child-size proof still depends on the ctor/resolve family (`0x43a330` /
+//   `0x43a2d0`) together rather than reset/init alone
+// - keep the four reservation scaffolds as source-owned modeling aids until the child-tail size is
+//   fully proved from the remaining static-RE
 //
 // Margin opcode 0x0c (0x4d) = MS_CreateCharacterRequest (used by state11)
 class Packet_MsCreateCharacterRequest_0x4b53c8 : public mxo::liblttcp::Packet_0x4af2a4 {
@@ -592,10 +627,14 @@ static_assert(sizeof(Packet_MsConnectRequest_0x4b5364) == sizeof(mxo::liblttcp::
 // - outbound role: compact raw-auth opcode `0x06` builder using the inherited packet base
 // - inbound role: larger auth-reply parse shell used by opcode `0x0b` ctor/copy helper family
 //
-// Fidelity note:
-// - launcher.exe overlays the parse shell on the same vtable family rather than expressing it as a
-//   normal C++ subclass extension. Source code does not need that ABI trick, so this class keeps
-//   both semantic roles together as one larger source-owned type.
+// Proven extended-child layout from `0x444390` ctor, `0x4449c0` copy helper, and `0x443470`
+// parse-field resolver:
+// - `+0x1c/+0x20` = auth-data pointer/length pair
+// - `+0x24/+0x28` .. `+0x54/+0x58` = eight more pointer/length pairs for optional
+//   length-prefixed payload fields rooted at reply offsets `+0x0d..+0x1d`
+// - `+0x5c..+0x6f` = embedded `Packet_WorldList_0x4b533c`-family accessor shell
+// - `+0x70..+0x8b` = embedded `Packet_AsAuthReply_0x4b5328`-family accessor shell
+// Therefore this is a real extended child / parse shell, not a base-sized packet view.
 class Packet_AsGetPublicKeyRequest_0x4b6c74 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
  static constexpr uint8_t kPayloadTag06 = 0x06;
@@ -611,7 +650,7 @@ public:
  // - debugString14     <-> stringField05Bytes14
  // - payloadSize18     <-> stringField05Length18
  // - packetType1a/1b   <-> padding1a
- // The parse-shell-only tail begins after the shared 0x1c-byte packet prefix.
+ // Proven child tail begins at `+0x1c`.
  uint32_t characterIdLow1c = 0u;
  uint32_t characterIdHigh20 = 0u;
  const uint8_t* PacketBody04() const { return reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(payloadPtr04)); }
@@ -641,14 +680,22 @@ public:
  }
 
  void ClearAuthDataPadding22() { characterIdHigh20 &= 0xffffu; }
+ // Field resolver `0x443470` maps raw reply-header offsets to these child slots:
+ // - payload+0x0d -> encrypted private exponent blob later decrypted by `0x448241`
+ // - payload+0x0f -> copied one-time reply blob consumed by child `+0x108`
+ // - payload+0x11 -> copied one-time reply blob consumed by child `+0x10c`
+ // - payload+0x13 -> character temp-record table (`0x0e` bytes each)
+ // - payload+0x19 -> world temp-record table (`0x20` bytes each)
+ // - payload+0x1b -> still unresolved optional blob/record span
+ // - payload+0x1d -> NUL-terminated reply string copied into owner source94 string flow
  const uint8_t* encryptedPrivateExponentBytes24 = nullptr;
  uint16_t encryptedPrivateExponentByteLength28 = 0u;
  std::array<uint8_t, 2> padding2a{};
- const uint8_t* opaqueField0fBytes2c = nullptr;
- uint16_t opaqueField0fByteLength30 = 0u;
+ const uint8_t* copiedOpaqueReplyBlob108Bytes2c = nullptr;
+ uint16_t copiedOpaqueReplyBlob108ByteLength30 = 0u;
  std::array<uint8_t, 2> padding32{};
- const uint8_t* opaqueField11Bytes34 = nullptr;
- uint16_t opaqueField11ByteLength38 = 0u;
+ const uint8_t* copiedOpaqueReplyBlob10CBytes34 = nullptr;
+ uint16_t copiedOpaqueReplyBlob10CByteLength38 = 0u;
  std::array<uint8_t, 2> padding3a{};
  const uint8_t* characterTempRecords3c = nullptr;
  uint16_t characterTempRecordCount40 = 0u;
@@ -701,6 +748,9 @@ public:
  const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadAlias10); }
 };
 
+static_assert(sizeof(Packet_AsGetPublicKeyRequest_0x4b6c74) == 0x8c,
+              "Packet_AsGetPublicKeyRequest_0x4b6c74 size mismatch");
+
 // =============================================================================
 // Packet_AsGetPublicKeyReply_0x4b6ca4 - Parse/builder accessor for MS_ConnectChallenge (opcode 0x07)
 // =============================================================================
@@ -743,6 +793,9 @@ struct State6Packet0x07FixedPayload {
 // - slot 4 (+0x10): inherited GetPayloadBase
 class Packet_AsGetPublicKeyReply_0x4b6ca4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+ // Proven child tail from `0x443910` / `0x443410`:
+ // - `+0x1c` = second optional length-prefixed field content pointer
+ // - `+0x20` = second optional field length word (upper 16 bits unused/zeroed by ctor path)
  uint32_t characterIdLow1c = 0u;
  uint32_t characterIdHigh20 = 0u;
  // anchor: launcher.exe:0x443910
@@ -885,6 +938,8 @@ public:
  }
 };
 
+// `0x443910` writes child storage through `+0x20`, proving this family extends the 0x1c-byte
+// packet base with a real `+0x1c/+0x20` tail.
 static_assert(sizeof(Packet_AsGetPublicKeyReply_0x4b6ca4) == 0x24, "Packet_MsConnectChallenge_0x4b6ca4 size mismatch");
 
 // =============================================================================
@@ -1051,6 +1106,11 @@ static_assert(sizeof(Packet_AsAuthChallengeResponse_0x4b6d08) == sizeof(mxo::lib
 // Margin opcode 0x0a = MS_ClaimCharacterNameRequest (but used generically for auth responses)
 class Packet_AsAuthChallengeResponse_0x4b6cf4 : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+ // Proven child tail from ctor `0x443ea0` and reset helper `0x443f00`:
+ // - `+0x1c` = second length-prefixed field content pointer
+ // - `+0x20` = second field length word
+ // - `+0x24` = third field content offset (`fieldOffset + 2`), stored as a 16-bit value in a dword slot
+ // - `+0x28` = third field reserved byte count word
  uint32_t characterIdLow1c = 0u;
  uint32_t characterIdHigh20 = 0u;
  uint16_t worldId24 = 0u;
@@ -1256,5 +1316,14 @@ public:
 
 // Note: keep the `_14_/_1c_/_24_` suffixes as the source-of-truth offset cues here.
 // `offsetof` on this virtual packet builder triggers noisy non-standard-layout warnings.
+
+// Proven child tail occupies `+0x1c..+0x29` in the source model:
+// - `+0x1c` dword pointer
+// - `+0x20` dword/length slot
+// - `+0x24` 16-bit offset/value slot
+// - `+0x28` 16-bit reserved-byte-count slot
+// With the tightened `0x1c` base, this source type is `0x28` bytes.
+static_assert(sizeof(Packet_AsAuthChallengeResponse_0x4b6cf4) == 0x28,
+              "Packet_AsAuthChallengeResponse_0x4b6cf4 size mismatch");
 
 } // namespace mxo::ltlogin

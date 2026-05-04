@@ -232,11 +232,11 @@ static void AuthBootstrap680AuthReplyParseObject_ResetWritableBody_0x4436b0(
     parseObject->encryptedPrivateExponentBytes24 = nullptr;
     parseObject->encryptedPrivateExponentByteLength28 = 0u;
     *reinterpret_cast<uint16_t*>(replyHeader + 0x0fu) = 0u;
-    parseObject->opaqueField0fBytes2c = nullptr;
-    parseObject->opaqueField0fByteLength30 = 0u;
+    parseObject->copiedOpaqueReplyBlob108Bytes2c = nullptr;
+    parseObject->copiedOpaqueReplyBlob108ByteLength30 = 0u;
     *reinterpret_cast<uint16_t*>(replyHeader + 0x11u) = 0u;
-    parseObject->opaqueField11Bytes34 = nullptr;
-    parseObject->opaqueField11ByteLength38 = 0u;
+    parseObject->copiedOpaqueReplyBlob10CBytes34 = nullptr;
+    parseObject->copiedOpaqueReplyBlob10CByteLength38 = 0u;
     *reinterpret_cast<uint32_t*>(replyHeader + 0x15u) = 0u;
     *reinterpret_cast<uint16_t*>(replyHeader + 0x19u) = 0u;
     parseObject->characterTempRecords3c = nullptr;
@@ -317,8 +317,8 @@ static void AuthBootstrap680AuthReplyParseObject_ResolveFieldViews_0x443470(
     parseObject->SetAuthDataByteLength20(authDataByteLength20);
     parseObject->ClearAuthDataPadding22();
     resolveField(0x0du, false, &parseObject->encryptedPrivateExponentBytes24, &parseObject->encryptedPrivateExponentByteLength28);
-    resolveField(0x0fu, false, &parseObject->opaqueField0fBytes2c, &parseObject->opaqueField0fByteLength30);
-    resolveField(0x11u, false, &parseObject->opaqueField11Bytes34, &parseObject->opaqueField11ByteLength38);
+    resolveField(0x0fu, false, &parseObject->copiedOpaqueReplyBlob108Bytes2c, &parseObject->copiedOpaqueReplyBlob108ByteLength30);
+    resolveField(0x11u, false, &parseObject->copiedOpaqueReplyBlob10CBytes34, &parseObject->copiedOpaqueReplyBlob10CByteLength38);
     resolveField(0x13u, false, &parseObject->characterTempRecords3c, &parseObject->characterTempRecordCount40);
     resolveField(0x19u, false, &parseObject->worldTempRecords44, &parseObject->worldTempRecordCount48);
     resolveField(0x1bu, false, &parseObject->opaqueField1bBytes4c, &parseObject->opaqueField1bByteLength50);
@@ -650,25 +650,25 @@ void AuthBootstrap680Child_0x441290::CopyOpaqueReplyBlobs108_10c() {
         opaqueReplyBlob10C = nullptr;
     }
 
-    if (parseObject != nullptr && parseObject->opaqueField0fBytes2c != nullptr &&
-        parseObject->opaqueField0fByteLength30 != 0u) {
-        void* const blob108 = std::malloc(parseObject->opaqueField0fByteLength30);
+    if (parseObject != nullptr && parseObject->copiedOpaqueReplyBlob108Bytes2c != nullptr &&
+        parseObject->copiedOpaqueReplyBlob108ByteLength30 != 0u) {
+        void* const blob108 = std::malloc(parseObject->copiedOpaqueReplyBlob108ByteLength30);
         if (blob108 != nullptr) {
             std::memcpy(
                 blob108,
-                parseObject->opaqueField0fBytes2c,
-                parseObject->opaqueField0fByteLength30);
+                parseObject->copiedOpaqueReplyBlob108Bytes2c,
+                parseObject->copiedOpaqueReplyBlob108ByteLength30);
             opaqueReplyBlob108 = blob108;
         }
     }
-    if (parseObject != nullptr && parseObject->opaqueField11Bytes34 != nullptr &&
-        parseObject->opaqueField11ByteLength38 != 0u) {
-        void* const blob10C = std::malloc(parseObject->opaqueField11ByteLength38);
+    if (parseObject != nullptr && parseObject->copiedOpaqueReplyBlob10CBytes34 != nullptr &&
+        parseObject->copiedOpaqueReplyBlob10CByteLength38 != 0u) {
+        void* const blob10C = std::malloc(parseObject->copiedOpaqueReplyBlob10CByteLength38);
         if (blob10C != nullptr) {
             std::memcpy(
                 blob10C,
-                parseObject->opaqueField11Bytes34,
-                parseObject->opaqueField11ByteLength38);
+                parseObject->copiedOpaqueReplyBlob10CBytes34,
+                parseObject->copiedOpaqueReplyBlob10CByteLength38);
             opaqueReplyBlob10C = blob10C;
         }
     }

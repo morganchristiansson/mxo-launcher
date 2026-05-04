@@ -495,14 +495,14 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                     "AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
                     replyString1d.empty() ? "<empty>" : replyString1d.c_str(),
                     static_cast<unsigned>(parseObject3 != nullptr &&
-                                          parseObject3->opaqueField0fBytes2c != nullptr &&
-                                          parseObject3->opaqueField0fByteLength30 != 0u
-                                              ? parseObject3->opaqueField0fByteLength30
+                                          parseObject3->copiedOpaqueReplyBlob108Bytes2c != nullptr &&
+                                          parseObject3->copiedOpaqueReplyBlob108ByteLength30 != 0u
+                                              ? parseObject3->copiedOpaqueReplyBlob108ByteLength30
                                               : 0u),
                     static_cast<unsigned>(parseObject3 != nullptr &&
-                                          parseObject3->opaqueField11Bytes34 != nullptr &&
-                                          parseObject3->opaqueField11ByteLength38 != 0u
-                                              ? parseObject3->opaqueField11ByteLength38
+                                          parseObject3->copiedOpaqueReplyBlob10CBytes34 != nullptr &&
+                                          parseObject3->copiedOpaqueReplyBlob10CByteLength38 != 0u
+                                              ? parseObject3->copiedOpaqueReplyBlob10CByteLength38
                                               : 0u),
                     fmt::ptr(authBootstrapChild.opaqueReplyBlob108),
                     fmt::ptr(authBootstrapChild.opaqueReplyBlob10C),

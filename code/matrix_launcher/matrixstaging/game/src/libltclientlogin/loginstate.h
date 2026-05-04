@@ -626,6 +626,12 @@ inline uint32_t ReadU32LE(const uint8_t* p) {
 // anchor: launcher.exe:0x4b542c
 class Packet_MsLoadCharacterReply_0x4b542c : public mxo::liblttcp::Packet_0x4af2a4 {
 public:
+    // Static-RE shape from `0x43ae50` / `0x43af20`:
+    // - binary object writes stay within the shared packet prefix (`+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18`)
+    // - the default empty reply body is a 0x10-byte inline source-owned scratch buffer layered on top
+    //   of source fields below, not proof of a larger launcher.exe child-object ABI
+    // - all semantic decode fields (`valid/status/field05/...`) are source-owned cached views of the
+    //   packet bytes and must not be treated as client-facing object layout proof
     // More faithful constructor using CMessageConnectionMessageRef_0x4ba23c directly.
     // Static-RE now treats this as a Packet_0x4af2a4-derived 5-slot vtable surface:
     // - slots 0/1/4 inherited from Packet_0x4af2a4
