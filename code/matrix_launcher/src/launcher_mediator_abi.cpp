@@ -321,34 +321,14 @@ static uint32_t __thiscall Mediator_GetCrashReporterPromptForSecurId58(MinimalLo
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPromptForSecurId58();
 }
 
-// UNANCHORED: C helper behind the caller-clean +0x60 ABI wrapper.
-// Keep the chained value opaque here:
-// - client `InitClientDLL` threads the previous return value through this slot
-// - launcher crashreporter seeding calls the same slot with no stack argument on its path
-extern "C" const char* Mediator_GetCrashReporterPassword60_Impl(
-    MinimalLoginMediatorStub* self,
-    const void* chainedValueToken) {
-    (void)self;
-    (void)chainedValueToken;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPassword60();
-}
-
 // anchor: client.dll early auth-name chain proves arg6 +0x60 is caller-clean on this path
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x60
-// Bisect step: restore +0x60 too; if stability returns, both early chained getters still depend on
-// the older thunk path or on being restored as a pair.
-__attribute__((naked)) static void Mediator_GetCrashReporterPassword60() {
-    __asm__ volatile(
-        "mov 4(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $8, %%esp\n\t"
-        "ret\n\t"
-        :
-        : "i"(Mediator_GetCrashReporterPassword60_Impl)
-        : "eax");
+// Final no-arg experiment: semantic signature now matches launcher.exe, so retry this slot as a
+// plain wrapper-facing no-arg getter.
+static const char* __thiscall Mediator_GetCrashReporterPassword60(
+    MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPassword60();
 }
 
 // anchor: launcher.exe:0x41f2b0 / owner vtable +0x64
@@ -358,31 +338,14 @@ static uint32_t __thiscall Mediator_GetBootstrapSuccessHeaderDword64(MinimalLogi
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetBootstrapSuccessHeaderDword64();
 }
 
-// UNANCHORED: C helper behind the caller-clean +0x5c ABI wrapper.
-// Keep the chained value opaque here for the same launcher/client split as `+0x60`.
-extern "C" const char* Mediator_GetCrashReporterUsername5c_Impl(
-    MinimalLoginMediatorStub* self,
-    const void* chainedValueToken) {
-    (void)self;
-    (void)chainedValueToken;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterUsername5c();
-}
-
 // anchor: client.dll early auth-name chain proves arg6 +0x5c is caller-clean on this path
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x5c
-// Bisect step: restore only +0x5c to the old thunk path while leaving +0x60 plain.
-__attribute__((naked)) static void Mediator_GetCrashReporterUsername5c() {
-    __asm__ volatile(
-        "mov 4(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $8, %%esp\n\t"
-        "ret\n\t"
-        :
-        : "i"(Mediator_GetCrashReporterUsername5c_Impl)
-        : "eax");
+// Final no-arg experiment: semantic signature now matches launcher.exe, so retry this slot as a
+// plain wrapper-facing no-arg getter.
+static const char* __thiscall Mediator_GetCrashReporterUsername5c(
+    MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterUsername5c();
 }
 
 // Focused selection cfg / mcd persistence note:
