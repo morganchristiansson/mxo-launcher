@@ -789,7 +789,7 @@ public:
     // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator_0x4af2b8.Default slot +0x10c
     // Keep the ABI-compatibility small-string object explicit instead of collapsing it into the
     // owner-side route-text helper family.
-    std::string_view GetRouteDescriptor30() const override;
+    const std::vector<char>& GetRouteDescriptor30() const override;
     // anchor: launcher.exe:0x41af50 / ILTLoginMediator_0x4af2b8.Default slot +0x118
     // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape lives directly
     // on the owner at `+0x1470/+0x1474/+0x1478`, so this getter can stay close to the original
@@ -1092,9 +1092,10 @@ public:
     // launcher-owned mediator model so the owner-side slot-record family can stay aligned with
     // `0x41f2e0 / 0x41f300`.
     // - `+0xd0`  = owner `+0x1460` state8 section-11 string view
-    // - `+0x10c` = owner `+0x30` route descriptor, modeled directly as `std::string`
+    // - `+0x10c` = owner `+0x30` route descriptor, now kept as null-terminated `std::vector<char>`
+    //             so the same storage model can serve both native source code and the wrapper ABI
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
-    std::string routeDescriptor30_{};
+    std::vector<char> routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // semantic model is `std::vector<std::string>`; the old-MSVC vector/string layout view is now
     // synthesized only inside `src/launcher_mediator_abi.cpp`.

@@ -878,20 +878,15 @@ static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLogin
 // Current best late-runtime read from the event-0x18 observer callback:
 // - returns owner `+0x30`
 // - client immediately consumes the first two dwords there as a small-string begin/current pair
-// - this slot now proves the thinner ABI strategy: publish a `std::vector<char>` storage object
-//   directly because its three-pointer layout matches the client.dll MSVC2003 `std::string`
-//   surface closely enough for this read-only boundary
+// - this slot is now thinner than the earlier proof version: the wrapper forwards the existing
+//   mediator-owned `std::vector<char>` storage directly instead of rebuilding local TLS storage
 // - wrapper also logs the exact client return address so the successful post-0x18 route can prove
 //   whether the current run actually executed the event-0x18 body or skipped it on observer byte
 //   `this+0xcc`
 static void* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    static thread_local std::vector<char> routeDescriptorStorage;
-
-    const std::string_view routeDescriptor = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30();
-    routeDescriptorStorage.assign(routeDescriptor.begin(), routeDescriptor.end());
-    routeDescriptorStorage.push_back('\0');
+    const std::vector<char>& routeDescriptorStorage = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30();
 
     const char* const begin = routeDescriptorStorage.empty() ? nullptr : routeDescriptorStorage.data();
     const char* const current = routeDescriptorStorage.empty() ? nullptr : routeDescriptorStorage.data() + routeDescriptorStorage.size();
@@ -904,7 +899,7 @@ static void* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub*
         fmt::ptr(begin),
         fmt::ptr(current),
         descriptorText);
-    return &routeDescriptorStorage;
+    return const_cast<std::vector<char>*>(&routeDescriptorStorage);
 }
 
 // anchor: launcher.exe:0x41af50

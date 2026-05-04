@@ -51,12 +51,14 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         // - when different, assign `[arg1, terminator)` into owner `+0x30`
         // - build a temporary concatenated string through the `0x403f20 / 0x4043b0` helper family
         const char* const newRouteDescriptor = routeHostText ? routeHostText : "";
-        if (_stricmp(routeDescriptor30_.c_str(), newRouteDescriptor) != 0) {
+        const char* const currentRouteDescriptor = routeDescriptor30_.empty() ? "" : routeDescriptor30_.data();
+        if (_stricmp(currentRouteDescriptor, newRouteDescriptor) != 0) {
             const char* sourceEnd = newRouteDescriptor;
             while (*sourceEnd != '\0') {
                 ++sourceEnd;
             }
-            StringAssignFromRange(routeDescriptor30_, newRouteDescriptor, sourceEnd);
+            routeDescriptor30_.assign(newRouteDescriptor, sourceEnd);
+            routeDescriptor30_.push_back('\0');
         }
 
         // Original reads global pointer slot `DAT_004d6814`, materializes it through
@@ -71,7 +73,9 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         //   earlier infidel plain-prefix model
         // - keep the concat shape explicit instead of trial-and-error special casing
         // anchor: launcher.exe:0x41e5c8..0x41e61a / DAT_004d6814 -> 0x403f20 -> 0x4043b0 -> CLTIPAddressList_Reinit
-        std::string rebuiltAddressListInput = routeDescriptor30_;
+        std::string rebuiltAddressListInput = routeDescriptor30_.empty()
+            ? std::string{}
+            : std::string(routeDescriptor30_.data());
         if (g_marginServerDNSName && g_marginServerDNSName[0] != '\0') {
             rebuiltAddressListInput += g_marginServerDNSName;
         }
@@ -110,8 +114,8 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         marginEndpoint6c_.portNetworkOrder =
             static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
         marginEndpoint6c_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
-    } else if (const char* const routeDescriptorBegin = StringBeginOrNull(routeDescriptor30_);
-               routeDescriptorBegin != nullptr && g_marginServerDNSName && g_marginServerDNSName[0]) {
+    } else if (const char* const routeDescriptorBegin = routeDescriptor30_.empty() ? nullptr : routeDescriptor30_.data();
+               routeDescriptorBegin != nullptr && routeDescriptorBegin[0] != '\0' && g_marginServerDNSName && g_marginServerDNSName[0]) {
         marginHost = std::string(routeDescriptorBegin) + g_marginServerDNSName;
     }
 

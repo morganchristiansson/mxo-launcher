@@ -1465,7 +1465,7 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
 }
 
 // anchor: launcher.exe:0x41f2c0 slot +0x10c
-std::string_view CLTLoginMediator::GetRouteDescriptor30() const {
+const std::vector<char>& CLTLoginMediator::GetRouteDescriptor30() const {
     // Static-RE body is the tiny accessor `return &this->mbr_0x30`.
     return routeDescriptor30_;
 }

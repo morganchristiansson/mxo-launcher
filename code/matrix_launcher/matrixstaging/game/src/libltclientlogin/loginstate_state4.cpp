@@ -116,7 +116,7 @@ void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     switch (upstreamPhaseCode) {
         case 6: {
-            const std::string_view routeDescriptor30 = g_CurrentLoginMediator->GetRouteDescriptor30();
+            const std::vector<char>& routeDescriptor30 = g_CurrentLoginMediator->GetRouteDescriptor30();
             g_CurrentLoginMediator->BeginMarginConnection(
                 routeDescriptor30.empty() ? nullptr : routeDescriptor30.data(),
                 0u);

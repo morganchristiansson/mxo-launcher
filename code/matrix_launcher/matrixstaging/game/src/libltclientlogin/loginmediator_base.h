@@ -161,9 +161,8 @@ static_assert(sizeof(Packet_WorldList_0x4b533c) >= sizeof(mxo::liblttcp::Packet_
 // Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
 // Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under
 // Ghidra evidence currently points at the `0x403f90` family being old-MSVC2003
-// `std::basic_string<char>` / `std::string`. Source therefore uses direct `std::string`
-// storage and exposes semantic string views; the raw three-pointer layout view now lives only
-// inside `src/launcher_mediator_abi.cpp` where the launcher/client ABI shim actually needs it.
+// `std::basic_string<char>` / `std::string`. Source now prefers null-terminated `std::vector<char>`
+// storage where the same object must satisfy both native code and the launcher/client ABI bridge.
 
 inline const char* StringBeginOrNull(const std::string& value) {
     return value.empty() ? nullptr : value.c_str();
@@ -578,7 +577,7 @@ public:
     // +0x108
     virtual uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
     // +0x10c
-    virtual std::string_view GetRouteDescriptor30() const = 0;
+    virtual const std::vector<char>& GetRouteDescriptor30() const = 0;
     // +0x110
     virtual void UnknownSlot68() {}
     // +0x114
