@@ -32,7 +32,6 @@
 #include "client_chunk_hashes.h"
 
 #include "loginstate.h"
-#include "../../../../src/launcher_mediator_abi.h"
 #include "authbootstrap680.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
@@ -134,7 +133,10 @@ struct LiveSelectionCfgCorpusView {
 
 static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
 
-
+const char* MaskedSensitiveValue(const char* value) {
+    if (!value || !value[0]) return "<empty>";
+    return "<provided>";
+}
 
 }  // namespace
 

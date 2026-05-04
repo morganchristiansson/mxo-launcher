@@ -452,76 +452,52 @@ public:
     // anchor: launcher.exe:0x41f2b0 / exact tiny body returns owner+0x680+0x110
     uint32_t GetBootstrapSuccessHeaderDword64() const override;
     // +0x68
-    // client.dll:0x62198670 = `hl.cfg` live-corpus gate; launcher getter returns owner byte `+0x140e
     uint32_t HasLiveHlCfg68() const override;
     // +0x6c
-    // client.dll:0x62198770 = `an.cfg` live-corpus gate; launcher getter returns owner byte `+0x1416`
     uint32_t HasLiveAnCfg6c() const override;
     // +0x70
-    // client.dll:0x62198870 = `pi.cfg` live-corpus gate; launcher getter returns owner byte `+0x141e`
     uint32_t HasLivePiCfg70() const override;
     // +0x74
-    // client.dll:0x62198970 = `ai.cfg` live-corpus gate; launcher getter returns owner byte `+0x1426`
     uint32_t HasLiveAiCfg74() const override;
     // +0x78
-    // client.dll:0x62198a70 = `cs.cfg` live-corpus gate; launcher getter returns owner byte `+0x142e`
     uint32_t HasLiveCsCfg78() const override;
     // +0x7c
-    // client.dll:0x62198b70 = `bl.cfg` live-corpus gate; launcher getter returns owner byte `+0x13fe`
     uint32_t HasLiveBlCfg7c() const override;
     // +0x80
-    // client.dll:0x62198c60 = `il.cfg` live-corpus gate; launcher getter returns owner byte `+0x1406`
     uint32_t HasLiveIlCfg80() const override;
     // +0x84
-    // client.dll:0x62198d50 = `rl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1448`
     uint32_t HasLiveRlCfg84() const override;
     // +0x88
-    // client.dll:0x62198e50 = `cl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1452`
     uint32_t HasLiveClCfg88() const override;
     // +0x8c
-    // client.dll:0x62198fa0 = `mcd.cfg` mediator-backed gate; launcher getter returns owner byte `+0x13f6`
     uint32_t HasState8PersistenceData8c() const override;
     // +0x90
-    // client.dll:0x621993d0 = `cui.cfg` live-corpus gate; launcher getter returns owner byte `+0x145a`
     uint32_t HasLiveCuiCfg90() const override;
     // +0x94
-    // client.dll:0x62198670 = `hl.cfg` live-corpus getter; launcher getter returns owner `+0x1408`, out-length `+0x140c`
     void* GetLiveHlCfg94(uint32_t* outLength) const override;
     // +0x98
-    // client.dll:0x62198770 = `an.cfg` live-corpus getter; launcher getter returns owner `+0x1410`, out-length `+0x1414`
     void* GetLiveAnCfg98(uint32_t* outLength) const override;
     // +0x9c
-    // client.dll:0x62198870 = `pi.cfg` live-corpus getter; launcher getter returns owner `+0x1418`, out-length `+0x141c`
     void* GetLivePiCfg9c(uint32_t* outLength) const override;
     // +0xa0
-    // client.dll:0x62198970 = `ai.cfg` live-corpus getter; launcher getter returns owner `+0x1420`, out-length `+0x1424`
     void* GetLiveAiCfgA0(uint32_t* outLength) const override;
     // +0xa4
-    // client.dll:0x62198a70 = `cs.cfg` live-corpus getter; launcher getter returns owner `+0x1428`, out-length `+0x142c`
     void* GetLiveCsCfgA4(uint32_t* outLength) const override;
     // +0xa8
-    // client.dll:0x62198b70 = `bl.cfg` live-corpus getter; launcher getter returns owner `+0x13f8`, out-length `+0x13fc`
     void* GetLiveBlCfgA8(uint32_t* outLength) const override;
     // +0xac
-    // client.dll:0x62198c60 = `il.cfg` live-corpus getter; launcher getter returns owner `+0x1400`, out-length `+0x1404`
     void* GetLiveIlCfgAc(uint32_t* outLength) const override;
     // +0xb0
-    // client.dll:0x62198d50 = `rl.cfg` live-corpus getter; launcher getter returns owner `+0x1440`, out-length `+0x1444`
     void* GetLiveRlCfgB0(uint32_t* outLength) const override;
     // +0xb4
-    // client.dll:0x62198e50 = `cl.cfg` live-corpus getter; launcher getter returns owner `+0x144c`, out-length `+0x1450`
     void* GetLiveClCfgB4(uint32_t* outLength) const override;
     // +0xb8
-    // client.dll:0x621993d0 = `cui.cfg` live-corpus getter; launcher getter returns owner `+0x1454`, out-length `+0x1458`
     void* GetLiveCuiCfgB8(uint32_t* outLength) const override;
     // +0xbc
-    // client.dll:0x62198fa0 = `mcd.cfg` mediator-backed header getter; launcher getter returns owner `+0xf48`
     const void* GetState8PersistenceHeaderBc() const override;
     // +0xc0
-    // client.dll:0x62198fa0 = `mcd.cfg` mediator-backed body getter; launcher getter returns owner `+0xf88`
     const void* GetState8PersistenceBodyC0() const override;
     // +0xc4
-    // client.dll:0x62198fa0 = `mcd.cfg` overflow-tail getter; launcher getter returns owner `+0x13f0`, out-length `+0x13f4`
     void* GetState8PersistenceOverflowC4(uint16_t* outLength) const override;
     // +0xc8
     // sibling state8 section-`0x0b` bool getter; launcher getter tests owner dword `+0x145c`
@@ -1091,9 +1067,8 @@ public:
     // Wrapper-facing selection object mirrors:
     // - `+0x40`  = selection-descriptor object for profile-path / arg7-derived selection work
     // - `+0x44`  = current-slot record object for later save/profile work
-    // Those fake outer objects now live in `src/launcher_mediator_abi.cpp` instead of the
-    // launcher-owned mediator model so the owner-side slot-record family can stay aligned with
-    // `0x41f2e0 / 0x41f300`.
+    // Keep those wrapper-facing objects external to the launcher-owned mediator body so the
+    // owner-side slot-record family can stay aligned with `0x41f2e0 / 0x41f300`.
     // - `+0xd0`  = owner `+0x1460` state8 section-11 string view
     // - `+0x10c` = owner `+0x30` route descriptor, now kept as null-terminated `std::vector<char>`
     //             so the same storage model can serve both native source code and the wrapper ABI

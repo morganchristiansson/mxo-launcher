@@ -14,7 +14,6 @@
 #include <spdlog/cfg/env.h>
 #include "autodetectdialog.h"
 #include "../../../../src/diagnostics.h"
-#include "../../../../src/launcher_mediator_abi.h"
 #include "../../../../src/launcher_replacement_support.h"
 #include "../../../../src/server_config.h"
 #include "../libltclientlogin/loginmediator.h"
@@ -144,10 +143,11 @@ bool PreloadDependencies() {
 
 void LogKnownStartupState(const CLauncher& launcher) {
     const uint32_t packedArg7Selection = launcher.BuildPackedArg7Selection();
+    void* const initClientMediator = static_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default);
     spdlog::info(
-        "InitClientDLL startup state networkObject={} mediatorStub={} arg7=0x{:08x} lastWorld='{}' initFlag=0x{:02x}",
+        "InitClientDLL startup state networkObject={} mediatorArg6={} arg7=0x{:08x} lastWorld='{}' initFlag=0x{:02x}",
         fmt::ptr(g_pLauncherObject6304),
-        fmt::ptr(&g_LoginMediatorStub),
+        fmt::ptr(initClientMediator),
         packedArg7Selection,
         g_LastWorldName[0] ? g_LastWorldName : "<unavailable>",
         static_cast<unsigned>(g_LauncherInitClientFlagByte));
@@ -250,13 +250,14 @@ bool CLauncher::InitializeThreadPerClientTCPEngine() const {
     // - preserve the original `result < 1` success test
     g_pLauncherObject6304 = new mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768();
 
-    void** mediatorVtable = *reinterpret_cast<void***>(&g_LoginMediatorStub);
-    typedef int (__thiscall *RegisterEngineFn)(void*, void*);
-    RegisterEngineFn registerEngine = (mediatorVtable && mediatorVtable[2])
-        ? reinterpret_cast<RegisterEngineFn>(mediatorVtable[2])
-        : nullptr;
-    const int registerResult = registerEngine
-        ? registerEngine(&g_LoginMediatorStub, g_pLauncherObject6304)
+    if (mxo::ltlogin::g_CurrentLoginMediator == nullptr) {
+        mxo::ltlogin::g_CurrentLoginMediator = new mxo::ltlogin::CLTLoginMediator();
+    }
+
+    const int registerResult = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default
+        ? static_cast<int>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->Initialize(
+              static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(
+                  g_pLauncherObject6304)))
         : 1;
 
     const bool operationSucceeded = (registerResult < 1);
@@ -522,17 +523,16 @@ bool CLauncher::RunClientDllLifecycle() const {
     // anchor: launcher.exe:0x40a55c..0x40a5a4
     // - arg1/arg2 come from launcher globals `0x4d2c5c/0x4d2c60`, not from a helper object call
     // - arg8 is a byte global at `0x4d2c69` zero-extended through `EDX` before the push
-    // Current direction:
-    // - go back to the wrapper-facing arg6 shell for stable startup behavior
-    // - keep thinning wrapper bodies toward direct owner calls so we can prove which slots still
-    //   need ABI thunking and which wrapper semantics are already unnecessary under clang-msvc
+    // Raw-arg6 retry after removing all mediator ABI thunk assembly and correcting the semantic
+    // signatures of the previously suspicious crash-reporter slots.
+    void* const initClientMediator = static_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default);
     const int initResult = initClientDLL(
         g_LauncherFilteredArgCount,
         g_LauncherFilteredArgv,
         g_hClient,
         g_hCres,
         g_pLauncherObject6304,
-        &g_LoginMediatorStub,
+        initClientMediator,
         packedArg7Selection,
         g_LauncherInitClientFlagByte);
     spdlog::info("InitClientDLL returned: {}", initResult);
@@ -578,7 +578,9 @@ bool CLauncher::InitInstance() {
     }
 
     ConfigureRecoveredServerGlobalsEarlyFromServerConfig();
-    DiagnosticInitializeMediatorStub();
+    if (mxo::ltlogin::g_CurrentLoginMediator == nullptr) {
+        mxo::ltlogin::g_CurrentLoginMediator = new mxo::ltlogin::CLTLoginMediator();
+    }
 
     // Text-only replacement note:
     // - original 0x40b739 calls `AfxInitRichEdit()` before `0x40a380`

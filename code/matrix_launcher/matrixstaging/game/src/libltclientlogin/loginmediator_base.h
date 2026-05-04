@@ -441,7 +441,7 @@ public:
     // +0x04
     // Fidelity note:
     // - keep this as an explicit placeholder slot so the source-side abstract surface matches the
-    //   recovered arg6 ABI order used by launcher.exe/client.dll and by `g_LoginMediatorVtable`
+    //   recovered arg6 ABI order used by launcher.exe/client.dll and by the live arg6 vtable
     // - do not collapse this to a commented-out destructor entry; when omitted entirely, every
     //   later virtual shifts relative to the wrapper-facing table
     virtual void UnknownSlot04() {}
@@ -452,6 +452,8 @@ public:
     // +0x0c
     virtual void ClearEngine() = 0;
     // +0x10
+    // client.dll early startup repeatedly gates InitClientDLL flow on this slot before the later
+    // auth/selection handoff and before feeding arg5 into the runtime loop.
     virtual uint32_t IsReady() = 0;
     // +0x14
     virtual void UnknownSlot5() {}
@@ -466,16 +468,21 @@ public:
     // +0x28
     virtual void UnknownSlot10() {}
     // +0x2c
+    // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 here before feeding arg5 into the
+    // runtime loop.
     virtual uint32_t IsConnected() = 0;
     // +0x30
     virtual uint32_t ProcessLoginRequest(const SubmitLoginRequestInput_0x407d50& input) = 0;
     // +0x34
     virtual void RequestAuthCloseAndSwitchToState0() = 0;
     // +0x38
+    // anchor: client profile-path construction later formats `Profiles\\%s\\...` with this slot.
     virtual const char* GetUsername() const = 0;
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
+    // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 here with the scratch-shaped arg7
+    // selection request object and consumes the returned slot record.
     virtual Packet_AsAuthReply_0x4b5328* GetAuthReplyPacketByIndex40(
         uint32_t selectionIndex) = 0;
     // +0x44
@@ -485,10 +492,14 @@ public:
     // +0x4c
     virtual const char* GetProfileOrSessionName() const = 0;
     // +0x50
+    // anchor: client.dll:0x625c86d0 later calls this slot and converts null/non-null into a flag.
     virtual void* BootstrapRaw08AuxHandle50() const = 0;
     // +0x54
     virtual uint32_t HasBootstrapRaw08AuxHandle54() const = 0;
     // +0x58
+    // anchor: client.dll:0x62001325..0x62001362 passes the low byte from this slot into
+    // `FUN_6236fa40(..., flag)`; launcher.exe also seeds the crashreporter PromptForSecurId global
+    // from the same byte.
     virtual uint32_t GetCrashReporterPromptForSecurId58() const = 0;
     // +0x5c
     // Fidelity correction from launcher.exe:0x41f3a0:
@@ -505,52 +516,76 @@ public:
     // +0x64
     virtual uint32_t GetBootstrapSuccessHeaderDword64() const = 0;
     // +0x68
+    // client helper `0x62198670` uses this as the `hl.cfg` live-corpus gate; launcher getter returns owner byte `+0x140e`
     virtual uint32_t HasLiveHlCfg68() const = 0;
     // +0x6c
+    // client helper `0x62198770` uses this as the `an.cfg` live-corpus gate; launcher getter returns owner byte `+0x1416`
     virtual uint32_t HasLiveAnCfg6c() const = 0;
     // +0x70
+    // client helper `0x62198870` uses this as the `pi.cfg` live-corpus gate; launcher getter returns owner byte `+0x141e`
     virtual uint32_t HasLivePiCfg70() const = 0;
     // +0x74
+    // client helper `0x62198970` uses this as the `ai.cfg` live-corpus gate; launcher getter returns owner byte `+0x1426`
     virtual uint32_t HasLiveAiCfg74() const = 0;
     // +0x78
+    // client helper `0x62198a70` uses this as the `cs.cfg` live-corpus gate; launcher getter returns owner byte `+0x142e`
     virtual uint32_t HasLiveCsCfg78() const = 0;
     // +0x7c
+    // client helper `0x62198b70` uses this as the `bl.cfg` live-corpus gate; launcher getter returns owner byte `+0x13fe`
     virtual uint32_t HasLiveBlCfg7c() const = 0;
     // +0x80
+    // client helper `0x62198c60` uses this as the `il.cfg` live-corpus gate; launcher getter returns owner byte `+0x1406`
     virtual uint32_t HasLiveIlCfg80() const = 0;
     // +0x84
+    // client helper `0x62198d50` uses this as the `rl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1448`
     virtual uint32_t HasLiveRlCfg84() const = 0;
     // +0x88
+    // client helper `0x62198e50` uses this as the `cl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1452`
     virtual uint32_t HasLiveClCfg88() const = 0;
     // +0x8c
+    // client helper `0x62198fa0` uses this as the `mcd.cfg` mediator-backed gate; launcher getter returns owner byte `+0x13f6`
     virtual uint32_t HasState8PersistenceData8c() const = 0;
     // +0x90
+    // client helper `0x621993d0` uses this as the `cui.cfg` live-corpus gate; launcher getter returns owner byte `+0x145a`
     virtual uint32_t HasLiveCuiCfg90() const = 0;
     // +0x94
+    // client helper `0x62198670` uses this as the `hl.cfg` live-corpus getter; launcher getter returns owner `+0x1408`, out-length `+0x140c`
     virtual void* GetLiveHlCfg94(uint32_t* outLength) const = 0;
     // +0x98
+    // client helper `0x62198770` uses this as the `an.cfg` live-corpus getter; launcher getter returns owner `+0x1410`, out-length `+0x1414`
     virtual void* GetLiveAnCfg98(uint32_t* outLength) const = 0;
     // +0x9c
+    // client helper `0x62198870` uses this as the `pi.cfg` live-corpus getter; launcher getter returns owner `+0x1418`, out-length `+0x141c`
     virtual void* GetLivePiCfg9c(uint32_t* outLength) const = 0;
     // +0xa0
+    // client helper `0x62198970` uses this as the `ai.cfg` live-corpus getter; launcher getter returns owner `+0x1420`, out-length `+0x1424`
     virtual void* GetLiveAiCfgA0(uint32_t* outLength) const = 0;
     // +0xa4
+    // client helper `0x62198a70` uses this as the `cs.cfg` live-corpus getter; launcher getter returns owner `+0x1428`, out-length `+0x142c`
     virtual void* GetLiveCsCfgA4(uint32_t* outLength) const = 0;
     // +0xa8
+    // client helper `0x62198b70` uses this as the `bl.cfg` live-corpus getter; launcher getter returns owner `+0x13f8`, out-length `+0x13fc`
     virtual void* GetLiveBlCfgA8(uint32_t* outLength) const = 0;
     // +0xac
+    // client helper `0x62198c60` uses this as the `il.cfg` live-corpus getter; launcher getter returns owner `+0x1400`, out-length `+0x1404`
     virtual void* GetLiveIlCfgAc(uint32_t* outLength) const = 0;
     // +0xb0
+    // client helper `0x62198d50` uses this as the `rl.cfg` live-corpus getter; launcher getter returns owner `+0x1440`, out-length `+0x1444`
     virtual void* GetLiveRlCfgB0(uint32_t* outLength) const = 0;
     // +0xb4
+    // client helper `0x62198e50` uses this as the `cl.cfg` live-corpus getter; launcher getter returns owner `+0x144c`, out-length `+0x1450`
     virtual void* GetLiveClCfgB4(uint32_t* outLength) const = 0;
     // +0xb8
+    // client helper `0x621993d0` uses this as the `cui.cfg` live-corpus getter; launcher getter returns owner `+0x1454`, out-length `+0x1458`
     virtual void* GetLiveCuiCfgB8(uint32_t* outLength) const = 0;
     // +0xbc
+    // client helper `0x62198fa0` uses this as the `mcd.cfg` mediator-backed header getter; launcher getter returns owner `+0xf48`
     virtual const void* GetState8PersistenceHeaderBc() const = 0;
     // +0xc0
+    // client helper `0x62198fa0` uses this as the `mcd.cfg` mediator-backed body getter; launcher getter returns owner `+0xf88`
     virtual const void* GetState8PersistenceBodyC0() const = 0;
     // +0xc4
+    // client helper `0x62198fa0` uses this as the `mcd.cfg` overflow-tail getter; launcher getter returns owner `+0x13f0`, out-length `+0x13f4`
     virtual void* GetState8PersistenceOverflowC4(uint16_t* outLength) const = 0;
     // +0xc8
     virtual uint32_t HasState8Section11Dword145c() const = 0;
@@ -561,6 +596,7 @@ public:
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8
+    // anchor: client.dll:0x62170b00 gates arg7 high-byte selection flow through this slot.
     virtual uint32_t GetArg7SelectionUpperBoundExclusive() const = 0;
     // +0xdc
     virtual const char* MapSelectionName(uint32_t selectionHighByte) const = 0;
@@ -574,6 +610,8 @@ public:
     // +0xe8
     virtual uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) = 0;
     // +0xec
+    // anchor: client.dll:0x62170f48 consumes the assembled 0xb4 selection/config handoff through
+    // this slot and drives the state3(wait)->state8 persistence transition.
     virtual uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) = 0;
     // +0xf0
     virtual uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) = 0;
@@ -600,8 +638,11 @@ public:
     // +0x11c
     virtual void UnknownSlot71() {}
     // +0x120
+    // anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
+    // post-auth create-character source block through this slot.
     virtual uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) = 0;
     // +0x124
+    // anchor: deeper client init hands netShell/netMgr/distrObjExecutive through this slot.
     virtual void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) = 0;
     // +0x128
     virtual void UnknownSlot74() {}
