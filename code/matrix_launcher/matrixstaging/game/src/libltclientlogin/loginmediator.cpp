@@ -629,7 +629,7 @@ void* CLTLoginMediator::BootstrapRaw08AuxHandle50() const {
 }
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
-bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
+uint32_t CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
     const bool present = authBootstrapChild680_
                              ? AuthBootstrapChildFromWriteHelper(*authBootstrapChild680_)
                                    .HasBootstrapRaw08AuxHandle54()
@@ -641,7 +641,7 @@ bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
 }
 
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
-uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
+uint32_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
     // Static body:
     //   mov eax, [ecx+0x680]
     //   mov al,  [eax+0x104]
@@ -1204,7 +1204,7 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
 // Direct owner-side slot-record status reader reused by the page-7 row builder / resolver. The
 // launcher passes the packed-row high word here; any negative / out-of-range index naturally falls
 // through to the same default status 7 as the original body.
-uint8_t CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const {
+uint32_t CLTLoginMediator::GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const {
     if (!currentState_) {
         return 7u;
     }
@@ -1408,7 +1408,7 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
 // Active replacement path note:
 // - the current text-mode selection menu only reaches this after auth success
 // - so the wrapper-facing gate byte now comes only from the recovered owner descriptor Status byte
-uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const {
+uint32_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const {
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t selectionGateByte100 =
         (stateAllowsDescriptorRead && index <= 0xffu)
@@ -1427,7 +1427,7 @@ uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x104
 // Corrected off-by-one read from Ghidra/disassembly: this wrapper slot now surfaces owner
 // descriptor Type byte `+0x18`, not server-version low byte.
-uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
+uint32_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t worldTypeByte = stateAllowsDescriptorRead
         ? ((index <= 0xffu) ? GetWorldListTypeByIndex(static_cast<uint8_t>(index)) : 0u)
@@ -1443,7 +1443,7 @@ uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
 
 // anchor: launcher.exe:0x41b3a0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x108
-uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const {
+uint32_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const {
     const bool stateAllowsDescriptorRead = currentState_ != nullptr && currentState_->GetStateId() > 2u;
     const uint8_t populationNibble = stateAllowsDescriptorRead
         ? ((index <= 0xffu) ? GetWorldListPopulationByIndex(static_cast<uint8_t>(index)) : 0u)
@@ -1670,7 +1670,7 @@ void CLTLoginMediator::SetSharedMarginPacketField660(uint32_t value) {
 // - tiny slot body uses owner auth-connection state (`+0x18`, `+0x2c`)
 // - keep that explicit instead of conflating it with the margin/state9 `+0x16c` family
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
+uint32_t CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
     if (!authConnection_) {
         spdlog::info(
             "CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1(+0x164 wrapper-facing) -> 0 [authConnection=<null> owner+0x2c={}]",
@@ -1701,7 +1701,7 @@ bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
 // - launcher teardown treats this as a close-and-wait-event-`0x0f` predicate
 // - the same underlying owner body is also the state9 success-side helper anchored below at
 //   `0x41b420`
-bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
+uint32_t CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
     if (!marginConnection_) {
         return false;
     }
@@ -1729,7 +1729,7 @@ bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
 }
 
 // anchor: launcher.exe:0x41ddb0 slot +0x170
-bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
+uint32_t CLTLoginMediator::RegisterLoginObserver(void* observer) {
     // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator_0x4af2b8.Default` object now
     // identifies `+0x170` as insertion into the owner `+0x674` listener tree, not as a startup
     // context handoff.
@@ -1766,7 +1766,7 @@ bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
 }
 
 // anchor: launcher.exe:0x41dde0 slot +0x174
-bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
+uint32_t CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator_0x4af2b8.Default` object now
     // identifies `+0x174` as removal from the owner `+0x674` listener tree.
     if (!observer) {
@@ -1988,7 +1988,7 @@ const uint32_t* CLTLoginMediator::GetNoPatchClientVersionValuePtr0c() const {
 }
 
 // anchor: launcher.exe:0x41f050
-uint8_t CLTLoginMediator::GetUnknownByte05() const {
+uint32_t CLTLoginMediator::GetUnknownByte05() const {
     return unknownByte05_;
 }
 

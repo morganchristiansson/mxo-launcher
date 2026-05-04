@@ -456,7 +456,7 @@ public:
     // +0x14
     virtual void UnknownSlot5() {}
     // +0x18 anchor: launcher.exe:0x41f050 = vtable slot +0x18
-    virtual uint8_t GetUnknownByte05() const = 0;
+    virtual uint32_t GetUnknownByte05() const = 0;
     // +0x1c
     virtual void SetValue1(void* value) = 0;
     // +0x20
@@ -487,9 +487,9 @@ public:
     // +0x50
     virtual void* BootstrapRaw08AuxHandle50() const = 0;
     // +0x54
-    virtual bool HasBootstrapRaw08AuxHandle54() const = 0;
+    virtual uint32_t HasBootstrapRaw08AuxHandle54() const = 0;
     // +0x58
-    virtual uint8_t GetCrashReporterPromptForSecurId58() const = 0;
+    virtual uint32_t GetCrashReporterPromptForSecurId58() const = 0;
     // +0x5c
     virtual const char* GetCrashReporterUsername5c(const void* chainedValueToken) = 0;
     // +0x60
@@ -562,7 +562,7 @@ public:
     // anchor: launcher.exe:0x41b2a0
     // Direct slot-record status reader used by the page-7 row builder / resolver. The launcher may
     // feed a sign-extended row high word here; out-of-range values naturally fall back to 7.
-    virtual uint8_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const = 0;
+    virtual uint32_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const = 0;
     // +0xe8
     virtual uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) = 0;
     // +0xec
@@ -576,11 +576,11 @@ public:
     // +0xfc
     virtual const char* GetWorldNameByIndex(uint32_t index) = 0;
     // +0x100
-    virtual uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const = 0;
+    virtual uint32_t GetWorldSelectionGateByteByIndex(uint32_t index) const = 0;
     // +0x104
-    virtual uint8_t GetWorldTypeByteByIndex(uint32_t index) const = 0;
+    virtual uint32_t GetWorldTypeByteByIndex(uint32_t index) const = 0;
     // +0x108
-    virtual uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
+    virtual uint32_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
     // +0x10c
     virtual const std::vector<char>& GetRouteDescriptor30() const = 0;
     // +0x110
@@ -626,15 +626,15 @@ public:
     // +0x160
     virtual void UnknownSlot88() {}
     // +0x164
-    virtual bool RequestAuthConnectionCloseWaitEvent1() = 0;
+    virtual uint32_t RequestAuthConnectionCloseWaitEvent1() = 0;
     // +0x168
     virtual void UnknownSlot90() {}
     // +0x16c
-    virtual bool RequestMarginConnectionCloseWaitEvent0f() = 0;
+    virtual uint32_t RequestMarginConnectionCloseWaitEvent0f() = 0;
     // +0x170
-    virtual bool RegisterLoginObserver(void* observer) = 0;
+    virtual uint32_t RegisterLoginObserver(void* observer) = 0;
     // +0x174
-    virtual bool UnregisterLoginObserver(void* observer) = 0;
+    virtual uint32_t UnregisterLoginObserver(void* observer) = 0;
     // +0x178
     virtual uint32_t GetLastLoginStatus() = 0;
     // +0x17c

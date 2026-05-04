@@ -385,7 +385,7 @@ public:
     // anchor: launcher.exe:0x41f050 = vtable +0x18
     // Returns owner `+0x05` (mbr_0x5). Default 0, set to 1 by SetUnknownByte05().
     // This byte is written to MS_ConnectRequest offset 0x22.
-    uint8_t GetUnknownByte05() const override;
+    uint32_t GetUnknownByte05() const override;
 
     // source-owned narrow accessor for owner `+0x94 + 0x60` small-string begin pointer.
     // Current concrete state7 use from `0x43ba20`:
@@ -436,10 +436,10 @@ public:
     // anchor: launcher.exe:0x41f360 / exact tiny body returns child `+0x10c`
     const char* GetProfileOrSessionName() const override;
     // +0x54
-    bool HasBootstrapRaw08AuxHandle54() const override;
+    uint32_t HasBootstrapRaw08AuxHandle54() const override;
     // +0x58
     // anchor: launcher.exe:0x41f390 / exact tiny body returns child byte `+0x104` in AL
-    uint8_t GetCrashReporterPromptForSecurId58() const override;
+    uint32_t GetCrashReporterPromptForSecurId58() const override;
     // +0x5c
     // anchor: launcher.exe:0x41f3a0 / tiny getter returns child `+0xf4+0x85` or pooled empty string
     const char* GetCrashReporterUsername5c(const void* chainedValueToken) override;
@@ -544,9 +544,9 @@ public:
     const char* GetVariantWorldName(uint32_t variantIndex) override;
     // +0xe4
     // anchor: launcher.exe:0x41b2a0
-    uint8_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const override;
+    uint32_t GetSlotRecordStatusBySelectionIndex(int32_t selectionIndex) const override;
     // +0x164
-    bool RequestAuthConnectionCloseWaitEvent1() override;
+    uint32_t RequestAuthConnectionCloseWaitEvent1() override;
 
     // +0x34
     // anchor: launcher.exe:0x41c0d0
@@ -555,7 +555,7 @@ public:
     void RequestAuthCloseAndSwitchToState0() override;
     // +0x16c
     // Wrapper-facing split kept explicit from the owner-side state9 helper below.
-    bool RequestMarginConnectionCloseWaitEvent0f() override;
+    uint32_t RequestMarginConnectionCloseWaitEvent0f() override;
     // +0x178
     uint32_t GetLastLoginStatus() override;
 
@@ -585,9 +585,9 @@ public:
     // observer registration bridge for arg6/`ILTLoginMediator_0x4af2b8.Default` slots `+0x170/+0x174`.
     void PostEvent(uint32_t eventId);
     void PostError(uint32_t errorId);
-    bool RegisterLoginObserver(void* observer) override;
+    uint32_t RegisterLoginObserver(void* observer) override;
     // +0x174
-    bool UnregisterLoginObserver(void* observer) override;
+    uint32_t UnregisterLoginObserver(void* observer) override;
     // Observer count getters for wrapper diagnostics (moved from g_MediatorRuntimeState):
 
 
@@ -710,9 +710,9 @@ public:
     // - `+0x104/+0x108` still stay `0` until the real descriptor table is present
     uint32_t GetWorldCount() const override;
     const char* GetWorldNameByIndex(uint32_t index) override;
-    uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const override;
-    uint8_t GetWorldTypeByteByIndex(uint32_t index) const override;
-    uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const override;
+    uint32_t GetWorldSelectionGateByteByIndex(uint32_t index) const override;
+    uint32_t GetWorldTypeByteByIndex(uint32_t index) const override;
+    uint32_t GetWorldPopulationNibbleByIndex(uint32_t index) const override;
 
     // Focused source home for auth-entry/connect-status scaffolding:
     // - `loginmediator_auth_entry.cpp`
