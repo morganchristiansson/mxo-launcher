@@ -1545,7 +1545,7 @@ public:
     //   `0x41bc20/0x41bbb0`-style seam first
     // - then route decoded code `2/4/5` through the recovered direct helper families before the
     //   later connection/owner continuations
-    virtual uint32_t DispatchMessage(void* messageRef);
+    uint32_t DispatchMessage(void* messageRef) override;
 
     // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_0x4b64a8_HandleCode2CertChallengeAndSendResponse)
     // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse

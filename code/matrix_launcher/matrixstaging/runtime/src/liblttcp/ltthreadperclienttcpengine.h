@@ -80,12 +80,12 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair {
 // - `+0x08` = shared status/payload dword used by connection/completion consumers
 struct CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader {
     void** vtable; // +0x00
-    uint32_t workType; // +0x04
+    uint32_t workType04; // +0x04
     uint32_t statusOrPayloadDword08; // +0x08
 };
 
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader) == 0x0c, "work-item header size mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, workType) == 0x04, "work-item header workType offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, workType04) == 0x04, "work-item header workType04 offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, statusOrPayloadDword08) == 0x08, "work-item header status/payload offset mismatch");
 
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_QueueRecord) == 0x28, "queue record size mismatch");
@@ -104,7 +104,7 @@ public:
     virtual uint32_t ReleaseSlot();
 
 private:
-    uint32_t workType_;
+    uint32_t workType04_;
     uint32_t statusOrPayloadDword08_;
 };
 
@@ -121,7 +121,7 @@ public:
     virtual uint32_t ReleaseSlot();
 
 private:
-    uint32_t workType_;
+    uint32_t workType04_;
     uint32_t statusOrPayloadDword08_;
 };
 
@@ -392,7 +392,7 @@ public:
     // slot 12 / derived body `launcher.exe:0x4316a0`, base stub currently unresolved (`0x441790`)
     virtual uint32_t CleanupConnection(void* contextKey) = 0;
 
-protected:
+public:
     uint32_t field04_;
     void* field08_;
     CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 queuePair0c_;
@@ -607,35 +607,7 @@ private:
     CLTCriticalSectionHelper_0x4add70 cleanupLockHelper98_;
 };
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
-    void** vtable;
-    uint32_t field04;
-    void* field08;
-    CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610 queuePair0C;
-    CLTEventCriticalSectionHelper_0x4b3e20 queueWaitHelper5C;
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* endpointTreeHead80;
-    uint32_t endpointCount84;
-    uint32_t reserved88;
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* contextTreeHead8C;
-    uint32_t contextCount90;
-    uint32_t reserved94;
-    CLTCriticalSectionHelper_0x4add70 cleanupLockHelper98;
-};
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror) == 0xb4, "layout mirror size mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field04) == 0x04, "field04 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field08) == 0x08, "field08 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C) == 0x0c, "queuePair0C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queuePair0C.queue28) == 0x34, "queuePair0C.queue28 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueWaitHelper5C) == 0x5c, "queueWaitHelper5C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointTreeHead80) == 0x80, "endpointTreeHead80 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointCount84) == 0x84, "endpointCount84 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, reserved88) == 0x88, "reserved88 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, contextTreeHead8C) == 0x8c, "contextTreeHead8C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, contextCount90) == 0x90, "contextCount90 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, reserved94) == 0x94, "reserved94 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, cleanupLockHelper98) == 0x98, "cleanupLockHelper98 offset mismatch");
-static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768) == sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror), "CLTThreadPerClientTCPEngine_0x4b2768 size must match launcher arg5");
 
 // Starter binding object used by the launcher scaffold while arg5 still enters through
 // the dedicated launcher-network ABI layer in src/launcher_network_object_abi.cpp.

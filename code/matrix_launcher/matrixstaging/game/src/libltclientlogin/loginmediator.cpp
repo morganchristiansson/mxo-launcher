@@ -1816,7 +1816,7 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connecti
 
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
+    if (workHeader->workType04 == mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x41afa5
         authConnection_ = nullptr;
     }
@@ -1852,7 +1852,7 @@ uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallback(void* connec
 
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
+    if (workHeader->workType04 == mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x41afe7
         // launcher.exe also zeroes owner `+0x20` here; keep that discrepancy documented until the
         // source layout grows a proven home for it.

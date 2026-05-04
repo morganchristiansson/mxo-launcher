@@ -28,7 +28,7 @@ uint32_t CLTLoginState_State1_0x4b4fc4::Slot1_HandlePrimaryGate(void* workItem) 
 
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    const uint32_t workType = workHeader ? workHeader->workType : 0u;
+    const uint32_t workType = workHeader ? workHeader->workType04 : 0u;
 
     // Assembly flow:
     // - if work type != 2: tail-call base CLTLoginState::Slot1_HandlePrimaryGate (0x438d80)

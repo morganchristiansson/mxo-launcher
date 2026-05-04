@@ -1299,7 +1299,7 @@ void CMessageConnection_0x4b7928::SendPacketMessageRef(
 static void CMessageConnection_0x4b7928_LogUnhandledOperation(void* workItem) {
     const auto* header =
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    const uint32_t workType = header ? header->workType : 0u;
+    const uint32_t workType = header ? header->workType04 : 0u;
     const uint32_t resultCode = header ? header->statusOrPayloadDword08 : 0u;
     const char* resultName = CResultNameArrayItem_GetResultName(resultCode);
     spdlog::info(
@@ -1350,7 +1350,7 @@ static uint32_t CMessageConnection_0x4b7928_WorkItemType(const void* workItem) {
 
     const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader* header =
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    return header->workType;
+    return header->workType04;
 }
 
 // anchor: launcher.exe:0x4490c0 -> 0x434d00
@@ -2417,7 +2417,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWork
     // meth_0x441850 (0x441850) creates a local work item and passes it to connection vtable+0x10.
     // Original directly constructs the work item; use the simple scaffold approach that works.
     CMarginConnectionLocalCompletionWorkItemScaffold workItem = {};
-    workItem.header.workType = 0x0bu;
+    workItem.header.workType04 = 0x0bu;
     workItem.header.statusOrPayloadDword08 = workPayloadStatus;
 
     CMessageConnection_0x4b7928* selfAsMessageConnection = this;

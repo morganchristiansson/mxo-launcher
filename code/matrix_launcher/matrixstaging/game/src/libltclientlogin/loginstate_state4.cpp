@@ -21,7 +21,7 @@ uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem
     // anchor: launcher.exe:0x4393fa-0x439401 - call workItem->GetWorkType() == 2?
     const auto* workItemHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    if (workItemHeader->workType !=
+    if (workItemHeader->workType04 !=
         mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus) {
         return CLTLoginState::Slot2_HandleSecondaryGate(workItem);
     }

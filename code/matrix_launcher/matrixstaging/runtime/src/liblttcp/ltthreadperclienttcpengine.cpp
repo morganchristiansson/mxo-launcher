@@ -188,7 +188,7 @@ static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorag
     // - the launcher ABI layer only bridges call/dispatch differences around that storage
     // - do not reintroduce shell-owned queue mirroring here unless a future compiler/ABI port
     //   proves that raw cross-module queue-subobject access can no longer stay native
-    return &reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror*>(self)->queuePair0C;
+    return &static_cast<CLTBaseThreadPerClientTCPEngine_0x4b3e74*>(self)->queuePair0c_;
 }
 
 static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -851,7 +851,7 @@ static uint32_t CLTIPSocket_StaticAllocateSocket(
 // anchor: launcher.exe:0x435050 / vtable `0x004b3df8`
 CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8::CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8(
     uint32_t statusOrPayloadDword08)
-    : workType_(CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus)
+    : workType04_(CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus)
     , statusOrPayloadDword08_(statusOrPayloadDword08) {}
 
 // anchor: launcher.exe:0x435c30 / deleting dtor slot at vtable `0x004b3df8`
@@ -865,7 +865,7 @@ uint32_t CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_0x4b3df8::ReleaseS
 
 // anchor: launcher.exe:0x435070 / vtable `0x004b3e00`
 CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00::CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00()
-    : workType_(CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose)
+    : workType04_(CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose)
     , statusOrPayloadDword08_(0u) {}
 
 // anchor: launcher.exe:0x435c80 / deleting dtor slot at vtable `0x004b3e00`
@@ -1816,7 +1816,7 @@ static uint32_t QueueWorkItem_GetType(const void* workItem) {
     }
     const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader* header =
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
-    return header->workType;
+    return header->workType04;
 }
 
 // Current queue/runtime pass keeps launcher.exe as the source of truth and trims prior
