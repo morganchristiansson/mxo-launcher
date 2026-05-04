@@ -948,47 +948,22 @@ static uint32_t __thiscall Mediator_HandleMarginConnectionCompletionFallback(
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HandleMarginConnectionCompletionFallback(connection, workItem);
 }
 
-// UNANCHORED: C helper behind the recovered +0x18c ABI wrapper.
-// Thin ABI thunk only: preserve the wrapper-facing entry/return shape, but let the owner-side
-// callback-blob builder own the full state9 logic directly.
-extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
+// anchor: launcher.exe:0x41e690 / arg6 vtable +0x18c
+// Direction-A retry after fixing the real +0x5c/+0x60 semantic signatures and keeping their ABI
+// thunks: plain wrapper-facing member-call shape with direct owner forwarding.
+static uint32_t __thiscall Mediator_FillState9CallbackBlob18c(
     MinimalLoginMediatorStub* self,
     void* outBuffer,
     uint32_t arg2,
-    uint32_t arg3,
-    void* returnAddress) {
+    uint32_t arg3) {
     (void)self;
-    (void)returnAddress;
-
     if (!outBuffer) {
         return 1u;
     }
-
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->FillState9CallbackBlob18c(
         static_cast<uint32_t*>(outBuffer),
         arg2,
         arg3);
-}
-
-// anchor: launcher.exe:0x41e690 / arg6 vtable +0x18c
-__attribute__((naked)) static void Mediator_FillState9CallbackBlob18c() {
-    __asm__ volatile(
-        "mov 0(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "mov 16(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "mov 16(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "mov 16(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $20, %%esp\n\t"
-        "ret $12\n\t"
-        :
-        : "i"(Mediator_FillState9CallbackBlob18c_Impl)
-        : "eax");
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x164
