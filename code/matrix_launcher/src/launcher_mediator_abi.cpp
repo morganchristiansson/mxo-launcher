@@ -710,23 +710,10 @@ static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediat
 // anchor: launcher.exe:0x41f180
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xc0
 // Live original `client.dll:0x62198fa0` copies 0x465 bytes from this pointer into DAT_629ea648-backed state.
-// Post-event-0x18 continuation note:
-// - event `0x0b` later reads byte `+0x464` from this returned block into client global
-//   `DAT_629e689d`
-// - `0x621704a0` then uses that same global as an early state-0 branch gate before any possible
-//   `ClientViewFactory_GetOrCreateViewById(0x67)` / `0x6298a5e8` observer-registration path
+// Thin wrapper only: launcher.exe `0x41f180` is just the tiny owner-body getter.
 static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    void* const body = const_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8PersistenceBodyC0());
-    const uint8_t byte464 = body ? *(reinterpret_cast<const uint8_t*>(body) + 0x464u) : 0u;
-    spdlog::info(
-        "MediatorStub::GetState8PersistenceBodyC0 caller={} [{}] result={} byte464=0x{:02x}",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(body),
-        static_cast<unsigned>(byte464));
-    return body;
+    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8PersistenceBodyC0());
 }
 
 // anchor: launcher.exe:0x41aec0
@@ -926,52 +913,23 @@ static void* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* s
     return const_cast<std::vector<std::vector<char>>*>(&entryStorage);
 }
 
-// UNANCHORED: C helper behind the recovered +0xec ABI wrapper.
-// thin wrapper forwarding to CLTLoginMediator::PersistSelectionContextForState8
+// anchor: launcher.exe:0x41c1f0 / arg6 vtable +0xec
+// Thin ABI thunk only: forward the scratch-shaped 0xb4 selection snapshot to the faithful
+// owner-side body and let `CLTLoginMediator::PersistSelectionContextForState8` own the logic.
 extern "C" void Mediator_PersistSelectionContextForState8_Impl(
     MinimalLoginMediatorStub* self,
     void* selectionContext,
     void* returnAddress) {
-  mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-  if (!mediator) {
+  (void)self;
+  (void)returnAddress;
+
+  mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
+  if (mediator == nullptr || selectionContext == nullptr) {
     return;
   }
 
-  if (selectionContext) {
-    mxo::ltlogin::State3SelectionContextInputSketch input = {};
-    std::memcpy(&input, selectionContext, sizeof(input));
-    mediator->PersistSelectionContextForState8(input);
-    // Current bounded client-side proof:
-    // - `ClientShell_OnEngineInitialized` (`0x6216f060`) earlier pushes a direct visible status
-    // sequence
-    // - `InitClientDLL_BeginLoadingCharacterFlow` then sets visible text `"Loading Character"`
-    // at `0x62170f2a`
-    // - it then immediately calls arg6 `+0xec` at `0x62170f48`
-    // Diagnostic stance:
-    // - the earlier launcher-owned progress-text mirrors were removed because they were not a
-    // trustworthy source of exact client-visible text
-    // - exact loading/status logging now comes only from the opt-in `client.dll:0x6215b930`
-    // hook when that diagnostic env flag is enabled
-  } else {
-    mediator->ResetSelectionContext0ecMirror();
-  }
-
-  // Keep the wrapper-facing arg6 `+0x1c` semantic split explicit.
-  // Store the input in the stub for client-side code that may read it without going through
-  // the owner vtable family. This is an ABI-wrapper concern, not a CLTLoginMediator field.
-  // The actual PersistSelectionContextForState8 call is made above (lines 830-846).
-  if (self) {
-    // Copy the input to stub-owned storage for field1C exposure
-    static thread_local mxo::ltlogin::State3SelectionContextInputSketch tl_input{};
-    if (selectionContext) {
-      std::memcpy(&tl_input, selectionContext, sizeof(tl_input));
-    } else {
-      tl_input = {};
-    }
-    self->field1C = &tl_input;
-  }
-
-  (void)returnAddress;
+  mediator->PersistSelectionContextForState8(
+      *static_cast<const mxo::ltlogin::State3SelectionContextInputSketch*>(selectionContext));
 }
 
 // anchor: client.dll:0x62170f48 consumes the assembled 0xb4 selection/config handoff through arg6 +0xec
