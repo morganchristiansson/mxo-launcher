@@ -89,7 +89,9 @@ void CLTLoginState_State9_0x4b517c::Slot3_BeginOrContinue(CLTLoginState* upstrea
 
     // Current best read from `0x439780` + `0x41de40`:
     // - this state consumes helper-local byte/word payload at `this+4/+6`
-    // - forwards them into the owner helper
+    // - producer tails in state8/state11 also preserve a live helper byte at `this+5`
+    //   (`pendingReplySectionCount5_`), even though `0x439780` itself does not pass it onward
+    // - forwards `this+4/+6` into the owner helper
     // - clears the local payload regardless of branch
     // - posts event `0x17` when that helper returns `< 1`
     // - newer original-launcher WineDbg now proves the natural path continues not just into this
@@ -102,23 +104,27 @@ void CLTLoginState_State9_0x4b517c::Slot3_BeginOrContinue(CLTLoginState* upstrea
     //   - `this+4 = 0`
     //   - `this+6 = 0x2710`
     const uint8_t consumedByte4 = pendingByte4_;
+    const uint8_t preservedReplySectionCount5 = pendingReplySectionCount5_;
     const uint16_t consumedWord6 = pendingWord6_;
     const uint32_t submitResult = g_CurrentLoginMediator->State9SubmitFollowup(consumedByte4, consumedWord6);
     pendingByte4_ = 0;
+    pendingReplySectionCount5_ = 0;
     pendingWord6_ = 0;
 
     if (submitResult < 1u) {
         // anchor: launcher.exe:0x439780 success-side event post after the `0x41de40` submit call.
         g_CurrentLoginMediator->PostEvent(0x17u);
         spdlog::info(
-            "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x} then posts event=0x17",
+            "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} preservedByte5=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x} then posts event=0x17",
             static_cast<unsigned>(consumedByte4),
+            static_cast<unsigned>(preservedReplySectionCount5),
             static_cast<unsigned>(consumedWord6),
             static_cast<unsigned>(submitResult));
     } else {
         spdlog::info(
-            "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x}",
+            "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} preservedByte5=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x}",
             static_cast<unsigned>(consumedByte4),
+            static_cast<unsigned>(preservedReplySectionCount5),
             static_cast<unsigned>(consumedWord6),
             static_cast<unsigned>(submitResult));
     }

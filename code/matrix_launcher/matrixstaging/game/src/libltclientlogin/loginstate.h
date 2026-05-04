@@ -352,12 +352,16 @@ public:
     CLTLoginState_State9_0x4b517c() = default;
 
 private:
-    // `0x00439780` consumes a local byte/word payload from `this+4/+6`.
-    // Newer natural-original WineDbg now confirms a representative live handoff there as:
+    // `0x00439780` consumes a local helper payload from `this+4/+6`, while the
+    // state8/state11 completion tails also prove a distinct live byte write at `this+5`.
+    // Newer natural-original WineDbg now confirms a representative slot-3 handoff as:
     // - `this+4 = 0`
     // - `this+6 = 0x2710`
+    // And disassembly proves the additional producer writes:
+    // - `0x43f984`: `MOV byte ptr [EDI + 0x5], DL`
+    // - `0x440373`: `MOV byte ptr [EDI + 0x5], AL`
     uint8_t pendingByte4_ = 0;
-    uint8_t padding5_ = 0;
+    uint8_t pendingReplySectionCount5_ = 0;
     uint16_t pendingWord6_ = 0;
 
 public:
@@ -370,11 +374,13 @@ public:
     // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) override;
 
-    // Fidelity: original sets pendingByte4_/pendingWord6_ from caller, no explicit setter but
-    // the call path needs this. Ghidra references: state8/state11 calls to set after successful
-    // load-character reply handoff to state9 transition.
-    void SetPendingPayload(uint8_t byte4, uint16_t word6) {
+    // Fidelity: original producer tails write helper-local payload bytes at `this+4/+5`
+    // plus the handoff word at `this+6` before switching into helper9/state9.
+    // Current source mirrors that explicit handoff shape even though `0x439780` only
+    // consumes `this+4` and `this+6` directly.
+    void SetPendingPayload(uint8_t byte4, uint8_t replySectionCount5, uint16_t word6) {
         pendingByte4_ = byte4;
+        pendingReplySectionCount5_ = replySectionCount5;
         pendingWord6_ = word6;
     }
 
@@ -671,7 +677,12 @@ public:
     const uint8_t* sectionData = nullptr;
 
 private:
-    uint32_t defaultMessageStorageHead1c_ = 0;
+    // Source-owned fallback scratch only. Static RE for `0x43ae50` / `0x43af20` shows the
+    // original launcher rebuilds the default 0x10-byte reply in the message-ref storage
+    // referenced by `messageBase04_` / `currentMessage10_`, not from a proven child field at
+    // `this+0x1c`. Keep this buffer explicit as source scaffolding rather than pretending the
+    // launcher.exe child object has confirmed inline storage here.
+    std::array<uint8_t, 0x10> sourceFallbackDefaultMessageScratch_{};
 
     uint8_t* messageBase04() const {
         return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(payloadPtr04));
@@ -698,12 +709,8 @@ private:
     }
 
     uint8_t* defaultMessageStorage1c() {
-        return reinterpret_cast<uint8_t*>(&defaultMessageStorageHead1c_);
+        return sourceFallbackDefaultMessageScratch_.data();
     }
-
-    // Extends the inherited +0x1c..+0x27 packet tail into the full 0x10-byte inline
-    // default reply buffer observed in the constructor/reset helper.
-    uint32_t defaultMessageStorageTail28_ = 0;
 };
 
 }  // namespace mxo::ltlogin

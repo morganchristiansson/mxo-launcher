@@ -943,7 +943,12 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
         }
 
         if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
-            nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
+            nextState->SetPendingPayload(
+                /*byte4=*/0,
+                /*replySectionCount5=*/loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount
+                    ? loadCharacterReplyEnvelope.expectedSectionCount0b
+                    : 0u,
+                loadCharacterReplyEnvelope.handoffWord09);
         }
         const uint32_t slot3Result = g_CurrentLoginMediator->SetCurrentState(9u);
         spdlog::info(

@@ -495,9 +495,15 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
     const bool completed = (replySectionsExpected05_ != 0u) && (replySectionsSeen04_ >= replySectionsExpected05_);
     if (completed) {
         if (auto* nextState = dynamic_cast<CLTLoginState_State9_0x4b517c*>(g_CurrentLoginMediator->LoginHelperStateByIdScaffold(9u))) {
-            // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
+            // `0x440320` writes packet byte `+0xb` into helper9 `this+5` when packet byte `+0xc == 1`,
+            // then writes parsed word `+9` into helper9 `this+6` before switching state.
             // Current source-owned mirror keeps that on the concrete state9 object.
-            nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
+            nextState->SetPendingPayload(
+                /*byte4=*/0,
+                /*replySectionCount5=*/loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount
+                    ? loadCharacterReplyEnvelope.expectedSectionCount0b
+                    : 0u,
+                loadCharacterReplyEnvelope.handoffWord09);
         }
         const uint32_t slot3Result = g_CurrentLoginMediator->SetCurrentState(9u);
         spdlog::info(
