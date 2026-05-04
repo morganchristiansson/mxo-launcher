@@ -365,32 +365,14 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
 }
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
-// Thin the wrapper to the raw owner-side packet pointer.
-// The previous sketch layer copied packet-facing fields into a fake outer object, but the
-// recovered owner body is already just a direct slot-record read and the interface prototype is
-// `Packet_AsAuthReply_0x4b5328*`. Keep the wrapper only as an ABI thunk.
-extern "C" void* Mediator_GetCurrentAuthReplyPacket44_Impl(MinimalLoginMediatorStub* self) {
-    (void)self;
-    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCurrentAuthReplyPacket44();
-}
-
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x44
 // Current wrapper-facing read from `0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md`:
 // - returns the current slot record on the later profile/save path
-// - this slot is now intentionally thinner than +0x40: we publish the raw `0x004b5328`
-//   packet/view directly instead of re-wrapping it into an extra ABI sketch layer
-// - keep that split explicit from +0x40, which still preserves the separate wrapper-facing
-//   descriptor sketch for the scratch-shaped selection request path
-__attribute__((naked)) static void Mediator_GetCurrentAuthReplyPacket44() {
-    __asm__ volatile(
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $4, %%esp\n\t"
-        "ret\n\t"
-        :
-        : "i"(Mediator_GetCurrentAuthReplyPacket44_Impl)
-        : "eax");
+// - this slot is now intentionally thin: plain wrapper-facing member-call shape with direct owner
+//   forwarding and no extra sketch object
+static void* __thiscall Mediator_GetCurrentAuthReplyPacket44(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCurrentAuthReplyPacket44();
 }
 
 // anchor: later client startup path calls arg6 +0x48 before the now-better-understood
