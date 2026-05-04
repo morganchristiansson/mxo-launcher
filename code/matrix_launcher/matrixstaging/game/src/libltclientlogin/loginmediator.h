@@ -528,7 +528,7 @@ public:
     uint32_t GetState8Section11Dword145c() const override;
     // +0xd0
     // sibling state8 section-`0x0b` small-string-like getter; launcher getter returns owner `+0x1460`
-    std::string_view GetState8Section11String1460() const override;
+    const std::vector<char>& GetState8Section11String1460() const override;
     // +0xd8
     // anchor: launcher.exe:0x41af00 / exact body returns owner byte `+0x684` only when the
     // current helper/state code is `>= 3`
@@ -1176,7 +1176,7 @@ public:
     uint16_t allocatedBufferLength1458 = 0;
     uint8_t flag145a = 0;
     uint32_t state8Section11Dword145c = 0;
-    std::string state8Section11String1460;
+    std::vector<char> state8Section11String1460;
     std::array<uint8_t, 8> replyParseBuffer{};
     uint8_t section0Flag13f6 = 0;
     uint32_t state6UdpSessionSecretF18_ = 0;  // owner +0xf18

@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace mxo::ltlogin {
 namespace {
@@ -55,26 +56,22 @@ private:
 static void CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect(
     const Packet_MsLoadCharacterReply_0x4b542c& parsedReplySectionEnvelope,
     CLTLoginMediatorCharacterPersistenceData_0x41d900& persistence,
-    std::string& section11String1460) {
+    std::vector<char>& section11String1460) {
     if (parsedReplySectionEnvelope.sectionByteCount > 4u) {
         persistence.section11Dword540 = ReadU32LE(parsedReplySectionEnvelope.sectionData);
         section11String1460.assign(
             reinterpret_cast<const char*>(parsedReplySectionEnvelope.sectionData + 4u),
             reinterpret_cast<const char*>(parsedReplySectionEnvelope.sectionData + parsedReplySectionEnvelope.sectionByteCount));
+        section11String1460.push_back('\0');
     } else {
         persistence.section11Dword540 = 0u;
-        if (!section11String1460.empty()) {
-            section11String1460[0] = '\0';
-            section11String1460.resize(0u);
-        } else {
-            section11String1460.clear();
-        }
+        section11String1460.clear();
     }
 
-    char* const section11Begin = section11String1460.data();
+    char* const section11Begin = section11String1460.empty() ? nullptr : section11String1460.data();
     persistence.section11StringBegin544 = section11Begin;
-    persistence.section11StringCurrent548 = section11Begin + section11String1460.size();
-    persistence.section11StringCapacity54c = section11Begin + section11String1460.capacity();
+    persistence.section11StringCurrent548 = section11Begin ? section11Begin + section11String1460.size() - 1u : nullptr;
+    persistence.section11StringCapacity54c = section11Begin ? section11Begin + section11String1460.capacity() : nullptr;
 }
 
 }  // namespace
@@ -835,6 +832,7 @@ uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::libltt
                 g_CurrentLoginMediator->state8Section11String1460.assign(
                     g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringBegin544,
                     g_CurrentLoginMediator->state8PersistenceDataF1c.section11StringCurrent548);
+                g_CurrentLoginMediator->state8Section11String1460.push_back('\0');
             } else {
                 g_CurrentLoginMediator->state8Section11String1460.clear();
             }

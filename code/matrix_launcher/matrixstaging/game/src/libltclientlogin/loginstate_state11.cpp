@@ -470,13 +470,14 @@ uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblt
                 ownerState.state8Section11String1460.assign(
                     reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + 4u),
                     reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + loadCharacterReplyEnvelope.sectionByteCount));
+                ownerState.state8Section11String1460.push_back('\0');
                 persistence.section11Dword540 = ownerState.state8Section11Dword145c;
-                char* const section11Begin = ownerState.state8Section11String1460.data();
+                char* const section11Begin = ownerState.state8Section11String1460.empty() ? nullptr : ownerState.state8Section11String1460.data();
                 persistence.section11StringBegin544 = section11Begin;
                 persistence.section11StringCurrent548 =
-                    section11Begin + ownerState.state8Section11String1460.size();
+                    section11Begin ? section11Begin + ownerState.state8Section11String1460.size() - 1u : nullptr;
                 persistence.section11StringCapacity54c =
-                    section11Begin + ownerState.state8Section11String1460.capacity();
+                    section11Begin ? section11Begin + ownerState.state8Section11String1460.capacity() : nullptr;
             }
             spdlog::info(
                 "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage applied shared section 0x0b side effect dword145c=0x{:08x} string1460Len={}",

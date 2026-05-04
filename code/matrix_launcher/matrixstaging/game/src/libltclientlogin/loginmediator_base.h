@@ -544,7 +544,7 @@ public:
     // +0xcc
     virtual uint32_t GetState8Section11Dword145c() const = 0;
     // +0xd0
-    virtual std::string_view GetState8Section11String1460() const = 0;
+    virtual const std::vector<char>& GetState8Section11String1460() const = 0;
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8

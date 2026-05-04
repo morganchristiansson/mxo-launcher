@@ -1063,21 +1063,14 @@ uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
 }
 
 // anchor: launcher.exe:0x41f1b0 / vtable +0xd0
-std::string_view CLTLoginMediator::GetState8Section11String1460() const {
-    const CLTLoginMediatorCharacterPersistenceData_0x41d900& snapshot = state8PersistenceDataF1c;
-    const char* const begin = snapshot.section11StringBegin544;
-    const char* const current = snapshot.section11StringCurrent548;
-    const std::string_view value =
-        (begin && current && current >= begin) ? std::string_view(begin, static_cast<size_t>(current - begin))
-                                               : std::string_view{};
-
+const std::vector<char>& CLTLoginMediator::GetState8Section11String1460() const {
     spdlog::info(
         "CLTLoginMediator::GetState8Section11String1460(+0xd0) -> begin={} current={} owner={} text='{}'",
-        fmt::ptr(begin),
-        fmt::ptr(current),
+        fmt::ptr(state8Section11String1460.empty() ? nullptr : state8Section11String1460.data()),
+        fmt::ptr(state8Section11String1460.empty() ? nullptr : state8Section11String1460.data() + state8Section11String1460.size()),
         fmt::ptr(this),
-        value.empty() ? "<empty>" : std::string(value));
-    return value;
+        state8Section11String1460.empty() ? std::string("<empty>") : std::string(state8Section11String1460.data()));
+    return state8Section11String1460;
 }
 
 // anchor: launcher.exe:0x41b4f0 +0xd4

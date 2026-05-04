@@ -760,13 +760,8 @@ static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediat
 // - do not add mediator-owned ABI helpers yet; keep the proof local to the wrapper
 static void* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
-    static thread_local std::vector<char> section11Storage;
-
-    const std::string_view section11Text = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460();
-    section11Storage.assign(section11Text.begin(), section11Text.end());
-    section11Storage.push_back('\0');
-
-    return &section11Storage;
+    const std::vector<char>& section11Storage = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460();
+    return const_cast<std::vector<char>*>(&section11Storage);
 }
 
 // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
