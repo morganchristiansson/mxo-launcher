@@ -677,12 +677,6 @@ public:
     const uint8_t* sectionData = nullptr;
 
 private:
-    // Source-owned fallback scratch only. Static RE for `0x43ae50` / `0x43af20` shows the
-    // original launcher rebuilds the default 0x10-byte reply in the message-ref storage
-    // referenced by `messageBase04_` / `currentMessage10_`, not from a proven child field at
-    // `this+0x1c`. Keep this buffer explicit as source scaffolding rather than pretending the
-    // launcher.exe child object has confirmed inline storage here.
-    std::array<uint8_t, 0x10> sourceFallbackDefaultMessageScratch_{};
 
     uint8_t* messageBase04() const {
         return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(payloadPtr04));
@@ -708,9 +702,6 @@ private:
         debugString14 = reinterpret_cast<const char*>(dataSectionBytes);
     }
 
-    uint8_t* defaultMessageStorage1c() {
-        return sourceFallbackDefaultMessageScratch_.data();
-    }
 };
 
 }  // namespace mxo::ltlogin

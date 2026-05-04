@@ -341,11 +341,6 @@ Packet_MsLoadCharacterReply_0x4b542c::Packet_MsLoadCharacterReply_0x4b542c(
 
     RefreshDataSectionView(initializeEmptyReply);
     if (initializeEmptyReply == '\0') {
-        if (currentMessage10() == nullptr) {
-            std::memset(defaultMessageStorage1c(), 0, 0x10u);
-            setMessageBase04(defaultMessageStorage1c());
-            setCurrentMessage10(messageBase04());
-        }
         currentMessage10()[0x00] = 0x10u;
         *reinterpret_cast<uint32_t*>(currentMessage10() + 0x01u) = 0u;
         *reinterpret_cast<uint32_t*>(currentMessage10() + 0x05u) = 0u;
@@ -402,23 +397,15 @@ void Packet_MsLoadCharacterReply_0x4b542c::InitializePayloadSize() {
 void Packet_MsLoadCharacterReply_0x4b542c::RefreshDataSectionView(char initializeEmptyReply) {
     setCurrentMessage10(messageBase04());
     if (initializeEmptyReply == '\0') {
-        if (messageRef08 != nullptr) {
-            messageRef08->GrowPayloadByteCount(0x10u);
-            if (messageRef08->messageStorage0c != nullptr) {
-                setMessageBase04(messageRef08->messageStorage0c->payloadBytes0c.data());
-                setCurrentMessage10(messageBase04());
-            }
-        }
+        messageRef08->GrowPayloadByteCount(0x10u);
         return;
     }
 
-    if (currentMessage10() != nullptr) {
-        const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10() + 0x0eu);
-        if (sectionOffset0eLocal != 0u) {
-            payloadSize18 = ReadU16LE(currentMessage10() + sectionOffset0eLocal);
-            setDataSectionBytes14(currentMessage10() + sectionOffset0eLocal + 2u);
-            return;
-        }
+    const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10() + 0x0eu);
+    if (sectionOffset0eLocal != 0u) {
+        payloadSize18 = ReadU16LE(currentMessage10() + sectionOffset0eLocal);
+        setDataSectionBytes14(currentMessage10() + sectionOffset0eLocal + 2u);
+        return;
     }
 
     payloadSize18 = 0u;
@@ -427,8 +414,13 @@ void Packet_MsLoadCharacterReply_0x4b542c::RefreshDataSectionView(char initializ
 
 // anchor: launcher.exe:0x43af20
 void Packet_MsLoadCharacterReply_0x4b542c::ResetToDefaultMessage() {
-    std::memset(defaultMessageStorage1c(), 0, 0x10u);
-    setMessageBase04(defaultMessageStorage1c());
+    if (messageRef08 != nullptr && messageRef08->messageStorage0c != nullptr) {
+        uint8_t* const payloadBase = messageRef08->messageStorage0c->payloadBytes0c.data();
+        const uint8_t encodedHeaderByte = payloadBase[0x01u];
+        const uint32_t lookupHigh = g_MessageOffsetLookupTable[(encodedHeaderByte >> 4u) & 7u];
+        const uint32_t lookupLow = g_MessageOffsetLookupTable[encodedHeaderByte & 7u];
+        setMessageBase04(payloadBase + lookupHigh + lookupLow + 0x12u);
+    }
     setCurrentMessage10(messageBase04());
     currentMessage10()[0x00] = 0x10u;
     currentMessage10()[0x0b] = 1u;
