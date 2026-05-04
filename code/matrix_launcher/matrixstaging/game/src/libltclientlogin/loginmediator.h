@@ -410,12 +410,13 @@ public:
     void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine);
     // +0x0c
     void ClearEngine() override;
-    // +0x14
+    // +0x10
     uint32_t IsReady() override;
-    // +0x18
+    // +0x14
     // void UnknownSlot5();
+    // +0x18
+    // uint8_t GetUnknownByte05() const override; declared earlier near the anchored owner-byte notes.
     // +0x1c
-    // void UnknownSlot6();
     void SetValue1(void* value) override;
     // +0x24
     void SetValue2(void* value) override;
