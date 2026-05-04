@@ -371,8 +371,7 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
 // `Packet_AsAuthReply_0x4b5328*`. Keep the wrapper only as an ABI thunk.
 extern "C" void* Mediator_GetCurrentAuthReplyPacket44_Impl(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->GetCurrentAuthReplyPacket44() : nullptr;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCurrentAuthReplyPacket44();
 }
 
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x44
@@ -859,21 +858,7 @@ static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLogin
 //   `this+0xcc`
 static void* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    const std::vector<char>& routeDescriptorStorage = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30();
-
-    const char* const begin = routeDescriptorStorage.empty() ? nullptr : routeDescriptorStorage.data();
-    const char* const current = routeDescriptorStorage.empty() ? nullptr : routeDescriptorStorage.data() + routeDescriptorStorage.size();
-    const std::string descriptorText = DescribeAbiCharVectorText(routeDescriptorStorage);
-    spdlog::info(
-        "MediatorStub::GetRouteDescriptor10c caller={} [{}] result={} begin={} current={} text='{}'",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(&routeDescriptorStorage),
-        fmt::ptr(begin),
-        fmt::ptr(current),
-        descriptorText);
-    return const_cast<std::vector<char>*>(&routeDescriptorStorage);
+    return const_cast<std::vector<char>*>(&mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30());
 }
 
 // anchor: launcher.exe:0x41af50
@@ -888,26 +873,12 @@ static void* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub*
 //   immediate event-0x18 helper fired or the later metric-matcher path also ran
 static void* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    const std::vector<std::vector<char>>& entryStorage = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
-
-    const std::string firstEntryText = entryStorage.empty() ? std::string("<empty>") : DescribeAbiCharVectorText(entryStorage.front());
-    spdlog::info(
-        "MediatorStub::GetLateEntryList118 caller={} [{}] result={} begin={} current={} capacity={} entryCount={} firstEntry='{}'",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(&entryStorage),
-        fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data()),
-        fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data() + entryStorage.size()),
-        fmt::ptr(entryStorage.empty() ? nullptr : entryStorage.data() + entryStorage.capacity()),
-        entryStorage.size(),
-        firstEntryText);
-    return const_cast<std::vector<std::vector<char>>*>(&entryStorage);
+    return const_cast<std::vector<std::vector<char>>*>(&mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470());
 }
 
 // anchor: launcher.exe:0x41c1f0 / arg6 vtable +0xec
-// Thin ABI thunk only: forward the scratch-shaped 0xb4 selection snapshot to the faithful
-// owner-side body and let `CLTLoginMediator::PersistSelectionContextForState8` own the logic.
+// Thin ABI thunk only: preserve the wrapper-facing entry/return shape, but let the owner-side
+// body own the full state3(wait)->state8 transition logic directly.
 extern "C" void Mediator_PersistSelectionContextForState8_Impl(
     MinimalLoginMediatorStub* self,
     void* selectionContext,
@@ -915,12 +886,11 @@ extern "C" void Mediator_PersistSelectionContextForState8_Impl(
   (void)self;
   (void)returnAddress;
 
-  mxo::ltlogin::CLTLoginMediator* const mediator = DiagnosticEnsureMediatorModel();
-  if (mediator == nullptr || selectionContext == nullptr) {
+  if (selectionContext == nullptr) {
     return;
   }
 
-  mediator->PersistSelectionContextForState8(
+  (void)mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->PersistSelectionContextForState8(
       *static_cast<const mxo::ltlogin::State3SelectionContextInputSketch*>(selectionContext));
 }
 
@@ -942,59 +912,19 @@ __attribute__((naked)) static void Mediator_PersistSelectionContextForState8() {
       : "eax", "edx");
 }
 
-// UNANCHORED: C helper behind the recovered +0x120 ABI wrapper.
-// Fidelity correction:
-// - launcher.exe already has the real body at owner `+0x120 / 0x41c3c0`
-// - do not invent a second capture/mirror helper in source
-// - wrapper dispatch should just burrow to the live owner/controller (`g_CurrentLoginMediator`)
-extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
-    MinimalLoginMediatorStub* self,
-    void* input120,
-    void* returnAddress) {
-    (void)self;
-    (void)returnAddress;
-
-    mxo::ltlogin::CLTLoginMediator* const mediator = mxo::ltlogin::g_CurrentLoginMediator;
-    if (mediator == nullptr || input120 == nullptr) {
-        return 1u;
-    }
-
-    return mediator->ProcessCreateCharacterInput120(
-        *static_cast<const mxo::ltlogin::ProcessCreateCharacterInput120Sketch*>(input120));
-}
-
 // anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
 // post-auth create-character source block to arg6 +0x120
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x120
-__attribute__((naked)) static void Mediator_ProcessCreateCharacterInput120() {
-    __asm__ volatile(
-        "mov 4(%%esp), %%eax\n\t"
-        "mov 0(%%esp), %%edx\n\t"
-        "push %%edx\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $12, %%esp\n\t"
-        "ret $4\n\t"
-        :
-        : "i"(Mediator_ProcessCreateCharacterInput120_Impl)
-        : "eax", "edx");
-}
-
-// UNANCHORED: near-direct C helper behind the recovered wrapper-facing +0x124 ABI slot.
-extern "C" void Mediator_ProvideStartupTriple_Impl(
+// Thinned further: now use a normal wrapper-facing member-call shape instead of a naked thunk.
+static uint32_t __thiscall Mediator_ProcessCreateCharacterInput120(
     MinimalLoginMediatorStub* self,
-    void* pNetShell,
-    void* pNetMgr,
-    void* pDistrObjExecutive,
-    void* returnAddress) {
+    void* input120) {
     (void)self;
-    (void)returnAddress;
-    mxo::ltlogin::CLTLoginMediator* const mediator = mxo::ltlogin::g_CurrentLoginMediator;
-    if (mediator != nullptr) {
-        mediator->ProvideStartupTriple(pNetShell, pNetMgr, pDistrObjExecutive);
+    if (input120 == nullptr) {
+        return 1u;
     }
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->ProcessCreateCharacterInput120(
+        *static_cast<const mxo::ltlogin::ProcessCreateCharacterInput120Sketch*>(input120));
 }
 
 // anchor: deeper client init hands netShell/netMgr/distrObjExecutive to arg6 +0x124
@@ -1010,24 +940,17 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
 // - so the live replacement path now preserves the same-run startup `+0x124` triple directly,
 //   while pairing that with a source-owned `+0x18c` implementation instead of cross-run object
 //   transplant or hardcoded callback bytes
-__attribute__((naked)) static void Mediator_ProvideStartupTriple() {
-    __asm__ volatile(
-        "mov 0(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "mov 16(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "mov 16(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "mov 16(%%esp), %%eax\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $20, %%esp\n\t"
-        "ret $12\n\t"
-        :
-        : "i"(Mediator_ProvideStartupTriple_Impl)
-        : "eax");
+// Thinned further: now use a normal wrapper-facing member-call shape instead of a naked thunk.
+static void __thiscall Mediator_ProvideStartupTriple(
+    MinimalLoginMediatorStub* self,
+    void* pNetShell,
+    void* pNetMgr,
+    void* pDistrObjExecutive) {
+    (void)self;
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->ProvideStartupTriple(
+        pNetShell,
+        pNetMgr,
+        pDistrObjExecutive);
 }
 
 // anchor: launcher.exe:0x4202c0
@@ -1038,52 +961,21 @@ static void __thiscall Mediator_InvokeSessionCallbackHelper13c(MinimalLoginMedia
     mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HelperSlot13c_InvokeSessionHelperVtable4();
 }
 
-// UNANCHORED: C helper behind the recovered +0x170 observer-registration ABI wrapper.
-// Wrapper now forwards to CLTLoginMediator::RegisterLoginObserver; owner keeps the tree state while
-// the ABI shell logs the exact client callsite (`InitClientDLL`, `LoadingAreaCommonLayoutView_ctor`,
-// `RsiLayoutsView_ctor`, etc.) so post-event-0x18 runs can prove which observer registrations did
-// or did not happen.
-extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
-    MinimalLoginMediatorStub* self,
-    void* observer,
-    void* returnAddress) {
-    (void)self;
-
-    const uint32_t result = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RegisterLoginObserver(observer);
-    spdlog::info(
-        "MediatorStub::RegisterLoginObserver170 caller={} [{}] observer={} ({}) -> returnValue={}",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(observer),
-        DescribeKnownMediatorObserver(observer),
-        result);
-    return result;
-}
-
 // anchor: launcher.exe:0x41ddb0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x170
-__attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
-    __asm__ volatile(
-        "mov 4(%%esp), %%eax\n\t"
-        "mov 0(%%esp), %%edx\n\t"
-        "push %%edx\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $12, %%esp\n\t"
-        "ret $4\n\t"
-        :
-        : "i"(Mediator_RegisterLoginObserver170_Impl)
-        : "eax", "edx");
+// Thinned further: plain member-call wrapper with no extra impl helper.
+static uint32_t __thiscall Mediator_RegisterLoginObserver170(
+    MinimalLoginMediatorStub* self,
+    void* observer) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RegisterLoginObserver(observer);
 }
 
 // anchor: launcher.exe:0x41f1c0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0xf4
 static void* __thiscall Mediator_GetState8PersistenceF1c(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? const_cast<void*>(mediator->GetState8PersistenceF1c()) : nullptr;
+    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8PersistenceF1c());
 }
 
 // anchor: launcher.exe:0x41f320 / owner vtable +0x148
@@ -1102,8 +994,7 @@ static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub
 // ILTDistrObjExecutive-like third startup object.
 static void* __thiscall Mediator_GetStartupDistrObjExecutive8c(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->GetStartupDistrObjExecutive8c() : nullptr;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetStartupDistrObjExecutive8c();
 }
 
 // anchor: launcher.exe:0x41f330 / wrapper-facing arg6 slot +0x14c
@@ -1118,43 +1009,14 @@ static uint32_t __thiscall Mediator_SetState9OptionalField90AndSwitchToState13(M
     return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetState9OptionalField90AndSwitchToState13(value);
 }
 
-// UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
-// Wrapper now forwards to CLTLoginMediator::UnregisterLoginObserver; owner keeps the tree state
-// while the ABI shell logs exact client callsites so paired view ctor/dtor observer lifetimes stay
-// visible during late-runtime investigation.
-extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
-    MinimalLoginMediatorStub* self,
-    void* observer,
-    void* returnAddress) {
-    (void)self;
-
-    const uint32_t result = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->UnregisterLoginObserver(observer);
-    spdlog::info(
-        "MediatorStub::UnregisterLoginObserver174 caller={} [{}] observer={} ({}) -> returnValue={}",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        fmt::ptr(observer),
-        DescribeKnownMediatorObserver(observer),
-        result);
-    return result;
-}
-
 // anchor: launcher.exe:0x41dde0
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x174
-__attribute__((naked)) static void Mediator_UnregisterLoginObserver174() {
-    __asm__ volatile(
-        "mov 4(%%esp), %%eax\n\t"
-        "mov 0(%%esp), %%edx\n\t"
-        "push %%edx\n\t"
-        "push %%eax\n\t"
-        "push %%ecx\n\t"
-        "mov %0, %%eax\n\t"
-        "call *%%eax\n\t"
-        "add $12, %%esp\n\t"
-        "ret $4\n\t"
-        :
-        : "i"(Mediator_UnregisterLoginObserver174_Impl)
-        : "eax", "edx");
+// Thinned further: plain member-call wrapper with no extra impl helper.
+static uint32_t __thiscall Mediator_UnregisterLoginObserver174(
+    MinimalLoginMediatorStub* self,
+    void* observer) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->UnregisterLoginObserver(observer);
 }
 
 // anchor: launcher.exe:0x41f240
@@ -1197,6 +1059,8 @@ static uint32_t __thiscall Mediator_HandleMarginConnectionCompletionFallback(
 }
 
 // UNANCHORED: C helper behind the recovered +0x18c ABI wrapper.
+// Thin ABI thunk only: preserve the wrapper-facing entry/return shape, but let the owner-side
+// callback-blob builder own the full state9 logic directly.
 extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
     MinimalLoginMediatorStub* self,
     void* outBuffer,
@@ -1206,12 +1070,11 @@ extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
     (void)self;
     (void)returnAddress;
 
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator || !outBuffer) {
+    if (!outBuffer) {
         return 1u;
     }
 
-    return mediator->FillState9CallbackBlob18c(
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->FillState9CallbackBlob18c(
         static_cast<uint32_t*>(outBuffer),
         arg2,
         arg3);
