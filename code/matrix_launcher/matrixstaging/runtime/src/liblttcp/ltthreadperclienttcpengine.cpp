@@ -161,26 +161,9 @@ static Node* TreeBeginNode(Head* head) {
     return (header && header->_M_left != header) ? static_cast<Node*>(header->_M_left) : nullptr;
 }
 
-static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* AllocateEndpointTreeNode(
-    const LTTCPEndpointKey_0x44b070& key,
-    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload) {
-    auto* node = static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(
-        std::malloc(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode)));
-    if (!node) {
-        return nullptr;
-    }
-
-    std::memset(node, 0, sizeof(*node));
-    node->_M_valptr()->first = key;
-    node->_M_valptr()->second = payload;
-    return node;
-}
-
-static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* AllocateContextTreeNode(
-    uint32_t key,
-    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* payload) {
-    auto* node = static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(
-        std::malloc(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode)));
+template <typename Node, typename Key, typename Payload>
+static Node* AllocateTreeNode(const Key& key, Payload payload) {
+    auto* node = static_cast<Node*>(std::malloc(sizeof(Node)));
     if (!node) {
         return nullptr;
     }
@@ -341,7 +324,8 @@ static bool EndpointTreeInsertPlaceholder(
         return true;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* insertedNode = AllocateEndpointTreeNode(key, nullptr);
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* insertedNode =
+        AllocateTreeNode<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode>(key, nullptr);
     if (!insertedNode) {
         return false;
     }
@@ -459,7 +443,8 @@ static CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* ContextTreeInsertUniqu
     }
 
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* worker = payload.get();
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* insertedNode = AllocateContextTreeNode(key, payload.release());
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* insertedNode =
+        AllocateTreeNode<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode>(key, payload.release());
     if (!insertedNode) {
         return nullptr;
     }
