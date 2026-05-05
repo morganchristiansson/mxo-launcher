@@ -893,7 +893,7 @@ uint32_t CLTThreadPerClientTCPEngine_CloseWorkItem_0x4b3e00::ReleaseSlot() {
 }
 
 // anchor: launcher.exe:0x4319e0
-CLTThread::CLTThread(const char* threadName)
+CLTThread_0x4b2850::CLTThread_0x4b2850(const char* threadName)
     : threadName_(threadName ? threadName : ""),
       startPriority_(2),
       suspendDepth_(0),
@@ -903,7 +903,7 @@ CLTThread::CLTThread(const char* threadName)
       stateMutex_() {}
 
 // anchor: launcher.exe:0x452950 / 0x431a80 deleting wrapper
-CLTThread::~CLTThread() {
+CLTThread_0x4b2850::~CLTThread_0x4b2850() {
     const HANDLE threadHandle = reinterpret_cast<HANDLE>(threadHandle_);
     if (threadHandle != nullptr) {
         CloseHandle(threadHandle);
@@ -912,12 +912,12 @@ CLTThread::~CLTThread() {
 }
 
 // anchor: launcher.exe:0x4319d0
-const std::string& CLTThread::GetNameString() const {
+const std::string& CLTThread_0x4b2850::GetNameString() const {
     return threadName_;
 }
 
 // anchor: launcher.exe:0x4528d0
-uint32_t CLTThread::Start(int startPriority) {
+uint32_t CLTThread_0x4b2850::Start(int startPriority) {
     const auto mapThreadPriority = [](int priority) -> int {
         switch (priority) {
             case 0:
@@ -954,7 +954,7 @@ uint32_t CLTThread::Start(int startPriority) {
     const uintptr_t threadHandle = _beginthreadex(
         nullptr,
         0x10000,
-        &CLTThread::ThreadStartAddressScaffold,
+        &CLTThread_0x4b2850::ThreadStartAddressScaffold,
         this,
         CREATE_SUSPENDED,
         &threadId);
@@ -983,7 +983,7 @@ uint32_t CLTThread::Start(int startPriority) {
 }
 
 // anchor: launcher.exe:0x4525d0
-bool CLTThread::Resume() {
+bool CLTThread_0x4b2850::Resume() {
     uintptr_t threadHandle = 0;
     bool isCurrentThread = false;
     {
@@ -1003,7 +1003,7 @@ bool CLTThread::Resume() {
 }
 
 // anchor: launcher.exe:0x452660
-int CLTThread::Stop(bool waitAfterTerminate) {
+int CLTThread_0x4b2850::Stop(bool waitAfterTerminate) {
     uintptr_t threadHandle = 0;
     {
         std::lock_guard<std::mutex> lock(stateMutex_);
@@ -1041,7 +1041,7 @@ int CLTThread::Stop(bool waitAfterTerminate) {
 }
 
 // anchor: launcher.exe:0x431a60
-bool CLTThread::IsRunning() const {
+bool CLTThread_0x4b2850::IsRunning() const {
     std::lock_guard<std::mutex> lock(stateMutex_);
     if (threadHandle_ == 0) {
         return false;
@@ -1050,7 +1050,7 @@ bool CLTThread::IsRunning() const {
 }
 
 // anchor: launcher.exe:0x4526e0
-uint32_t CLTThread::Wait() {
+uint32_t CLTThread_0x4b2850::Wait() {
     uintptr_t threadHandle = 0;
     {
         std::lock_guard<std::mutex> lock(stateMutex_);
@@ -1070,7 +1070,7 @@ uint32_t CLTThread::Wait() {
 }
 
 // anchor: launcher.exe:0x452620
-void CLTThread::Suspend() {
+void CLTThread_0x4b2850::Suspend() {
     uintptr_t threadHandle = 0;
     int previousSuspendDepth = 0;
     {
@@ -1088,28 +1088,28 @@ void CLTThread::Suspend() {
 }
 
 // anchor: launcher.exe:0x431a40
-bool CLTThread::IsCurrentThread() const {
+bool CLTThread_0x4b2850::IsCurrentThread() const {
     std::lock_guard<std::mutex> lock(stateMutex_);
     return threadId_ != 0 && threadId_ == GetCurrentThreadId();
 }
 
 // anchor: launcher.exe:0x437b50 on the current shared base vtable family
-uint32_t CLTThread::PreRun() {
+uint32_t CLTThread_0x4b2850::PreRun() {
     return 0;
 }
 
 // UNANCHORED scaffold base default; concrete derived thread classes override this slot
-void CLTThread::Run() {}
+void CLTThread_0x4b2850::Run() {}
 
 // anchor: launcher.exe:0x452770
-void CLTThread::LogExit() {
+void CLTThread_0x4b2850::LogExit() {
     if (!threadName_.empty()) {
         spdlog::debug("{} exiting.", threadName_);
     }
 }
 
 // anchor: launcher.exe:0x452800
-uint32_t CLTThread::ExecuteThreadMainScaffold() {
+uint32_t CLTThread_0x4b2850::ExecuteThreadMainScaffold() {
     {
         std::lock_guard<std::mutex> lock(stateMutex_);
         threadId_ = GetCurrentThreadId();
@@ -1133,18 +1133,18 @@ uint32_t CLTThread::ExecuteThreadMainScaffold() {
 }
 
 // anchor: launcher.exe:0x452800 / `_beginthreadex` start thunk
-unsigned __stdcall CLTThread::ThreadStartAddressScaffold(void* parameter) {
-    CLTThread* self = static_cast<CLTThread*>(parameter);
+unsigned __stdcall CLTThread_0x4b2850::ThreadStartAddressScaffold(void* parameter) {
+    CLTThread_0x4b2850* self = static_cast<CLTThread_0x4b2850*>(parameter);
     return self ? self->ExecuteThreadMainScaffold() : 0u;
 }
 
 // anchor: launcher.exe:0x4365a0
 CLTThreadPerClientTCPEngine_0x4b2768_QueueThread::CLTThreadPerClientTCPEngine_0x4b2768_QueueThread(
     CLTThreadPerClientTCPEngine_0x4b2768* owner)
-    : CLTThread("ILTTCPEngine::QueueThread"),
+    : CLTThread_0x4b2850("ILTTCPEngine::QueueThread"),
       owner_(owner) {}
 
-// UNANCHORED: current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
+// UNANCHORED: current vtable family keeps the shared CLTThread_0x4b2850 deleting dtor at slot +0x2c
 CLTThreadPerClientTCPEngine_0x4b2768_QueueThread::~CLTThreadPerClientTCPEngine_0x4b2768_QueueThread() = default;
 
 // UNANCHORED: scaffold accessor for the recovered child +0x38 owner field
@@ -1163,7 +1163,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_QueueThread::Run() {
 CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread::CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread(
     uint32_t listenSocketHandle,
     void* ownerContext)
-    : CLTThread("CLTThreadPerClientTCPEngine_0x4b2768::AcceptThread"),
+    : CLTThread_0x4b2850("CLTThreadPerClientTCPEngine_0x4b2768::AcceptThread"),
       ownerContext_(ownerContext),
       listenSocketHandle_(listenSocketHandle),
       wakeupSocketHandle_(CreateConnectedWakeupSocketHandle()) {}
@@ -1209,7 +1209,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread::Run() {
 CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread(
     void* contextKey,
     bool datagramMode)
-    : CLTThread("CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread"),
+    : CLTThread_0x4b2850("CLTThreadPerClientTCPEngine_0x4b2768::WorkerThread"),
       contextKey_(contextKey),
       datagramMode_(datagramMode),
       wakeupSocketHandle_(CreateConnectedWakeupSocketHandle()),

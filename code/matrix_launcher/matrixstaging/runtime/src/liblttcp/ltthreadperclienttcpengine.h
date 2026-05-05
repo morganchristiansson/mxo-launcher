@@ -205,16 +205,16 @@ static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18) == 
 // Scaffold note:
 // - this source model now tracks the recovered object layout / naming / ownership surface
 // - but it still does NOT reproduce original Win32 force-terminate semantics faithfully yet
-class CLTThread {
+class CLTThread_0x4b2850 {
 public:
     static constexpr uint32_t kStartSuccess = 0;
     static constexpr uint32_t kStartAlreadyRunning = 0x8000005;
     static constexpr uint32_t kStartFailure = 1;
 
     // anchor: launcher.exe:0x4319e0
-    explicit CLTThread(const char* threadName);
+    explicit CLTThread_0x4b2850(const char* threadName);
     // anchor: launcher.exe:0x452950 / 0x431a80 deleting wrapper
-    virtual ~CLTThread();
+    virtual ~CLTThread_0x4b2850();
 
     // anchor: launcher.exe:0x4319d0
     const std::string& GetNameString() const;
@@ -257,14 +257,14 @@ protected:
 
 // Recovered queue-thread child allocated by engine base ctor helper 0x4365a0.
 // Current high-confidence shape:
-// - inherits generic CLTThread-style base state
+// - inherits generic CLTThread_0x4b2850-style base state
 // - stores owner engine pointer at +0x38
 // - overrides the thread-main slot to call owner RunCompletedOperationQueue(owner, 0)
-class CLTThreadPerClientTCPEngine_0x4b2768_QueueThread : public CLTThread {
+class CLTThreadPerClientTCPEngine_0x4b2768_QueueThread : public CLTThread_0x4b2850 {
 public:
     // anchor: launcher.exe:0x4365a0
     explicit CLTThreadPerClientTCPEngine_0x4b2768_QueueThread(CLTThreadPerClientTCPEngine_0x4b2768* owner);
-    // UNANCHORED: current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
+    // UNANCHORED: current vtable family keeps the shared CLTThread_0x4b2850 deleting dtor at slot +0x2c
     ~CLTThreadPerClientTCPEngine_0x4b2768_QueueThread() override;
 
     // UNANCHORED: scaffold accessor for the recovered child +0x38 owner field
@@ -280,14 +280,14 @@ private:
 
 // Recovered accept-thread child stored as the +0x80 endpoint-tree payload.
 // Current high-confidence shape from 0x431ab0 / 0x431b30:
-// - inherits generic CLTThread-style base state
+// - inherits generic CLTThread_0x4b2850-style base state
 // - stores owner/context-like state at +0x38
 //   - current best evidence: `0x431840` writes `[payload+0x38]` to the caller out-pointer on the
 //     endpoint-removal path, so this still reads best as the owner/context pointer rather than the
 //     listening socket handle
 // - stores the listening socket handle at +0x3c
 // - owns a wakeup socket helper at +0x40
-class CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread : public CLTThread {
+class CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread : public CLTThread_0x4b2850 {
 public:
     // anchor: launcher.exe:0x431ab0
     CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread(uint32_t listenSocketHandle, void* ownerContext);
@@ -315,12 +315,12 @@ private:
 
 // Recovered worker-thread child stored as the +0x8c context-tree payload.
 // Current high-confidence shape from 0x431b60 / 0x431be0:
-// - inherits generic CLTThread-style base state
+// - inherits generic CLTThread_0x4b2850-style base state
 // - stores the context/connection key at +0x38
 // - stores a mode byte at +0x3c
 // - owns a wakeup socket helper at +0x40
 // - stores an exit-request flag at +0x44
-class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread : public CLTThread {
+class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread : public CLTThread_0x4b2850 {
 public:
     // anchor: launcher.exe:0x431b60
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread(void* contextKey, bool datagramMode);
