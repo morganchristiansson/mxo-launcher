@@ -409,8 +409,11 @@ public:
     // - owner `CLTLoginMediator +0x0c` is `0x41f510 = ResetOwnedRuntimeState`, not a direct engine setter
     void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine);
     // +0x0c
+    // anchor: launcher.exe:0x41f510 = ResetOwnedRuntimeState
+    // Guarded by owner byte +0x04; successful reset clears that byte back to 0.
     void ClearEngine() override;
     // +0x10
+    // anchor: launcher.exe:0x41f030 - exact body returns owner byte +0x04
     uint32_t IsReady() override;
     // +0x14
     // void UnknownSlot5();

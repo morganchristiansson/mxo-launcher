@@ -126,22 +126,66 @@ public:
     // anchor: launcher.exe:0x43ded0 / vtable +0x08
     void DebugString(int /*formatType*/ = 2) override {}
 
-    // anchor: launcher.exe:0x439b50 / vtable +0x0c
-    void InitializePayloadSize() override {
-        payloadPtr04 = messageRef08 && messageRef08->messageStorage0c
-            ? reinterpret_cast<uint32_t>(messageRef08->messageStorage0c->PayloadBase())
-            : payloadPtr04;
-        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+    // anchor: launcher.exe:0x439b10
+    // Zeroes the semantic world-descriptor fields rooted at the current decoded record body.
+    void ClearDecodedWorldDescriptorBody() {
+        uint8_t* const payload = static_cast<uint8_t*>(payloadAlias10);
+        if (!payload) {
+            return;
+        }
 
+        payload[0x00] = 0u;
+        *reinterpret_cast<uint16_t*>(payload + 0x01) = 0u;
+        payload[0x17] = 0u;
+        payload[0x18] = 0u;
+        *reinterpret_cast<uint32_t*>(payload + 0x19) = 0u;
+        payload[0x1d] = 0u;
+        payload[0x1e] = 0u;
+        payload[0x1f] = 0u;
+    }
+
+    // anchor: launcher.exe:0x439a70
+    // Recomputes the effective decoded-body pointer from the retained incoming message, then clears
+    // the semantic world-descriptor bytes at that body. This is the packet-family helper Ghidra now
+    // names `CLTLoginMediatorWorldDescriptor_ResetPayload` under `Packet_WorldList_0x4b533c`.
+    void ResetPayload() {
+        if (!messageRef08 || !messageRef08->messageStorage0c) {
+            payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+            return;
+        }
+
+        uint8_t* const payloadBase = messageRef08->messageStorage0c->PayloadBase();
+        if (!payloadBase) {
+            payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+            return;
+        }
+
+        const uint8_t descriptor = payloadBase[0x0d];
+        const uint32_t leadingPrefixByteCount =
+            static_cast<uint32_t>(g_MessageOffsetLookupTable[(descriptor >> 4) & 0x07u]) +
+            static_cast<uint32_t>(g_MessageOffsetLookupTable[descriptor & 0x07u]) +
+            0x12u;
+        payloadPtr04 = reinterpret_cast<uint32_t>(payloadBase + 0x0c + leadingPrefixByteCount);
+
+        messageRef08->messageStorage0c->ResetPayloadByteCount(static_cast<uint16_t>(leadingPrefixByteCount));
+        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
+        ClearDecodedWorldDescriptorBody();
+    }
+
+    // anchor: launcher.exe:0x439b50 / vtable +0x0c
+    // Builder path for the world-descriptor family: first perform the shared reset/body-base
+    // recomputation (`0x439a70`), then retarget payloadAlias10 to the packet-body start and stamp
+    // a fresh 6-byte opcode-0x35 request payload there.
+    void InitializePayloadSize() override {
+        ResetPayload();
+
+        payloadAlias10 = reinterpret_cast<void*>(payloadPtr04);
         if (!messageRef08 || !messageRef08->messageStorage0c) {
             return;
         }
 
-        messageRef08->GrowPayloadByteCount(kFixedByteCount);
-        payloadAlias10 = messageRef08->messageStorage0c->PayloadBase();
-        payloadPtr04 = reinterpret_cast<uint32_t>(payloadAlias10);
-
-        uint8_t* payload = static_cast<uint8_t*>(payloadAlias10);
+        messageRef08->messageStorage0c->ResetPayloadByteCount(kFixedByteCount);
+        uint8_t* const payload = static_cast<uint8_t*>(payloadAlias10);
         if (!payload) {
             return;
         }

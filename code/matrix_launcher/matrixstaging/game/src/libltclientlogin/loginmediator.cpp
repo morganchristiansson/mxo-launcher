@@ -196,6 +196,8 @@ CLTLoginMediator::CLTLoginMediator()
       authLauncherVersion_(76005),
       authKeyConfigMd5_(),
       authUiConfigMd5_() {
+    // anchor: launcher.exe:0x41ee70 - ctor clears owner byte +0x04
+    ownerReadyFlag04_ = 0;
     InitializeObserverTree674();
 }
 
@@ -340,18 +342,30 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
 // nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {
+    // anchor: launcher.exe:0x41f51a - ResetOwnedRuntimeState early-outs unless owner byte +0x04 is set
+    if (ownerReadyFlag04_ == 0) {
+        spdlog::info("CLTLoginMediator::ClearEngine skipped (ownerReadyFlag04_=0)");
+        return;
+    }
+
     selectionRouteState684_.ResetSelectionRouteState();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
     launchPadClient65c_ = nullptr;
     authBootstrapChild680_.reset();
-    spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold");
+
+    // anchor: launcher.exe:0x41f5d2 / 0x41f5df - clear ready byte and global current mediator
+    ownerReadyFlag04_ = 0;
+    g_CurrentLoginMediator = nullptr;
+
+    spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold and cleared ownerReadyFlag04_");
 }
 
 // anchor: launcher.exe:0x41f030 vtable offset +0x10
 uint32_t CLTLoginMediator::IsReady() {
-    spdlog::info("CLTLoginMediator::IsReady() -> 1");
-    return 1;
+    const uint32_t ready = ownerReadyFlag04_ != 0 ? 1u : 0u;
+    spdlog::info("CLTLoginMediator::IsReady() -> {}", ready);
+    return ready;
 }
 
 // +0x1c
