@@ -130,13 +130,10 @@ Current compare-helper note from `0x44b040` as used by the endpoint tree wrapper
   not currently evidenced as tree-ordering fields in launcher.exe
 
 Current source status:
-- caller-side recovery now also reads this outer layer best as a plain unique map keyed by the
-  endpoint
-- source now models it directly with map semantics plus staged placeholder insertion before later
-  accept-thread attachment, mirroring the original `InsertUniqueHint -> socket setup -> payload store`
-  workflow more directly than the older source-owned tree-wrapper mechanics
-- the recovered `+0x80/+0x84` head/count surface remains visible on the engine object for layout and
-  diagnostic parity
+- source now keeps the recovered `+0x80/+0x84` head/count surface live and manipulates explicit
+  `0x24` launcher-shaped nodes through the narrow SGI-tree compatibility shim
+- insertion still follows the original staged flow (`InsertUniqueHint -> socket setup -> payload
+  store`), but no longer routes through a source-owned `std::map` sidecar
 
 ### Context-keyed tree (`+0x8c`, `0x18` nodes)
 - `0x4196b0` = `CLTThreadPerClientTCPEngine_ContextTree_InsertUniqueHint`
@@ -151,12 +148,10 @@ Recovered node shape:
 - payload at `+0x14` = `WorkerThread`-style payload pointer
 
 Current source status:
-- caller-side recovery now reads this outer layer best as a plain unique map keyed by the
-  normalized connection/context pointer
-- source now models that outer layer directly with map semantics while keeping the recovered
-  `+0x8c/+0x90` head/count surface visible on the engine object
-- the endpoint tree still uses the narrower SGI-tree compatibility layer because its lifecycle is a
-  little more coupled to staged insertion / later payload attachment
+- source now keeps the recovered `+0x8c/+0x90` head/count surface live and manipulates explicit
+  `0x18` launcher-shaped nodes through the same narrow SGI-tree compatibility shim
+- worker insertion/removal now mirrors the recovered unique-insert/find/erase wrapper family more
+  directly instead of routing through a source-owned map abstraction
 
 ## B. Console-variable registry tree
 

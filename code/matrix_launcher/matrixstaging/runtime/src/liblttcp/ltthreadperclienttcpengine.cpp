@@ -13,9 +13,8 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <map>
+#include <memory>
 #include <new>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -30,12 +29,6 @@ static bool ShouldLogRepeatedQueueDiagnosticCount(uint32_t count) {
 static int CompareEndpointTreeKeys(
     const LTTCPEndpointKey_0x44b070& lhs,
     const LTTCPEndpointKey_0x44b070& rhs);
-
-static bool EndpointTreeKeyLess(
-    const LTTCPEndpointKey_0x44b070& lhs,
-    const LTTCPEndpointKey_0x44b070& rhs) {
-    return CompareEndpointTreeKeys(lhs, rhs) < 0;
-}
 
 // Per-logger SPDLOG_LEVEL overrides only apply on call sites that explicitly fetch a named logger.
 // Keep the receive hot-path seam narrow by only routing labels with registered logger names through
@@ -158,24 +151,25 @@ static_assert(sizeof(std::pair<uint32_t, CLTThreadPerClientTCPEngine_0x4b2768_Wo
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode) == 0x24, "endpoint tree node size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode) == 0x18, "context tree node size mismatch");
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadEntry {
-    LTTCPEndpointKey_0x44b070 key{};
-    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload;
-};
+static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24*& EndpointTreeHeadField(
+    CLTThreadPerClientTCPEngine_0x4b2768* self) {
+    return *reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24**>(
+        reinterpret_cast<uint8_t*>(self) + 0x80);
+}
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking {
-    std::map<LTTCPEndpointKey_0x44b070, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread>,
-             bool(*)(const LTTCPEndpointKey_0x44b070&, const LTTCPEndpointKey_0x44b070&)> entries{EndpointTreeKeyLess};
-};
+static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18*& ContextTreeHeadField(
+    CLTThreadPerClientTCPEngine_0x4b2768* self) {
+    return *reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18**>(
+        reinterpret_cast<uint8_t*>(self) + 0x8c);
+}
 
-struct CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking {
-    std::map<uint32_t, std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread>> entries;
-};
+static uint32_t& EndpointCountField(CLTThreadPerClientTCPEngine_0x4b2768* self) {
+    return *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(self) + 0x84);
+}
 
-static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking>
-    g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings;
-static std::unordered_map<CLTThreadPerClientTCPEngine_0x4b2768*, CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking>
-    g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings;
+static uint32_t& ContextCountField(CLTThreadPerClientTCPEngine_0x4b2768* self) {
+    return *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(self) + 0x90);
+}
 
 static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorageScaffold(
     CLTThreadPerClientTCPEngine_0x4b2768* self) {
@@ -191,34 +185,40 @@ static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorag
     return &static_cast<CLTBaseThreadPerClientTCPEngine_0x4b3e74*>(self)->queuePair0c_;
 }
 
-static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
-    const CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    if (!self) {
+template <typename Node, typename Head>
+static Node* TreeBeginNode(Head* head) {
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    return (header && header->_M_left != header) ? static_cast<Node*>(header->_M_left) : nullptr;
+}
+
+static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* AllocateEndpointTreeNode(
+    const LTTCPEndpointKey_0x44b070& key,
+    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload) {
+    auto* node = static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(
+        std::malloc(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode)));
+    if (!node) {
         return nullptr;
     }
-    auto it = g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings.find(
-        const_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(self));
-    return (it != g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings.end()) ? &it->second : nullptr;
+
+    std::memset(node, 0, sizeof(*node));
+    node->_M_valptr()->first = key;
+    node->_M_valptr()->second = payload;
+    return node;
 }
 
-static CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking& EnsureEngineEndpointPayloadBacking(
-    CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    return g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings[self];
-}
-
-static CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* FindEngineContextPayloadBacking(
-    const CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    if (!self) {
+static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* AllocateContextTreeNode(
+    uint32_t key,
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* payload) {
+    auto* node = static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(
+        std::malloc(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode)));
+    if (!node) {
         return nullptr;
     }
-    auto it = g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings.find(
-        const_cast<CLTThreadPerClientTCPEngine_0x4b2768*>(self));
-    return (it != g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings.end()) ? &it->second : nullptr;
-}
 
-static CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking& EnsureEngineContextPayloadBacking(
-    CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    return g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings[self];
+    std::memset(node, 0, sizeof(*node));
+    node->_M_valptr()->first = key;
+    node->_M_valptr()->second = payload;
+    return node;
 }
 
 template <typename Head>
@@ -300,14 +300,12 @@ static Node* LauncherTreeFindNode(const Head* head, const Key& key, Compare comp
         : nullptr;
 }
 
-template <typename Node, typename Head, typename Backing>
-static bool LauncherTreeEraseOwnedNode(Backing* backing, Head* head, Node* node) {
-    if (!backing || !head || !node) {
-        return false;
+template <typename Node, typename Head>
+static Node* LauncherTreeEraseNodeAndReturnDetached(Head* head, Node* node) {
+    if (!head || !node) {
+        return nullptr;
     }
-    mxo::sgi_tree::_Rb_tree_node_base* erased = mxo::sgi_tree::_Rb_tree_rebalance_for_erase(node, *TreeHeaderBase(head));
-    backing->entries.erase(static_cast<Node*>(erased));
-    return true;
+    return static_cast<Node*>(mxo::sgi_tree::_Rb_tree_rebalance_for_erase(node, *TreeHeaderBase(head)));
 }
 
 // anchor: launcher.exe:0x42fdb0
@@ -323,38 +321,85 @@ static CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* EndpointTreeFindNo
 static CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindEngineEndpointPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     const LTTCPEndpointKey_0x44b070& key) {
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* backing =
-        FindEngineEndpointPayloadBacking(self);
-    if (!backing) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head = self ? EndpointTreeHeadField(self) : nullptr;
+    if (!self || !head) {
         return nullptr;
     }
 
-    auto it = backing->entries.find(key);
-    return (it != backing->entries.end() && it->second) ? it->second.get() : nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
+        EndpointTreeFindNode(head, key);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    return (node && node != reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(header))
+        ? node->_M_valptr()->second
+        : nullptr;
 }
 
-// Source-owned endpoint-tree outer-layer adapter.
-// Evidence addresses: launcher.exe:0x4318f0 / 0x431240 / 0x431ce0 / 0x431200.
-// Current semantic read of the callsites is a unique map keyed by the endpoint, with staged
-// insertion before the eventual accept-thread payload attachment.
+// anchor family: launcher.exe:0x4318f0 / 0x431240
+// Current source now mirrors the original SGI tree wrapper shape directly instead of staging
+// through `std::map` payload sidecars.
 static bool EndpointTreeInsertPlaceholder(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
     const LTTCPEndpointKey_0x44b070& key,
     bool* outInserted) {
-    (void)head;
     if (outInserted) {
         *outInserted = false;
     }
-    if (!self) {
+    if (!self || !head) {
         return false;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking& backing =
-        EnsureEngineEndpointPayloadBacking(self);
-    auto [_, inserted] = backing.entries.emplace(key, nullptr);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* parent =
+        reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(header);
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node = TreeRootNode<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode>(head);
+    bool insertLeft = true;
+    while (node) {
+        parent = node;
+        insertLeft = CompareEndpointTreeKeys(key, node->_M_valptr()->first) < 0;
+        node = insertLeft
+            ? static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(node->_M_left)
+            : static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(node->_M_right);
+    }
+
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* candidate = parent;
+    if (!insertLeft) {
+        if (candidate != reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(header)) {
+            candidate = static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(
+                mxo::sgi_tree::_Rb_tree_increment(candidate));
+            if (candidate == reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(header)) {
+                candidate = nullptr;
+            }
+        }
+    } else if (parent != reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(header) &&
+               parent != reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(header->_M_left)) {
+        mxo::sgi_tree::_Rb_tree_node_base* previous = parent;
+        while (previous->_M_left && previous == previous->_M_parent->_M_left) {
+            previous = previous->_M_parent;
+        }
+        previous = previous->_M_parent;
+        candidate = (previous != header)
+            ? static_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(previous)
+            : nullptr;
+    }
+
+    if (candidate && CompareEndpointTreeKeys(candidate->_M_valptr()->first, key) == 0) {
+        return true;
+    }
+
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* insertedNode = AllocateEndpointTreeNode(key, nullptr);
+    if (!insertedNode) {
+        return false;
+    }
+
+    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(
+        insertLeft,
+        insertedNode,
+        reinterpret_cast<mxo::sgi_tree::_Rb_tree_node_base*>(parent),
+        *header);
+    ++EndpointCountField(self);
     if (outInserted) {
-        *outInserted = inserted;
+        *outInserted = true;
     }
     return true;
 }
@@ -363,40 +408,41 @@ static bool EndpointTreeAttachPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     const LTTCPEndpointKey_0x44b070& key,
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload) {
-    if (!payload) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head = self ? EndpointTreeHeadField(self) : nullptr;
+    if (!self || !head || !payload) {
         return false;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* backing =
-        FindEngineEndpointPayloadBacking(self);
-    if (!backing) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
+        EndpointTreeFindNode(head, key);
+    if (!node || node == reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(TreeHeaderBase(head))) {
         return false;
     }
 
-    auto it = backing->entries.find(key);
-    if (it == backing->entries.end()) {
-        return false;
-    }
-    it->second = std::move(payload);
+    node->_M_valptr()->second = payload.release();
     return true;
 }
 
 static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> EndpointTreeDetachPayloadByKey(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     const LTTCPEndpointKey_0x44b070& key) {
-    CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* backing =
-        FindEngineEndpointPayloadBacking(self);
-    if (!backing) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head = self ? EndpointTreeHeadField(self) : nullptr;
+    if (!self || !head) {
         return nullptr;
     }
 
-    auto it = backing->entries.find(key);
-    if (it == backing->entries.end()) {
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
+        EndpointTreeFindNode(head, key);
+    if (!node || node == reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode*>(TreeHeaderBase(head))) {
         return nullptr;
     }
 
-    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload = std::move(it->second);
-    backing->entries.erase(it);
+    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> payload(node->_M_valptr()->second);
+    node->_M_valptr()->second = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* erased =
+        LauncherTreeEraseNodeAndReturnDetached(head, node);
+    std::free(erased);
+    --EndpointCountField(self);
     return payload;
 }
 
@@ -413,64 +459,89 @@ static CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* ContextTreeFindNode
 static CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindEngineContextWorkerPayload(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     uint32_t key) {
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* backing =
-        FindEngineContextPayloadBacking(self);
-    if (!backing) {
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head = self ? ContextTreeHeadField(self) : nullptr;
+    if (!self || !head) {
         return nullptr;
     }
 
-    auto it = backing->entries.find(key);
-    return (it != backing->entries.end() && it->second) ? it->second.get() : nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
+        ContextTreeFindNode(head, key);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    return (node && node != reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(header))
+        ? node->_M_valptr()->second
+        : nullptr;
 }
 
-// Source-owned context-tree outer-layer adapter.
-// Evidence addresses: launcher.exe:0x4196b0 / 0x420ba0 / 0x431ff0.
-// Current semantic read of the callsites is a plain unique map keyed by the normalized connection
-// context pointer.
+// anchor family: launcher.exe:0x4196b0 / 0x420ba0 / 0x431ff0.
 static CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* ContextTreeInsertUniqueWorkerNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
     uint32_t key,
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload,
     bool* outInserted) {
-    (void)head;
     if (outInserted) {
         *outInserted = false;
     }
-    if (!self || !payload) {
+    if (!self || !head || !payload) {
         return nullptr;
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking& backing =
-        EnsureEngineContextPayloadBacking(self);
-    auto [it, inserted] = backing.entries.emplace(key, nullptr);
-    if (!inserted) {
-        return it->second.get();
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* existing = ContextTreeFindNode(head, key);
+    if (existing && existing != reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(TreeHeaderBase(head))) {
+        return existing->_M_valptr()->second;
     }
 
-    it->second = std::move(payload);
+    mxo::sgi_tree::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* parent =
+        reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(header);
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node = TreeRootNode<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode>(head);
+    bool insertLeft = true;
+    while (node) {
+        parent = node;
+        insertLeft = key < node->_M_valptr()->first;
+        node = insertLeft
+            ? static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(node->_M_left)
+            : static_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(node->_M_right);
+    }
+
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* worker = payload.get();
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* insertedNode = AllocateContextTreeNode(key, payload.release());
+    if (!insertedNode) {
+        return nullptr;
+    }
+
+    mxo::sgi_tree::_Rb_tree_insert_and_rebalance(
+        insertLeft,
+        insertedNode,
+        reinterpret_cast<mxo::sgi_tree::_Rb_tree_node_base*>(parent),
+        *header);
+    ++ContextCountField(self);
     if (outInserted) {
         *outInserted = true;
     }
-    return it->second.get();
+    return worker;
 }
 
 static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> ContextTreeDetachPayloadByKey(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     uint32_t key) {
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* backing =
-        FindEngineContextPayloadBacking(self);
-    if (!backing) {
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head = self ? ContextTreeHeadField(self) : nullptr;
+    if (!self || !head) {
         return nullptr;
     }
 
-    auto it = backing->entries.find(key);
-    if (it == backing->entries.end()) {
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
+        ContextTreeFindNode(head, key);
+    if (!node || node == reinterpret_cast<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode*>(TreeHeaderBase(head))) {
         return nullptr;
     }
 
-    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload = std::move(it->second);
-    backing->entries.erase(it);
+    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> payload(node->_M_valptr()->second);
+    node->_M_valptr()->second = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* erased =
+        LauncherTreeEraseNodeAndReturnDetached(head, node);
+    std::free(erased);
+    --ContextCountField(self);
     return payload;
 }
 
@@ -481,28 +552,28 @@ static bool EndpointTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node) {
-    (void)self;
-    (void)head;
-    (void)node;
+    if (!self || !head || !node) {
+        return false;
+    }
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* erased =
+        LauncherTreeEraseNodeAndReturnDetached(head, node);
+    std::free(erased);
+    --EndpointCountField(self);
     return true;
 }
 
-// Source-owned context-tree erase adapter.
-// Current source models the recovered outer layer as a plain map keyed by the normalized
-// connection/context pointer, so erase is handled by key-removal in `ContextTreeDetachPayloadByKey`.
 static bool ContextTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head,
     CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node) {
-    (void)self;
-    (void)head;
-    (void)node;
+    if (!self || !head || !node) {
+        return false;
+    }
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* erased =
+        LauncherTreeEraseNodeAndReturnDetached(head, node);
+    std::free(erased);
+    --ContextCountField(self);
     return true;
-}
-
-static void EraseEngineBackings(CLTThreadPerClientTCPEngine_0x4b2768* self) {
-    g_CLTThreadPerClientTCPEngine_0x4b2768EndpointPayloadBackings.erase(self);
-    g_CLTThreadPerClientTCPEngine_0x4b2768ContextPayloadBackings.erase(self);
 }
 
 static const char* EngineWorkTypeName(uint32_t workType) {
@@ -1964,28 +2035,21 @@ CLTThreadPerClientTCPEngine_0x4b2768::CLTThreadPerClientTCPEngine_0x4b2768()
 
 // anchor: launcher.exe:0x40b389..0x40b404 teardown releases arg5 through vtable slot 0
 // vtable: launcher.exe:0x004b2768
-// NOTE: starter C++ destructor only models local sidecar cleanup, not the full original dtor body.
 CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
     StopQueueThreads();
 
-    if (CLTThreadPerClientTCPEngine_0x4b2768_EndpointPayloadBacking* endpointBacking =
-            FindEngineEndpointPayloadBacking(this)) {
-        for (auto& it : endpointBacking->entries) {
-            StopAcceptThreadScaffold(it.second.get());
-        }
-        endpointBacking->entries.clear();
+    while (CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode* node =
+               TreeBeginNode<CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode>(endpointTreeHead80_)) {
+        std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread> acceptThread(node->_M_valptr()->second);
+        node->_M_valptr()->second = nullptr;
+        StopAcceptThreadScaffold(acceptThread.get());
+        (void)EndpointTreeEraseNode(this, endpointTreeHead80_, node);
     }
 
-    if (CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking =
-            FindEngineContextPayloadBacking(this)) {
-        for (auto& it : contextBacking->entries) {
-            CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread = it.second.get();
-            if (!workerThread) {
-                continue;
-            }
-
-            // Keep the remaining context-worker teardown visible in the anchored destructor path
-            // instead of hiding it behind the broader unanchored helper.
+    while (CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode* node =
+               TreeBeginNode<CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeNode>(contextTreeHead8c_)) {
+        CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread = node->_M_valptr()->second;
+        if (workerThread) {
             workerThread->RequestExit();
             workerThread->SignalWakeup();
             if (workerThread->IsRunning()) {
@@ -1995,8 +2059,10 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
                     static_cast<CMessageConnection_0x4b7928*>(workerThread->ContextKey())) {
                 connection->SetWorkerThreadScaffold(nullptr);
             }
+            delete workerThread;
+            node->_M_valptr()->second = nullptr;
         }
-        contextBacking->entries.clear();
+        (void)ContextTreeEraseNode(this, contextTreeHead8c_, node);
     }
 
     if (endpointTreeHead80_) {
@@ -2007,8 +2073,6 @@ CLTThreadPerClientTCPEngine_0x4b2768::~CLTThreadPerClientTCPEngine_0x4b2768() {
         std::free(contextTreeHead8c_);
         contextTreeHead8c_ = nullptr;
     }
-
-    EraseEngineBackings(this);
 }
 
 // anchor: launcher.exe:0x436000
@@ -2092,7 +2156,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
         IPPROTO_TCP,
         /*flags=*/0u);
     if (listenSocketHandle == kInvalidSocketHandle) {
-        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
+        (void)EndpointTreeDetachPayloadByKey(this, key);
         return 1u;
     }
 
@@ -2104,7 +2168,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
     if (bind(listenSocket, reinterpret_cast<const sockaddr*>(&listenAddr), sizeof(listenAddr)) == SOCKET_ERROR ||
         listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
         closesocket(listenSocket);
-        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
+        (void)EndpointTreeDetachPayloadByKey(this, key);
         return 1u;
     }
 
@@ -2118,7 +2182,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
             closesocket(static_cast<SOCKET>(socketHandleToClose));
             socketHandleToClose = kInvalidSocketHandle;
         }
-        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
+        (void)EndpointTreeDetachPayloadByKey(this, key);
         return 1u;
     }
     if (!EndpointTreeAttachPayload(this, key, std::move(acceptThread))) {
@@ -2127,14 +2191,14 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
             closesocket(static_cast<SOCKET>(socketHandleToClose));
             socketHandleToClose = kInvalidSocketHandle;
         }
-        (void)EnsureEngineEndpointPayloadBacking(this).entries.erase(key);
+        (void)EndpointTreeDetachPayloadByKey(this, key);
         return 1u;
     }
 
     if (CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* payload = FindEngineEndpointPayload(this, key)) {
         (void)payload->Start(/*startPriority=*/2);
     }
-    endpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
+    endpointCount84_ = EndpointCountField(this);
     return 0u;
 }
 
@@ -2190,7 +2254,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostO
 
     connection->SetState(LTTCPEngineConnectionState::kUdpMonitorActive);
     (void)worker->Start(/*startPriority=*/2);
-    contextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
+    contextCount90_ = ContextCountField(this);
     return 0u;
 }
 
@@ -2219,7 +2283,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UnmonitorPort(uint16_t portHostOr
     }
     StopAcceptThreadScaffold(acceptThread.get());
     acceptThread.reset();
-    endpointCount84_ = static_cast<uint32_t>(EnsureEngineEndpointPayloadBacking(this).entries.size());
+    endpointCount84_ = EndpointCountField(this);
     if (endpointTreeHead80_ && endpointCount84_ == 0u) {
         InitializeEndpointTreeHead24(endpointTreeHead80_);
     }
@@ -2403,7 +2467,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
         static_cast<unsigned>(connection->State()),
         fmt::ptr(connection->OwnerContext()));
-    contextCount90_ = static_cast<uint32_t>(EnsureEngineContextPayloadBacking(this).entries.size());
+    contextCount90_ = ContextCountField(this);
     return kResultSuccess;
 }
 
@@ -2658,10 +2722,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
         workerPayload.reset();
     }
 
-    CLTThreadPerClientTCPEngine_0x4b2768_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
-    contextCount90_ = contextBacking
-        ? static_cast<uint32_t>(contextBacking->entries.size())
-        : 0u;
+    contextCount90_ = ContextCountField(this);
     if (contextTreeHead8c_ && contextCount90_ == 0u) {
         InitializeContextTreeHead18(contextTreeHead8c_);
     }
