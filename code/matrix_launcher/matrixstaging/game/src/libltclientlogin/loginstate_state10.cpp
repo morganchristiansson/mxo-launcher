@@ -148,13 +148,7 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
         return 1u;
     }
 
-    // Success path (status < 1): allocate and populate new slot record
-    //
-    // Fidelity note on allocation model:
-    // Original at 0x4401ec-0x440228: PUSH 0x1c; CALL 0x403260 (TrackedMalloc);
-    // CALL 0x4398b0 (SlotRecord_Initialize); then stores the pointer at
-    // [ESI + count*4 + 4] (pointer table at +0x688). Source now mirrors that with
-    // heap-backed `Packet_AsAuthReply_0x4b5328*` ownership instead of inline objects.
+    // Success path (status < 1): allocate and populate new slot record.
     const uint8_t appendedSlotIndex = g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_;
     const uint32_t selectedWorldDescriptorIndex =
         g_CurrentLoginMediator->createCharacterData108.selectedWorldField24;
@@ -175,38 +169,19 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
         *g_CurrentLoginMediator->worldListPacketsD84_[selectedWorldDescriptorIndex];
 
     // anchor: launcher.exe:0x4401a0
-    // Exact success-side write order recovered from listing:
-    // 1. store initialized slot record at +0x688[currentCount]  (0x440228)
-    // 2. copy selected descriptor inline name into +0x818[currentCount]  (0x44022c-0x44024d)
-    //    via CopyInlineNameToString(0x43d430) + the `0x407dd0` basic-string assign-from-range helper
-    // 3. free temp inline-name copy string  (0x440252-0x440265)
-    // 4. set +0x644 = currentCount  (0x440268-0x44026a)
-    // 5. increment +0x00 (count)  (0x440270-0x440272)
-    // 6. SetCharacterName from createCharacterData  (0x440274-0x440283)
-    // 7. write character IDs / status / worldId  (0x440288-0x4402ab)
-    // 8. SetCurrentState(0xb)  (0x4402af-0x4402b7)
-    // 9. PostEvent(0x14)  (0x4402bc-0x4402c4)
-    //
     Packet_AsAuthReply_0x4b5328* const appendedSlotRecord = new Packet_AsAuthReply_0x4b5328();
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = appendedSlotRecord;
     g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[appendedSlotIndex] =
         selectedWorldDescriptor.inlineNamePlus03;
     // anchor: launcher.exe:0x440268-0x440272
-    // Static RE shows a direct write to owner +0xcc8 / selectionRouteState684_.currentSlotOrSelectionIndex644_
-    // followed by incrementing the slot count. Do not use the broader scaffold helper here because
-    // `0x4401a0` does not show the extra mirrored writes to owner +0xcc8 sidecars.
     g_CurrentLoginMediator->selectionRouteState684_.currentSlotOrSelectionIndex644_ = appendedSlotIndex;
     g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 
     // anchor: launcher.exe:0x440274-0x440283
-    // Original: PUSH &mediator->createCharacterData108; MOV ECX,pNewSlotRecord; CALL 0x43aa80.
-    // Static-RE ownership now points that helper at Packet_AsAuthReply_0x4b5328.
     appendedSlotRecord->SetCharacterName(
         g_CurrentLoginMediator->createCharacterData108.characterName00.data());
 
     // anchor: launcher.exe:0x440288-0x4402ab
-    // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
-    // [EDI+0x10]+0xb = 0 (status), [EDI+0x10]+0xc = worldId (word from descriptor)
     if (appendedSlotRecord->payloadAlias10 != nullptr) {
         uint8_t* const slotPayload = static_cast<uint8_t*>(appendedSlotRecord->payloadAlias10);
         *reinterpret_cast<uint32_t*>(slotPayload + 0x03u) = parsed.characterIdLow;
@@ -216,9 +191,6 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     }
 
     // anchor: launcher.exe:0x4402af-0x4402c4
-    // Original: SetCurrentState(g_Mediator, 0xb) then PostEvent(g_Mediator, 0x14).
-    // No helper-state null-check and no extra margin-routing sidecar writes here.
-    // The parse-object virtual destructor runs at 0x4402e7-0x4402f0 before return.
     (void)g_CurrentLoginMediator->SetCurrentState(0x0bu);
     g_CurrentLoginMediator->PostEvent(0x14u);
     spdlog::info(

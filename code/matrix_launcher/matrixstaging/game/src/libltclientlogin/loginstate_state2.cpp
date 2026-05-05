@@ -396,12 +396,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // - materialize owner `+0x688`
                 // - validate slot status inline and force invalid values to `7`
                 // - walk owner `+0xd84` and seed `+0x818` when worldId matches
-                //
-                // Source again keeps the same resulting owner state while now reusing the more
-                // faithful packet family split from `0x43f300`:
-                // - select `currentCharacterTempRecord80/currentCharacterHandle84`
-                // - allocate each owner slot entry as a `Packet_AsAuthReply_0x4b5328*`
-                // - then normalize status / seed route-host strings by matching world ids
                 {
                     g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
                     const size_t characterCount = std::min(
@@ -470,7 +464,6 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                             }
                         }
                         if (matchedWorldIndex >= 0) {
-                            // anchor: launcher.exe:0x43f74a
                             Packet_WorldList_0x4b533c* const matchedWorldPacket =
                                 g_CurrentLoginMediator->worldListPacketsD84_[static_cast<size_t>(
                                     matchedWorldIndex)];
