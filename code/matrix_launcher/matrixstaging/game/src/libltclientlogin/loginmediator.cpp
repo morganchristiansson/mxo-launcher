@@ -210,12 +210,7 @@ CLTLoginMediator::~CLTLoginMediator() {
     worldListPacketCountD80_ = 0;
     selectionRouteState684_.DestroySelectionRouteState();
     FreeLateEntryList1470StorageScaffold();
-    ResetLauncherConnectionsScaffold();
-    ClearObserverTree674();
-    EraseMarginBootstrapState(this);
-}
 
-void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     if (authConnection_) {
         authConnection_->SetOwnerContext(nullptr);
     }
@@ -225,7 +220,6 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
 
     SetCurrentState(0u);
     SetNetworkEngine(nullptr);
-    // inline UnregisterActiveStateSourceScaffold
     g_CurrentLoginMediator = nullptr;
 
     authConnection_ = nullptr;
@@ -233,7 +227,8 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     authPeerCloseQueuedScaffold_ = false;
     marginPeerCloseQueuedScaffold_ = false;
 
-    spdlog::info("CLTLoginMediator::ResetLauncherConnectionsScaffold completed");
+    ClearObserverTree674();
+    EraseMarginBootstrapState(this);
 }
 
 // anchor: launcher.exe:0x41b160 / owner vtable +0x08
@@ -352,8 +347,19 @@ void CLTLoginMediator::ClearEngine() {
     ClearLateEntryList1470Scaffold();
     // anchor: launcher.exe:0x41f55a..0x41f571
     selectionRouteState684_.ResetSelectionRouteState();
-    // anchor: launcher.exe:0x41f576..0x41f59c
-    ResetLauncherConnectionsScaffold();
+
+    // anchor: launcher.exe:0x41f576..0x41f59c - close current auth/margin connections and clear
+    // only the owner-side transport pointers/flags touched by ResetOwnedRuntimeState.
+    if (authConnection_ != nullptr) {
+        authConnection_->Close(1);
+    }
+    authConnection_ = nullptr;
+
+    if (marginConnection_ != nullptr) {
+        marginConnection_->Close(1);
+    }
+    marginConnection_ = nullptr;
+
     // anchor: launcher.exe:0x41f59f..0x41f5be
     authBootstrapChild680_.reset();
 
