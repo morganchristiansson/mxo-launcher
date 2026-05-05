@@ -153,9 +153,8 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // Fidelity note on allocation model:
     // Original at 0x4401ec-0x440228: PUSH 0x1c; CALL 0x403260 (TrackedMalloc);
     // CALL 0x4398b0 (SlotRecord_Initialize); then stores the pointer at
-    // [ESI + count*4 + 4] (pointer table at +0x688). Current source uses an
-    // inline std::array<Packet_AsAuthReply_0x4b5328, N> instead of a pointer table,
-    // so the TrackedMalloc+Init is approximated by value-initialization.
+    // [ESI + count*4 + 4] (pointer table at +0x688). Source now mirrors that with
+    // heap-backed `Packet_AsAuthReply_0x4b5328*` ownership instead of inline objects.
     const uint8_t appendedSlotIndex = g_CurrentLoginMediator->selectionRouteState684_.slotRecordCount00_;
     const uint32_t selectedWorldDescriptorIndex =
         g_CurrentLoginMediator->createCharacterData108.selectedWorldField24;
@@ -188,8 +187,8 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // 8. SetCurrentState(0xb)  (0x4402af-0x4402b7)
     // 9. PostEvent(0x14)  (0x4402bc-0x4402c4)
     //
-    // Note: original has no slotRecordValid04_ write — just the pointer store at 0x440228.
-    g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
+    Packet_AsAuthReply_0x4b5328* const appendedSlotRecord = new Packet_AsAuthReply_0x4b5328();
+    g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = appendedSlotRecord;
     g_CurrentLoginMediator->selectionRouteState684_.routeHostStrings194_[appendedSlotIndex] =
         selectedWorldDescriptor.inlineNamePlus03;
     // anchor: launcher.exe:0x440268-0x440272
@@ -202,16 +201,14 @@ uint32_t CLTLoginState_State10_0x4b512c::Slot6_HandleSecondaryMessage(
     // anchor: launcher.exe:0x440274-0x440283
     // Original: PUSH &mediator->createCharacterData108; MOV ECX,pNewSlotRecord; CALL 0x43aa80.
     // Static-RE ownership now points that helper at Packet_AsAuthReply_0x4b5328.
-    Packet_AsAuthReply_0x4b5328& appendedSlotRecord =
-        g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
-    appendedSlotRecord.SetCharacterName(
+    appendedSlotRecord->SetCharacterName(
         g_CurrentLoginMediator->createCharacterData108.characterName00.data());
 
     // anchor: launcher.exe:0x440288-0x4402ab
     // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
     // [EDI+0x10]+0xb = 0 (status), [EDI+0x10]+0xc = worldId (word from descriptor)
-    if (appendedSlotRecord.payloadAlias10 != nullptr) {
-        uint8_t* const slotPayload = static_cast<uint8_t*>(appendedSlotRecord.payloadAlias10);
+    if (appendedSlotRecord->payloadAlias10 != nullptr) {
+        uint8_t* const slotPayload = static_cast<uint8_t*>(appendedSlotRecord->payloadAlias10);
         *reinterpret_cast<uint32_t*>(slotPayload + 0x03u) = parsed.characterIdLow;
         *reinterpret_cast<uint32_t*>(slotPayload + 0x07u) = parsed.characterIdHigh;
         slotPayload[0x0bu] = 0u;

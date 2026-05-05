@@ -146,11 +146,10 @@ CLTLoginMediatorSelectionRouteState_0x41dba0::CLTLoginMediatorSelectionRouteStat
     for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
         routeHostStrings194_[i].clear();
     }
-    for (size_t i = 0; i < slotRecordTable04_.size(); ++i) {
-        slotRecordTable04_[i] = {};
-        slotRecordValid04_[i] = false;
-    }
     currentSlotOrSelectionIndex644_ = 0xffu;
+    for (size_t i = 0; i < slotRecordTable04_.size(); ++i) {
+        slotRecordTable04_[i] = nullptr;
+    }
     persistedSelectionContext64c_ = {};
 }
 
@@ -158,8 +157,8 @@ CLTLoginMediatorSelectionRouteState_0x41dba0::CLTLoginMediatorSelectionRouteStat
 void CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState() {
     const size_t activeCount = std::min(static_cast<size_t>(slotRecordCount00_), slotRecordTable04_.size());
     for (size_t i = 0; i < activeCount; ++i) {
-        slotRecordTable04_[i] = {};
-        slotRecordValid04_[i] = false;
+        delete slotRecordTable04_[i];
+        slotRecordTable04_[i] = nullptr;
         routeHostStrings194_[i].clear();
     }
     slotRecordCount00_ = 0;
@@ -171,8 +170,7 @@ void CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState() 
     ResetSelectionRouteState();
     for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
         StringReleaseStorage(routeHostStrings194_[i]);
-        slotRecordTable04_[i] = {};
-        slotRecordValid04_[i] = false;
+        slotRecordTable04_[i] = nullptr;
     }
 }
 
@@ -606,7 +604,7 @@ Packet_AsAuthReply_0x4b5328* CLTLoginMediator::GetAuthReplyPacketByIndex40(
     uint32_t selectionIndex) {
     const uint8_t slotIndex = static_cast<uint8_t>(selectionIndex & 0xffu);
     if (slotIndex != 0xffu) {
-        return &selectionRouteState684_.slotRecordTable04_[slotIndex];
+        return selectionRouteState684_.slotRecordTable04_[slotIndex];
     }
     return nullptr;
 }
@@ -616,7 +614,7 @@ Packet_AsAuthReply_0x4b5328* CLTLoginMediator::GetAuthReplyPacketByIndex40(
 Packet_AsAuthReply_0x4b5328* CLTLoginMediator::GetCurrentAuthReplyPacket44() {
     const uint8_t currentSlot = selectionRouteState684_.currentSlotOrSelectionIndex644_;
     if (currentSlot != 0xffu) {
-        return &selectionRouteState684_.slotRecordTable04_[currentSlot];
+        return selectionRouteState684_.slotRecordTable04_[currentSlot];
     }
     return nullptr;
 }
@@ -1258,22 +1256,23 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 
     const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
     const uint8_t oldCount = selectionRouteState684_.slotRecordCount00_;
-    const char* removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].debugString14;
+    Packet_AsAuthReply_0x4b5328* const removedRecord = selectionRouteState684_.slotRecordTable04_[slotIndex];
+    const std::string removedName =
+        (removedRecord != nullptr && removedRecord->debugString14 != nullptr)
+            ? removedRecord->debugString14
+            : std::string();
 
+    delete removedRecord;
     selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(oldCount - 1u);
-    selectionRouteState684_.slotRecordValid04_[slotIndex] = false;
-    selectionRouteState684_.slotRecordTable04_[slotIndex] = {};
 
-    for (size_t i = slotIndex; i + 1u < static_cast<size_t>(selectionRouteState684_.slotRecordCount00_); ++i) {
+    for (size_t i = slotIndex; i < static_cast<size_t>(selectionRouteState684_.slotRecordCount00_); ++i) {
         selectionRouteState684_.slotRecordTable04_[i] = selectionRouteState684_.slotRecordTable04_[i + 1u];
-        selectionRouteState684_.slotRecordValid04_[i] = selectionRouteState684_.slotRecordValid04_[i + 1u];
         selectionRouteState684_.routeHostStrings194_[i] =
             selectionRouteState684_.routeHostStrings194_[i + 1u];
     }
 
     const size_t tailIndex = static_cast<size_t>(selectionRouteState684_.slotRecordCount00_);
-    selectionRouteState684_.slotRecordTable04_[tailIndex] = {};
-    selectionRouteState684_.slotRecordValid04_[tailIndex] = false;
+    selectionRouteState684_.slotRecordTable04_[tailIndex] = nullptr;
     selectionRouteState684_.routeHostStrings194_[tailIndex].clear();
 
     PersistCharactersIniFromRecoveredAuthStateScaffold();
@@ -1283,7 +1282,7 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
         static_cast<unsigned>(selectedSlotRecordIndex),
         static_cast<unsigned>(oldCount),
         static_cast<unsigned>(selectionRouteState684_.slotRecordCount00_),
-        (removedName && removedName[0] != '\0') ? removedName : "<empty>",
+        !removedName.empty() ? removedName.c_str() : "<empty>",
         currentState_ ? currentState_->DebugName() : "<null>");
     return 0u;
 }
@@ -2221,13 +2220,13 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
     for (size_t i = 0; i < selectionRouteState684_.slotRecordCount00_ &&
                        i < selectionRouteState684_.slotRecordTable04_.size();
          ++i) {
-        if (!selectionRouteState684_.slotRecordValid04_[i]) {
+        const Packet_AsAuthReply_0x4b5328* const slotRecord = selectionRouteState684_.slotRecordTable04_[i];
+        if (slotRecord == nullptr) {
             continue;
         }
 
-        const Packet_AsAuthReply_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const std::string& route = selectionRouteState684_.routeHostStrings194_[i];
-        const char* characterName = slotRecord.debugString14 ? slotRecord.debugString14 : "";
+        const char* characterName = slotRecord->debugString14 ? slotRecord->debugString14 : "";
         const char* routeText = route.empty() ? "" : route.c_str();
         std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);
         ++persistedCount;

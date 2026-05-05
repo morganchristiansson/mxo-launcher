@@ -162,7 +162,7 @@ const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotInde
     if (slotIndex >= 100u) {
         return nullptr;
     }
-    const Packet_AsAuthReply_0x4b5328* record = &selectionRouteState684_.slotRecordTable04_[slotIndex];
+    const Packet_AsAuthReply_0x4b5328* const record = selectionRouteState684_.slotRecordTable04_[slotIndex];
     if (!record) {
         return nullptr;
     }

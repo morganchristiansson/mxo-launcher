@@ -400,7 +400,7 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                 // Source again keeps the same resulting owner state while now reusing the more
                 // faithful packet family split from `0x43f300`:
                 // - select `currentCharacterTempRecord80/currentCharacterHandle84`
-                // - initialize each owner slot entry as a `Packet_AsAuthReply_0x4b5328`
+                // - allocate each owner slot entry as a `Packet_AsAuthReply_0x4b5328*`
                 // - then normalize status / seed route-host strings by matching world ids
                 {
                     g_CurrentLoginMediator->selectionRouteState684_.ResetSelectionRouteState();
@@ -438,18 +438,20 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                                 static_cast<unsigned>(rawStatus));
                         }
 
-                        auto& slotRecord = g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
-                        slotRecord = {};
+                        Packet_AsAuthReply_0x4b5328*& slotRecord =
+                            g_CurrentLoginMediator->selectionRouteState684_.slotRecordTable04_[i];
+                        slotRecord = new Packet_AsAuthReply_0x4b5328();
                         (void)handleLength;
                         if (!AuthBootstrap680InitializeSlotRecordFromSelectedTempRecord(
-                                &slotRecord,
+                                slotRecord,
                                 const_cast<Packet_AsGetPublicKeyRequest_0x4b6c74*>(parseObject))) {
+                            delete slotRecord;
+                            slotRecord = nullptr;
                             break;
                         }
-                        if (slotRecord.payloadAlias10 != nullptr) {
-                            static_cast<uint8_t*>(slotRecord.payloadAlias10)[0x0bu] = normalizedStatus;
+                        if (slotRecord->payloadAlias10 != nullptr) {
+                            static_cast<uint8_t*>(slotRecord->payloadAlias10)[0x0bu] = normalizedStatus;
                         }
-                        g_CurrentLoginMediator->selectionRouteState684_.slotRecordValid04_[i] = true;
 
                         int matchedWorldIndex = -1;
                         for (size_t worldIndex = 0;
@@ -460,8 +462,8 @@ uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* w
                                 g_CurrentLoginMediator->worldListPacketsD84_[worldIndex];
                             if (worldPacket != nullptr &&
                                 worldPacket->worldId01 ==
-                                    (slotRecord.payloadAlias10 != nullptr
-                                        ? *reinterpret_cast<const uint16_t*>(static_cast<const uint8_t*>(slotRecord.payloadAlias10) + 0x0cu)
+                                    (slotRecord->payloadAlias10 != nullptr
+                                        ? *reinterpret_cast<const uint16_t*>(static_cast<const uint8_t*>(slotRecord->payloadAlias10) + 0x0cu)
                                         : 0u)) {
                                 matchedWorldIndex = static_cast<int>(worldIndex);
                                 break;

@@ -220,14 +220,13 @@ public:
 
     // Source-owned mirrors of the original embedded helper layout:
     // - `+0x00`  = active slot-record count
-    // - `+0x04`  = slot-record pointer table (mirrored here as value objects plus validity bits)
+    // - `+0x04`  = fixed 100-entry slot-record pointer table
     // - `+0x194` = route-host `std::string` array, matching the recovered old-MSVC2003
     //              `std::basic_string<char>` family at `0x403f90`
     // - `+0x644` = current slot / selection byte
     // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
     uint8_t slotRecordCount00_ = 0;
-    std::array<Packet_AsAuthReply_0x4b5328, kCLTLoginMediatorRecoveredWorldSlotCapacity> slotRecordTable04_{};
-    std::array<bool, kCLTLoginMediatorRecoveredWorldSlotCapacity> slotRecordValid04_{};
+    std::array<Packet_AsAuthReply_0x4b5328*, kCLTLoginMediatorRecoveredWorldSlotCapacity> slotRecordTable04_{};
     std::array<std::string, kCLTLoginMediatorRecoveredWorldSlotCapacity> routeHostStrings194_{};
     uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
     PersistedSelectionContext64c persistedSelectionContext64c_{};
