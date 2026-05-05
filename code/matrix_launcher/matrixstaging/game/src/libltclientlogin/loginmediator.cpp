@@ -348,17 +348,26 @@ void CLTLoginMediator::ClearEngine() {
         return;
     }
 
+    // anchor: launcher.exe:0x41f52b..0x41f560 - clear late-entry active range but keep the backing owner vector family alive
+    ClearLateEntryList1470Scaffold();
+    // anchor: launcher.exe:0x41f55a..0x41f571
     selectionRouteState684_.ResetSelectionRouteState();
-    FreeLateEntryList1470StorageScaffold();
+    // anchor: launcher.exe:0x41f576..0x41f59c
     ResetLauncherConnectionsScaffold();
-    launchPadClient65c_ = nullptr;
+    // anchor: launcher.exe:0x41f59f..0x41f5be
     authBootstrapChild680_.reset();
 
-    // anchor: launcher.exe:0x41f5d2 / 0x41f5df - clear ready byte and global current mediator
+    // anchor: launcher.exe:0x41f5be..0x41f5d8 - delete session callback helper if present
+    if (launchPadClient65c_ != nullptr) {
+        delete launchPadClient65c_;
+        launchPadClient65c_ = nullptr;
+    }
+
+    // anchor: launcher.exe:0x41f5cc / 0x41f5d8 - clear ready byte and global current mediator
     ownerReadyFlag04_ = 0;
     g_CurrentLoginMediator = nullptr;
 
-    spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold and cleared ownerReadyFlag04_");
+    spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold (cleared late-entry active range, connections, helper65c, ownerReadyFlag04_)");
 }
 
 // anchor: launcher.exe:0x41f030 vtable offset +0x10
