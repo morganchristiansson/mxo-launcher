@@ -99,25 +99,10 @@ struct CLTThreadPerClientTCPEngine_0x4b2768_SmallWorkItemPoolState {
     bool initialized = false;
 };
 
-// Source-owned aggregate over the original connection-status work-item pool globals.
-// This is not one byte-faithful launcher.exe global by itself; it groups the recovered pieces:
-// - anchor: launcher.exe:0x004cb410 = g_ConnectionStatusWorkItemPoolLockHelper
-// - anchor: launcher.exe:0x004f76c0 = g_ConnectionStatusWorkItemPoolObjectCountPerBackingBlock
-// - anchor: launcher.exe:0x004f76c4 = g_ConnectionStatusWorkItemPoolBackingBlockCount
-// - anchor: launcher.exe:0x004f76c8 = g_ConnectionStatusWorkItemPoolBackingBlockBytes
-// - anchor: launcher.exe:0x004f76cc = g_ConnectionStatusWorkItemPoolBackingBlockListHead
-// - anchor: launcher.exe:0x004f76d0 = g_ConnectionStatusWorkItemPoolFreeListHead
-// - anchor: launcher.exe:0x004f76d4 = g_ConnectionStatusWorkItemPoolExtraObjectBytes
+// launcher.exe pool globals grouped into source-side state objects:
+// - connection-status pool anchors: 0x004cb410 / 0x004f76c0..0x004f76d4
+// - close-work-item pool anchors: 0x004cb42c / 0x004f76d8..0x004f76ec
 static CLTThreadPerClientTCPEngine_0x4b2768_SmallWorkItemPoolState g_ConnectionStatusWorkItemPoolState;
-// Source-owned aggregate over the original close-work-item pool globals.
-// This is not one byte-faithful launcher.exe global by itself; it groups the recovered pieces:
-// - anchor: launcher.exe:0x004cb42c = g_CloseWorkItemPoolLockHelper
-// - anchor: launcher.exe:0x004f76d8 = g_CloseWorkItemPoolObjectCountPerBackingBlock
-// - anchor: launcher.exe:0x004f76dc = g_CloseWorkItemPoolBackingBlockCount
-// - anchor: launcher.exe:0x004f76e0 = g_CloseWorkItemPoolBackingBlockBytes
-// - anchor: launcher.exe:0x004f76e4 = g_CloseWorkItemPoolBackingBlockListHead
-// - anchor: launcher.exe:0x004f76e8 = g_CloseWorkItemPoolFreeListHead
-// - anchor: launcher.exe:0x004f76ec = g_CloseWorkItemPoolExtraObjectBytes
 static CLTThreadPerClientTCPEngine_0x4b2768_SmallWorkItemPoolState g_CloseWorkItemPoolState;
 
 static void SmallWorkItemPool_FreeStorageScaffold(
@@ -126,20 +111,10 @@ static void SmallWorkItemPool_FreeStorageScaffold(
 static void CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemPool_Clear();
 static void CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemPool_Clear();
 
-
-// GHIDRA layout audit anchors:
-// - derived ctor `launcher.exe:0x431c30`
-// - base ctor `launcher.exe:0x4366f0`
-// - derived dtor `launcher.exe:0x431310`
-// - worker insert helper `launcher.exe:0x431ff0`
-// - endpoint insert/search/remove family `0x4318f0 / 0x42fdb0 / 0x4154d0`
-// - context insert/search/remove family `0x4196b0 / 0x42fe10 / 0x4154d0`
-// Current best read:
-// - the real `0xb4` engine object is already fully accounted for by the recovered in-object fields
-//   at `+0x04/+0x08/+0x0c/+0x34/+0x5c/+0x60/+0x7c/+0x80/+0x84/+0x8c/+0x90/+0x98`
-// - so none of the source-owned maps below should be mistaken for hidden original class fields
-// - recovered runtime payload families are tracked separately from source-only launcher ABI-shell
-//   baggage using node shapes that match the launcher tree families rather than source vectors
+// anchor set:
+// - ctor/dtor: launcher.exe:0x431c30 / 0x4366f0 / 0x431310
+// - endpoint tree: 0x4318f0 / 0x431240 / 0x42fdb0 / 0x4154d0
+// - context tree: 0x4196b0 / 0x420ba0 / 0x42fe10 / 0x4154d0
 
 static_assert(sizeof(mxo::sgi_tree::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
 using CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeNode =
@@ -177,11 +152,6 @@ static CLTBaseThreadPerClientTCPEngine_QueuePair_0x436610* ActiveQueuePairStorag
         return nullptr;
     }
 
-    // Fidelity correction from the queue subobject pass:
-    // - client.dll now reads/writes the inline queue pair directly in the live engine object
-    // - the launcher ABI layer only bridges call/dispatch differences around that storage
-    // - do not reintroduce shell-owned queue mirroring here unless a future compiler/ABI port
-    //   proves that raw cross-module queue-subobject access can no longer stay native
     return &static_cast<CLTBaseThreadPerClientTCPEngine_0x4b3e74*>(self)->queuePair0c_;
 }
 
@@ -243,24 +213,10 @@ static const Node* TreeRootNode(const Head* head) {
     return (header && header->_M_parent) ? static_cast<const Node*>(header->_M_parent) : nullptr;
 }
 
-// Tree users below now route through the narrow `compat/sgi_tree_compat.h` shim.
-// Provenance/reference lineage for the recovered helper family:
-// - `/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++/bits/stl_tree.h`
-// - the local `13-posix` copy is identical on this machine
-// Launcher.exe remains the source of truth for object layout, call shape, and wrapper behavior.
-//
-// Retained helpers below are wrapper-level adapters, not duplicate `_Rb_tree` mechanics:
-// - `TreeHeaderBase` / `TreeRootNode` adapt the recovered launcher head layout to
-//   `_Rb_tree_node_base`
-// - endpoint/context compare and find helpers match the recovered wrapper families above the shared
-//   `_Rb_tree` core
-// - insert/erase helpers still own duplicate handling and source-owned payload/backing lifetime
-//
+// Narrow wrapper layer over the shared launcher RB-tree helper family.
+// `compat/sgi_tree_compat.h` provides only the primitive node/rebalance operations.
 // anchor family: launcher.exe:0x44b040 used by 0x42fdb0 / 0x4318f0 / 0x431240
-// Current best static read:
-// - endpoint tree ordering compares only `portNetworkOrder`, then `ipv4NetworkOrder`
-// - `family/reserved0/reserved1` remain part of the copied key payload, but are not currently
-//   evidenced as tree-ordering fields in launcher.exe
+// Ordering currently evidenced on `portNetworkOrder`, then `ipv4NetworkOrder`.
 static int CompareEndpointTreeKeys(
     const LTTCPEndpointKey_0x44b070& lhs,
     const LTTCPEndpointKey_0x44b070& rhs) {
@@ -335,8 +291,6 @@ static CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindEngineEndpointPayl
 }
 
 // anchor family: launcher.exe:0x4318f0 / 0x431240
-// Current source now mirrors the original SGI tree wrapper shape directly instead of staging
-// through `std::map` payload sidecars.
 static bool EndpointTreeInsertPlaceholder(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
