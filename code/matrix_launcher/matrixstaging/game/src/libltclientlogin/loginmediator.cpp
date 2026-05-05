@@ -141,7 +141,7 @@ const char* MaskedSensitiveValue(const char* value) {
 }  // namespace
 
 // anchor: launcher.exe:0x41dba0 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0 ctor
-CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::CLTLoginMediatorSelectionRouteState_0x41dba0() {
+CLTLoginMediatorSelectionRouteState_0x41dba0::CLTLoginMediatorSelectionRouteState_0x41dba0() {
     slotRecordCount00_ = 0;
     for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
         routeHostStrings194_[i].clear();
@@ -155,7 +155,7 @@ CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::CLTLoginMediator
 }
 
 // anchor: launcher.exe:0x41d270 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState
-void CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState() {
+void CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState() {
     const size_t activeCount = std::min(static_cast<size_t>(slotRecordCount00_), slotRecordTable04_.size());
     for (size_t i = 0; i < activeCount; ++i) {
         slotRecordTable04_[i] = {};
@@ -167,7 +167,7 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelect
 }
 
 // anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
-void CLTLoginMediator::CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState() {
+void CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState() {
     ResetSelectionRouteState();
     for (size_t i = 0; i < routeHostStrings194_.size(); ++i) {
         StringReleaseStorage(routeHostStrings194_[i]);

@@ -185,6 +185,54 @@ public:
 static_assert(sizeof(CLTLoginMediatorCharacterPersistenceData_0x41d900) == 0x550);
 #pragma pack(pop)
 
+inline constexpr size_t kCLTLoginMediatorRecoveredWorldSlotCapacity = 100;
+
+// Source implementation of the original shared owner-side selection/slot/route state island.
+// Keep this as a standalone class so the source spelling matches the current Ghidra class name
+// `CLTLoginMediatorSelectionRouteState_0x41dba0` instead of introducing an extra
+// `CLTLoginMediator::` prefix that does not exist in the binary analysis.
+class CLTLoginMediatorSelectionRouteState_0x41dba0 {
+public:
+    struct PersistedSelectionContext64c {
+        // owner `+0x64c .. +0x6fb` inside `CLTLoginMediatorSelectionRouteState_0x41dba0`
+        // which corresponds to mediator owner `+0xcd0 .. +0xd7f`
+        std::array<uint32_t, 4> blockCd0{};
+        std::array<uint32_t, 4> blockCe0{};
+        std::array<uint32_t, 4> blockCf0{};
+        std::array<uint32_t, 4> blockD00{};
+        std::array<uint32_t, 4> blockD10{};
+        std::array<uint32_t, 4> blockD20{};
+        std::array<uint32_t, 4> blockD30{};
+        std::array<uint32_t, 4> blockD40{};
+        std::array<uint32_t, 4> blockD50{};
+        std::array<uint32_t, 4> blockD60{};
+        std::array<uint32_t, 4> blockD70{};
+    };
+
+    // anchor: launcher.exe:0x41dba0 / embedded owner subobject ctor
+    CLTLoginMediatorSelectionRouteState_0x41dba0();
+
+    // anchor: launcher.exe:0x41d270 / embedded owner subobject reset
+    void ResetSelectionRouteState();
+
+    // anchor: launcher.exe:0x41dd00 / embedded owner subobject destroy/final release
+    void DestroySelectionRouteState();
+
+    // Source-owned mirrors of the original embedded helper layout:
+    // - `+0x00`  = active slot-record count
+    // - `+0x04`  = slot-record pointer table (mirrored here as value objects plus validity bits)
+    // - `+0x194` = route-host `std::string` array, matching the recovered old-MSVC2003
+    //              `std::basic_string<char>` family at `0x403f90`
+    // - `+0x644` = current slot / selection byte
+    // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
+    uint8_t slotRecordCount00_ = 0;
+    std::array<Packet_AsAuthReply_0x4b5328, kCLTLoginMediatorRecoveredWorldSlotCapacity> slotRecordTable04_{};
+    std::array<bool, kCLTLoginMediatorRecoveredWorldSlotCapacity> slotRecordValid04_{};
+    std::array<std::string, kCLTLoginMediatorRecoveredWorldSlotCapacity> routeHostStrings194_{};
+    uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
+    PersistedSelectionContext64c persistedSelectionContext64c_{};
+};
+
 class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     // Source-ownership split note:
     // - the phase-2 auth/bootstrap child rooted at owner `+0x680` now has its own focused source
@@ -206,7 +254,8 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     friend class mxo::liblttcp::CMarginConnection_0x4aff38;
 
 public:
-    static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;
+    static constexpr uint32_t kRecoveredWorldSlotCapacity =
+        static_cast<uint32_t>(kCLTLoginMediatorRecoveredWorldSlotCapacity);
 
     // String-backed config anchors recovered from launcher/client registration code.
     static constexpr const char* kConfigQsAuthServerDnsName = "qsAuthServerDNSName";
@@ -322,48 +371,6 @@ public:
     // Fidelity note: the old source-only `PostAuthMarginLoadingState` wrapper has been retired.
     // Static-RE now shows this region is just ordinary `CLTLoginMediator` storage, with the
     // canonical state8 persistence object living directly at owner `+0xf1c`.
-
-    class CLTLoginMediatorSelectionRouteState_0x41dba0 {
-    public:
-        struct PersistedSelectionContext64c {
-            // owner `+0x64c .. +0x6fb` inside `CLTLoginMediatorSelectionRouteState_0x41dba0`
-            // which corresponds to mediator owner `+0xcd0 .. +0xd7f`
-            std::array<uint32_t, 4> blockCd0{};
-            std::array<uint32_t, 4> blockCe0{};
-            std::array<uint32_t, 4> blockCf0{};
-            std::array<uint32_t, 4> blockD00{};
-            std::array<uint32_t, 4> blockD10{};
-            std::array<uint32_t, 4> blockD20{};
-            std::array<uint32_t, 4> blockD30{};
-            std::array<uint32_t, 4> blockD40{};
-            std::array<uint32_t, 4> blockD50{};
-            std::array<uint32_t, 4> blockD60{};
-            std::array<uint32_t, 4> blockD70{};
-        };
-
-        // anchor: launcher.exe:0x41dba0 / embedded owner subobject ctor
-        CLTLoginMediatorSelectionRouteState_0x41dba0();
-
-        // anchor: launcher.exe:0x41d270 / embedded owner subobject reset
-        void ResetSelectionRouteState();
-
-        // anchor: launcher.exe:0x41dd00 / embedded owner subobject destroy/final release
-        void DestroySelectionRouteState();
-
-        // Source-owned mirrors of the original embedded helper layout:
-        // - `+0x00`  = active slot-record count
-        // - `+0x04`  = slot-record pointer table (mirrored here as value objects plus validity bits)
-        // - `+0x194` = route-host `std::string` array, matching the recovered old-MSVC2003
-        //              `std::basic_string<char>` family at `0x403f90`
-        // - `+0x644` = current slot / selection byte
-        // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
-        uint8_t slotRecordCount00_ = 0;
-        std::array<Packet_AsAuthReply_0x4b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
-        std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
-        std::array<std::string, kRecoveredWorldSlotCapacity> routeHostStrings194_{};
-        uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
-        PersistedSelectionContext64c persistedSelectionContext64c_{};
-    };
 
     CLTLoginMediator();
     ~CLTLoginMediator();
@@ -842,7 +849,7 @@ public:
     // Source ownership note:
     // - original keeps this as one embedded helper spanning count + `+0x688` slot table + `+0x818`
     //   route strings + current-slot byte `+0xcc8` + snapshot body `+0xcd0..+0xd7f`
-    // - replacement now models that ownership island as the nested
+    // - replacement now models that ownership island as the standalone
     //   `CLTLoginMediatorSelectionRouteState_0x41dba0` class and keeps the anchored method boundaries there
 
     // =============================================================================
