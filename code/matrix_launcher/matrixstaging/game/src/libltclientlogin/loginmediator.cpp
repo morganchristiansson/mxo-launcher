@@ -376,17 +376,14 @@ void CLTLoginMediator::ClearEngine() {
     spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold (cleared late-entry active range, connections, helper65c, ownerReadyFlag04_)");
 }
 
-// anchor: launcher.exe:0x41f030 vtable offset +0x10
+// anchor: launcher.exe:0x41f030 / vtable +0x10
 uint32_t CLTLoginMediator::IsReady() {
     const uint32_t ready = ownerReadyFlag04_ != 0 ? 1u : 0u;
     spdlog::info("CLTLoginMediator::IsReady() -> {}", ready);
     return ready;
 }
 
-// +0x1c
-// anchor: launcher.exe:0x41f060
-// anchor: launcher.exe:0x409a73..0x409b5f explicit nopatch path
-// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x1c
+// anchor: launcher.exe:0x41f060 / vtable +0x1c
 void CLTLoginMediator::SetValue1(void* value) {
     nopatchLauncherVersionValue08_ = value ? *static_cast<const uint32_t*>(value) : 0u;
     spdlog::debug(
@@ -395,10 +392,7 @@ void CLTLoginMediator::SetValue1(void* value) {
         static_cast<unsigned>(nopatchLauncherVersionValue08_));
 }
 
-// +0x24
-// anchor: launcher.exe:0x41f080
-// anchor: launcher.exe:0x409a98..0x409c2d explicit nopatch path
-// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x24
+// anchor: launcher.exe:0x41f080 / vtable +0x24
 void CLTLoginMediator::SetValue2(void* value) {
     nopatchClientVersionValue0c_ = value ? *static_cast<const uint32_t*>(value) : 0u;
     spdlog::debug(
@@ -412,12 +406,6 @@ static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
     return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
 }
 
-// Source-owned helper for tightening owner-backed selection/world readers toward launcher.exe
-// state-gated table access patterns (`stateCode >= 3`).
-static uint32_t CurrentHelperStateCodeOrZero(const mxo::ltlogin::CLTLoginMediator* mediator) {
-    const mxo::ltlogin::CLTLoginState* state = mediator ? mediator->currentState_ : nullptr;
-    return state ? state->DispatchPhaseCode() : 0u;
-}
 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
 // vtable: ILTLoginMediator_0x4af2b8.Default slot +0x2c
@@ -1196,10 +1184,11 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
             arg6VariantWorldNameQueryCountE0_);
     }
 
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const bool stateAllowsRead = stateCode >= 3u;
+    const mxo::ltlogin::CLTLoginState* const currentState = currentState_;
+    const uint32_t stateCode = currentState ? currentState->GetStateId() : 0u;
+    const bool stateAllowsRead = stateCode > 2u;
     const bool indexInRange = variantIndex < 100u;
-    const char* worldName = (stateAllowsRead && indexInRange)
+    const char* worldName = indexInRange
         ? LookupRouteHostPrefixBySlot(static_cast<uint8_t>(variantIndex))
         : nullptr;
 

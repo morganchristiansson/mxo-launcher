@@ -813,9 +813,7 @@ public:
     LaunchPadClient_0x4b0e48* GetLaunchPadClient65c() const override;
     // anchor: launcher.exe:0x4202c0 / owner vtable +0x13c
     void HelperSlot13c_InvokeSessionHelperVtable4() override;
-    // anchor: launcher.exe:0x41b260
-    // Source-owned helper over the recovered route-host string table; do not treat this as the
-    // current `ILTLoginMediator_0x4af2b8` vtable slot `+0xe0` name.
+    // anchor: launcher.exe:0x41b260 / owner vtable +0xe0
     const char* LookupRouteHostPrefixBySlot(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2a0 / owner vtable +0xe4? / current slot-record payload reader
     uint8_t GetSlotRecordStatusByIndex(uint8_t slotIndex) const;
