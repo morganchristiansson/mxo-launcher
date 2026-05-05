@@ -492,9 +492,6 @@ static std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> Contex
     return payload;
 }
 
-// Source-owned endpoint-tree erase adapter.
-// Current source models the recovered outer layer as a plain endpoint-keyed map, so erase is
-// handled by key-removal in `EndpointTreeDetachPayloadByKey` / direct `map::erase` cleanup.
 static bool EndpointTreeEraseNode(
     CLTThreadPerClientTCPEngine_0x4b2768* self,
     CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head,
